@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|show] [flags]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|show|session] [flags]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -68,6 +69,31 @@ func main() {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		runScan(ctx, cfg, dryRun)
+	case "session":
+		cfg, err := sightjack.LoadConfig(configPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+			os.Exit(1)
+		}
+		if lang != "" {
+			cfg.Lang = lang
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		baseDir, err := os.Getwd()
+		if err != nil {
+			sightjack.LogError("Failed to get working directory: %v", err)
+			os.Exit(1)
+		}
+		sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
+		var sessionInput io.Reader
+		if !dryRun {
+			sessionInput = os.Stdin
+		}
+		if err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, dryRun, sessionInput); err != nil {
+			sightjack.LogError("Session failed: %v", err)
+			os.Exit(1)
+		}
 	case "show":
 		runShow()
 	}
@@ -77,35 +103,65 @@ func main() {
 // Returns an error if a non-flag positional argument is found that isn't a known command.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "show": true}
+	knownCmds := map[string]bool{"scan": true, "show": true, "session": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
 		"-lang": true, "--lang": true, "-l": true,
 	}
+	// Boolean flags that may optionally consume "true"/"false" as next token.
+	boolFlags := map[string]bool{
+		"-verbose": true, "--verbose": true, "-v": true,
+		"-dry-run": true, "--dry-run": true,
+		"-version": true, "--version": true,
+	}
 
+	var subcmd string
+	var filtered []string
 	skipNext := false
-	for i, arg := range args {
+	lastBoolFlag := "" // non-empty when the previous token was a boolean flag
+
+	for _, arg := range args {
 		if skipNext {
 			skipNext = false
+			filtered = append(filtered, arg)
 			continue
 		}
+		// After a boolean flag, merge "true"/"false" into --flag=value form.
+		if lastBoolFlag != "" {
+			flag := lastBoolFlag
+			lastBoolFlag = ""
+			lower := strings.ToLower(arg)
+			if lower == "true" || lower == "false" {
+				filtered[len(filtered)-1] = flag + "=" + lower
+				continue
+			}
+		}
 		if strings.HasPrefix(arg, "-") {
-			// Flag with embedded value (--flag=val) is self-contained.
+			filtered = append(filtered, arg)
 			if strings.Contains(arg, "=") {
 				continue
 			}
 			if valuedFlags[arg] {
 				skipNext = true
+			} else if boolFlags[arg] {
+				lastBoolFlag = arg
 			}
 			continue
 		}
 		if knownCmds[arg] {
-			return arg, append(args[:i], args[i+1:]...), nil
+			if subcmd != "" {
+				return "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|show|session] [flags]", arg)
+			}
+			subcmd = arg
+			continue
 		}
-		return "", nil, fmt.Errorf("unknown command: %s\nUsage: sightjack [scan|show]", arg)
+		return "", nil, fmt.Errorf("unknown command: %s\nUsage: sightjack [scan|show|session]", arg)
 	}
-	return "scan", args, nil
+	if subcmd == "" {
+		subcmd = "scan"
+	}
+	return subcmd, filtered, nil
 }
 
 func runScan(ctx context.Context, cfg *sightjack.Config, dryRun bool) {

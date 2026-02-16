@@ -202,3 +202,55 @@ func TestRenderNavigator_LongClusterName(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderNavigatorWithWaves(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25},
+			{Name: "API", Completeness: 0.30},
+		},
+		TotalIssues:  10,
+		Completeness: 0.275,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "locked"},
+		{ID: "api-w1", ClusterName: "API", Title: "Split", Status: "available"},
+	}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves)
+
+	// then
+	if !strings.Contains(nav, "[ ]") {
+		t.Error("expected [ ] for available wave")
+	}
+	if !strings.Contains(nav, "[x]") {
+		t.Error("expected [x] for locked wave")
+	}
+	if !strings.Contains(nav, "Deps") {
+		t.Error("expected wave title 'Deps' in output")
+	}
+}
+
+func TestRenderNavigatorWithWaves_CompletedWave(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.40}},
+		TotalIssues:  4,
+		Completeness: 0.40,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
+	}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves)
+
+	// then
+	if !strings.Contains(nav, "[=]") {
+		t.Error("expected [=] for completed wave")
+	}
+}

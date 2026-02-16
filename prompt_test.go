@@ -51,6 +51,106 @@ func TestRenderDeepScanPrompt(t *testing.T) {
 	}
 }
 
+func TestRenderWaveGeneratePrompt(t *testing.T) {
+	// given
+	data := WaveGeneratePromptData{
+		ClusterName:  "Auth",
+		Completeness: "25",
+		Issues:       `[{"id":"ENG-101","title":"Login","completeness":0.3,"gaps":["No DoD"]}]`,
+		Observations: "Cross-cluster dependency detected",
+		OutputPath:   "/tmp/wave_auth.json",
+	}
+
+	// when
+	result, err := RenderWaveGeneratePrompt("ja", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Auth") {
+		t.Error("expected cluster name in output")
+	}
+	if !strings.Contains(result, "/tmp/wave_auth.json") {
+		t.Error("expected output path in output")
+	}
+}
+
+func TestRenderWaveGeneratePrompt_English(t *testing.T) {
+	// given
+	data := WaveGeneratePromptData{
+		ClusterName:  "Auth",
+		Completeness: "25",
+		Issues:       `[{"id":"ENG-101","title":"Login"}]`,
+		Observations: "Dependency detected",
+		OutputPath:   "/tmp/wave_auth.json",
+	}
+
+	// when
+	result, err := RenderWaveGeneratePrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Scanner Agent") {
+		t.Error("expected Scanner Agent in English prompt")
+	}
+	if !strings.Contains(result, "Auth") {
+		t.Error("expected cluster name in output")
+	}
+}
+
+func TestRenderWaveApplyPrompt(t *testing.T) {
+	// given
+	data := WaveApplyPromptData{
+		WaveID:      "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Dependency Ordering",
+		Actions:     `[{"type":"add_dependency","issue_id":"ENG-101","description":"Auth before token","detail":"ENG-101 -> ENG-102"}]`,
+		OutputPath:  "/tmp/apply_auth-w1.json",
+	}
+
+	// when
+	result, err := RenderWaveApplyPrompt("ja", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "auth-w1") {
+		t.Error("expected wave ID in output")
+	}
+	if !strings.Contains(result, "/tmp/apply_auth-w1.json") {
+		t.Error("expected output path in output")
+	}
+}
+
+func TestRenderWaveApplyPrompt_English(t *testing.T) {
+	// given
+	data := WaveApplyPromptData{
+		WaveID:      "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Dependency Ordering",
+		Actions:     `[{"type":"add_dependency","issue_id":"ENG-101"}]`,
+		OutputPath:  "/tmp/apply_auth-w1.json",
+	}
+
+	// when
+	result, err := RenderWaveApplyPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Scanner Agent") {
+		t.Error("expected Scanner Agent in English prompt")
+	}
+	if !strings.Contains(result, "auth-w1") {
+		t.Error("expected wave ID in output")
+	}
+}
+
 func TestRenderClassifyPrompt_English(t *testing.T) {
 	// given
 	data := ClassifyPromptData{

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -83,12 +84,13 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 }
 
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
-// useful for previewing what would be sent.
-func RunClaudeDryRun(cfg *Config, prompt, outputPath string) error {
+// useful for previewing what would be sent. The name parameter makes each
+// prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
+func RunClaudeDryRun(cfg *Config, prompt, outputPath string, name string) error {
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return fmt.Errorf("create dry-run dir: %w", err)
 	}
-	promptFile := outputPath + "/prompt.md"
+	promptFile := filepath.Join(outputPath, name+"_prompt.md")
 	if err := os.WriteFile(promptFile, []byte(prompt), 0644); err != nil {
 		return fmt.Errorf("write prompt: %w", err)
 	}

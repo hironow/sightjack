@@ -1,0 +1,100 @@
+package sightjack
+
+import (
+	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+)
+
+// ErrQuit signals the user chose to quit.
+var ErrQuit = errors.New("user quit")
+
+// ScanLine reads one line from s, returning early if ctx is cancelled.
+// The goroutine blocked on s.Scan() may outlive the call when the context
+// fires first; this is acceptable for a CLI tool that exits shortly after.
+func ScanLine(ctx context.Context, s *bufio.Scanner) (string, error) {
+	type result struct{ ok bool }
+	ch := make(chan result, 1)
+	go func() {
+		ch <- result{s.Scan()}
+	}()
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case r := <-ch:
+		if !r.ok {
+			if err := s.Err(); err != nil {
+				return "", err
+			}
+			return "", io.EOF
+		}
+		return s.Text(), nil
+	}
+}
+
+// PromptWaveSelection displays available waves and reads the user's choice.
+func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, waves []Wave) (Wave, error) {
+	fmt.Fprintln(w, "\nAvailable waves:")
+	for i, wave := range waves {
+		fmt.Fprintf(w, "  %d. %-6s W: %-20s (%2.0f%% -> %2.0f%%)\n",
+			i+1, wave.ClusterName, wave.Title,
+			wave.Delta.Before*100, wave.Delta.After*100)
+	}
+	fmt.Fprintf(w, "\nSelect wave [1-%d, q=quit]: ", len(waves))
+
+	line, err := ScanLine(ctx, s)
+	if err != nil {
+		return Wave{}, ErrQuit
+	}
+	input := strings.TrimSpace(line)
+	if input == "q" {
+		return Wave{}, ErrQuit
+	}
+	num, parseErr := strconv.Atoi(input)
+	if parseErr != nil || num < 1 || num > len(waves) {
+		return Wave{}, fmt.Errorf("invalid selection: %s", input)
+	}
+	return waves[num-1], nil
+}
+
+// PromptWaveApproval displays a wave proposal and reads approve/reject.
+func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave Wave) (bool, error) {
+	fmt.Fprintf(w, "\n--- %s - %s ---\n", wave.ClusterName, wave.Title)
+	fmt.Fprintf(w, "  Proposed actions (%d):\n", len(wave.Actions))
+	for i, a := range wave.Actions {
+		fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
+	}
+	fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
+	fmt.Fprint(w, "\n  [a] Approve all  [r] Reject  [q] Back to navigator: ")
+
+	line, err := ScanLine(ctx, s)
+	if err != nil {
+		return false, ErrQuit
+	}
+	input := strings.TrimSpace(strings.ToLower(line))
+	switch input {
+	case "a":
+		return true, nil
+	case "r":
+		return false, nil
+	case "q":
+		return false, ErrQuit
+	default:
+		return false, fmt.Errorf("invalid input: %s", input)
+	}
+}
+
+// DisplayRippleEffects shows cross-cluster effects after a wave is applied.
+func DisplayRippleEffects(w io.Writer, ripples []Ripple) {
+	if len(ripples) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\n  Ripple effects:")
+	for _, r := range ripples {
+		fmt.Fprintf(w, "    -> %s: %s\n", r.ClusterName, r.Description)
+	}
+}

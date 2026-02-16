@@ -51,17 +51,48 @@ func TestRunClaudeDryRun(t *testing.T) {
 	prompt := "test prompt content"
 	outDir := dir + "/dryrun"
 
-	err := RunClaudeDryRun(cfg, prompt, outDir)
+	err := RunClaudeDryRun(cfg, prompt, outDir, "classify")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(outDir + "/prompt.md")
+	data, err := os.ReadFile(outDir + "/classify_prompt.md")
 	if err != nil {
 		t.Fatalf("failed to read prompt file: %v", err)
 	}
 	if string(data) != prompt {
 		t.Errorf("expected %q, got %q", prompt, string(data))
+	}
+}
+
+func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
+	// given: two dry-run calls with different names to the same dir
+	dir := t.TempDir()
+	cfg := &Config{Claude: ClaudeConfig{Command: "claude"}}
+
+	// when
+	if err := RunClaudeDryRun(cfg, "prompt A", dir, "wave_00_auth"); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunClaudeDryRun(cfg, "prompt B", dir, "wave_01_api"); err != nil {
+		t.Fatal(err)
+	}
+
+	// then: both files exist with correct content
+	dataA, err := os.ReadFile(dir + "/wave_00_auth_prompt.md")
+	if err != nil {
+		t.Fatalf("wave_00_auth prompt missing: %v", err)
+	}
+	if string(dataA) != "prompt A" {
+		t.Errorf("expected 'prompt A', got %q", string(dataA))
+	}
+
+	dataB, err := os.ReadFile(dir + "/wave_01_api_prompt.md")
+	if err != nil {
+		t.Fatalf("wave_01_api prompt missing: %v", err)
+	}
+	if string(dataB) != "prompt B" {
+		t.Errorf("expected 'prompt B', got %q", string(dataB))
 	}
 }

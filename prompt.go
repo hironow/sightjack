@@ -25,6 +25,24 @@ type DeepScanPromptData struct {
 	OutputPath  string
 }
 
+// WaveGeneratePromptData holds template data for the wave generation prompt.
+type WaveGeneratePromptData struct {
+	ClusterName  string
+	Completeness string
+	Issues       string
+	Observations string
+	OutputPath   string
+}
+
+// WaveApplyPromptData holds template data for the wave apply prompt.
+type WaveApplyPromptData struct {
+	WaveID      string
+	ClusterName string
+	Title       string
+	Actions     string
+	OutputPath  string
+}
+
 func renderTemplate(name string, data any) (string, error) {
 	tmpl, err := template.ParseFS(promptFS, name)
 	if err != nil {
@@ -46,5 +64,17 @@ func RenderClassifyPrompt(lang string, data ClassifyPromptData) (string, error) 
 // RenderDeepScanPrompt renders the deep scan prompt for the given language.
 func RenderDeepScanPrompt(lang string, data DeepScanPromptData) (string, error) {
 	name := fmt.Sprintf("prompts/templates/scanner_deepscan_%s.md.tmpl", lang)
+	return renderTemplate(name, data)
+}
+
+// RenderWaveGeneratePrompt renders the wave generation prompt for the given language.
+func RenderWaveGeneratePrompt(lang string, data WaveGeneratePromptData) (string, error) {
+	name := fmt.Sprintf("prompts/templates/wave_generate_%s.md.tmpl", lang)
+	return renderTemplate(name, data)
+}
+
+// RenderWaveApplyPrompt renders the wave apply prompt for the given language.
+func RenderWaveApplyPrompt(lang string, data WaveApplyPromptData) (string, error) {
+	name := fmt.Sprintf("prompts/templates/wave_apply_%s.md.tmpl", lang)
 	return renderTemplate(name, data)
 }

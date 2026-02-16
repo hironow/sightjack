@@ -58,6 +58,90 @@ func RenderNavigator(result *ScanResult, projectName string) string {
 	return b.String()
 }
 
+// RenderNavigatorWithWaves renders the Link Navigator with actual wave data.
+// Wave status symbols: [ ] available  [x] locked  [=] completed
+func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave) string {
+	// Group waves by cluster name
+	wavesByCluster := make(map[string][]Wave)
+	for _, w := range waves {
+		wavesByCluster[w.ClusterName] = append(wavesByCluster[w.ClusterName], w)
+	}
+
+	var b strings.Builder
+
+	completePct := int(result.Completeness * 100)
+
+	border := strings.Repeat("=", navigatorWidth)
+	b.WriteString(fmt.Sprintf("+%s+\n", border))
+	b.WriteString(fmt.Sprintf("|%s|\n", center("SIGHTJACK - Link Navigator", navigatorWidth)))
+	projName := padRight(truncate(projectName, 20), 20)
+	projRow := "  Project: " + projName + "  |  Completeness: " + fmt.Sprintf("%3d%%", completePct)
+	b.WriteString("|" + padRight(projRow, navigatorWidth) + "|\n")
+	b.WriteString(fmt.Sprintf("+%s+\n", border))
+
+	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))
+	header := fmt.Sprintf("  %-*s", maxClusterName, "Cluster")
+	for i := 1; i <= waveColumns; i++ {
+		header += fmt.Sprintf(" W%d  ", i)
+	}
+	header += "  Comp."
+	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, header))
+
+	separator := "  " + strings.Repeat("-", navigatorWidth-4)
+	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, separator))
+
+	for _, cluster := range result.Clusters {
+		pct := int(cluster.Completeness * 100)
+		name := padRight(truncate(cluster.Name, maxClusterName), maxClusterName)
+		row := "  " + name
+
+		clusterWaves := wavesByCluster[cluster.Name]
+		for i := 0; i < waveColumns; i++ {
+			if i < len(clusterWaves) {
+				row += waveStatusSymbol(clusterWaves[i].Status)
+			} else {
+				row += "     " // empty cell (5 chars, matches waveStatusSymbol width)
+			}
+		}
+		row += fmt.Sprintf("  %3d%%", pct)
+		b.WriteString("|" + padRight(" "+row, navigatorWidth) + "|\n")
+	}
+
+	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))
+	b.WriteString(fmt.Sprintf("+%s+\n", border))
+	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, " [ ] available  [x] locked  [=] completed"))
+	b.WriteString(fmt.Sprintf("+%s+\n", border))
+
+	// Wave listing: show wave titles grouped by cluster
+	for _, cluster := range result.Clusters {
+		clusterWaves := wavesByCluster[cluster.Name]
+		if len(clusterWaves) == 0 {
+			continue
+		}
+		for i, w := range clusterWaves {
+			line := fmt.Sprintf("  %s W%d: %s %s",
+				cluster.Name, i+1, waveStatusSymbol(w.Status), w.Title)
+			b.WriteString(line + "\n")
+		}
+	}
+
+	return b.String()
+}
+
+// waveStatusSymbol returns a 5-character cell for a wave's status.
+func waveStatusSymbol(status string) string {
+	switch status {
+	case "available":
+		return " [ ] "
+	case "locked":
+		return " [x] "
+	case "completed":
+		return " [=] "
+	default:
+		return " [?] "
+	}
+}
+
 // isWide returns true for East Asian wide characters that occupy
 // two columns in a fixed-width terminal.
 func isWide(r rune) bool {

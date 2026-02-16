@@ -73,7 +73,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	}
 
 	if dryRun {
-		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir)
+		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify")
 	}
 
 	if _, err := RunClaude(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
@@ -134,6 +134,62 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 	merged := MergeScanResults(clusters)
 	return &merged, nil
+}
+
+// RunWaveGenerate executes Pass 3: generate waves for each cluster in parallel.
+func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool) ([]Wave, error) {
+	LogScan("Pass 3: Generating waves for %d clusters...", len(clusters))
+
+	waveResults := make([]WaveGenerateResult, len(clusters))
+
+	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(cfg.Scan.MaxConcurrency)
+
+	for i, cluster := range clusters {
+		g.Go(func() error {
+			waveFile := filepath.Join(scanDir, fmt.Sprintf("wave_%02d_%s.json", i, sanitizeName(cluster.Name)))
+
+			issuesJSON, err := json.Marshal(cluster.Issues)
+			if err != nil {
+				return fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
+			}
+
+			prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
+				ClusterName:  cluster.Name,
+				Completeness: fmt.Sprintf("%.0f", cluster.Completeness*100),
+				Issues:       string(issuesJSON),
+				Observations: strings.Join(cluster.Observations, "\n"),
+				OutputPath:   waveFile,
+			})
+			if err != nil {
+				return fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)
+			}
+
+			if dryRun {
+				dryRunName := fmt.Sprintf("wave_%02d_%s", i, sanitizeName(cluster.Name))
+				return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName)
+			}
+
+			LogScan("Generating waves: %s", cluster.Name)
+			if _, err := RunClaude(gCtx, cfg, prompt, io.Discard); err != nil {
+				return fmt.Errorf("wave generate %s: %w", cluster.Name, err)
+			}
+
+			result, err := ParseWaveGenerateResult(waveFile)
+			if err != nil {
+				return fmt.Errorf("parse waves %s: %w", cluster.Name, err)
+			}
+			waveResults[i] = *result
+			LogOK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return MergeWaveResults(waveResults), nil
 }
 
 // chunkSlice splits items into sub-slices of at most size elements.

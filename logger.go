@@ -71,10 +71,10 @@ func logLine(prefix, color string, format string, args ...any) {
 
 func LogInfo(format string, args ...any)  { logLine("INFO", colorCyan, format, args...) }
 func LogOK(format string, args ...any)    { logLine(" OK ", colorGreen, format, args...) }
-func LogWarn(format string, args ...any)   { logLine("WARN", colorYellow, format, args...) }
-func LogError(format string, args ...any)  { logLine(" ERR", colorRed, format, args...) }
-func LogScan(format string, args ...any)   { logLine("SCAN", colorBlue, format, args...) }
-func LogNav(format string, args ...any)    { logLine(" NAV", colorPurple, format, args...) }
+func LogWarn(format string, args ...any)  { logLine("WARN", colorYellow, format, args...) }
+func LogError(format string, args ...any) { logLine(" ERR", colorRed, format, args...) }
+func LogScan(format string, args ...any)  { logLine("SCAN", colorBlue, format, args...) }
+func LogNav(format string, args ...any)   { logLine(" NAV", colorPurple, format, args...) }
 func LogDebug(format string, args ...any) {
 	if verboseMode {
 		logLine("DBUG", colorCyan, format, args...)

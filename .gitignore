@@ -6,3 +6,5 @@ coverage.out
 .siren/
 # claude local settings
 .claude/*.local.*
+
+.gocache/

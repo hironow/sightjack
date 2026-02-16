@@ -1,0 +1,49 @@
+あなたは Scanner Agent です。
+以下のクラスタの分析結果に基づいて、Issue群の完成度を向上させるための Wave（作業塊）を提案してください。
+
+## 対象クラスタ
+- クラスタ名: {{.ClusterName}}
+- 現在の完成度: {{.Completeness}}%
+
+## Issue分析結果
+{{.Issues}}
+
+## 観察事項
+{{.Observations}}
+
+## Wave提案の指針
+- 各Waveは「1回の作業セッション」で完了できる粒度
+- Wave 1は前提条件なし（即座に着手可能）
+- Wave 2以降はWave 1の完了を前提にしてよい
+- 各Waveには具体的なアクション（DoD追記、依存関係追加、ラベル付与等）を含める
+
+## アクションタイプ
+- `add_dod`: IssueのDescriptionにDoD項目を追記
+- `add_dependency`: Issue間の依存関係を設定
+- `add_label`: Issueにラベルを付与
+- `update_description`: Issueの説明を更新
+
+## 出力
+以下の JSON を **{{.OutputPath}}** に書き込んでください:
+
+```json
+{
+  "cluster_name": "{{.ClusterName}}",
+  "waves": [
+    {
+      "id": "cluster-w1",
+      "cluster_name": "{{.ClusterName}}",
+      "title": "Wave名",
+      "description": "このWaveで何をやるか",
+      "actions": [
+        {"type": "add_dod", "issue_id": "issue-id", "description": "人間向け説明", "detail": "追記する具体的な内容"}
+      ],
+      "prerequisites": [],
+      "delta": {"before": 0.25, "after": 0.40},
+      "status": "available"
+    }
+  ]
+}
+```
+
+重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。

@@ -52,6 +52,48 @@ func TestState_ReadMissing_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestState_WriteAndRead_WithWaves(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	state := &SessionState{
+		Version:      "0.2",
+		SessionID:    "test-session",
+		Project:      "TestProject",
+		LastScanned:  time.Now().Truncate(time.Second),
+		Completeness: 0.35,
+		Clusters: []ClusterState{
+			{Name: "Auth", Completeness: 0.25, IssueCount: 4},
+		},
+		Waves: []WaveState{
+			{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed", ActionCount: 3},
+			{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available", Prerequisites: []string{"auth-w1"}, ActionCount: 5},
+		},
+	}
+
+	// when
+	if err := WriteState(dir, state); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	loaded, err := ReadState(dir)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	// then
+	if len(loaded.Waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(loaded.Waves))
+	}
+	if loaded.Waves[0].ID != "auth-w1" {
+		t.Errorf("expected auth-w1, got %s", loaded.Waves[0].ID)
+	}
+	if loaded.Waves[1].Status != "available" {
+		t.Errorf("expected available, got %s", loaded.Waves[1].Status)
+	}
+	if loaded.Waves[1].Prerequisites[0] != "auth-w1" {
+		t.Errorf("expected prerequisite auth-w1")
+	}
+}
+
 func TestStatePath(t *testing.T) {
 	path := StatePath("/project")
 	expected := filepath.Join("/project", ".siren", "state.json")

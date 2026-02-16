@@ -228,6 +228,42 @@ func TestMergeClusterChunks_SingleChunk_CanonicalName(t *testing.T) {
 	}
 }
 
+func TestRunWaveGenerate_ParsesResults(t *testing.T) {
+	// given: mock wave generation output files
+	dir := t.TempDir()
+	wave0 := filepath.Join(dir, "wave_00_auth.json")
+	wave1 := filepath.Join(dir, "wave_01_api.json")
+
+	os.WriteFile(wave0, []byte(`{
+		"cluster_name": "Auth",
+		"waves": [
+			{"id": "auth-w1", "cluster_name": "Auth", "title": "Deps", "actions": [], "prerequisites": [], "delta": {"before": 0.25, "after": 0.40}, "status": "available"}
+		]
+	}`), 0644)
+	os.WriteFile(wave1, []byte(`{
+		"cluster_name": "API",
+		"waves": [
+			{"id": "api-w1", "cluster_name": "API", "title": "Split", "actions": [], "prerequisites": [], "delta": {"before": 0.30, "after": 0.45}, "status": "available"}
+		]
+	}`), 0644)
+
+	// when: parse both files
+	result0, err := ParseWaveGenerateResult(wave0)
+	if err != nil {
+		t.Fatalf("parse wave 0: %v", err)
+	}
+	result1, err := ParseWaveGenerateResult(wave1)
+	if err != nil {
+		t.Fatalf("parse wave 1: %v", err)
+	}
+
+	// then: merge waves
+	allWaves := MergeWaveResults([]WaveGenerateResult{*result0, *result1})
+	if len(allWaves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(allWaves))
+	}
+}
+
 func TestMergeScanResults(t *testing.T) {
 	// given
 	clusters := []ClusterScanResult{

@@ -79,6 +79,90 @@ func TestClusterScanResult_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestWave_UnmarshalJSON(t *testing.T) {
+	data := `{
+		"id": "auth-w1",
+		"cluster_name": "Auth",
+		"title": "Dependency Ordering",
+		"description": "Establish issue dependencies",
+		"actions": [
+			{"type": "add_dependency", "issue_id": "ENG-101", "description": "Auth before token", "detail": "ENG-101 -> ENG-102"}
+		],
+		"prerequisites": [],
+		"delta": {"before": 0.25, "after": 0.40},
+		"status": "available"
+	}`
+	var w Wave
+	if err := json.Unmarshal([]byte(data), &w); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if w.ID != "auth-w1" {
+		t.Errorf("expected auth-w1, got %s", w.ID)
+	}
+	if w.ClusterName != "Auth" {
+		t.Errorf("expected Auth, got %s", w.ClusterName)
+	}
+	if len(w.Actions) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(w.Actions))
+	}
+	if w.Actions[0].Type != "add_dependency" {
+		t.Errorf("expected add_dependency, got %s", w.Actions[0].Type)
+	}
+	if w.Delta.Before != 0.25 || w.Delta.After != 0.40 {
+		t.Errorf("unexpected delta: %+v", w.Delta)
+	}
+}
+
+func TestWaveGenerateResult_UnmarshalJSON(t *testing.T) {
+	data := `{
+		"cluster_name": "Auth",
+		"waves": [
+			{"id": "auth-w1", "cluster_name": "Auth", "title": "W1", "actions": [], "prerequisites": [], "delta": {"before": 0.25, "after": 0.40}, "status": "available"},
+			{"id": "auth-w2", "cluster_name": "Auth", "title": "W2", "actions": [], "prerequisites": ["auth-w1"], "delta": {"before": 0.40, "after": 0.65}, "status": "locked"}
+		]
+	}`
+	var result WaveGenerateResult
+	if err := json.Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result.ClusterName != "Auth" {
+		t.Errorf("expected Auth, got %s", result.ClusterName)
+	}
+	if len(result.Waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(result.Waves))
+	}
+	if result.Waves[1].Prerequisites[0] != "auth-w1" {
+		t.Errorf("expected prerequisite auth-w1, got %s", result.Waves[1].Prerequisites[0])
+	}
+}
+
+func TestWaveApplyResult_UnmarshalJSON(t *testing.T) {
+	data := `{
+		"wave_id": "auth-w1",
+		"applied": 7,
+		"errors": [],
+		"ripples": [
+			{"cluster_name": "API", "description": "W2 unlocked"}
+		]
+	}`
+	var result WaveApplyResult
+	if err := json.Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result.WaveID != "auth-w1" {
+		t.Errorf("expected auth-w1, got %s", result.WaveID)
+	}
+	if result.Applied != 7 {
+		t.Errorf("expected 7, got %d", result.Applied)
+	}
+	if len(result.Ripples) != 1 {
+		t.Fatalf("expected 1 ripple, got %d", len(result.Ripples))
+	}
+	if result.Ripples[0].ClusterName != "API" {
+		t.Errorf("expected API, got %s", result.Ripples[0].ClusterName)
+	}
+}
+
 func TestScanResult_CalculateCompleteness(t *testing.T) {
 	// given
 	result := ScanResult{

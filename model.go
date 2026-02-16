@@ -65,6 +65,7 @@ type SessionState struct {
 	LastScanned  time.Time      `json:"last_scanned"`
 	Completeness float64        `json:"completeness"`
 	Clusters     []ClusterState `json:"clusters"`
+	Waves        []WaveState    `json:"waves,omitempty"`
 }
 
 // ClusterState is the per-cluster state within SessionState.
@@ -72,4 +73,60 @@ type ClusterState struct {
 	Name         string  `json:"name"`
 	Completeness float64 `json:"completeness"`
 	IssueCount   int     `json:"issue_count"`
+}
+
+// WaveState is the per-wave state within SessionState.
+type WaveState struct {
+	ID            string   `json:"id"`
+	ClusterName   string   `json:"cluster_name"`
+	Title         string   `json:"title"`
+	Status        string   `json:"status"`
+	Prerequisites []string `json:"prerequisites,omitempty"`
+	ActionCount   int      `json:"action_count"`
+}
+
+// Wave is a unit of work proposed by AI for a cluster.
+type Wave struct {
+	ID            string       `json:"id"`
+	ClusterName   string       `json:"cluster_name"`
+	Title         string       `json:"title"`
+	Description   string       `json:"description"`
+	Actions       []WaveAction `json:"actions"`
+	Prerequisites []string     `json:"prerequisites"`
+	Delta         WaveDelta    `json:"delta"`
+	Status        string       `json:"status"`
+}
+
+// WaveAction is a single change proposed within a Wave.
+type WaveAction struct {
+	Type        string `json:"type"`
+	IssueID     string `json:"issue_id"`
+	Description string `json:"description"`
+	Detail      string `json:"detail"`
+}
+
+// WaveDelta holds expected completeness change.
+type WaveDelta struct {
+	Before float64 `json:"before"`
+	After  float64 `json:"after"`
+}
+
+// WaveGenerateResult is the Pass 3 output per cluster.
+type WaveGenerateResult struct {
+	ClusterName string `json:"cluster_name"`
+	Waves       []Wave `json:"waves"`
+}
+
+// WaveApplyResult is the Pass 4 output per wave.
+type WaveApplyResult struct {
+	WaveID  string   `json:"wave_id"`
+	Applied int      `json:"applied"`
+	Errors  []string `json:"errors"`
+	Ripples []Ripple `json:"ripples"`
+}
+
+// Ripple is a cross-cluster effect from applying a wave.
+type Ripple struct {
+	ClusterName string `json:"cluster_name"`
+	Description string `json:"description"`
 }
