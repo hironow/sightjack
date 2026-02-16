@@ -78,17 +78,29 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			continue
 		}
 
-		// Prompt wave approval
-		approved, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
-		if err == ErrQuit {
-			continue
+		// Prompt wave approval (with discuss loop)
+		var applyWave bool
+		for {
+			choice, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
+			if err == ErrQuit {
+				break
+			}
+			if err != nil {
+				LogWarn("Invalid input: %v", err)
+				continue
+			}
+
+			switch choice {
+			case ApprovalApprove:
+				applyWave = true
+			case ApprovalReject:
+				LogInfo("Wave rejected.")
+			case ApprovalDiscuss:
+				LogInfo("Discussion mode not yet implemented.")
+			}
+			break
 		}
-		if err != nil {
-			LogWarn("Invalid input: %v", err)
-			continue
-		}
-		if !approved {
-			LogInfo("Wave rejected.")
+		if !applyWave {
 			continue
 		}
 

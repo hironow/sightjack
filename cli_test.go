@@ -62,12 +62,12 @@ func TestPromptWaveApproval_Approve(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	approved, err := PromptWaveApproval(ctx, &output, scanner, wave)
+	choice, err := PromptWaveApproval(ctx, &output, scanner, wave)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !approved {
-		t.Error("expected approval")
+	if choice != ApprovalApprove {
+		t.Errorf("expected ApprovalApprove, got %d", choice)
 	}
 }
 
@@ -78,12 +78,37 @@ func TestPromptWaveApproval_Reject(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	approved, err := PromptWaveApproval(ctx, &output, scanner, wave)
+	choice, err := PromptWaveApproval(ctx, &output, scanner, wave)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if approved {
-		t.Error("expected rejection")
+	if choice != ApprovalReject {
+		t.Errorf("expected ApprovalReject, got %d", choice)
+	}
+}
+
+func TestPromptWaveApproval_Discuss(t *testing.T) {
+	wave := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Dependency Ordering",
+		Actions:     []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Delta:       WaveDelta{Before: 0.25, After: 0.40},
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader("d\n"))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	choice, err := PromptWaveApproval(ctx, &output, scanner, wave)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if choice != ApprovalDiscuss {
+		t.Errorf("expected ApprovalDiscuss, got %d", choice)
+	}
+	if !strings.Contains(output.String(), "[d] Discuss") {
+		t.Error("expected [d] Discuss in prompt output")
 	}
 }
 
@@ -107,14 +132,14 @@ func TestPromptSequence_SelectionThenApproval(t *testing.T) {
 		t.Errorf("expected auth-w1, got %s", selected.ID)
 	}
 
-	approved, err := PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err := PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("approval: unexpected error: %v", err)
 	}
 
 	// then: approval should read "a" from the same scanner
-	if !approved {
-		t.Error("expected approval, but got rejection (scanner likely lost buffered input)")
+	if choice != ApprovalApprove {
+		t.Errorf("expected ApprovalApprove, got %d (scanner likely lost buffered input)", choice)
 	}
 }
 
