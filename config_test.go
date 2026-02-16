@@ -1,0 +1,187 @@
+package sightjack
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestLoadConfig_Defaults(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+linear:
+  team: "TEST-TEAM"
+  project: "Test Project"
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(cfgPath)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Linear.Team != "TEST-TEAM" {
+		t.Errorf("expected TEST-TEAM, got %s", cfg.Linear.Team)
+	}
+	if cfg.Linear.Project != "Test Project" {
+		t.Errorf("expected Test Project, got %s", cfg.Linear.Project)
+	}
+	if cfg.Scan.ChunkSize != 20 {
+		t.Errorf("expected default chunk_size 20, got %d", cfg.Scan.ChunkSize)
+	}
+	if cfg.Scan.MaxConcurrency != 3 {
+		t.Errorf("expected default max_concurrency 3, got %d", cfg.Scan.MaxConcurrency)
+	}
+	if cfg.Claude.Command != "claude" {
+		t.Errorf("expected default command 'claude', got %s", cfg.Claude.Command)
+	}
+	if cfg.Claude.TimeoutSec != 300 {
+		t.Errorf("expected default timeout 300, got %d", cfg.Claude.TimeoutSec)
+	}
+	if cfg.Lang != "ja" {
+		t.Errorf("expected default lang 'ja', got %s", cfg.Lang)
+	}
+}
+
+func TestLoadConfig_FullOverride(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+linear:
+  team: "MY-TEAM"
+  project: "My Project"
+  cycle: "Sprint 5"
+scan:
+  chunk_size: 50
+  max_concurrency: 5
+claude:
+  command: "cc-p"
+  model: "sonnet"
+  timeout_sec: 600
+lang: "en"
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(cfgPath)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Scan.ChunkSize != 50 {
+		t.Errorf("expected 50, got %d", cfg.Scan.ChunkSize)
+	}
+	if cfg.Claude.Model != "sonnet" {
+		t.Errorf("expected sonnet, got %s", cfg.Claude.Model)
+	}
+	if cfg.Lang != "en" {
+		t.Errorf("expected en, got %s", cfg.Lang)
+	}
+}
+
+func TestLoadConfig_ZeroConcurrency_ClampsToOne(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+scan:
+  max_concurrency: 0
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	cfg, err := LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Scan.MaxConcurrency != 1 {
+		t.Errorf("expected max_concurrency clamped to 1, got %d", cfg.Scan.MaxConcurrency)
+	}
+}
+
+func TestLoadConfig_ZeroChunkSize_ClampsToDefault(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+scan:
+  chunk_size: 0
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	cfg, err := LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Scan.ChunkSize != 20 {
+		t.Errorf("expected chunk_size clamped to default 20, got %d", cfg.Scan.ChunkSize)
+	}
+}
+
+func TestLoadConfig_ZeroTimeout_ClampsToDefault(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+claude:
+  timeout_sec: 0
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	cfg, err := LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Claude.TimeoutSec != 300 {
+		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Claude.TimeoutSec)
+	}
+}
+
+func TestLoadConfig_NegativeTimeout_ClampsToDefault(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+claude:
+  timeout_sec: -10
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	cfg, err := LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Claude.TimeoutSec != 300 {
+		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Claude.TimeoutSec)
+	}
+}
+
+func TestLoadConfig_FileNotFound(t *testing.T) {
+	_, err := LoadConfig("/nonexistent/path.yaml")
+	if err == nil {
+		t.Error("expected error for missing config file")
+	}
+}

@@ -1,0 +1,75 @@
+package sightjack
+
+import "time"
+
+// ClassifyResult is the output of Pass 1 (cluster classification).
+// Written by Claude Code to classify.json.
+type ClassifyResult struct {
+	Clusters    []ClusterClassification `json:"clusters"`
+	TotalIssues int                     `json:"total_issues"`
+}
+
+// ClusterClassification holds a cluster name and its issue IDs from Pass 1.
+type ClusterClassification struct {
+	Name     string   `json:"name"`
+	IssueIDs []string `json:"issue_ids"`
+}
+
+// ClusterScanResult is the output of Pass 2 (per-cluster deep scan).
+// Written by Claude Code to cluster_{name}.json.
+type ClusterScanResult struct {
+	Name         string        `json:"name"`
+	Completeness float64       `json:"completeness"`
+	Issues       []IssueDetail `json:"issues"`
+	Observations []string      `json:"observations"`
+}
+
+// IssueDetail holds the deep scan analysis of a single issue.
+type IssueDetail struct {
+	ID           string   `json:"id"`
+	Identifier   string   `json:"identifier"`
+	Title        string   `json:"title"`
+	Completeness float64  `json:"completeness"`
+	Gaps         []string `json:"gaps"`
+}
+
+// ScanResult is the merged result of Pass 1 + Pass 2.
+type ScanResult struct {
+	Clusters     []ClusterScanResult
+	TotalIssues  int
+	Completeness float64
+	Observations []string
+}
+
+// CalculateCompleteness computes overall completeness as the average of cluster completeness values,
+// and tallies total issues across all clusters.
+func (r *ScanResult) CalculateCompleteness() {
+	if len(r.Clusters) == 0 {
+		return
+	}
+	var sum float64
+	var total int
+	for _, c := range r.Clusters {
+		sum += c.Completeness
+		total += len(c.Issues)
+	}
+	r.Completeness = sum / float64(len(r.Clusters))
+	r.TotalIssues = total
+}
+
+// SessionState is the thin state file persisted to .siren/state.json.
+type SessionState struct {
+	Version      string         `json:"version"`
+	SessionID    string         `json:"session_id"`
+	Project      string         `json:"project"`
+	LastScanned  time.Time      `json:"last_scanned"`
+	Completeness float64        `json:"completeness"`
+	Clusters     []ClusterState `json:"clusters"`
+}
+
+// ClusterState is the per-cluster state within SessionState.
+type ClusterState struct {
+	Name         string  `json:"name"`
+	Completeness float64 `json:"completeness"`
+	IssueCount   int     `json:"issue_count"`
+}

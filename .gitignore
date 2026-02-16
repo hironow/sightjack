@@ -1,0 +1,8 @@
+# build files
+/sightjack
+# test
+coverage.out
+# sightjack runtime state on target repository
+.siren/
+# claude local settings
+.claude/*.local.*

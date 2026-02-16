@@ -1,0 +1,44 @@
+You are a Scanner Agent.
+Analyze the Issues belonging to the following cluster in detail
+and evaluate their completeness.
+
+## Target Cluster
+- Cluster Name: {{.ClusterName}}
+- Issue IDs: {{.IssueIDs}}
+
+## Analysis Criteria
+Evaluate each Issue on:
+- Presence and quality of DoD (Definition of Done)
+- Clarity of dependencies
+- Whether technical decisions are needed
+- Whether it is estimable at its current granularity
+- Missing information (gaps)
+
+## Completeness Scale
+- 0.0-0.2: Title only, no details
+- 0.2-0.4: Overview exists, no DoD/dependencies
+- 0.4-0.6: Partial DoD, some dependencies noted
+- 0.6-0.8: Full DoD, clear dependencies, technical decisions recorded
+- 0.8-1.0: Implementation-ready (processable by Paintress)
+
+## Output
+Write the following JSON to **{{.OutputPath}}**:
+
+```json
+{
+  "name": "{{.ClusterName}}",
+  "completeness": 0.35,
+  "issues": [
+    {
+      "id": "issue-id",
+      "identifier": "AWE-50",
+      "title": "Issue Title",
+      "completeness": 0.4,
+      "gaps": ["DoD missing", "No dependency specified"]
+    }
+  ],
+  "observations": ["Cross-cluster findings"]
+}
+```
+
+Important: Write output directly to the file path above. Do not write to stdout.
