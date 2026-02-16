@@ -130,3 +130,20 @@ type Ripple struct {
 	ClusterName string `json:"cluster_name"`
 	Description string `json:"description"`
 }
+
+// ApprovalChoice represents the human's choice at the wave approval prompt.
+type ApprovalChoice int
+
+const (
+	ApprovalApprove ApprovalChoice = iota
+	ApprovalReject
+	ApprovalDiscuss
+	ApprovalQuit
+)
+
+// ArchitectResponse is the output of an architect discussion round.
+type ArchitectResponse struct {
+	Analysis     string `json:"analysis"`
+	ModifiedWave *Wave  `json:"modified_wave"`
+	Reasoning    string `json:"reasoning"`
+}

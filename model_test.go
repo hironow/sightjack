@@ -163,6 +163,57 @@ func TestWaveApplyResult_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestArchitectResponse_UnmarshalJSON(t *testing.T) {
+	data := `{
+		"analysis": "Looking at the cluster, splitting is unnecessary.",
+		"modified_wave": {
+			"id": "auth-w1",
+			"cluster_name": "Auth",
+			"title": "Dependency Ordering",
+			"actions": [
+				{"type": "add_dependency", "issue_id": "ENG-101", "description": "Auth before token", "detail": ""}
+			],
+			"prerequisites": [],
+			"delta": {"before": 0.25, "after": 0.42},
+			"status": "available"
+		},
+		"reasoning": "Project scale favors fewer issues"
+	}`
+
+	var resp ArchitectResponse
+	if err := json.Unmarshal([]byte(data), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Analysis != "Looking at the cluster, splitting is unnecessary." {
+		t.Errorf("unexpected analysis: %s", resp.Analysis)
+	}
+	if resp.ModifiedWave == nil {
+		t.Fatal("expected non-nil modified_wave")
+	}
+	if resp.ModifiedWave.ID != "auth-w1" {
+		t.Errorf("expected auth-w1, got %s", resp.ModifiedWave.ID)
+	}
+	if resp.Reasoning != "Project scale favors fewer issues" {
+		t.Errorf("unexpected reasoning: %s", resp.Reasoning)
+	}
+}
+
+func TestArchitectResponse_NilModifiedWave(t *testing.T) {
+	data := `{
+		"analysis": "No changes needed.",
+		"modified_wave": null,
+		"reasoning": "Current actions are sufficient"
+	}`
+
+	var resp ArchitectResponse
+	if err := json.Unmarshal([]byte(data), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.ModifiedWave != nil {
+		t.Error("expected nil modified_wave")
+	}
+}
+
 func TestScanResult_CalculateCompleteness(t *testing.T) {
 	// given
 	result := ScanResult{
