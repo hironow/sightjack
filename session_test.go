@@ -1,6 +1,8 @@
 package sightjack
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -168,5 +170,59 @@ func TestBuildWaveStates(t *testing.T) {
 	}
 	if states[1].Prerequisites[0] != "auth-w1" {
 		t.Errorf("expected prerequisite auth-w1")
+	}
+}
+
+func TestDiscussBranchReturnsToApproval(t *testing.T) {
+	// This tests the session-level logic: after a discuss round,
+	// the approval loop should re-prompt (not exit).
+	// We verify this indirectly through PromptWaveApproval behavior:
+	// input "d\n" followed by topic, then "a\n" should eventually approve.
+
+	// given: piped input sequence: select wave 1, discuss, enter topic, then approve
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
+			Actions: []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   WaveDelta{Before: 0.25, After: 0.40}},
+	}
+	input := "1\nd\nShould we split?\na\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when: selection
+	selected, err := PromptWaveSelection(ctx, &output, scanner, waves)
+	if err != nil {
+		t.Fatalf("selection error: %v", err)
+	}
+	if selected.ID != "auth-w1" {
+		t.Fatalf("expected auth-w1, got %s", selected.ID)
+	}
+
+	// when: first approval -> discuss
+	choice, err := PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("first approval error: %v", err)
+	}
+	if choice != ApprovalDiscuss {
+		t.Fatalf("expected ApprovalDiscuss, got %d", choice)
+	}
+
+	// when: topic input
+	topic, err := PromptDiscussTopic(ctx, &output, scanner)
+	if err != nil {
+		t.Fatalf("topic error: %v", err)
+	}
+	if topic != "Should we split?" {
+		t.Errorf("expected topic, got: %s", topic)
+	}
+
+	// when: second approval -> approve
+	choice, err = PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("second approval error: %v", err)
+	}
+	if choice != ApprovalApprove {
+		t.Errorf("expected ApprovalApprove after discuss, got %d", choice)
 	}
 }

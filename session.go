@@ -106,7 +106,24 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			case ApprovalReject:
 				LogInfo("Wave rejected.")
 			case ApprovalDiscuss:
-				LogInfo("Discussion mode not yet implemented.")
+				topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
+				if topicErr == ErrQuit {
+					continue
+				}
+				if topicErr != nil {
+					LogWarn("Invalid topic: %v", topicErr)
+					continue
+				}
+				result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic)
+				if discussErr != nil {
+					LogError("Architect discussion failed: %v", discussErr)
+					continue
+				}
+				DisplayArchitectResponse(os.Stdout, result)
+				if result.ModifiedWave != nil {
+					selected = *result.ModifiedWave
+				}
+				continue // back to approval prompt with (possibly modified) wave
 			}
 			break
 		}
