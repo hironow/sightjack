@@ -170,7 +170,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 
 	// Save state
 	state := &SessionState{
-		Version:      "0.2",
+		Version:      "0.3",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  time.Now(),
