@@ -90,3 +90,30 @@ func TestArchitectDiscussFileName_SpecialChars(t *testing.T) {
 		t.Errorf("expected architect_ui_frontend_w-1.json, got %s", name)
 	}
 }
+
+func TestRunArchitectDiscuss_DryRun(t *testing.T) {
+	// given
+	scanDir := t.TempDir()
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+	}
+	wave := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Dependency Ordering",
+		Actions:     []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+	}
+
+	// when
+	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	promptFile := filepath.Join(scanDir, "architect_auth_auth-w1_prompt.md")
+	if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+		t.Error("expected architect prompt file to be generated")
+	}
+}

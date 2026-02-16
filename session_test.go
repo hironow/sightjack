@@ -102,6 +102,12 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	if _, err := os.Stat(wavePrompt); os.IsNotExist(err) {
 		t.Error("wave_00_sample_prompt.md not generated — dry-run did not reach Pass 3")
 	}
+
+	// then: architect discuss prompt was generated
+	architectPrompt := filepath.Join(scanDir, "architect_sample_sample-w1_prompt.md")
+	if _, err := os.Stat(architectPrompt); os.IsNotExist(err) {
+		t.Error("architect_sample_sample-w1_prompt.md not generated — dry-run did not reach architect step")
+	}
 }
 
 func TestRunSession_NilInputReturnsError(t *testing.T) {

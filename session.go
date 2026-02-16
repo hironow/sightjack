@@ -38,6 +38,16 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		if _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true); err != nil {
 			return fmt.Errorf("wave generate dry-run: %w", err)
 		}
+		// Also generate architect discuss prompt for dry-run
+		sampleWave := Wave{
+			ID:          "sample-w1",
+			ClusterName: "sample",
+			Title:       "Sample Wave",
+			Actions:     []WaveAction{{Type: "add_dod", IssueID: "SAMPLE-1", Description: "Sample DoD"}},
+		}
+		if err := RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic"); err != nil {
+			return fmt.Errorf("architect discuss dry-run: %w", err)
+		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
 	}
