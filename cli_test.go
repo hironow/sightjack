@@ -526,6 +526,98 @@ func TestDisplayScribeResponse_EmptyTitle(t *testing.T) {
 	}
 }
 
+func TestPromptResume_ChooseResume(t *testing.T) {
+	state := &SessionState{
+		Completeness: 0.62,
+		ADRCount:     4,
+		LastScanned:  time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC),
+	}
+	input := "r\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	choice, err := PromptResume(ctx, &output, scanner, state)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if choice != ResumeChoiceResume {
+		t.Errorf("expected ResumeChoiceResume, got %d", choice)
+	}
+	if !strings.Contains(output.String(), "62%") {
+		t.Error("expected completeness in prompt")
+	}
+	if !strings.Contains(output.String(), "4 ADRs") {
+		t.Error("expected ADR count in prompt")
+	}
+}
+
+func TestPromptResume_ChooseNew(t *testing.T) {
+	state := &SessionState{Completeness: 0.30, ADRCount: 1, LastScanned: time.Now()}
+	input := "n\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	choice, err := PromptResume(ctx, &output, scanner, state)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if choice != ResumeChoiceNew {
+		t.Errorf("expected ResumeChoiceNew, got %d", choice)
+	}
+}
+
+func TestPromptResume_ChooseRescan(t *testing.T) {
+	state := &SessionState{Completeness: 0.50, ADRCount: 2, LastScanned: time.Now()}
+	input := "s\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	choice, err := PromptResume(ctx, &output, scanner, state)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if choice != ResumeChoiceRescan {
+		t.Errorf("expected ResumeChoiceRescan, got %d", choice)
+	}
+}
+
+func TestPromptResume_ChooseQuit(t *testing.T) {
+	state := &SessionState{Completeness: 0.50, LastScanned: time.Now()}
+	input := "q\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	_, err := PromptResume(ctx, &output, scanner, state)
+
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit, got %v", err)
+	}
+}
+
+func TestPromptResume_InvalidInput(t *testing.T) {
+	state := &SessionState{Completeness: 0.50, LastScanned: time.Now()}
+	input := "x\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	_, err := PromptResume(ctx, &output, scanner, state)
+
+	if err == nil {
+		t.Fatal("expected error for invalid input")
+	}
+	if err == ErrQuit {
+		t.Error("should not be ErrQuit for invalid input")
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{

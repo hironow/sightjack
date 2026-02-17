@@ -145,6 +145,15 @@ const (
 	ApprovalQuit
 )
 
+// ResumeChoice represents the user's choice when a previous session is detected.
+type ResumeChoice int
+
+const (
+	ResumeChoiceResume ResumeChoice = iota
+	ResumeChoiceNew
+	ResumeChoiceRescan
+)
+
 // ScribeResponse is the output of the Scribe Agent (ADR generation).
 type ScribeResponse struct {
 	ADRID     string `json:"adr_id"`

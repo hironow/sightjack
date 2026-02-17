@@ -135,6 +135,35 @@ func DisplayArchitectResponse(w io.Writer, resp *ArchitectResponse) {
 	}
 }
 
+// PromptResume displays previous session info and asks the user to resume, start new, or re-scan.
+func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, state *SessionState) (ResumeChoice, error) {
+	completePct := int(state.Completeness * 100)
+	fmt.Fprintf(w, "\n  Previous session found (%d%% complete, %d ADRs)\n", completePct, state.ADRCount)
+	fmt.Fprintf(w, "  Last scan: %s\n\n", state.LastScanned.Format("2006-01-02 15:04"))
+	fmt.Fprintln(w, "  [r] Resume session")
+	fmt.Fprintln(w, "  [n] Start new session")
+	fmt.Fprintln(w, "  [s] Re-scan Linear and resume")
+	fmt.Fprint(w, "\n  Choice: ")
+
+	line, err := ScanLine(ctx, s)
+	if err != nil {
+		return ResumeChoiceResume, ErrQuit
+	}
+	input := strings.TrimSpace(strings.ToLower(line))
+	switch input {
+	case "r":
+		return ResumeChoiceResume, nil
+	case "n":
+		return ResumeChoiceNew, nil
+	case "s":
+		return ResumeChoiceRescan, nil
+	case "q":
+		return ResumeChoiceResume, ErrQuit
+	default:
+		return ResumeChoiceResume, fmt.Errorf("invalid input: %s", input)
+	}
+}
+
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
