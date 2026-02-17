@@ -3,6 +3,7 @@ package sightjack
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -141,22 +142,9 @@ func TestSessionState_ADRCount_ZeroOmitted(t *testing.T) {
 
 	// then: "adr_count" should not appear in JSON
 	raw := string(data)
-	if json.Valid(data) && contains(raw, "adr_count") {
+	if json.Valid(data) && strings.Contains(raw, "adr_count") {
 		t.Errorf("expected adr_count to be omitted when 0, got: %s", raw)
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchString(s, substr)
-}
-
-func searchString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 func TestSessionState_ADRCount_WriteAndRead(t *testing.T) {
