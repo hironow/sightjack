@@ -401,6 +401,21 @@ func TestPromptDiscussTopic_PaddedQuit(t *testing.T) {
 	}
 }
 
+func TestPromptDiscussTopic_UppercaseQuit(t *testing.T) {
+	// given: uppercase "Q" should also quit (consistent with PromptWaveApproval)
+	scanner := bufio.NewScanner(strings.NewReader("Q\n"))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when
+	_, err := PromptDiscussTopic(ctx, &output, scanner)
+
+	// then
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit for uppercase 'Q', got %v", err)
+	}
+}
+
 func TestDisplayArchitectResponse_ZeroDelta(t *testing.T) {
 	// given: ModifiedWave with zero-value delta (architect forgot to populate)
 	resp := &ArchitectResponse{

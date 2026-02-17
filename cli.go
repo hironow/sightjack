@@ -110,7 +110,7 @@ func PromptDiscussTopic(ctx context.Context, w io.Writer, s *bufio.Scanner) (str
 		return "", ErrQuit
 	}
 	input := strings.TrimSpace(line)
-	if input == "q" {
+	if strings.EqualFold(input, "q") {
 		return "", ErrQuit
 	}
 	if input == "" {
