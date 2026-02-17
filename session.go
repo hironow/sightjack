@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -37,6 +38,16 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}}
 		if _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true); err != nil {
 			return fmt.Errorf("wave generate dry-run: %w", err)
+		}
+		// Also generate architect discuss prompt for dry-run
+		sampleWave := Wave{
+			ID:          "sample-w1",
+			ClusterName: "sample",
+			Title:       "Sample Wave",
+			Actions:     []WaveAction{{Type: "add_dod", IssueID: "SAMPLE-1", Description: "Sample DoD"}},
+		}
+		if err := RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic"); err != nil {
+			return fmt.Errorf("architect discuss dry-run: %w", err)
 		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
@@ -78,17 +89,51 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			continue
 		}
 
-		// Prompt wave approval
-		approved, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
-		if err == ErrQuit {
-			continue
+		// Prompt wave approval (with discuss loop)
+		var applyWave bool
+		for {
+			choice, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
+			if err == ErrQuit {
+				break
+			}
+			if err != nil {
+				LogWarn("Invalid input: %v", err)
+				continue
+			}
+
+			switch choice {
+			case ApprovalApprove:
+				applyWave = true
+			case ApprovalReject:
+				LogInfo("Wave rejected.")
+			case ApprovalDiscuss:
+				topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
+				if topicErr == ErrQuit {
+					continue
+				}
+				if topicErr != nil {
+					LogWarn("Invalid topic: %v", topicErr)
+					continue
+				}
+				result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic)
+				if discussErr != nil {
+					LogError("Architect discussion failed: %v", discussErr)
+					continue
+				}
+				DisplayArchitectResponse(os.Stdout, result)
+				if result.ModifiedWave != nil {
+					selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+					PropagateWaveUpdate(waves, selected)
+					if selected.Status == "locked" {
+						LogWarn("Architect added unmet prerequisites — wave is now locked.")
+						break
+					}
+				}
+				continue // back to approval prompt with (possibly modified) wave
+			}
+			break
 		}
-		if err != nil {
-			LogWarn("Invalid input: %v", err)
-			continue
-		}
-		if !approved {
-			LogInfo("Wave rejected.")
+		if !applyWave {
 			continue
 		}
 
@@ -131,7 +176,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 
 	// Save state
 	state := &SessionState{
-		Version:      "0.2",
+		Version:      "0.3",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  time.Now(),
@@ -159,6 +204,55 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 // indicating all actions were successfully applied.
 func IsWaveApplyComplete(result *WaveApplyResult) bool {
 	return len(result.Errors) == 0
+}
+
+// ApplyModifiedWave merges a modified wave from the architect into the original,
+// preserving identity fields (ID, ClusterName) so that completion bookkeeping
+// remains stable. Status is recomputed from the modified prerequisites against
+// the completed map to prevent applying waves with unmet dependencies.
+func ApplyModifiedWave(original, modified Wave, completed map[string]bool) Wave {
+	modified.ID = original.ID
+	modified.ClusterName = original.ClusterName
+
+	// Preserve original fields when architect omits them (nil/zero from JSON).
+	if modified.Actions == nil {
+		modified.Actions = original.Actions
+	}
+	if modified.Prerequisites == nil {
+		modified.Prerequisites = original.Prerequisites
+	}
+	if modified.Delta == (WaveDelta{}) {
+		modified.Delta = original.Delta
+	}
+
+	// Normalize bare prerequisite IDs to composite "ClusterName:ID" format.
+	for i, p := range modified.Prerequisites {
+		if !strings.Contains(p, ":") {
+			modified.Prerequisites[i] = modified.ClusterName + ":" + p
+		}
+	}
+
+	// Recompute status: if any prerequisite is unmet, lock the wave.
+	modified.Status = "available"
+	for _, prereq := range modified.Prerequisites {
+		if !completed[prereq] {
+			modified.Status = "locked"
+			break
+		}
+	}
+	return modified
+}
+
+// PropagateWaveUpdate writes the updated wave back into the waves slice,
+// matching by WaveKey so that subsequent AvailableWaves calls see the new state.
+func PropagateWaveUpdate(waves []Wave, updated Wave) {
+	key := WaveKey(updated)
+	for i := range waves {
+		if WaveKey(waves[i]) == key {
+			waves[i] = updated
+			return
+		}
+	}
 }
 
 // BuildCompletedWaveMap returns a set of completed waves keyed by WaveKey (ClusterName:ID).

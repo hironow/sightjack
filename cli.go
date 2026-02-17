@@ -61,30 +61,32 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 	return waves[num-1], nil
 }
 
-// PromptWaveApproval displays a wave proposal and reads approve/reject.
-func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave Wave) (bool, error) {
+// PromptWaveApproval displays a wave proposal and reads approve/reject/discuss.
+func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave Wave) (ApprovalChoice, error) {
 	fmt.Fprintf(w, "\n--- %s - %s ---\n", wave.ClusterName, wave.Title)
 	fmt.Fprintf(w, "  Proposed actions (%d):\n", len(wave.Actions))
 	for i, a := range wave.Actions {
 		fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
 	}
 	fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
-	fmt.Fprint(w, "\n  [a] Approve all  [r] Reject  [q] Back to navigator: ")
+	fmt.Fprint(w, "\n  [a] Approve all  [r] Reject  [d] Discuss  [q] Back to navigator: ")
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return false, ErrQuit
+		return ApprovalQuit, ErrQuit
 	}
 	input := strings.TrimSpace(strings.ToLower(line))
 	switch input {
 	case "a":
-		return true, nil
+		return ApprovalApprove, nil
 	case "r":
-		return false, nil
+		return ApprovalReject, nil
+	case "d":
+		return ApprovalDiscuss, nil
 	case "q":
-		return false, ErrQuit
+		return ApprovalQuit, ErrQuit
 	default:
-		return false, fmt.Errorf("invalid input: %s", input)
+		return ApprovalQuit, fmt.Errorf("invalid input: %s", input)
 	}
 }
 
@@ -96,5 +98,39 @@ func DisplayRippleEffects(w io.Writer, ripples []Ripple) {
 	fmt.Fprintln(w, "\n  Ripple effects:")
 	for _, r := range ripples {
 		fmt.Fprintf(w, "    -> %s: %s\n", r.ClusterName, r.Description)
+	}
+}
+
+// PromptDiscussTopic reads a free-text discussion topic from the user.
+func PromptDiscussTopic(ctx context.Context, w io.Writer, s *bufio.Scanner) (string, error) {
+	fmt.Fprint(w, "\n  Topic: ")
+
+	line, err := ScanLine(ctx, s)
+	if err != nil {
+		return "", ErrQuit
+	}
+	input := strings.TrimSpace(line)
+	if strings.EqualFold(input, "q") {
+		return "", ErrQuit
+	}
+	if input == "" {
+		return "", fmt.Errorf("empty topic")
+	}
+	return input, nil
+}
+
+// DisplayArchitectResponse shows the architect's analysis and any wave modifications.
+func DisplayArchitectResponse(w io.Writer, resp *ArchitectResponse) {
+	fmt.Fprintf(w, "\n  [Architect] %s\n", resp.Analysis)
+	if resp.Reasoning != "" {
+		fmt.Fprintf(w, "\n  Reasoning: %s\n", resp.Reasoning)
+	}
+	if resp.ModifiedWave != nil {
+		fmt.Fprintf(w, "\n  Modified actions (%d):\n", len(resp.ModifiedWave.Actions))
+		for i, a := range resp.ModifiedWave.Actions {
+			fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
+		}
+		fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n",
+			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100)
 	}
 }

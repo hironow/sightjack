@@ -43,6 +43,15 @@ type WaveApplyPromptData struct {
 	OutputPath  string
 }
 
+// ArchitectDiscussPromptData holds template data for the architect discussion prompt.
+type ArchitectDiscussPromptData struct {
+	ClusterName string
+	WaveTitle   string
+	WaveActions string
+	Topic       string
+	OutputPath  string
+}
+
 func renderTemplate(name string, data any) (string, error) {
 	tmpl, err := template.ParseFS(promptFS, name)
 	if err != nil {
@@ -76,5 +85,11 @@ func RenderWaveGeneratePrompt(lang string, data WaveGeneratePromptData) (string,
 // RenderWaveApplyPrompt renders the wave apply prompt for the given language.
 func RenderWaveApplyPrompt(lang string, data WaveApplyPromptData) (string, error) {
 	name := fmt.Sprintf("prompts/templates/wave_apply_%s.md.tmpl", lang)
+	return renderTemplate(name, data)
+}
+
+// RenderArchitectDiscussPrompt renders the architect discussion prompt for the given language.
+func RenderArchitectDiscussPrompt(lang string, data ArchitectDiscussPromptData) (string, error) {
+	name := fmt.Sprintf("prompts/templates/architect_discuss_%s.md.tmpl", lang)
 	return renderTemplate(name, data)
 }

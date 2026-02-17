@@ -151,6 +151,122 @@ func TestRenderWaveApplyPrompt_English(t *testing.T) {
 	}
 }
 
+func TestRenderArchitectDiscussPrompt(t *testing.T) {
+	// given
+	data := ArchitectDiscussPromptData{
+		ClusterName: "Auth",
+		WaveTitle:   "Dependency Ordering",
+		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101","description":"Auth before token"}]`,
+		Topic:       "Should we split ENG-101?",
+		OutputPath:  "/tmp/architect_auth_auth-w1.json",
+	}
+
+	// when
+	result, err := RenderArchitectDiscussPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Auth") {
+		t.Error("expected cluster name in output")
+	}
+	if !strings.Contains(result, "Should we split ENG-101?") {
+		t.Error("expected topic in output")
+	}
+	if !strings.Contains(result, "/tmp/architect_auth_auth-w1.json") {
+		t.Error("expected output path in output")
+	}
+}
+
+func TestRenderArchitectDiscussPrompt_Japanese(t *testing.T) {
+	// given
+	data := ArchitectDiscussPromptData{
+		ClusterName: "Auth",
+		WaveTitle:   "Dependency Ordering",
+		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101"}]`,
+		Topic:       "ENG-101を分割すべき？",
+		OutputPath:  "/tmp/out.json",
+	}
+
+	// when
+	result, err := RenderArchitectDiscussPrompt("ja", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Architect Agent") {
+		t.Error("expected Architect Agent in Japanese prompt")
+	}
+	if !strings.Contains(result, "Auth") {
+		t.Error("expected cluster name in output")
+	}
+}
+
+func TestRenderArchitectDiscussPrompt_UnsupportedLang(t *testing.T) {
+	// given: unsupported language code
+	data := ArchitectDiscussPromptData{
+		ClusterName: "Auth",
+		WaveTitle:   "Test",
+		WaveActions: "[]",
+		Topic:       "test",
+		OutputPath:  "/tmp/out.json",
+	}
+
+	// when
+	_, err := RenderArchitectDiscussPrompt("fr", data)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for unsupported language")
+	}
+}
+
+func TestRenderArchitectDiscussPrompt_SpecialCharsInTopic(t *testing.T) {
+	// given: topic containing Go template delimiters — should pass through as data, not template syntax
+	data := ArchitectDiscussPromptData{
+		ClusterName: "Auth",
+		WaveTitle:   "Test",
+		WaveActions: "[]",
+		Topic:       "What if we use {{interface}} here?",
+		OutputPath:  "/tmp/out.json",
+	}
+
+	// when
+	result, err := RenderArchitectDiscussPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result, "{{interface}}") {
+		t.Error("expected template delimiters in topic to pass through as literal text")
+	}
+}
+
+func TestRenderArchitectDiscussPrompt_EmptyWaveActions(t *testing.T) {
+	// given: empty string for WaveActions (not "[]" or "null")
+	data := ArchitectDiscussPromptData{
+		ClusterName: "Auth",
+		WaveTitle:   "Test",
+		WaveActions: "",
+		Topic:       "test topic",
+		OutputPath:  "/tmp/out.json",
+	}
+
+	// when
+	result, err := RenderArchitectDiscussPrompt("en", data)
+
+	// then: renders successfully with empty section
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result, "Auth") {
+		t.Error("expected cluster name in output")
+	}
+}
+
 func TestRenderClassifyPrompt_English(t *testing.T) {
 	// given
 	data := ClassifyPromptData{
