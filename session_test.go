@@ -669,3 +669,35 @@ func TestApplyModifiedWave_PreservesOriginalDeltaWhenZero(t *testing.T) {
 		t.Errorf("expected original delta {0.25, 0.50}, got {%v, %v}", result.Delta.Before, result.Delta.After)
 	}
 }
+
+func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
+	// given: original wave has actions, modified wave omits them (nil from JSON)
+	originalActions := []WaveAction{
+		{Type: "add_dod", IssueID: "ENG-101", Description: "Original action 1"},
+		{Type: "add_dependency", IssueID: "ENG-102", Description: "Original action 2"},
+	}
+	original := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Original",
+		Status:      "available",
+		Actions:     originalActions,
+		Delta:       WaveDelta{Before: 0.20, After: 0.40},
+	}
+	modified := Wave{
+		Title:   "Modified Title",
+		Actions: nil, // architect omitted the field
+	}
+	completed := map[string]bool{}
+
+	// when
+	result := ApplyModifiedWave(original, modified, completed)
+
+	// then: actions should fall back to original
+	if len(result.Actions) != 2 {
+		t.Fatalf("expected 2 original actions preserved, got %d", len(result.Actions))
+	}
+	if result.Actions[0].IssueID != "ENG-101" {
+		t.Errorf("expected first action ENG-101, got %s", result.Actions[0].IssueID)
+	}
+}

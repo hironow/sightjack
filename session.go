@@ -214,12 +214,13 @@ func ApplyModifiedWave(original, modified Wave, completed map[string]bool) Wave 
 	modified.ID = original.ID
 	modified.ClusterName = original.ClusterName
 
-	// Preserve original prerequisites when architect omits the field (nil from JSON).
+	// Preserve original fields when architect omits them (nil/zero from JSON).
+	if modified.Actions == nil {
+		modified.Actions = original.Actions
+	}
 	if modified.Prerequisites == nil {
 		modified.Prerequisites = original.Prerequisites
 	}
-
-	// Preserve original delta when architect omits the field (zero value from JSON).
 	if modified.Delta == (WaveDelta{}) {
 		modified.Delta = original.Delta
 	}
