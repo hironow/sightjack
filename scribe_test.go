@@ -266,3 +266,45 @@ func TestSanitizeADRTitle_Empty(t *testing.T) {
 		t.Errorf("expected 'untitled' for empty title, got %s", result)
 	}
 }
+
+func TestCountADRFiles_EmptyDir(t *testing.T) {
+	// given
+	dir := t.TempDir()
+
+	// when
+	count := CountADRFiles(dir)
+
+	// then
+	if count != 0 {
+		t.Errorf("expected 0 for empty dir, got %d", count)
+	}
+}
+
+func TestCountADRFiles_WithMatchingAndNonMatching(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "0001-foo.md"), []byte(""), 0644)
+	os.WriteFile(filepath.Join(dir, "0003-bar.md"), []byte(""), 0644)
+	os.WriteFile(filepath.Join(dir, "README.md"), []byte(""), 0644)
+
+	// when
+	count := CountADRFiles(dir)
+
+	// then: only 2 files match NNNN-*.md pattern
+	if count != 2 {
+		t.Errorf("expected 2, got %d", count)
+	}
+}
+
+func TestCountADRFiles_NonexistentDir(t *testing.T) {
+	// given
+	dir := filepath.Join(t.TempDir(), "nonexistent")
+
+	// when
+	count := CountADRFiles(dir)
+
+	// then
+	if count != 0 {
+		t.Errorf("expected 0 for non-existent dir, got %d", count)
+	}
+}

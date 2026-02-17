@@ -72,7 +72,8 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 
 	completed := BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
-	adrCount := 0
+	adrDir := filepath.Join(baseDir, "docs", "adr")
+	adrCount := CountADRFiles(adrDir)
 
 	// --- Interactive Loop ---
 	for {
@@ -140,7 +141,6 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 					}
 					// Trigger Scribe to generate ADR for the modification
 					if cfg.Scribe.Enabled {
-						adrDir := filepath.Join(baseDir, "docs", "adr")
 						scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir)
 						if scribeErr != nil {
 							LogWarn("Scribe failed (non-fatal): %v", scribeErr)

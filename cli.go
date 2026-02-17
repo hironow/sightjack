@@ -138,5 +138,5 @@ func DisplayArchitectResponse(w io.Writer, resp *ArchitectResponse) {
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
-	fmt.Fprintf(w, "  Saved to docs/adr/%s-%s.md\n", resp.ADRID, resp.Title)
+	fmt.Fprintf(w, "  Saved to docs/adr/%s-%s.md\n", resp.ADRID, sanitizeADRTitle(resp.Title))
 }

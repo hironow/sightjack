@@ -55,6 +55,22 @@ func sanitizeADRTitle(title string) string {
 	return s
 }
 
+// CountADRFiles returns the number of files matching NNNN-*.md in adrDir.
+// Returns 0 if the directory is empty or does not exist.
+func CountADRFiles(adrDir string) int {
+	entries, err := os.ReadDir(adrDir)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, e := range entries {
+		if !e.IsDir() && adrPattern.MatchString(e.Name()) {
+			count++
+		}
+	}
+	return count
+}
+
 // scribeFileName returns the output filename for a scribe run.
 func scribeFileName(wave Wave) string {
 	return fmt.Sprintf("scribe_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))

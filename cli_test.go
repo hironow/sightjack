@@ -525,3 +525,22 @@ func TestDisplayScribeResponse_EmptyTitle(t *testing.T) {
 		t.Error("expected ADR ID in output")
 	}
 }
+
+func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
+	// given: title with uppercase and spaces (would be sanitized on write)
+	resp := &ScribeResponse{
+		ADRID:   "0005",
+		Title:   "Use FastAPI for API Layer",
+		Content: "# 0005. Use FastAPI for API Layer",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayScribeResponse(&output, resp)
+
+	// then: "Saved to" line should show sanitized filename, not raw title
+	out := output.String()
+	if !strings.Contains(out, "use_fastapi_for_api_layer") {
+		t.Errorf("expected sanitized title in file path, got: %s", out)
+	}
+}
