@@ -286,3 +286,83 @@ func TestRenderClassifyPrompt_English(t *testing.T) {
 		t.Error("expected Scanner Agent in English prompt")
 	}
 }
+
+func TestRenderScribeADRPrompt_English(t *testing.T) {
+	// given
+	data := ScribeADRPromptData{
+		ClusterName: "Auth",
+		WaveTitle:   "Dependency Ordering",
+		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101"}]`,
+		Analysis:    "Splitting recommended.",
+		Reasoning:   "Project scale favors smaller batches.",
+		ADRNumber:   "0003",
+		OutputPath:  "/tmp/scribe_auth_auth-w1.json",
+	}
+
+	// when
+	result, err := RenderScribeADRPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Scribe Agent") {
+		t.Error("expected Scribe Agent in English prompt")
+	}
+	if !strings.Contains(result, "Auth") {
+		t.Error("expected cluster name in prompt")
+	}
+	if !strings.Contains(result, "0003") {
+		t.Error("expected ADR number in prompt")
+	}
+	if !strings.Contains(result, "/tmp/scribe_auth_auth-w1.json") {
+		t.Error("expected output path in prompt")
+	}
+}
+
+func TestRenderScribeADRPrompt_Japanese(t *testing.T) {
+	// given
+	data := ScribeADRPromptData{
+		ClusterName: "Auth",
+		WaveTitle:   "Dependency Ordering",
+		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101"}]`,
+		Analysis:    "分割を推奨。",
+		Reasoning:   "プロジェクト規模に適している。",
+		ADRNumber:   "0001",
+		OutputPath:  "/tmp/scribe.json",
+	}
+
+	// when
+	result, err := RenderScribeADRPrompt("ja", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Scribe Agent") {
+		t.Error("expected Scribe Agent in Japanese prompt")
+	}
+	if !strings.Contains(result, "Auth") {
+		t.Error("expected cluster name in prompt")
+	}
+	if !strings.Contains(result, "0001") {
+		t.Error("expected ADR number in prompt")
+	}
+}
+
+func TestRenderScribeADRPrompt_UnsupportedLang(t *testing.T) {
+	// given
+	data := ScribeADRPromptData{
+		ClusterName: "Auth",
+		ADRNumber:   "0001",
+		OutputPath:  "/tmp/out.json",
+	}
+
+	// when
+	_, err := RenderScribeADRPrompt("fr", data)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for unsupported language")
+	}
+}

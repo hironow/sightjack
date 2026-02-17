@@ -66,6 +66,7 @@ type SessionState struct {
 	Completeness float64        `json:"completeness"`
 	Clusters     []ClusterState `json:"clusters"`
 	Waves        []WaveState    `json:"waves,omitempty"`
+	ADRCount     int            `json:"adr_count,omitempty"`
 }
 
 // ClusterState is the per-cluster state within SessionState.
@@ -140,6 +141,14 @@ const (
 	ApprovalDiscuss
 	ApprovalQuit
 )
+
+// ScribeResponse is the output of the Scribe Agent (ADR generation).
+type ScribeResponse struct {
+	ADRID     string `json:"adr_id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Reasoning string `json:"reasoning"`
+}
 
 // ArchitectResponse is the output of an architect discussion round.
 type ArchitectResponse struct {

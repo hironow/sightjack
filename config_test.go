@@ -185,3 +185,61 @@ func TestLoadConfig_FileNotFound(t *testing.T) {
 		t.Error("expected error for missing config file")
 	}
 }
+
+func TestDefaultConfig_ScribeEnabled(t *testing.T) {
+	// given/when
+	cfg := DefaultConfig()
+
+	// then
+	if !cfg.Scribe.Enabled {
+		t.Error("expected Scribe.Enabled to be true by default")
+	}
+}
+
+func TestLoadConfig_ScribeDisabled(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+scribe:
+  enabled: false
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	cfg, err := LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Scribe.Enabled {
+		t.Error("expected Scribe.Enabled to be false")
+	}
+}
+
+func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
+	// given: config without scribe section
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	err := os.WriteFile(cfgPath, []byte(`
+linear:
+  team: "TEST"
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	cfg, err := LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Scribe.Enabled {
+		t.Error("expected Scribe.Enabled to default to true when section missing")
+	}
+}

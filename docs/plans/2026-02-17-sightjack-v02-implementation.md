@@ -763,7 +763,7 @@ func TestRenderNavigator_WithWaves(t *testing.T) {
 		{ID: "api-w1", ClusterName: "API", Title: "Split", Status: "available"},
 	}
 
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
 
 	if !strings.Contains(nav, "[ ]") {
 		t.Error("expected [ ] for available wave")
@@ -787,7 +787,7 @@ func TestRenderNavigator_WithCompletedWave(t *testing.T) {
 		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
 	}
 
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
 
 	if !strings.Contains(nav, "[=]") {
 		t.Error("expected [=] for completed wave")
@@ -807,7 +807,7 @@ Add a new function `RenderNavigatorWithWaves` that groups waves by cluster and r
 ```go
 // RenderNavigatorWithWaves renders the Link Navigator with actual wave data.
 // Wave status symbols: [ ] available  [x] locked  [=] completed
-func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave) string {
+func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave, adrCount int) string {
 	// Group waves by cluster name
 	wavesByCluster := make(map[string][]Wave)
 	for _, w := range waves {
@@ -1414,7 +1414,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 
 		// Display Link Navigator
-		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves)
+		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount)
 		fmt.Println()
 		fmt.Print(nav)
 

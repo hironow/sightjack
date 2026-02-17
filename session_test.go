@@ -80,6 +80,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 			Team:    "ENG",
 			Project: "Test",
 		},
+		Scribe: ScribeConfig{Enabled: true},
 	}
 	sessionID := "test-dry-run"
 	ctx := context.Background()
@@ -109,6 +110,50 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	architectPrompt := filepath.Join(scanDir, "architect_sample_sample-w1_prompt.md")
 	if _, err := os.Stat(architectPrompt); os.IsNotExist(err) {
 		t.Error("architect_sample_sample-w1_prompt.md not generated — dry-run did not reach architect step")
+	}
+
+	// then: scribe ADR prompt was generated
+	scribePrompt := filepath.Join(scanDir, "scribe_sample_sample-w1_prompt.md")
+	if _, err := os.Stat(scribePrompt); os.IsNotExist(err) {
+		t.Error("scribe_sample_sample-w1_prompt.md not generated — dry-run did not reach scribe step")
+	}
+}
+
+func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
+	// given: dry-run with Scribe disabled
+	baseDir := t.TempDir()
+	cfg := &Config{
+		Lang: "en",
+		Claude: ClaudeConfig{
+			Command:    "claude",
+			TimeoutSec: 60,
+		},
+		Scan: ScanConfig{
+			MaxConcurrency: 1,
+			ChunkSize:      50,
+		},
+		Linear: LinearConfig{
+			Team:    "ENG",
+			Project: "Test",
+		},
+		Scribe: ScribeConfig{Enabled: false},
+	}
+	sessionID := "test-dry-run-no-scribe"
+	ctx := context.Background()
+
+	// when
+	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// then: scribe prompt should NOT be generated
+	scanDir := ScanDir(baseDir, sessionID)
+	scribePrompt := filepath.Join(scanDir, "scribe_sample_sample-w1_prompt.md")
+	if _, err := os.Stat(scribePrompt); !os.IsNotExist(err) {
+		t.Error("scribe prompt should not be generated when Scribe is disabled")
 	}
 }
 

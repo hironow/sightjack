@@ -134,3 +134,9 @@ func DisplayArchitectResponse(w io.Writer, resp *ArchitectResponse) {
 			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100)
 	}
 }
+
+// DisplayScribeResponse shows the scribe's ADR generation result.
+func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
+	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
+	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", adrSubdir, resp.ADRID, sanitizeADRTitle(resp.Title))
+}

@@ -478,3 +478,69 @@ func TestDisplayArchitectResponse_ModifiedWaveNilActions(t *testing.T) {
 		t.Errorf("expected 'Modified actions (0)' for nil actions, got: %s", out)
 	}
 }
+
+func TestDisplayScribeResponse(t *testing.T) {
+	// given
+	resp := &ScribeResponse{
+		ADRID:     "0003",
+		Title:     "adopt-event-sourcing",
+		Content:   "# 0003. Adopt Event Sourcing",
+		Reasoning: "Discussion revealed need for event sourcing.",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayScribeResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "[Scribe]") {
+		t.Error("expected [Scribe] label in output")
+	}
+	if !strings.Contains(out, "0003") {
+		t.Error("expected ADR ID in output")
+	}
+	if !strings.Contains(out, "adopt-event-sourcing") {
+		t.Error("expected ADR title in output")
+	}
+}
+
+func TestDisplayScribeResponse_EmptyTitle(t *testing.T) {
+	// given
+	resp := &ScribeResponse{
+		ADRID: "0001",
+		Title: "",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayScribeResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "[Scribe]") {
+		t.Error("expected [Scribe] label even with empty title")
+	}
+	if !strings.Contains(out, "0001") {
+		t.Error("expected ADR ID in output")
+	}
+}
+
+func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
+	// given: title with uppercase and spaces (would be sanitized on write)
+	resp := &ScribeResponse{
+		ADRID:   "0005",
+		Title:   "Use FastAPI for API Layer",
+		Content: "# 0005. Use FastAPI for API Layer",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayScribeResponse(&output, resp)
+
+	// then: "Saved to" line should show sanitized filename, not raw title
+	out := output.String()
+	if !strings.Contains(out, "use_fastapi_for_api_layer") {
+		t.Errorf("expected sanitized title in file path, got: %s", out)
+	}
+}
