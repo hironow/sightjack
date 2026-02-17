@@ -308,3 +308,42 @@ func TestCountADRFiles_NonexistentDir(t *testing.T) {
 		t.Errorf("expected 0 for non-existent dir, got %d", count)
 	}
 }
+
+func TestNormalizeScribeResult_MatchingID(t *testing.T) {
+	// given: Claude returned matching adr_id
+	result := &ScribeResponse{ADRID: "0003", Title: "test"}
+
+	// when
+	normalizeScribeResult(result, "0003")
+
+	// then: no change
+	if result.ADRID != "0003" {
+		t.Errorf("expected 0003, got %s", result.ADRID)
+	}
+}
+
+func TestNormalizeScribeResult_MismatchID(t *testing.T) {
+	// given: Claude returned wrong adr_id
+	result := &ScribeResponse{ADRID: "9999", Title: "test"}
+
+	// when
+	normalizeScribeResult(result, "0003")
+
+	// then: overwritten with authoritative ID
+	if result.ADRID != "0003" {
+		t.Errorf("expected 0003, got %s", result.ADRID)
+	}
+}
+
+func TestNormalizeScribeResult_EmptyID(t *testing.T) {
+	// given: Claude returned empty adr_id
+	result := &ScribeResponse{ADRID: "", Title: "test"}
+
+	// when
+	normalizeScribeResult(result, "0003")
+
+	// then: filled with authoritative ID
+	if result.ADRID != "0003" {
+		t.Errorf("expected 0003, got %s", result.ADRID)
+	}
+}

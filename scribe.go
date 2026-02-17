@@ -121,6 +121,18 @@ func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *A
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName)
 }
 
+// normalizeScribeResult ensures the parsed ADRID matches the filesystem-derived
+// adrID. Claude may return a mismatched or empty adr_id; the generated ID is
+// authoritative because it is used to name the ADR file on disk.
+func normalizeScribeResult(result *ScribeResponse, adrID string) {
+	if result.ADRID != adrID {
+		if result.ADRID != "" {
+			LogScan("Scribe ADR ID mismatch: generated %s, parsed %s; using %s", adrID, result.ADRID, adrID)
+		}
+		result.ADRID = adrID
+	}
+}
+
 // ParseScribeResult reads and parses a scribe response JSON file.
 func ParseScribeResult(path string) (*ScribeResponse, error) {
 	data, err := os.ReadFile(path)
@@ -172,6 +184,7 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 	if err != nil {
 		return nil, fmt.Errorf("parse scribe result %s: %w", wave.ID, err)
 	}
+	normalizeScribeResult(result, adrID)
 
 	// Write ADR file to adrDir (sanitize title to prevent path traversal)
 	if err := os.MkdirAll(adrDir, 0755); err != nil {
