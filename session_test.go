@@ -1076,8 +1076,8 @@ func TestResumeSession_RestoresWavesFromState(t *testing.T) {
 	if resumedScanResult.Completeness != 0.50 {
 		t.Errorf("expected completeness 0.50, got %f", resumedScanResult.Completeness)
 	}
-	if adrCount != 2 {
-		t.Errorf("expected adrCount 2, got %d", adrCount)
+	if adrCount != 0 {
+		t.Errorf("expected adrCount 0 (no ADR files on disk), got %d", adrCount)
 	}
 }
 
@@ -1167,5 +1167,51 @@ func TestResumeSession_ErrorOnMissingScanResultFile(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "load cached scan result") {
 		t.Errorf("expected load error, got: %v", err)
+	}
+}
+
+func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
+	// given: state says ADRCount=2, but filesystem has 3 ADR files
+	baseDir := t.TempDir()
+	scanDir := filepath.Join(baseDir, ".siren", "scans", "old-session")
+	os.MkdirAll(scanDir, 0755)
+
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50, Issues: []IssueDetail{{ID: "E1", Identifier: "E1", Title: "t"}}}},
+		TotalIssues:  1,
+		Completeness: 0.50,
+	}
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("write scan result: %v", err)
+	}
+
+	// Create 3 ADR files on filesystem
+	adrDir := ADRDir(baseDir)
+	os.MkdirAll(adrDir, 0755)
+	for _, name := range []string{"0001-first.md", "0002-second.md", "0003-third.md"} {
+		os.WriteFile(filepath.Join(adrDir, name), []byte("# ADR"), 0644)
+	}
+
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: scanResultPath,
+		Waves:          []WaveState{{ID: "w1", ClusterName: "Auth", Status: "available"}},
+		ADRCount:       2, // stale: says 2 but filesystem has 3
+	}
+	if err := WriteState(baseDir, state); err != nil {
+		t.Fatalf("write state: %v", err)
+	}
+
+	// when
+	_, _, _, adrCount, err := ResumeSession(baseDir, state)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if adrCount != 3 {
+		t.Errorf("expected adrCount 3 (from filesystem), got %d", adrCount)
 	}
 }

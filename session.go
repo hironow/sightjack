@@ -245,7 +245,8 @@ func ResumeSession(baseDir string, state *SessionState) (*ScanResult, []Wave, ma
 	}
 	waves := RestoreWaves(state.Waves)
 	completed := BuildCompletedWaveMap(waves)
-	return scanResult, waves, completed, state.ADRCount, nil
+	adrCount := CountADRFiles(ADRDir(baseDir))
+	return scanResult, waves, completed, adrCount, nil
 }
 
 // RunResumeSession resumes an existing session from saved state.
@@ -295,9 +296,9 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	waves = MergeCompletedStatus(oldCompleted, waves)
 	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
 	completed := BuildCompletedWaveMap(waves)
-	adrCount := oldState.ADRCount
-	scanner := bufio.NewScanner(input)
 	adrDir := ADRDir(baseDir)
+	adrCount := CountADRFiles(adrDir)
+	scanner := bufio.NewScanner(input)
 
 	LogOK("Re-scanned: %d clusters, %d waves (%d previously completed)",
 		len(scanResult.Clusters), len(waves), len(completed))
