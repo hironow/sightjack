@@ -147,6 +147,55 @@ func TestSessionState_ADRCount_ZeroOmitted(t *testing.T) {
 	}
 }
 
+func TestWaveState_FullFieldsRoundTrip(t *testing.T) {
+	// given: WaveState with all v0.5 fields populated
+	state := &SessionState{
+		Version:   "0.5",
+		SessionID: "test-full-wave",
+		Waves: []WaveState{
+			{
+				ID:            "auth-w1",
+				ClusterName:   "Auth",
+				Title:         "Dependency Ordering",
+				Status:        "completed",
+				Prerequisites: []string{"Auth:auth-w0"},
+				ActionCount:   2,
+				Actions: []WaveAction{
+					{Type: "add_dependency", IssueID: "ENG-101", Description: "Add dep"},
+					{Type: "add_dod", IssueID: "ENG-102", Description: "Add DoD"},
+				},
+				Description: "Order dependencies first",
+				Delta:       WaveDelta{Before: 0.25, After: 0.50},
+			},
+		},
+	}
+
+	// when: round-trip through WriteState / ReadState
+	dir := t.TempDir()
+	if err := WriteState(dir, state); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	loaded, err := ReadState(dir)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	// then
+	w := loaded.Waves[0]
+	if len(w.Actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(w.Actions))
+	}
+	if w.Actions[0].Type != "add_dependency" {
+		t.Errorf("expected add_dependency, got %s", w.Actions[0].Type)
+	}
+	if w.Description != "Order dependencies first" {
+		t.Errorf("expected description, got %s", w.Description)
+	}
+	if w.Delta.Before != 0.25 || w.Delta.After != 0.50 {
+		t.Errorf("expected delta {0.25, 0.50}, got {%v, %v}", w.Delta.Before, w.Delta.After)
+	}
+}
+
 func TestSessionState_ADRCount_WriteAndRead(t *testing.T) {
 	// given
 	dir := t.TempDir()

@@ -78,12 +78,15 @@ type ClusterState struct {
 
 // WaveState is the per-wave state within SessionState.
 type WaveState struct {
-	ID            string   `json:"id"`
-	ClusterName   string   `json:"cluster_name"`
-	Title         string   `json:"title"`
-	Status        string   `json:"status"`
-	Prerequisites []string `json:"prerequisites,omitempty"`
-	ActionCount   int      `json:"action_count"`
+	ID            string       `json:"id"`
+	ClusterName   string       `json:"cluster_name"`
+	Title         string       `json:"title"`
+	Status        string       `json:"status"`
+	Prerequisites []string     `json:"prerequisites,omitempty"`
+	ActionCount   int          `json:"action_count"`
+	Actions       []WaveAction `json:"actions,omitempty"`
+	Description   string       `json:"description,omitempty"`
+	Delta         WaveDelta    `json:"delta,omitempty"`
 }
 
 // Wave is a unit of work proposed by AI for a cluster.
