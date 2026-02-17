@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -122,6 +123,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 				DisplayArchitectResponse(os.Stdout, result)
 				if result.ModifiedWave != nil {
 					selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+					PropagateWaveUpdate(waves, selected)
 					if selected.Status == "locked" {
 						LogWarn("Architect added unmet prerequisites — wave is now locked.")
 						break
@@ -212,6 +214,13 @@ func ApplyModifiedWave(original, modified Wave, completed map[string]bool) Wave 
 	modified.ID = original.ID
 	modified.ClusterName = original.ClusterName
 
+	// Normalize bare prerequisite IDs to composite "ClusterName:ID" format.
+	for i, p := range modified.Prerequisites {
+		if !strings.Contains(p, ":") {
+			modified.Prerequisites[i] = modified.ClusterName + ":" + p
+		}
+	}
+
 	// Recompute status: if any prerequisite is unmet, lock the wave.
 	modified.Status = "available"
 	for _, prereq := range modified.Prerequisites {
@@ -221,6 +230,18 @@ func ApplyModifiedWave(original, modified Wave, completed map[string]bool) Wave 
 		}
 	}
 	return modified
+}
+
+// PropagateWaveUpdate writes the updated wave back into the waves slice,
+// matching by WaveKey so that subsequent AvailableWaves calls see the new state.
+func PropagateWaveUpdate(waves []Wave, updated Wave) {
+	key := WaveKey(updated)
+	for i := range waves {
+		if WaveKey(waves[i]) == key {
+			waves[i] = updated
+			return
+		}
+	}
 }
 
 // BuildCompletedWaveMap returns a set of completed waves keyed by WaveKey (ClusterName:ID).

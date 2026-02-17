@@ -546,3 +546,71 @@ func TestApplyModifiedWave_AvailableWhenPrereqsMet(t *testing.T) {
 		t.Errorf("expected 'available' for met prerequisites, got '%s'", result.Status)
 	}
 }
+
+func TestApplyModifiedWave_NormalizesBarePrerequisites(t *testing.T) {
+	// given: architect returns bare ID "auth-w1" instead of composite "Auth:auth-w1"
+	original := Wave{
+		ID:          "auth-w2",
+		ClusterName: "Auth",
+		Title:       "Original",
+		Status:      "available",
+	}
+	modified := Wave{
+		ID:            "auth-w2",
+		ClusterName:   "Auth",
+		Title:         "Modified",
+		Prerequisites: []string{"auth-w1"}, // bare ID, not composite
+		Actions:       []WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
+	}
+	// given: "Auth:auth-w1" IS completed (composite key)
+	completed := map[string]bool{"Auth:auth-w1": true}
+
+	// when
+	result := ApplyModifiedWave(original, modified, completed)
+
+	// then: should be "available" because bare "auth-w1" normalizes to "Auth:auth-w1"
+	if result.Status != "available" {
+		t.Errorf("expected 'available' after normalizing bare prereq, got '%s'", result.Status)
+	}
+	// then: prerequisites should be stored in normalized composite form
+	if len(result.Prerequisites) != 1 || result.Prerequisites[0] != "Auth:auth-w1" {
+		t.Errorf("expected normalized prereq 'Auth:auth-w1', got %v", result.Prerequisites)
+	}
+}
+
+func TestApplyModifiedWave_PropagatesLockToWaves(t *testing.T) {
+	// given: a waves slice and an architect-modified wave that becomes locked
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Wave 1", Status: "available"},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "Wave 2", Status: "available"},
+	}
+	modified := Wave{
+		ID:            "auth-w1",
+		ClusterName:   "Auth",
+		Title:         "Modified",
+		Prerequisites: []string{"API:api-w1"}, // unmet
+		Actions:       []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
+	}
+	completed := map[string]bool{}
+
+	// when: apply modification
+	result := ApplyModifiedWave(waves[0], modified, completed)
+	if result.Status != "locked" {
+		t.Fatalf("precondition: expected locked, got %s", result.Status)
+	}
+
+	// when: propagate back to waves slice
+	PropagateWaveUpdate(waves, result)
+
+	// then: the waves slice entry should be updated
+	if waves[0].Status != "locked" {
+		t.Errorf("expected waves[0] to be locked, got '%s'", waves[0].Status)
+	}
+	if waves[0].Title != "Modified" {
+		t.Errorf("expected waves[0] title to be updated, got '%s'", waves[0].Title)
+	}
+	// other waves unaffected
+	if waves[1].Status != "available" {
+		t.Errorf("expected waves[1] unchanged, got '%s'", waves[1].Status)
+	}
+}
