@@ -316,6 +316,9 @@ func BuildWaveStates(waves []Wave) []WaveState {
 			Status:        w.Status,
 			Prerequisites: w.Prerequisites,
 			ActionCount:   len(w.Actions),
+			Actions:       w.Actions,
+			Description:   w.Description,
+			Delta:         w.Delta,
 		}
 	}
 	return states

@@ -787,6 +787,40 @@ func TestMergeCompletedStatus_EmptyNew(t *testing.T) {
 	}
 }
 
+func TestBuildWaveStates_IncludesFullFields(t *testing.T) {
+	// given
+	waves := []Wave{
+		{
+			ID:            "auth-w1",
+			ClusterName:   "Auth",
+			Title:         "Deps",
+			Status:        "completed",
+			Prerequisites: []string{"Auth:auth-w0"},
+			Actions: []WaveAction{
+				{Type: "add_dependency", IssueID: "ENG-101", Description: "dep"},
+				{Type: "add_dod", IssueID: "ENG-102", Description: "dod"},
+			},
+			Description: "Order dependencies first",
+			Delta:       WaveDelta{Before: 0.20, After: 0.40},
+		},
+	}
+
+	// when
+	states := BuildWaveStates(waves)
+
+	// then
+	s := states[0]
+	if len(s.Actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(s.Actions))
+	}
+	if s.Description != "Order dependencies first" {
+		t.Errorf("expected description, got %s", s.Description)
+	}
+	if s.Delta.Before != 0.20 || s.Delta.After != 0.40 {
+		t.Errorf("expected delta {0.20, 0.40}, got {%v, %v}", s.Delta.Before, s.Delta.After)
+	}
+}
+
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
 	originalActions := []WaveAction{
