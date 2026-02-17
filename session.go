@@ -64,6 +64,9 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		return nil
 	}
 
+	// Capture scan timestamp once so it stays stable across wave completions
+	scanTime := time.Now()
+
 	// Cache ScanResult for resume
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
@@ -84,7 +87,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &scanTime)
 }
 
 // runInteractiveLoop runs the wave selection/approval/apply loop shared by
@@ -301,6 +304,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if err != nil {
 		return fmt.Errorf("re-scan: %w", err)
 	}
+	scanTime := time.Now()
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		LogWarn("Failed to cache scan result: %v", err)
@@ -321,7 +325,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		len(scanResult.Clusters), len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &scanTime)
 }
 
 // BuildSessionState creates a SessionState from current session data.
