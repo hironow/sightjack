@@ -102,6 +102,10 @@ func main() {
 				} else {
 					switch choice {
 					case sightjack.ResumeChoiceResume:
+						if !sightjack.CanResume(existingState) {
+							sightjack.LogWarn("Cached scan data missing — starting fresh session instead.")
+							break // fall through to fresh session
+						}
 						if err := sightjack.RunResumeSession(ctx, cfg, baseDir, existingState, os.Stdin); err != nil {
 							sightjack.LogError("Resume failed: %v", err)
 							os.Exit(1)

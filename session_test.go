@@ -939,7 +939,7 @@ func TestBuildSessionState(t *testing.T) {
 	adrCount := 2
 
 	// when
-	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount)
+	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, nil)
 
 	// then
 	if state.Version != "0.5" {
@@ -974,6 +974,40 @@ func TestBuildSessionState(t *testing.T) {
 	}
 	if state.Project != "TestProject" {
 		t.Errorf("expected project TestProject, got %s", state.Project)
+	}
+}
+
+func TestBuildSessionState_PreservesLastScanned(t *testing.T) {
+	// given: a specific lastScanned time (simulating resume)
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50, Issues: make([]IssueDetail, 1)}},
+		Completeness: 0.50,
+	}
+	waves := []Wave{{ID: "w1", ClusterName: "Auth", Status: "available"}}
+	cfg := &Config{Linear: LinearConfig{Project: "P"}}
+	originalScanTime := time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC)
+
+	// when: BuildSessionState is called with a prior lastScanned
+	state := BuildSessionState(cfg, "s1", scanResult, waves, 0, &originalScanTime)
+
+	// then: LastScanned should be the original, not time.Now()
+	if !state.LastScanned.Equal(originalScanTime) {
+		t.Errorf("expected LastScanned %v, got %v", originalScanTime, state.LastScanned)
+	}
+}
+
+func TestBuildSessionState_NilLastScannedUsesNow(t *testing.T) {
+	// given
+	scanResult := &ScanResult{Completeness: 0.50}
+	cfg := &Config{Linear: LinearConfig{Project: "P"}}
+	before := time.Now()
+
+	// when: nil lastScanned means fresh session
+	state := BuildSessionState(cfg, "s1", scanResult, nil, 0, nil)
+
+	// then: LastScanned should be approximately now
+	if state.LastScanned.Before(before) {
+		t.Errorf("expected LastScanned >= %v, got %v", before, state.LastScanned)
 	}
 }
 
@@ -1213,5 +1247,41 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 	}
 	if adrCount != 3 {
 		t.Errorf("expected adrCount 3 (from filesystem), got %d", adrCount)
+	}
+}
+
+func TestCanResume_ValidState(t *testing.T) {
+	// given: state with valid ScanResultPath pointing to existing file
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
+	os.MkdirAll(scanDir, 0755)
+	path := filepath.Join(scanDir, "scan_result.json")
+	os.WriteFile(path, []byte(`{}`), 0644)
+
+	state := &SessionState{ScanResultPath: path}
+
+	// when / then
+	if !CanResume(state) {
+		t.Error("expected CanResume true for valid state")
+	}
+}
+
+func TestCanResume_EmptyPath(t *testing.T) {
+	// given: state with empty ScanResultPath (v0.4 upgrade)
+	state := &SessionState{ScanResultPath: ""}
+
+	// when / then
+	if CanResume(state) {
+		t.Error("expected CanResume false for empty path")
+	}
+}
+
+func TestCanResume_MissingFile(t *testing.T) {
+	// given: state with ScanResultPath pointing to deleted file
+	state := &SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
+
+	// when / then
+	if CanResume(state) {
+		t.Error("expected CanResume false for missing file")
 	}
 }

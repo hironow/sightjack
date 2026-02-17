@@ -212,7 +212,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		scanResult.CalculateCompleteness()
 
 		// Save state after each wave completion (crash resilience)
-		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount)
+		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, lastScanned)
 		midState.ScanResultPath = scanResultPath
 		if err := WriteState(baseDir, midState); err != nil {
 			LogWarn("Failed to save mid-session state: %v", err)
@@ -222,7 +222,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	}
 
 	// Save state
-	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount)
+	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, lastScanned)
 	state.ScanResultPath = scanResultPath
 	if err := WriteState(baseDir, state); err != nil {
 		LogWarn("Failed to save state: %v", err)
@@ -231,6 +231,17 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	}
 
 	return nil
+}
+
+// CanResume checks whether a saved session state supports resumption.
+// It returns false when the cached ScanResult path is empty (e.g. v0.4
+// state files) or the file no longer exists on disk.
+func CanResume(state *SessionState) bool {
+	if state.ScanResultPath == "" {
+		return false
+	}
+	_, err := os.Stat(state.ScanResultPath)
+	return err == nil
 }
 
 // ResumeSession loads a previous session's state and cached scan result,
@@ -308,12 +319,18 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 }
 
 // BuildSessionState creates a SessionState from current session data.
-func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, waves []Wave, adrCount int) *SessionState {
+// When lastScanned is non-nil the stored timestamp is preserved (resume);
+// otherwise it defaults to time.Now() (fresh scan).
+func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, waves []Wave, adrCount int, lastScanned *time.Time) *SessionState {
+	ts := time.Now()
+	if lastScanned != nil {
+		ts = *lastScanned
+	}
 	state := &SessionState{
 		Version:      "0.5",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
-		LastScanned:  time.Now(),
+		LastScanned:  ts,
 		Completeness: scanResult.Completeness,
 		Waves:        BuildWaveStates(waves),
 		ADRCount:     adrCount,
