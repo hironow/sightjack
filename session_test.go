@@ -614,3 +614,58 @@ func TestApplyModifiedWave_PropagatesLockToWaves(t *testing.T) {
 		t.Errorf("expected waves[1] unchanged, got '%s'", waves[1].Status)
 	}
 }
+
+func TestApplyModifiedWave_PreservesOriginalPrerequisitesWhenNil(t *testing.T) {
+	// given: original wave has prerequisites, modified wave omits them (nil from JSON)
+	original := Wave{
+		ID:            "auth-w2",
+		ClusterName:   "Auth",
+		Title:         "Original",
+		Status:        "locked",
+		Prerequisites: []string{"Auth:auth-w1"},
+		Delta:         WaveDelta{Before: 0.20, After: 0.40},
+	}
+	modified := Wave{
+		Title:         "Modified Title",
+		Prerequisites: nil, // architect omitted the field
+		Actions:       []WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
+	}
+	completed := map[string]bool{} // auth-w1 NOT completed
+
+	// when
+	result := ApplyModifiedWave(original, modified, completed)
+
+	// then: prerequisites should fall back to original, not be empty
+	if len(result.Prerequisites) != 1 || result.Prerequisites[0] != "Auth:auth-w1" {
+		t.Errorf("expected original prereqs preserved, got %v", result.Prerequisites)
+	}
+	// then: wave should be locked because auth-w1 is not completed
+	if result.Status != "locked" {
+		t.Errorf("expected 'locked' with unmet original prereqs, got '%s'", result.Status)
+	}
+}
+
+func TestApplyModifiedWave_PreservesOriginalDeltaWhenZero(t *testing.T) {
+	// given: original wave has meaningful delta, modified wave omits it (zero value from JSON)
+	original := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Original",
+		Status:      "available",
+		Delta:       WaveDelta{Before: 0.25, After: 0.50},
+	}
+	modified := Wave{
+		Title:   "Modified Title",
+		Actions: []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
+		Delta:   WaveDelta{}, // zero value — architect omitted the field
+	}
+	completed := map[string]bool{}
+
+	// when
+	result := ApplyModifiedWave(original, modified, completed)
+
+	// then: delta should fall back to original
+	if result.Delta.Before != 0.25 || result.Delta.After != 0.50 {
+		t.Errorf("expected original delta {0.25, 0.50}, got {%v, %v}", result.Delta.Before, result.Delta.After)
+	}
+}
