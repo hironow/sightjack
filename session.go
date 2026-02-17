@@ -86,7 +86,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 
 		// Display Link Navigator
-		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount)
+		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, nil)
 		fmt.Println()
 		fmt.Print(nav)
 
@@ -303,6 +303,24 @@ func MergeCompletedStatus(oldCompleted map[string]bool, newWaves []Wave) []Wave 
 		}
 	}
 	return result
+}
+
+// RestoreWaves converts persisted WaveState list back into Wave list for session resume.
+func RestoreWaves(states []WaveState) []Wave {
+	waves := make([]Wave, len(states))
+	for i, s := range states {
+		waves[i] = Wave{
+			ID:            s.ID,
+			ClusterName:   s.ClusterName,
+			Title:         s.Title,
+			Description:   s.Description,
+			Actions:       s.Actions,
+			Prerequisites: s.Prerequisites,
+			Delta:         s.Delta,
+			Status:        s.Status,
+		}
+	}
+	return waves
 }
 
 // BuildWaveStates converts Wave list to WaveState list for persistence.

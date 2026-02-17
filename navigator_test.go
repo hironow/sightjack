@@ -3,6 +3,7 @@ package sightjack
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRenderNavigator_Basic(t *testing.T) {
@@ -220,7 +221,7 @@ func TestRenderNavigatorWithWaves(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
 
 	// then
 	if !strings.Contains(nav, "[ ]") {
@@ -247,7 +248,7 @@ func TestRenderNavigatorWithWaves_CompletedWave(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
 
 	// then
 	if !strings.Contains(nav, "[=]") {
@@ -267,7 +268,7 @@ func TestRenderNavigatorWithWaves_ADRCountZero(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
 
 	// then
 	if !strings.Contains(nav, "ADRs: 0") {
@@ -287,10 +288,54 @@ func TestRenderNavigatorWithWaves_ADRCountPositive(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 5)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 5, nil)
 
 	// then
 	if !strings.Contains(nav, "ADRs: 5") {
 		t.Error("expected 'ADRs: 5' in navigator")
+	}
+}
+
+func TestRenderNavigatorWithWaves_ResumeInfo(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.62}},
+		TotalIssues:  5,
+		Completeness: 0.62,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
+	}
+	lastScanned := time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC)
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 3, &lastScanned)
+
+	// then
+	if !strings.Contains(nav, "Session: resumed") {
+		t.Error("expected 'Session: resumed' in navigator")
+	}
+	if !strings.Contains(nav, "2026-02-17 15:30") {
+		t.Error("expected last scan timestamp in navigator")
+	}
+}
+
+func TestRenderNavigatorWithWaves_NoResumeInfo(t *testing.T) {
+	// given: nil lastScanned means fresh session
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+		TotalIssues:  3,
+		Completeness: 0.25,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
+	}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
+
+	// then: no resume line
+	if strings.Contains(nav, "Session:") {
+		t.Error("should not contain 'Session:' for fresh session")
 	}
 }

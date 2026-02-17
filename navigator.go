@@ -3,6 +3,7 @@ package sightjack
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -60,7 +61,7 @@ func RenderNavigator(result *ScanResult, projectName string) string {
 
 // RenderNavigatorWithWaves renders the Link Navigator with actual wave data.
 // Wave status symbols: [ ] available  [x] locked  [=] completed
-func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave, adrCount int) string {
+func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave, adrCount int, lastScanned *time.Time) string {
 	// Group waves by cluster name
 	wavesByCluster := make(map[string][]Wave)
 	for _, w := range waves {
@@ -79,6 +80,10 @@ func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wa
 	b.WriteString("|" + padRight(projRow, navigatorWidth) + "|\n")
 	adrRow := fmt.Sprintf("  ADRs: %d", adrCount)
 	b.WriteString("|" + padRight(adrRow, navigatorWidth) + "|\n")
+	if lastScanned != nil {
+		sessionRow := fmt.Sprintf("  Session: resumed (last scan: %s)", lastScanned.Format("2006-01-02 15:04"))
+		b.WriteString("|" + padRight(sessionRow, navigatorWidth) + "|\n")
+	}
 	b.WriteString(fmt.Sprintf("+%s+\n", border))
 
 	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))
