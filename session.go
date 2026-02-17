@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -61,6 +62,12 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
+	}
+
+	// Cache ScanResult for resume
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to cache scan result: %v", err)
 	}
 
 	// --- Pass 3: Wave Generate ---

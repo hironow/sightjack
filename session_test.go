@@ -893,6 +893,33 @@ func TestRestoreWaves_EmptyInput(t *testing.T) {
 	}
 }
 
+func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
+	// given: dry-run should NOT write scan_result.json (no real scan happened)
+	baseDir := t.TempDir()
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Scan:   ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Linear: LinearConfig{Team: "ENG", Project: "Test"},
+		Scribe: ScribeConfig{Enabled: true},
+	}
+	sessionID := "test-no-cache"
+	ctx := context.Background()
+
+	// when
+	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	scanDir := ScanDir(baseDir, sessionID)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if _, err := os.Stat(scanResultPath); !os.IsNotExist(err) {
+		t.Error("scan_result.json should not exist in dry-run mode")
+	}
+}
+
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
 	originalActions := []WaveAction{
