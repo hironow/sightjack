@@ -92,19 +92,20 @@ func main() {
 			existingState, stateErr := sightjack.ReadState(baseDir)
 			if stateErr == nil {
 				scanner := bufio.NewScanner(os.Stdin)
-				choice, promptErr := sightjack.PromptResume(ctx, os.Stdout, scanner, existingState)
-				if promptErr == sightjack.ErrQuit {
-					return
-				}
-				if promptErr != nil {
-					sightjack.LogWarn("Invalid input: %v", promptErr)
-					// Fall through to fresh session
-				} else {
+				for {
+					choice, promptErr := sightjack.PromptResume(ctx, os.Stdout, scanner, existingState)
+					if promptErr == sightjack.ErrQuit {
+						return
+					}
+					if promptErr != nil {
+						sightjack.LogWarn("Invalid input: %v", promptErr)
+						continue // re-prompt instead of falling through
+					}
 					switch choice {
 					case sightjack.ResumeChoiceResume:
 						if !sightjack.CanResume(existingState) {
 							sightjack.LogWarn("Cached scan data missing — starting fresh session instead.")
-							break // fall through to fresh session
+							goto freshSession
 						}
 						if err := sightjack.RunResumeSession(ctx, cfg, baseDir, existingState, os.Stdin); err != nil {
 							sightjack.LogError("Resume failed: %v", err)
@@ -118,11 +119,12 @@ func main() {
 						}
 						return
 					case sightjack.ResumeChoiceNew:
-						// Fall through to fresh session below
+						goto freshSession
 					}
 				}
 			}
 		}
+	freshSession:
 
 		// Fresh session
 		sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
