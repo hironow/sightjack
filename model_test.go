@@ -235,3 +235,56 @@ func TestScanResult_CalculateCompleteness(t *testing.T) {
 		t.Errorf("expected 10 total issues, got %d", result.TotalIssues)
 	}
 }
+
+func TestArchitectResponse_MissingAnalysis(t *testing.T) {
+	// given: JSON without "analysis" key — Go defaults to empty string
+	data := `{
+		"modified_wave": null,
+		"reasoning": "ok"
+	}`
+
+	// when
+	var resp ArchitectResponse
+	if err := json.Unmarshal([]byte(data), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if resp.Analysis != "" {
+		t.Errorf("expected empty string for missing analysis, got: %s", resp.Analysis)
+	}
+}
+
+func TestArchitectResponse_ModifiedWaveEmptyActions(t *testing.T) {
+	// given: modified_wave with "actions": [] (explicitly empty, not omitted)
+	data := `{
+		"analysis": "Simplified.",
+		"modified_wave": {
+			"id": "auth-w1",
+			"cluster_name": "Auth",
+			"title": "Simplified",
+			"actions": [],
+			"prerequisites": [],
+			"delta": {"before": 0.25, "after": 0.40},
+			"status": "available"
+		},
+		"reasoning": "Removed all actions"
+	}`
+
+	// when
+	var resp ArchitectResponse
+	if err := json.Unmarshal([]byte(data), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if resp.ModifiedWave == nil {
+		t.Fatal("expected non-nil modified_wave")
+	}
+	if resp.ModifiedWave.Actions == nil {
+		t.Error("expected non-nil (empty) Actions slice for explicit []")
+	}
+	if len(resp.ModifiedWave.Actions) != 0 {
+		t.Errorf("expected 0 actions, got %d", len(resp.ModifiedWave.Actions))
+	}
+}

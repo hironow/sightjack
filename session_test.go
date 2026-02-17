@@ -226,3 +226,217 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 		t.Errorf("expected ApprovalApprove after discuss, got %d", choice)
 	}
 }
+
+func TestBuildCompletedWaveMap_Empty(t *testing.T) {
+	// given: nil and empty wave slices
+	tests := []struct {
+		name  string
+		waves []Wave
+	}{
+		{"nil", nil},
+		{"empty", []Wave{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// when
+			completed := BuildCompletedWaveMap(tt.waves)
+
+			// then: should return non-nil empty map (callers do completed[key] lookups)
+			if completed == nil {
+				t.Fatal("expected non-nil map for empty input")
+			}
+			if len(completed) != 0 {
+				t.Errorf("expected empty map, got %d entries", len(completed))
+			}
+		})
+	}
+}
+
+func TestBuildCompletedWaveMap_DuplicateIDsAcrossClusters(t *testing.T) {
+	// given: same wave ID "w1" in two different clusters, both completed
+	waves := []Wave{
+		{ID: "w1", ClusterName: "Auth", Status: "completed"},
+		{ID: "w1", ClusterName: "API", Status: "completed"},
+	}
+
+	// when
+	completed := BuildCompletedWaveMap(waves)
+
+	// then: composite keys should be distinct
+	if len(completed) != 2 {
+		t.Fatalf("expected 2 entries (distinct composite keys), got %d", len(completed))
+	}
+	if !completed["Auth:w1"] {
+		t.Error("expected Auth:w1 to be completed")
+	}
+	if !completed["API:w1"] {
+		t.Error("expected API:w1 to be completed")
+	}
+}
+
+func TestBuildWaveStates_Empty(t *testing.T) {
+	// given: nil and empty wave slices
+	tests := []struct {
+		name  string
+		waves []Wave
+	}{
+		{"nil", nil},
+		{"empty", []Wave{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// when
+			states := BuildWaveStates(tt.waves)
+
+			// then: make([]WaveState, 0) returns non-nil empty slice
+			if states == nil {
+				t.Fatal("expected non-nil slice for empty input")
+			}
+			if len(states) != 0 {
+				t.Errorf("expected empty slice, got %d entries", len(states))
+			}
+		})
+	}
+}
+
+func TestDiscussBranchThenReject(t *testing.T) {
+	// given: piped input: select wave 1, discuss, enter topic, then reject
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
+			Actions: []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   WaveDelta{Before: 0.25, After: 0.40}},
+	}
+	input := "1\nd\nShould we split?\nr\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when: selection
+	selected, err := PromptWaveSelection(ctx, &output, scanner, waves)
+	if err != nil {
+		t.Fatalf("selection error: %v", err)
+	}
+
+	// when: first approval -> discuss
+	choice, err := PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("first approval error: %v", err)
+	}
+	if choice != ApprovalDiscuss {
+		t.Fatalf("expected ApprovalDiscuss, got %d", choice)
+	}
+
+	// when: topic input
+	topic, err := PromptDiscussTopic(ctx, &output, scanner)
+	if err != nil {
+		t.Fatalf("topic error: %v", err)
+	}
+	if topic != "Should we split?" {
+		t.Errorf("expected topic, got: %s", topic)
+	}
+
+	// when: second approval -> reject
+	choice, err = PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("second approval error: %v", err)
+	}
+	if choice != ApprovalReject {
+		t.Errorf("expected ApprovalReject after discuss, got %d", choice)
+	}
+}
+
+func TestDiscussBranchQuitAtTopic(t *testing.T) {
+	// given: piped input: select wave 1, discuss, then quit at topic prompt
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
+			Actions: []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   WaveDelta{Before: 0.25, After: 0.40}},
+	}
+	input := "1\nd\nq\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when: selection
+	selected, err := PromptWaveSelection(ctx, &output, scanner, waves)
+	if err != nil {
+		t.Fatalf("selection error: %v", err)
+	}
+
+	// when: approval -> discuss
+	choice, err := PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("approval error: %v", err)
+	}
+	if choice != ApprovalDiscuss {
+		t.Fatalf("expected ApprovalDiscuss, got %d", choice)
+	}
+
+	// when: topic -> quit
+	_, err = PromptDiscussTopic(ctx, &output, scanner)
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit when quitting at topic, got %v", err)
+	}
+}
+
+func TestMultipleDiscussRounds(t *testing.T) {
+	// given: two discuss rounds then approve
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
+			Actions: []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   WaveDelta{Before: 0.25, After: 0.40}},
+	}
+	input := "1\nd\nFirst topic\nd\nSecond topic\na\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when: selection
+	selected, err := PromptWaveSelection(ctx, &output, scanner, waves)
+	if err != nil {
+		t.Fatalf("selection error: %v", err)
+	}
+
+	// Round 1: discuss
+	choice, err := PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("round 1 approval error: %v", err)
+	}
+	if choice != ApprovalDiscuss {
+		t.Fatalf("round 1: expected ApprovalDiscuss, got %d", choice)
+	}
+	topic, err := PromptDiscussTopic(ctx, &output, scanner)
+	if err != nil {
+		t.Fatalf("round 1 topic error: %v", err)
+	}
+	if topic != "First topic" {
+		t.Errorf("round 1: expected 'First topic', got: %s", topic)
+	}
+
+	// Round 2: discuss again
+	choice, err = PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("round 2 approval error: %v", err)
+	}
+	if choice != ApprovalDiscuss {
+		t.Fatalf("round 2: expected ApprovalDiscuss, got %d", choice)
+	}
+	topic, err = PromptDiscussTopic(ctx, &output, scanner)
+	if err != nil {
+		t.Fatalf("round 2 topic error: %v", err)
+	}
+	if topic != "Second topic" {
+		t.Errorf("round 2: expected 'Second topic', got: %s", topic)
+	}
+
+	// Final: approve
+	choice, err = PromptWaveApproval(ctx, &output, scanner, selected)
+	if err != nil {
+		t.Fatalf("final approval error: %v", err)
+	}
+	if choice != ApprovalApprove {
+		t.Errorf("expected ApprovalApprove after two discuss rounds, got %d", choice)
+	}
+}

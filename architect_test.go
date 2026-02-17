@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -115,5 +116,91 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	promptFile := filepath.Join(scanDir, "architect_auth_auth-w1_prompt.md")
 	if _, err := os.Stat(promptFile); os.IsNotExist(err) {
 		t.Error("expected architect prompt file to be generated")
+	}
+}
+
+func TestParseArchitectResult_MalformedJSON(t *testing.T) {
+	// given: file exists but contains truncated/invalid JSON (realistic: Claude output cut off)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "architect.json")
+	os.WriteFile(path, []byte(`{"analysis": "truncated`), 0644)
+
+	// when
+	_, err := ParseArchitectResult(path)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for malformed JSON")
+	}
+	if !strings.Contains(err.Error(), "parse architect result") {
+		t.Errorf("expected 'parse architect result' in error, got: %v", err)
+	}
+}
+
+func TestParseArchitectResult_ModifiedWaveNilActions(t *testing.T) {
+	// given: Claude returns modified_wave but omits the "actions" field entirely
+	dir := t.TempDir()
+	path := filepath.Join(dir, "architect.json")
+	data := []byte(`{
+		"analysis": "Modified wave proposed",
+		"modified_wave": {
+			"id": "auth-w1",
+			"cluster_name": "Auth",
+			"title": "Modified",
+			"delta": {"before": 0.25, "after": 0.40},
+			"status": "available"
+		},
+		"reasoning": "Simplified"
+	}`)
+	os.WriteFile(path, data, 0644)
+
+	// when
+	result, err := ParseArchitectResult(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ModifiedWave == nil {
+		t.Fatal("expected non-nil modified_wave")
+	}
+	if result.ModifiedWave.Actions != nil {
+		t.Errorf("expected nil Actions when field omitted, got %v", result.ModifiedWave.Actions)
+	}
+	// Verify ranging over nil Actions is safe (this is Go's guarantee but documents the contract)
+	for range result.ModifiedWave.Actions {
+		t.Error("should not iterate over nil actions")
+	}
+}
+
+func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
+	// given: wave with nil Actions — json.Marshal produces "null" not "[]"
+	scanDir := t.TempDir()
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+	}
+	wave := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Empty Wave",
+		Actions:     nil, // explicitly nil
+	}
+
+	// when
+	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	promptFile := filepath.Join(scanDir, "architect_auth_auth-w1_prompt.md")
+	content, readErr := os.ReadFile(promptFile)
+	if readErr != nil {
+		t.Fatalf("failed to read prompt file: %v", readErr)
+	}
+	// json.Marshal(nil) for []WaveAction produces "null"
+	if !strings.Contains(string(content), "null") {
+		t.Error("expected 'null' in prompt for nil actions")
 	}
 }

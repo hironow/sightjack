@@ -200,3 +200,266 @@ func TestDisplayRippleEffects(t *testing.T) {
 		t.Error("expected ripple description in output")
 	}
 }
+
+func TestPromptDiscussTopic(t *testing.T) {
+	// given
+	scanner := bufio.NewScanner(strings.NewReader("Should we split ENG-101?\n"))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when
+	topic, err := PromptDiscussTopic(ctx, &output, scanner)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if topic != "Should we split ENG-101?" {
+		t.Errorf("expected topic text, got: %s", topic)
+	}
+	if !strings.Contains(output.String(), "Topic") {
+		t.Error("expected Topic prompt in output")
+	}
+}
+
+func TestPromptDiscussTopic_Quit(t *testing.T) {
+	// given
+	scanner := bufio.NewScanner(strings.NewReader("q\n"))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when
+	_, err := PromptDiscussTopic(ctx, &output, scanner)
+
+	// then
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit, got %v", err)
+	}
+}
+
+func TestPromptDiscussTopic_Empty(t *testing.T) {
+	// given: empty input should error
+	scanner := bufio.NewScanner(strings.NewReader("\n"))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when
+	_, err := PromptDiscussTopic(ctx, &output, scanner)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for empty topic")
+	}
+	if err == ErrQuit {
+		t.Error("expected non-quit error for empty topic")
+	}
+}
+
+func TestDisplayArchitectResponse_WithModifiedWave(t *testing.T) {
+	// given
+	resp := &ArchitectResponse{
+		Analysis: "Splitting is unnecessary for this scale.",
+		ModifiedWave: &Wave{
+			ID:          "auth-w1",
+			ClusterName: "Auth",
+			Title:       "Dependency Ordering",
+			Actions: []WaveAction{
+				{Type: "add_dependency", IssueID: "ENG-101", Description: "Auth before token"},
+				{Type: "add_dod", IssueID: "ENG-101", Description: "Middleware interface"},
+			},
+			Delta: WaveDelta{Before: 0.25, After: 0.42},
+		},
+		Reasoning: "Project scale favors fewer issues.",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayArchitectResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "Splitting is unnecessary") {
+		t.Error("expected analysis text in output")
+	}
+	if !strings.Contains(out, "Middleware interface") {
+		t.Error("expected modified action in output")
+	}
+	if !strings.Contains(out, "Project scale") {
+		t.Error("expected reasoning in output")
+	}
+}
+
+func TestDisplayArchitectResponse_NoModifications(t *testing.T) {
+	// given
+	resp := &ArchitectResponse{
+		Analysis:     "Current actions look good.",
+		ModifiedWave: nil,
+		Reasoning:    "No changes needed.",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayArchitectResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "Current actions look good") {
+		t.Error("expected analysis text in output")
+	}
+	if strings.Contains(out, "Modified") {
+		t.Error("should not show modified section when no modifications")
+	}
+}
+
+func TestPromptWaveApproval_UppercaseInput(t *testing.T) {
+	wave := Wave{
+		ID: "auth-w1", ClusterName: "Auth", Title: "Test",
+		Actions: []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Delta:   WaveDelta{Before: 0.25, After: 0.40},
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected ApprovalChoice
+	}{
+		{"uppercase A", "A\n", ApprovalApprove},
+		{"uppercase D", "D\n", ApprovalDiscuss},
+		{"uppercase R", "R\n", ApprovalReject},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scanner := bufio.NewScanner(strings.NewReader(tt.input))
+			var output bytes.Buffer
+			ctx := context.Background()
+
+			choice, err := PromptWaveApproval(ctx, &output, scanner, wave)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if choice != tt.expected {
+				t.Errorf("expected %d, got %d", tt.expected, choice)
+			}
+		})
+	}
+}
+
+func TestPromptWaveApproval_UppercaseQ(t *testing.T) {
+	wave := Wave{ID: "auth-w1", Actions: []WaveAction{}}
+	scanner := bufio.NewScanner(strings.NewReader("Q\n"))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	_, err := PromptWaveApproval(ctx, &output, scanner, wave)
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit for uppercase Q, got %v", err)
+	}
+}
+
+func TestPromptWaveApproval_InvalidInput(t *testing.T) {
+	wave := Wave{ID: "auth-w1", Actions: []WaveAction{}}
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"unknown letter", "x\n"},
+		{"number", "2\n"},
+		{"empty after trim", "   \n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scanner := bufio.NewScanner(strings.NewReader(tt.input))
+			var output bytes.Buffer
+			ctx := context.Background()
+
+			_, err := PromptWaveApproval(ctx, &output, scanner, wave)
+			if err == nil {
+				t.Fatal("expected error for invalid input")
+			}
+			if err == ErrQuit {
+				t.Error("expected non-quit error for invalid input")
+			}
+		})
+	}
+}
+
+func TestPromptDiscussTopic_PaddedQuit(t *testing.T) {
+	// given: "  q  " should be treated as quit after TrimSpace
+	scanner := bufio.NewScanner(strings.NewReader("  q  \n"))
+	var output bytes.Buffer
+	ctx := context.Background()
+
+	// when
+	_, err := PromptDiscussTopic(ctx, &output, scanner)
+
+	// then
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit for padded 'q', got %v", err)
+	}
+}
+
+func TestDisplayArchitectResponse_ZeroDelta(t *testing.T) {
+	// given: ModifiedWave with zero-value delta (architect forgot to populate)
+	resp := &ArchitectResponse{
+		Analysis: "Modified wave.",
+		ModifiedWave: &Wave{
+			ID:      "auth-w1",
+			Actions: []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "test"}},
+			Delta:   WaveDelta{Before: 0.0, After: 0.0},
+		},
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayArchitectResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "0% -> 0%") {
+		t.Errorf("expected '0%% -> 0%%' for zero delta, got: %s", out)
+	}
+}
+
+func TestDisplayArchitectResponse_EmptyAnalysis(t *testing.T) {
+	// given: empty analysis string (Claude omitted the field)
+	resp := &ArchitectResponse{
+		Analysis:  "",
+		Reasoning: "some reasoning",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayArchitectResponse(&output, resp)
+
+	// then
+	out := output.String()
+	// Should still render the [Architect] prefix line
+	if !strings.Contains(out, "[Architect]") {
+		t.Error("expected [Architect] label even with empty analysis")
+	}
+}
+
+func TestDisplayArchitectResponse_ModifiedWaveNilActions(t *testing.T) {
+	// given: ModifiedWave is non-nil but Actions is nil
+	resp := &ArchitectResponse{
+		Analysis: "Simplified wave.",
+		ModifiedWave: &Wave{
+			ID:      "auth-w1",
+			Actions: nil,
+			Delta:   WaveDelta{Before: 0.25, After: 0.35},
+		},
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayArchitectResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "Modified actions (0)") {
+		t.Errorf("expected 'Modified actions (0)' for nil actions, got: %s", out)
+	}
+}
