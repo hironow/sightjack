@@ -212,6 +212,9 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		scanResult.CalculateCompleteness()
 
 		// Save state after each wave completion (crash resilience)
+		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+			LogWarn("Failed to update cached scan result: %v", err)
+		}
 		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, lastScanned)
 		midState.ScanResultPath = scanResultPath
 		if err := WriteState(baseDir, midState); err != nil {
@@ -221,7 +224,10 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		LogOK("Completeness: %.0f%%", scanResult.Completeness*100)
 	}
 
-	// Save state
+	// Save state + updated scan result
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to update cached scan result: %v", err)
+	}
 	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, lastScanned)
 	state.ScanResultPath = scanResultPath
 	if err := WriteState(baseDir, state); err != nil {
