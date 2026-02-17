@@ -66,7 +66,8 @@ type SessionState struct {
 	Completeness float64        `json:"completeness"`
 	Clusters     []ClusterState `json:"clusters"`
 	Waves        []WaveState    `json:"waves,omitempty"`
-	ADRCount     int            `json:"adr_count,omitempty"`
+	ADRCount       int    `json:"adr_count,omitempty"`
+	ScanResultPath string `json:"scan_result_path,omitempty"`
 }
 
 // ClusterState is the per-cluster state within SessionState.

@@ -290,6 +290,46 @@ func TestLoadScanResult_FileNotFound(t *testing.T) {
 	}
 }
 
+func TestSessionState_ScanResultPath_RoundTrip(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "test-scan-path",
+		ScanResultPath: ".siren/scans/session-123/scan_result.json",
+	}
+
+	// when
+	if err := WriteState(dir, state); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	loaded, err := ReadState(dir)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	// then
+	if loaded.ScanResultPath != ".siren/scans/session-123/scan_result.json" {
+		t.Errorf("expected scan result path, got %s", loaded.ScanResultPath)
+	}
+}
+
+func TestSessionState_ScanResultPath_OmittedWhenEmpty(t *testing.T) {
+	// given
+	state := SessionState{Version: "0.5", ScanResultPath: ""}
+
+	// when
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	// then
+	if strings.Contains(string(data), "scan_result_path") {
+		t.Error("expected scan_result_path to be omitted when empty")
+	}
+}
+
 func TestLoadScanResult_MalformedJSON(t *testing.T) {
 	// given
 	dir := t.TempDir()
