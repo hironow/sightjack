@@ -49,8 +49,17 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName)
 }
 
+// clearArchitectOutput removes any existing architect output file to prevent
+// stale results from a prior discuss round being parsed if Claude fails to
+// write a new file.
+func clearArchitectOutput(scanDir string, wave Wave) {
+	path := filepath.Join(scanDir, architectDiscussFileName(wave))
+	os.Remove(path)
+}
+
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
 func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string) (*ArchitectResponse, error) {
+	clearArchitectOutput(scanDir, wave)
 	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
 
 	actionsJSON, err := json.Marshal(wave.Actions)

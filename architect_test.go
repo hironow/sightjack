@@ -204,3 +204,23 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 		t.Error("expected 'null' in prompt for nil actions")
 	}
 }
+
+func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
+	// given: a pre-existing stale output file from a previous discuss round
+	scanDir := t.TempDir()
+	wave := Wave{ID: "auth-w1", ClusterName: "Auth", Title: "Test"}
+	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
+	os.WriteFile(outputFile, []byte(`{"analysis":"stale","modified_wave":null,"reasoning":"old"}`), 0644)
+
+	// when: verify the stale file exists before the function runs
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		t.Fatal("precondition: stale file should exist")
+	}
+
+	// then: clearArchitectOutput removes it
+	clearArchitectOutput(scanDir, wave)
+
+	if _, err := os.Stat(outputFile); !os.IsNotExist(err) {
+		t.Error("expected stale output file to be removed")
+	}
+}
