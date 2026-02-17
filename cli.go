@@ -100,3 +100,37 @@ func DisplayRippleEffects(w io.Writer, ripples []Ripple) {
 		fmt.Fprintf(w, "    -> %s: %s\n", r.ClusterName, r.Description)
 	}
 }
+
+// PromptDiscussTopic reads a free-text discussion topic from the user.
+func PromptDiscussTopic(ctx context.Context, w io.Writer, s *bufio.Scanner) (string, error) {
+	fmt.Fprint(w, "\n  Topic: ")
+
+	line, err := ScanLine(ctx, s)
+	if err != nil {
+		return "", ErrQuit
+	}
+	input := strings.TrimSpace(line)
+	if input == "q" {
+		return "", ErrQuit
+	}
+	if input == "" {
+		return "", fmt.Errorf("empty topic")
+	}
+	return input, nil
+}
+
+// DisplayArchitectResponse shows the architect's analysis and any wave modifications.
+func DisplayArchitectResponse(w io.Writer, resp *ArchitectResponse) {
+	fmt.Fprintf(w, "\n  [Architect] %s\n", resp.Analysis)
+	if resp.Reasoning != "" {
+		fmt.Fprintf(w, "\n  Reasoning: %s\n", resp.Reasoning)
+	}
+	if resp.ModifiedWave != nil {
+		fmt.Fprintf(w, "\n  Modified actions (%d):\n", len(resp.ModifiedWave.Actions))
+		for i, a := range resp.ModifiedWave.Actions {
+			fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
+		}
+		fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n",
+			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100)
+	}
+}
