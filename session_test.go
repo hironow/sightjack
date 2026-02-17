@@ -821,6 +821,78 @@ func TestBuildWaveStates_IncludesFullFields(t *testing.T) {
 	}
 }
 
+func TestRestoreWaves_ConvertsWaveStatesToWaves(t *testing.T) {
+	// given
+	states := []WaveState{
+		{
+			ID:            "auth-w1",
+			ClusterName:   "Auth",
+			Title:         "Deps",
+			Status:        "completed",
+			Prerequisites: []string{"Auth:auth-w0"},
+			ActionCount:   2,
+			Actions: []WaveAction{
+				{Type: "add_dependency", IssueID: "ENG-101", Description: "dep"},
+				{Type: "add_dod", IssueID: "ENG-102", Description: "dod"},
+			},
+			Description: "Order dependencies first",
+			Delta:       WaveDelta{Before: 0.20, After: 0.40},
+		},
+		{
+			ID:          "auth-w2",
+			ClusterName: "Auth",
+			Title:       "DoD",
+			Status:      "available",
+			ActionCount: 1,
+			Actions:     []WaveAction{{Type: "add_dod", IssueID: "ENG-103", Description: "dod2"}},
+			Delta:       WaveDelta{Before: 0.40, After: 0.60},
+		},
+	}
+
+	// when
+	waves := RestoreWaves(states)
+
+	// then
+	if len(waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(waves))
+	}
+	w := waves[0]
+	if w.ID != "auth-w1" {
+		t.Errorf("expected auth-w1, got %s", w.ID)
+	}
+	if w.ClusterName != "Auth" {
+		t.Errorf("expected Auth, got %s", w.ClusterName)
+	}
+	if w.Status != "completed" {
+		t.Errorf("expected completed, got %s", w.Status)
+	}
+	if len(w.Actions) != 2 {
+		t.Errorf("expected 2 actions, got %d", len(w.Actions))
+	}
+	if w.Description != "Order dependencies first" {
+		t.Errorf("expected description, got %s", w.Description)
+	}
+	if w.Delta.Before != 0.20 {
+		t.Errorf("expected delta before 0.20, got %v", w.Delta.Before)
+	}
+}
+
+func TestRestoreWaves_EmptyInput(t *testing.T) {
+	// given
+	var states []WaveState
+
+	// when
+	waves := RestoreWaves(states)
+
+	// then
+	if waves == nil {
+		t.Fatal("expected non-nil slice")
+	}
+	if len(waves) != 0 {
+		t.Errorf("expected empty slice, got %d", len(waves))
+	}
+}
+
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
 	originalActions := []WaveAction{
