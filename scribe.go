@@ -44,6 +44,17 @@ func NextADRNumber(adrDir string) (int, error) {
 	return maxNum + 1, nil
 }
 
+// sanitizeADRTitle ensures an ADR title is safe for use in filenames.
+// Prevents path traversal by stripping everything except [a-z0-9-_].
+// Returns "untitled" for empty input.
+func sanitizeADRTitle(title string) string {
+	s := sanitizeName(title)
+	if s == "" {
+		return "untitled"
+	}
+	return s
+}
+
 // scribeFileName returns the output filename for a scribe run.
 func scribeFileName(wave Wave) string {
 	return fmt.Sprintf("scribe_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
@@ -139,11 +150,12 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		return nil, fmt.Errorf("parse scribe result %s: %w", wave.ID, err)
 	}
 
-	// Write ADR file to adrDir
+	// Write ADR file to adrDir (sanitize title to prevent path traversal)
 	if err := os.MkdirAll(adrDir, 0755); err != nil {
 		return nil, fmt.Errorf("create adr dir: %w", err)
 	}
-	adrFileName := fmt.Sprintf("%s-%s.md", adrID, result.Title)
+	safeTitle := sanitizeADRTitle(result.Title)
+	adrFileName := fmt.Sprintf("%s-%s.md", adrID, safeTitle)
 	adrPath := filepath.Join(adrDir, adrFileName)
 	if err := os.WriteFile(adrPath, []byte(result.Content), 0644); err != nil {
 		return nil, fmt.Errorf("write adr file: %w", err)

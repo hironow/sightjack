@@ -212,3 +212,57 @@ func TestParseScribeResult_FileNotFound(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestSanitizeADRTitle_Normal(t *testing.T) {
+	// given
+	title := "adopt-event-sourcing"
+
+	// when
+	result := sanitizeADRTitle(title)
+
+	// then
+	if result != "adopt-event-sourcing" {
+		t.Errorf("expected adopt-event-sourcing, got %s", result)
+	}
+}
+
+func TestSanitizeADRTitle_PathTraversal(t *testing.T) {
+	// given: malicious title with path traversal
+	title := "../../../etc/passwd"
+
+	// when
+	result := sanitizeADRTitle(title)
+
+	// then: should not contain path separators or ..
+	if strings.Contains(result, "/") || strings.Contains(result, "..") {
+		t.Errorf("expected path separators removed, got %s", result)
+	}
+}
+
+func TestSanitizeADRTitle_SpecialChars(t *testing.T) {
+	// given: title with spaces and special characters
+	title := "Use FastAPI for API Layer!"
+
+	// when
+	result := sanitizeADRTitle(title)
+
+	// then: should only contain safe chars
+	for _, r := range result {
+		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+			t.Errorf("unexpected character %q in sanitized title %s", r, result)
+		}
+	}
+}
+
+func TestSanitizeADRTitle_Empty(t *testing.T) {
+	// given
+	title := ""
+
+	// when
+	result := sanitizeADRTitle(title)
+
+	// then: should return fallback
+	if result != "untitled" {
+		t.Errorf("expected 'untitled' for empty title, got %s", result)
+	}
+}
