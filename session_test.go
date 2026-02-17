@@ -920,6 +920,62 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	}
 }
 
+func TestBuildSessionState(t *testing.T) {
+	// given
+	scanResult := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.50, Issues: make([]IssueDetail, 3)},
+		},
+		Completeness: 0.50,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed",
+			Actions: []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d"}},
+			Delta:   WaveDelta{Before: 0.25, After: 0.50}},
+	}
+	cfg := &Config{Linear: LinearConfig{Project: "TestProject"}}
+	sessionID := "test-123"
+	adrCount := 2
+
+	// when
+	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount)
+
+	// then
+	if state.Version != "0.5" {
+		t.Errorf("expected version 0.5, got %s", state.Version)
+	}
+	if state.SessionID != "test-123" {
+		t.Errorf("expected test-123, got %s", state.SessionID)
+	}
+	if state.Completeness != 0.50 {
+		t.Errorf("expected 0.50, got %f", state.Completeness)
+	}
+	if state.ADRCount != 2 {
+		t.Errorf("expected 2, got %d", state.ADRCount)
+	}
+	if len(state.Clusters) != 1 {
+		t.Fatalf("expected 1 cluster, got %d", len(state.Clusters))
+	}
+	if state.Clusters[0].Name != "Auth" {
+		t.Errorf("expected cluster name Auth, got %s", state.Clusters[0].Name)
+	}
+	if state.Clusters[0].Completeness != 0.50 {
+		t.Errorf("expected cluster completeness 0.50, got %f", state.Clusters[0].Completeness)
+	}
+	if state.Clusters[0].IssueCount != 3 {
+		t.Errorf("expected issue count 3, got %d", state.Clusters[0].IssueCount)
+	}
+	if len(state.Waves) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(state.Waves))
+	}
+	if state.Waves[0].ID != "auth-w1" {
+		t.Errorf("expected wave ID auth-w1, got %s", state.Waves[0].ID)
+	}
+	if state.Project != "TestProject" {
+		t.Errorf("expected project TestProject, got %s", state.Project)
+	}
+}
+
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
 	originalActions := []WaveAction{

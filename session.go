@@ -201,12 +201,32 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 		scanResult.CalculateCompleteness()
 
+		// Save state after each wave completion (crash resilience)
+		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount)
+		midState.ScanResultPath = scanResultPath
+		if err := WriteState(baseDir, midState); err != nil {
+			LogWarn("Failed to save mid-session state: %v", err)
+		}
+
 		LogOK("Completeness: %.0f%%", scanResult.Completeness*100)
 	}
 
 	// Save state
+	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount)
+	state.ScanResultPath = scanResultPath
+	if err := WriteState(baseDir, state); err != nil {
+		LogWarn("Failed to save state: %v", err)
+	} else {
+		LogOK("State saved to %s", StatePath(baseDir))
+	}
+
+	return nil
+}
+
+// BuildSessionState creates a SessionState from current session data.
+func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, waves []Wave, adrCount int) *SessionState {
 	state := &SessionState{
-		Version:      "0.4",
+		Version:      "0.5",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  time.Now(),
@@ -221,14 +241,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			IssueCount:   len(c.Issues),
 		})
 	}
-
-	if err := WriteState(baseDir, state); err != nil {
-		LogWarn("Failed to save state: %v", err)
-	} else {
-		LogOK("State saved to %s", StatePath(baseDir))
-	}
-
-	return nil
+	return state
 }
 
 // IsWaveApplyComplete returns true when the apply result has no errors,
