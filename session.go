@@ -83,6 +83,16 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	adrDir := ADRDir(baseDir)
 	adrCount := CountADRFiles(adrDir)
 
+	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil)
+}
+
+// runInteractiveLoop runs the wave selection/approval/apply loop shared by
+// RunSession, RunResumeSession, and RunRescanSession.
+func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, scanDir, scanResultPath string,
+	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
+	scanner *bufio.Scanner, adrDir string, lastScanned *time.Time) error {
+
 	// --- Interactive Loop ---
 	for {
 		waves = EvaluateUnlocks(waves, completed)
@@ -93,7 +103,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 
 		// Display Link Navigator
-		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, nil)
+		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, lastScanned)
 		fmt.Println()
 		fmt.Print(nav)
 
@@ -221,6 +231,79 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	}
 
 	return nil
+}
+
+// ResumeSession loads a previous session's state and cached scan result,
+// restoring waves and completed map for the interactive loop.
+func ResumeSession(baseDir string, state *SessionState) (*ScanResult, []Wave, map[string]bool, int, error) {
+	if state.ScanResultPath == "" {
+		return nil, nil, nil, 0, fmt.Errorf("no cached scan result path in state")
+	}
+	scanResult, err := LoadScanResult(state.ScanResultPath)
+	if err != nil {
+		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
+	}
+	waves := RestoreWaves(state.Waves)
+	completed := BuildCompletedWaveMap(waves)
+	return scanResult, waves, completed, state.ADRCount, nil
+}
+
+// RunResumeSession resumes an existing session from saved state.
+func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader) error {
+	if input == nil {
+		return fmt.Errorf("input reader is required for interactive session")
+	}
+	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
+	if err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+	scanDir := ScanDir(baseDir, state.SessionID)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	scanner := bufio.NewScanner(input)
+	adrDir := ADRDir(baseDir)
+	lastScanned := state.LastScanned
+
+	LogOK("Resumed session: %d waves, %d completed", len(waves), len(completed))
+
+	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned)
+}
+
+// RunRescanSession performs a fresh scan then merges completed status from old state.
+func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState *SessionState, input io.Reader) error {
+	if input == nil {
+		return fmt.Errorf("input reader is required for interactive session")
+	}
+	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	scanDir, err := EnsureScanDir(baseDir, sessionID)
+	if err != nil {
+		return err
+	}
+	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, false)
+	if err != nil {
+		return fmt.Errorf("re-scan: %w", err)
+	}
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to cache scan result: %v", err)
+	}
+	waves, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false)
+	if err != nil {
+		return fmt.Errorf("wave generate: %w", err)
+	}
+	oldCompleted := BuildCompletedWaveMap(RestoreWaves(oldState.Waves))
+	waves = MergeCompletedStatus(oldCompleted, waves)
+	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
+	completed := BuildCompletedWaveMap(waves)
+	adrCount := oldState.ADRCount
+	scanner := bufio.NewScanner(input)
+	adrDir := ADRDir(baseDir)
+
+	LogOK("Re-scanned: %d clusters, %d waves (%d previously completed)",
+		len(scanResult.Clusters), len(waves), len(completed))
+
+	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil)
 }
 
 // BuildSessionState creates a SessionState from current session data.

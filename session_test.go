@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsWaveApplyComplete_NoErrors(t *testing.T) {
@@ -1005,5 +1006,166 @@ func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	}
 	if result.Actions[0].IssueID != "ENG-101" {
 		t.Errorf("expected first action ENG-101, got %s", result.Actions[0].IssueID)
+	}
+}
+
+func TestResumeSession_RestoresWavesFromState(t *testing.T) {
+	// given: a saved state with completed and available waves + cached scan result
+	baseDir := t.TempDir()
+
+	// Create scan result cache
+	scanDir := ScanDir(baseDir, "old-session")
+	os.MkdirAll(scanDir, 0755)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	scanResult := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.50, Issues: []IssueDetail{
+				{ID: "ENG-101", Identifier: "ENG-101", Title: "Login", Completeness: 0.50},
+			}},
+		},
+		TotalIssues:  1,
+		Completeness: 0.50,
+	}
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("write scan result: %v", err)
+	}
+
+	// Create state pointing to that scan result
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		Project:        "TestProject",
+		LastScanned:    time.Now(),
+		Completeness:   0.50,
+		ScanResultPath: scanResultPath,
+		Clusters: []ClusterState{
+			{Name: "Auth", Completeness: 0.50, IssueCount: 1},
+		},
+		Waves: []WaveState{
+			{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed",
+				ActionCount: 1,
+				Actions:     []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d"}},
+				Delta:       WaveDelta{Before: 0.25, After: 0.50}},
+			{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available",
+				ActionCount: 1,
+				Actions:     []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d2"}},
+				Delta:       WaveDelta{Before: 0.50, After: 0.75}},
+		},
+		ADRCount: 2,
+	}
+	if err := WriteState(baseDir, state); err != nil {
+		t.Fatalf("write state: %v", err)
+	}
+
+	// when: ResumeSession loads state and returns waves + scan result
+	resumedScanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(waves))
+	}
+	if waves[0].Status != "completed" {
+		t.Errorf("expected auth-w1 completed, got %s", waves[0].Status)
+	}
+	if !completed["Auth:auth-w1"] {
+		t.Error("expected Auth:auth-w1 in completed map")
+	}
+	if resumedScanResult.Completeness != 0.50 {
+		t.Errorf("expected completeness 0.50, got %f", resumedScanResult.Completeness)
+	}
+	if adrCount != 2 {
+		t.Errorf("expected adrCount 2, got %d", adrCount)
+	}
+}
+
+func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
+	// given: nil input should return error
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Linear: LinearConfig{Team: "ENG", Project: "Test"},
+	}
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: "/some/path.json",
+	}
+
+	// when
+	err := RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nil input")
+	}
+	if !strings.Contains(err.Error(), "input") {
+		t.Errorf("expected input-related error, got: %v", err)
+	}
+}
+
+func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
+	// given: nil input should return error
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Linear: LinearConfig{Team: "ENG", Project: "Test"},
+	}
+	state := &SessionState{
+		Version:   "0.5",
+		SessionID: "old-session",
+	}
+
+	// when
+	err := RunRescanSession(context.Background(), cfg, t.TempDir(), state, nil)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nil input")
+	}
+	if !strings.Contains(err.Error(), "input") {
+		t.Errorf("expected input-related error, got: %v", err)
+	}
+}
+
+func TestResumeSession_ErrorOnMissingScanResultPath(t *testing.T) {
+	// given: state with empty scan result path
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: "",
+	}
+
+	// when
+	_, _, _, _, err := ResumeSession(t.TempDir(), state)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for empty scan result path")
+	}
+	if !strings.Contains(err.Error(), "no cached scan result path") {
+		t.Errorf("expected scan result path error, got: %v", err)
+	}
+}
+
+func TestResumeSession_ErrorOnMissingScanResultFile(t *testing.T) {
+	// given: state with non-existent scan result path
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: "/nonexistent/scan_result.json",
+	}
+
+	// when
+	_, _, _, _, err := ResumeSession(t.TempDir(), state)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for missing scan result file")
+	}
+	if !strings.Contains(err.Error(), "load cached scan result") {
+		t.Errorf("expected load error, got: %v", err)
 	}
 }
