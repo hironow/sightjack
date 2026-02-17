@@ -61,3 +61,28 @@ func EnsureScanDir(baseDir, sessionID string) (string, error) {
 	}
 	return dir, nil
 }
+
+// WriteScanResult serializes a ScanResult to a JSON file for session resume caching.
+func WriteScanResult(path string, result *ScanResult) error {
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal scan result: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("write scan result: %w", err)
+	}
+	return nil
+}
+
+// LoadScanResult reads a cached ScanResult from a JSON file.
+func LoadScanResult(path string) (*ScanResult, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read scan result: %w", err)
+	}
+	var result ScanResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("parse scan result: %w", err)
+	}
+	return &result, nil
+}

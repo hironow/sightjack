@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -221,5 +222,85 @@ func TestSessionState_ADRCount_WriteAndRead(t *testing.T) {
 	// then
 	if loaded.ADRCount != 5 {
 		t.Errorf("expected ADRCount 5, got %d", loaded.ADRCount)
+	}
+}
+
+func TestWriteAndLoadScanResult_RoundTrip(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	path := filepath.Join(dir, "scan_result.json")
+	original := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{
+				Name:         "Auth",
+				Completeness: 0.25,
+				Issues: []IssueDetail{
+					{ID: "ENG-101", Identifier: "ENG-101", Title: "Login", Completeness: 0.30},
+				},
+				Observations: []string{"Missing MFA"},
+			},
+			{
+				Name:         "API",
+				Completeness: 0.40,
+				Issues: []IssueDetail{
+					{ID: "ENG-201", Identifier: "ENG-201", Title: "Rate limit", Completeness: 0.40},
+				},
+				Observations: []string{"No throttling"},
+			},
+		},
+		TotalIssues:  2,
+		Completeness: 0.325,
+		Observations: []string{"Missing MFA", "No throttling"},
+	}
+
+	// when
+	if err := WriteScanResult(path, original); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	loaded, err := LoadScanResult(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	// then
+	if len(loaded.Clusters) != 2 {
+		t.Fatalf("expected 2 clusters, got %d", len(loaded.Clusters))
+	}
+	if loaded.Clusters[0].Name != "Auth" {
+		t.Errorf("expected Auth, got %s", loaded.Clusters[0].Name)
+	}
+	if loaded.Completeness != 0.325 {
+		t.Errorf("expected 0.325, got %f", loaded.Completeness)
+	}
+	if loaded.TotalIssues != 2 {
+		t.Errorf("expected 2 total issues, got %d", loaded.TotalIssues)
+	}
+	if len(loaded.Clusters[0].Issues) != 1 {
+		t.Errorf("expected 1 issue in Auth, got %d", len(loaded.Clusters[0].Issues))
+	}
+}
+
+func TestLoadScanResult_FileNotFound(t *testing.T) {
+	// when
+	_, err := LoadScanResult("/nonexistent/scan_result.json")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestLoadScanResult_MalformedJSON(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	path := filepath.Join(dir, "scan_result.json")
+	os.WriteFile(path, []byte(`{invalid`), 0644)
+
+	// when
+	_, err := LoadScanResult(path)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for malformed JSON")
 	}
 }
