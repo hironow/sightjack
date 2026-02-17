@@ -715,6 +715,78 @@ func TestApplyModifiedWave_PreservesOriginalDeltaWhenZero(t *testing.T) {
 	}
 }
 
+func TestMergeCompletedStatus_PreservesCompleted(t *testing.T) {
+	// given: old completed waves
+	oldCompleted := map[string]bool{
+		"Auth:auth-w1": true,
+		"API:api-w1":   true,
+	}
+	// given: new waves from re-scan (auth-w1 still exists, api-w2 is new)
+	newWaves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "locked"},
+		{ID: "api-w2", ClusterName: "API", Title: "New Wave", Status: "available"},
+	}
+
+	// when
+	merged := MergeCompletedStatus(oldCompleted, newWaves)
+
+	// then: auth-w1 should be completed (was in old)
+	for _, w := range merged {
+		if WaveKey(w) == "Auth:auth-w1" && w.Status != "completed" {
+			t.Errorf("expected Auth:auth-w1 completed, got %s", w.Status)
+		}
+	}
+	// then: api-w1 not in new waves (dropped from Linear) — not present at all
+	for _, w := range merged {
+		if WaveKey(w) == "API:api-w1" {
+			t.Error("API:api-w1 should not appear in merged result")
+		}
+	}
+	// then: auth-w2 and api-w2 keep original status
+	for _, w := range merged {
+		if WaveKey(w) == "Auth:auth-w2" && w.Status != "locked" {
+			t.Errorf("expected Auth:auth-w2 locked, got %s", w.Status)
+		}
+		if WaveKey(w) == "API:api-w2" && w.Status != "available" {
+			t.Errorf("expected API:api-w2 available, got %s", w.Status)
+		}
+	}
+}
+
+func TestMergeCompletedStatus_EmptyOld(t *testing.T) {
+	// given: no old completed waves
+	oldCompleted := map[string]bool{}
+	newWaves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "available"},
+	}
+
+	// when
+	merged := MergeCompletedStatus(oldCompleted, newWaves)
+
+	// then: all waves keep original status
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(merged))
+	}
+	if merged[0].Status != "available" {
+		t.Errorf("expected available, got %s", merged[0].Status)
+	}
+}
+
+func TestMergeCompletedStatus_EmptyNew(t *testing.T) {
+	// given: old waves completed but new scan returns nothing
+	oldCompleted := map[string]bool{"Auth:auth-w1": true}
+	var newWaves []Wave
+
+	// when
+	merged := MergeCompletedStatus(oldCompleted, newWaves)
+
+	// then
+	if len(merged) != 0 {
+		t.Errorf("expected 0 waves, got %d", len(merged))
+	}
+}
+
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
 	originalActions := []WaveAction{

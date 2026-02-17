@@ -290,6 +290,21 @@ func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 	return completed
 }
 
+// MergeCompletedStatus preserves completed status from a previous session
+// when waves are regenerated after a re-scan. Waves in newWaves that match
+// a key in oldCompleted are marked "completed". Waves that were in the old
+// session but not in newWaves are dropped (Linear removed them).
+func MergeCompletedStatus(oldCompleted map[string]bool, newWaves []Wave) []Wave {
+	result := make([]Wave, len(newWaves))
+	copy(result, newWaves)
+	for i, w := range result {
+		if oldCompleted[WaveKey(w)] {
+			result[i].Status = "completed"
+		}
+	}
+	return result
+}
+
 // BuildWaveStates converts Wave list to WaveState list for persistence.
 func BuildWaveStates(waves []Wave) []WaveState {
 	states := make([]WaveState, len(waves))
