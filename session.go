@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -56,7 +55,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 				Analysis:  "Sample architect analysis for dry-run",
 				Reasoning: "Sample reasoning",
 			}
-			if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, filepath.Join(baseDir, "docs", "adr")); err != nil {
+			if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, ADRDir(baseDir)); err != nil {
 				return fmt.Errorf("scribe dry-run: %w", err)
 			}
 		}
@@ -74,7 +73,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 
 	completed := BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
-	adrDir := filepath.Join(baseDir, "docs", "adr")
+	adrDir := ADRDir(baseDir)
 	adrCount := CountADRFiles(adrDir)
 
 	// --- Interactive Loop ---
@@ -137,11 +136,8 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 				if result.ModifiedWave != nil {
 					selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
 					PropagateWaveUpdate(waves, selected)
-					if selected.Status == "locked" {
-						LogWarn("Architect added unmet prerequisites — wave is now locked.")
-						break
-					}
 					// Trigger Scribe to generate ADR for the modification
+					// (runs even for locked waves — the decision itself is worth recording)
 					if cfg.Scribe.Enabled {
 						scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir)
 						if scribeErr != nil {
@@ -150,6 +146,10 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 							DisplayScribeResponse(os.Stdout, scribeResp)
 							adrCount++
 						}
+					}
+					if selected.Status == "locked" {
+						LogWarn("Architect added unmet prerequisites — wave is now locked.")
+						break
 					}
 				}
 				continue // back to approval prompt with (possibly modified) wave

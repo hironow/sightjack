@@ -10,7 +10,14 @@ import (
 	"strconv"
 )
 
+const adrSubdir = "docs/adr"
+
 var adrPattern = regexp.MustCompile(`^(\d{4})-.*\.md$`)
+
+// ADRDir returns the ADR directory path under baseDir.
+func ADRDir(baseDir string) string {
+	return filepath.Join(baseDir, adrSubdir)
+}
 
 // NextADRNumber scans adrDir for files matching NNNN-*.md and returns max(NNNN)+1.
 // Returns 1 if the directory is empty or does not exist.
