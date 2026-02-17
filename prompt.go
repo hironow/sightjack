@@ -43,6 +43,17 @@ type WaveApplyPromptData struct {
 	OutputPath  string
 }
 
+// ScribeADRPromptData holds template data for the scribe ADR generation prompt.
+type ScribeADRPromptData struct {
+	ClusterName string
+	WaveTitle   string
+	WaveActions string
+	Analysis    string
+	Reasoning   string
+	ADRNumber   string
+	OutputPath  string
+}
+
 // ArchitectDiscussPromptData holds template data for the architect discussion prompt.
 type ArchitectDiscussPromptData struct {
 	ClusterName string
@@ -85,6 +96,12 @@ func RenderWaveGeneratePrompt(lang string, data WaveGeneratePromptData) (string,
 // RenderWaveApplyPrompt renders the wave apply prompt for the given language.
 func RenderWaveApplyPrompt(lang string, data WaveApplyPromptData) (string, error) {
 	name := fmt.Sprintf("prompts/templates/wave_apply_%s.md.tmpl", lang)
+	return renderTemplate(name, data)
+}
+
+// RenderScribeADRPrompt renders the scribe ADR generation prompt for the given language.
+func RenderScribeADRPrompt(lang string, data ScribeADRPromptData) (string, error) {
+	name := fmt.Sprintf("prompts/templates/scribe_adr_%s.md.tmpl", lang)
 	return renderTemplate(name, data)
 }
 

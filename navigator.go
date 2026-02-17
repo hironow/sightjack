@@ -60,7 +60,7 @@ func RenderNavigator(result *ScanResult, projectName string) string {
 
 // RenderNavigatorWithWaves renders the Link Navigator with actual wave data.
 // Wave status symbols: [ ] available  [x] locked  [=] completed
-func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave) string {
+func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave, adrCount int) string {
 	// Group waves by cluster name
 	wavesByCluster := make(map[string][]Wave)
 	for _, w := range waves {
@@ -77,6 +77,8 @@ func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wa
 	projName := padRight(truncate(projectName, 20), 20)
 	projRow := "  Project: " + projName + "  |  Completeness: " + fmt.Sprintf("%3d%%", completePct)
 	b.WriteString("|" + padRight(projRow, navigatorWidth) + "|\n")
+	adrRow := fmt.Sprintf("  ADRs: %d", adrCount)
+	b.WriteString("|" + padRight(adrRow, navigatorWidth) + "|\n")
 	b.WriteString(fmt.Sprintf("+%s+\n", border))
 
 	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))

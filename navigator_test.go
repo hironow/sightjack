@@ -220,7 +220,7 @@ func TestRenderNavigatorWithWaves(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
 
 	// then
 	if !strings.Contains(nav, "[ ]") {
@@ -247,10 +247,50 @@ func TestRenderNavigatorWithWaves_CompletedWave(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
 
 	// then
 	if !strings.Contains(nav, "[=]") {
 		t.Error("expected [=] for completed wave")
+	}
+}
+
+func TestRenderNavigatorWithWaves_ADRCountZero(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+		TotalIssues:  3,
+		Completeness: 0.25,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
+	}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0)
+
+	// then
+	if !strings.Contains(nav, "ADRs: 0") {
+		t.Error("expected 'ADRs: 0' in navigator")
+	}
+}
+
+func TestRenderNavigatorWithWaves_ADRCountPositive(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50}},
+		TotalIssues:  5,
+		Completeness: 0.50,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
+	}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 5)
+
+	// then
+	if !strings.Contains(nav, "ADRs: 5") {
+		t.Error("expected 'ADRs: 5' in navigator")
 	}
 }

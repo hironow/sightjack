@@ -478,3 +478,50 @@ func TestDisplayArchitectResponse_ModifiedWaveNilActions(t *testing.T) {
 		t.Errorf("expected 'Modified actions (0)' for nil actions, got: %s", out)
 	}
 }
+
+func TestDisplayScribeResponse(t *testing.T) {
+	// given
+	resp := &ScribeResponse{
+		ADRID:     "0003",
+		Title:     "adopt-event-sourcing",
+		Content:   "# 0003. Adopt Event Sourcing",
+		Reasoning: "Discussion revealed need for event sourcing.",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayScribeResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "[Scribe]") {
+		t.Error("expected [Scribe] label in output")
+	}
+	if !strings.Contains(out, "0003") {
+		t.Error("expected ADR ID in output")
+	}
+	if !strings.Contains(out, "adopt-event-sourcing") {
+		t.Error("expected ADR title in output")
+	}
+}
+
+func TestDisplayScribeResponse_EmptyTitle(t *testing.T) {
+	// given
+	resp := &ScribeResponse{
+		ADRID: "0001",
+		Title: "",
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayScribeResponse(&output, resp)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "[Scribe]") {
+		t.Error("expected [Scribe] label even with empty title")
+	}
+	if !strings.Contains(out, "0001") {
+		t.Error("expected ADR ID in output")
+	}
+}

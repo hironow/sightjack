@@ -12,7 +12,13 @@ type Config struct {
 	Linear LinearConfig `yaml:"linear"`
 	Scan   ScanConfig   `yaml:"scan"`
 	Claude ClaudeConfig `yaml:"claude"`
+	Scribe ScribeConfig `yaml:"scribe"`
 	Lang   string       `yaml:"lang"`
+}
+
+// ScribeConfig holds Scribe Agent settings.
+type ScribeConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 // LinearConfig holds Linear integration settings.
@@ -46,6 +52,9 @@ func DefaultConfig() Config {
 			Command:    "claude",
 			Model:      "opus",
 			TimeoutSec: 300,
+		},
+		Scribe: ScribeConfig{
+			Enabled: true,
 		},
 		Lang: "ja",
 	}

@@ -1,6 +1,7 @@
 package sightjack
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -99,5 +100,89 @@ func TestStatePath(t *testing.T) {
 	expected := filepath.Join("/project", ".siren", "state.json")
 	if path != expected {
 		t.Errorf("expected %s, got %s", expected, path)
+	}
+}
+
+func TestSessionState_ADRCount_Positive(t *testing.T) {
+	// given
+	state := SessionState{
+		Version:  "0.4",
+		ADRCount: 3,
+	}
+
+	// when
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded SessionState
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if decoded.ADRCount != 3 {
+		t.Errorf("expected ADRCount 3, got %d", decoded.ADRCount)
+	}
+}
+
+func TestSessionState_ADRCount_ZeroOmitted(t *testing.T) {
+	// given: ADRCount = 0 should be omitted from JSON (omitempty)
+	state := SessionState{
+		Version:  "0.4",
+		ADRCount: 0,
+	}
+
+	// when
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	// then: "adr_count" should not appear in JSON
+	raw := string(data)
+	if json.Valid(data) && contains(raw, "adr_count") {
+		t.Errorf("expected adr_count to be omitted when 0, got: %s", raw)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSessionState_ADRCount_WriteAndRead(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	state := &SessionState{
+		Version:      "0.4",
+		SessionID:    "test-adr-count",
+		Project:      "TestProject",
+		LastScanned:  time.Now().Truncate(time.Second),
+		Completeness: 0.50,
+		Clusters:     []ClusterState{{Name: "Auth", Completeness: 0.50, IssueCount: 3}},
+		ADRCount:     5,
+	}
+
+	// when
+	if err := WriteState(dir, state); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	loaded, err := ReadState(dir)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	// then
+	if loaded.ADRCount != 5 {
+		t.Errorf("expected ADRCount 5, got %d", loaded.ADRCount)
 	}
 }

@@ -1,0 +1,39 @@
+あなたは Scribe Agent です。
+Architect の議論結果に基づいて ADR（Architecture Decision Record）を生成してください。
+
+## クラスタ
+{{.ClusterName}}
+
+## Wave
+タイトル: {{.WaveTitle}}
+
+### Wave アクション
+{{.WaveActions}}
+
+## Architect の分析
+{{.Analysis}}
+
+## Architect の推論
+{{.Reasoning}}
+
+## ADR 番号
+{{.ADRNumber}}
+
+## 指示
+1. 標準的な ADR フォーマット（Context / Decision / Consequences）で作成する
+2. Architect の議論で決定された内容を記録する
+3. クラスタ、Wave、関連する Issue を適宜参照する
+4. ADR 番号 {{.ADRNumber}} をタイトルに含める
+5. 簡潔かつ完全な ADR を作成する
+
+## 出力
+以下の JSON を **{{.OutputPath}}** に書き込んでください:
+
+{
+  "adr_id": "{{.ADRNumber}}",
+  "title": "short-slug-title",
+  "content": "# {{.ADRNumber}}. タイトル\n\n**Date:** YYYY-MM-DD\n**Status:** Accepted\n\n## Context\n...\n\n## Decision\n...\n\n## Consequences\n...",
+  "reasoning": "この ADR を生成した理由"
+}
+
+重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。

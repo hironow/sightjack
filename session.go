@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -49,6 +50,14 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		if err := RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic"); err != nil {
 			return fmt.Errorf("architect discuss dry-run: %w", err)
 		}
+		// Also generate scribe ADR prompt for dry-run
+		sampleArchitectResp := &ArchitectResponse{
+			Analysis:  "Sample architect analysis for dry-run",
+			Reasoning: "Sample reasoning",
+		}
+		if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, filepath.Join(baseDir, "docs", "adr")); err != nil {
+			return fmt.Errorf("scribe dry-run: %w", err)
+		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
 	}
@@ -63,6 +72,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 
 	completed := BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
+	adrCount := 0
 
 	// --- Interactive Loop ---
 	for {
@@ -74,7 +84,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 
 		// Display Link Navigator
-		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves)
+		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount)
 		fmt.Println()
 		fmt.Print(nav)
 
@@ -128,6 +138,17 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 						LogWarn("Architect added unmet prerequisites — wave is now locked.")
 						break
 					}
+					// Trigger Scribe to generate ADR for the modification
+					if cfg.Scribe.Enabled {
+						adrDir := filepath.Join(baseDir, "docs", "adr")
+						scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir)
+						if scribeErr != nil {
+							LogWarn("Scribe failed (non-fatal): %v", scribeErr)
+						} else {
+							DisplayScribeResponse(os.Stdout, scribeResp)
+							adrCount++
+						}
+					}
 				}
 				continue // back to approval prompt with (possibly modified) wave
 			}
@@ -176,12 +197,13 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 
 	// Save state
 	state := &SessionState{
-		Version:      "0.3",
+		Version:      "0.4",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  time.Now(),
 		Completeness: scanResult.Completeness,
 		Waves:        BuildWaveStates(waves),
+		ADRCount:     adrCount,
 	}
 	for _, c := range scanResult.Clusters {
 		state.Clusters = append(state.Clusters, ClusterState{

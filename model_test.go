@@ -288,3 +288,56 @@ func TestArchitectResponse_ModifiedWaveEmptyActions(t *testing.T) {
 		t.Errorf("expected 0 actions, got %d", len(resp.ModifiedWave.Actions))
 	}
 }
+
+func TestScribeResponse_JSONRoundTrip(t *testing.T) {
+	// given
+	original := ScribeResponse{
+		ADRID:     "0003",
+		Title:     "adopt-event-sourcing",
+		Content:   "# 0003. Adopt Event Sourcing\n\n**Date:** 2026-02-18\n**Status:** Accepted",
+		Reasoning: "The architect discussion revealed a need for event sourcing.",
+	}
+
+	// when: marshal then unmarshal
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ScribeResponse
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if decoded.ADRID != original.ADRID {
+		t.Errorf("ADRID: expected %s, got %s", original.ADRID, decoded.ADRID)
+	}
+	if decoded.Title != original.Title {
+		t.Errorf("Title: expected %s, got %s", original.Title, decoded.Title)
+	}
+	if decoded.Content != original.Content {
+		t.Errorf("Content: expected %s, got %s", original.Content, decoded.Content)
+	}
+	if decoded.Reasoning != original.Reasoning {
+		t.Errorf("Reasoning: expected %s, got %s", original.Reasoning, decoded.Reasoning)
+	}
+}
+
+func TestScribeResponse_ZeroValues(t *testing.T) {
+	// given: all zero-value fields
+	data := `{"adr_id":"","title":"","content":"","reasoning":""}`
+
+	// when
+	var resp ScribeResponse
+	if err := json.Unmarshal([]byte(data), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if resp.ADRID != "" {
+		t.Errorf("expected empty ADRID, got %s", resp.ADRID)
+	}
+	if resp.Title != "" {
+		t.Errorf("expected empty Title, got %s", resp.Title)
+	}
+}
