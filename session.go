@@ -51,12 +51,14 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			return fmt.Errorf("architect discuss dry-run: %w", err)
 		}
 		// Also generate scribe ADR prompt for dry-run
-		sampleArchitectResp := &ArchitectResponse{
-			Analysis:  "Sample architect analysis for dry-run",
-			Reasoning: "Sample reasoning",
-		}
-		if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, filepath.Join(baseDir, "docs", "adr")); err != nil {
-			return fmt.Errorf("scribe dry-run: %w", err)
+		if cfg.Scribe.Enabled {
+			sampleArchitectResp := &ArchitectResponse{
+				Analysis:  "Sample architect analysis for dry-run",
+				Reasoning: "Sample reasoning",
+			}
+			if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, filepath.Join(baseDir, "docs", "adr")); err != nil {
+				return fmt.Errorf("scribe dry-run: %w", err)
+			}
 		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
