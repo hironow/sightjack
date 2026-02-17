@@ -121,7 +121,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 				}
 				DisplayArchitectResponse(os.Stdout, result)
 				if result.ModifiedWave != nil {
-					selected = *result.ModifiedWave
+					selected = ApplyModifiedWave(selected, *result.ModifiedWave)
 				}
 				continue // back to approval prompt with (possibly modified) wave
 			}
@@ -198,6 +198,16 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 // indicating all actions were successfully applied.
 func IsWaveApplyComplete(result *WaveApplyResult) bool {
 	return len(result.Errors) == 0
+}
+
+// ApplyModifiedWave merges a modified wave from the architect into the original,
+// preserving identity fields (ID, ClusterName, Status) so that completion
+// bookkeeping remains stable.
+func ApplyModifiedWave(original, modified Wave) Wave {
+	modified.ID = original.ID
+	modified.ClusterName = original.ClusterName
+	modified.Status = original.Status
+	return modified
 }
 
 // BuildCompletedWaveMap returns a set of completed waves keyed by WaveKey (ClusterName:ID).

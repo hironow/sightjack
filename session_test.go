@@ -440,3 +440,52 @@ func TestMultipleDiscussRounds(t *testing.T) {
 		t.Errorf("expected ApprovalApprove after two discuss rounds, got %d", choice)
 	}
 }
+
+func TestApplyModifiedWave_PreservesIdentity(t *testing.T) {
+	// given: original wave with known identity
+	original := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Original Title",
+		Actions:     []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "original"}},
+		Delta:       WaveDelta{Before: 0.25, After: 0.40},
+		Status:      "available",
+	}
+	// given: architect returns modified wave with CHANGED identity fields
+	modified := Wave{
+		ID:          "new-w1",
+		ClusterName: "Authentication",
+		Title:       "Better Title",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
+			{Type: "add_dod", IssueID: "ENG-101", Description: "new action"},
+		},
+		Delta:  WaveDelta{Before: 0.25, After: 0.50},
+		Status: "modified",
+	}
+
+	// when
+	result := ApplyModifiedWave(original, modified)
+
+	// then: identity preserved from original
+	if result.ID != "auth-w1" {
+		t.Errorf("expected original ID 'auth-w1', got '%s'", result.ID)
+	}
+	if result.ClusterName != "Auth" {
+		t.Errorf("expected original ClusterName 'Auth', got '%s'", result.ClusterName)
+	}
+
+	// then: content taken from modified
+	if result.Title != "Better Title" {
+		t.Errorf("expected modified title, got '%s'", result.Title)
+	}
+	if len(result.Actions) != 2 {
+		t.Errorf("expected 2 modified actions, got %d", len(result.Actions))
+	}
+	if result.Delta.After != 0.50 {
+		t.Errorf("expected modified delta after 0.50, got %f", result.Delta.After)
+	}
+	if result.Status != "available" {
+		t.Errorf("expected original status 'available', got '%s'", result.Status)
+	}
+}
