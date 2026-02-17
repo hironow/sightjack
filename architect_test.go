@@ -27,8 +27,13 @@ func TestParseArchitectResult(t *testing.T) {
 		},
 		Reasoning: "Project scale favors fewer issues.",
 	}
-	raw, _ := json.MarshalIndent(data, "", "  ")
-	os.WriteFile(path, raw, 0644)
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal test data: %v", err)
+	}
+	if err := os.WriteFile(path, raw, 0644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
 
 	// when
 	result, err := ParseArchitectResult(path)
@@ -52,7 +57,9 @@ func TestParseArchitectResult_NilWave(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	path := filepath.Join(dir, "architect.json")
-	os.WriteFile(path, []byte(`{"analysis":"No changes.","modified_wave":null,"reasoning":"OK"}`), 0644)
+	if err := os.WriteFile(path, []byte(`{"analysis":"No changes.","modified_wave":null,"reasoning":"OK"}`), 0644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
 
 	// when
 	result, err := ParseArchitectResult(path)
@@ -123,7 +130,9 @@ func TestParseArchitectResult_MalformedJSON(t *testing.T) {
 	// given: file exists but contains truncated/invalid JSON (realistic: Claude output cut off)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "architect.json")
-	os.WriteFile(path, []byte(`{"analysis": "truncated`), 0644)
+	if err := os.WriteFile(path, []byte(`{"analysis": "truncated`), 0644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
 
 	// when
 	_, err := ParseArchitectResult(path)
@@ -152,7 +161,9 @@ func TestParseArchitectResult_ModifiedWaveNilActions(t *testing.T) {
 		},
 		"reasoning": "Simplified"
 	}`)
-	os.WriteFile(path, data, 0644)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
 
 	// when
 	result, err := ParseArchitectResult(path)
@@ -210,7 +221,9 @@ func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
 	scanDir := t.TempDir()
 	wave := Wave{ID: "auth-w1", ClusterName: "Auth", Title: "Test"}
 	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
-	os.WriteFile(outputFile, []byte(`{"analysis":"stale","modified_wave":null,"reasoning":"old"}`), 0644)
+	if err := os.WriteFile(outputFile, []byte(`{"analysis":"stale","modified_wave":null,"reasoning":"old"}`), 0644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
 
 	// when: verify the stale file exists before the function runs
 	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
