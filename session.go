@@ -87,14 +87,16 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &scanTime)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
 }
 
 // runInteractiveLoop runs the wave selection/approval/apply loop shared by
 // RunSession, RunResumeSession, and RunRescanSession.
+// resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
+// scanTimestamp is persisted in state as LastScanned and stays stable across saves.
 func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
-	scanner *bufio.Scanner, adrDir string, lastScanned *time.Time) error {
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time) error {
 
 	// --- Interactive Loop ---
 	for {
@@ -106,7 +108,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		}
 
 		// Display Link Navigator
-		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, lastScanned)
+		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt)
 		fmt.Println()
 		fmt.Print(nav)
 
@@ -218,7 +220,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 			LogWarn("Failed to update cached scan result: %v", err)
 		}
-		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, lastScanned)
+		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, &scanTimestamp)
 		midState.ScanResultPath = scanResultPath
 		if err := WriteState(baseDir, midState); err != nil {
 			LogWarn("Failed to save mid-session state: %v", err)
@@ -231,7 +233,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		LogWarn("Failed to update cached scan result: %v", err)
 	}
-	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, lastScanned)
+	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, &scanTimestamp)
 	state.ScanResultPath = scanResultPath
 	if err := WriteState(baseDir, state); err != nil {
 		LogWarn("Failed to save state: %v", err)
@@ -287,7 +289,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	LogOK("Resumed session: %d waves, %d completed", len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned)
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
@@ -325,7 +327,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		len(scanResult.Clusters), len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &scanTime)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
 }
 
 // BuildSessionState creates a SessionState from current session data.
