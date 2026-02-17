@@ -121,7 +121,11 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 				}
 				DisplayArchitectResponse(os.Stdout, result)
 				if result.ModifiedWave != nil {
-					selected = ApplyModifiedWave(selected, *result.ModifiedWave)
+					selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+					if selected.Status == "locked" {
+						LogWarn("Architect added unmet prerequisites — wave is now locked.")
+						break
+					}
 				}
 				continue // back to approval prompt with (possibly modified) wave
 			}
@@ -201,12 +205,21 @@ func IsWaveApplyComplete(result *WaveApplyResult) bool {
 }
 
 // ApplyModifiedWave merges a modified wave from the architect into the original,
-// preserving identity fields (ID, ClusterName, Status) so that completion
-// bookkeeping remains stable.
-func ApplyModifiedWave(original, modified Wave) Wave {
+// preserving identity fields (ID, ClusterName) so that completion bookkeeping
+// remains stable. Status is recomputed from the modified prerequisites against
+// the completed map to prevent applying waves with unmet dependencies.
+func ApplyModifiedWave(original, modified Wave, completed map[string]bool) Wave {
 	modified.ID = original.ID
 	modified.ClusterName = original.ClusterName
-	modified.Status = original.Status
+
+	// Recompute status: if any prerequisite is unmet, lock the wave.
+	modified.Status = "available"
+	for _, prereq := range modified.Prerequisites {
+		if !completed[prereq] {
+			modified.Status = "locked"
+			break
+		}
+	}
 	return modified
 }
 

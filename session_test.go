@@ -464,8 +464,8 @@ func TestApplyModifiedWave_PreservesIdentity(t *testing.T) {
 		Status: "modified",
 	}
 
-	// when
-	result := ApplyModifiedWave(original, modified)
+	// when: no prerequisites, empty completed map
+	result := ApplyModifiedWave(original, modified, map[string]bool{})
 
 	// then: identity preserved from original
 	if result.ID != "auth-w1" {
@@ -486,6 +486,63 @@ func TestApplyModifiedWave_PreservesIdentity(t *testing.T) {
 		t.Errorf("expected modified delta after 0.50, got %f", result.Delta.After)
 	}
 	if result.Status != "available" {
-		t.Errorf("expected original status 'available', got '%s'", result.Status)
+		t.Errorf("expected status 'available' (no unmet prereqs), got '%s'", result.Status)
+	}
+}
+
+func TestApplyModifiedWave_LocksOnUnmetPrerequisites(t *testing.T) {
+	// given: original available wave with no prerequisites
+	original := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Original",
+		Status:      "available",
+	}
+	// given: architect adds a prerequisite that hasn't been completed
+	modified := Wave{
+		ID:            "auth-w1",
+		ClusterName:   "Auth",
+		Title:         "Modified",
+		Prerequisites: []string{"API:api-w1"},
+		Actions:       []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
+	}
+	// given: api-w1 is NOT in the completed map
+	completed := map[string]bool{}
+
+	// when
+	result := ApplyModifiedWave(original, modified, completed)
+
+	// then: status should be "locked" because prerequisite is unmet
+	if result.Status != "locked" {
+		t.Errorf("expected 'locked' for unmet prerequisites, got '%s'", result.Status)
+	}
+	if len(result.Prerequisites) != 1 || result.Prerequisites[0] != "API:api-w1" {
+		t.Errorf("expected prerequisites from modified wave, got %v", result.Prerequisites)
+	}
+}
+
+func TestApplyModifiedWave_AvailableWhenPrereqsMet(t *testing.T) {
+	// given: architect adds a prerequisite that HAS been completed
+	original := Wave{
+		ID:          "auth-w2",
+		ClusterName: "Auth",
+		Title:       "Original",
+		Status:      "available",
+	}
+	modified := Wave{
+		ID:            "auth-w2",
+		ClusterName:   "Auth",
+		Title:         "Modified",
+		Prerequisites: []string{"Auth:auth-w1"},
+		Actions:       []WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
+	}
+	completed := map[string]bool{"Auth:auth-w1": true}
+
+	// when
+	result := ApplyModifiedWave(original, modified, completed)
+
+	// then: status should remain "available" because prerequisite is met
+	if result.Status != "available" {
+		t.Errorf("expected 'available' for met prerequisites, got '%s'", result.Status)
 	}
 }
