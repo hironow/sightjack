@@ -430,6 +430,48 @@ retry:
 	}
 }
 
+func TestLabelsConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.Labels.Enabled {
+		t.Error("expected Labels.Enabled=true by default")
+	}
+	if cfg.Labels.Prefix != "sightjack" {
+		t.Errorf("expected Prefix='sightjack', got %q", cfg.Labels.Prefix)
+	}
+	if cfg.Labels.ReadyLabel != "sightjack:ready" {
+		t.Errorf("expected ReadyLabel='sightjack:ready', got %q", cfg.Labels.ReadyLabel)
+	}
+}
+
+func TestLoadConfigWithLabels(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+labels:
+  enabled: false
+  prefix: "myprefix"
+  ready_label: "myprefix:done"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Labels.Enabled {
+		t.Error("expected Labels.Enabled=false")
+	}
+	if cfg.Labels.Prefix != "myprefix" {
+		t.Errorf("Prefix: expected 'myprefix', got %q", cfg.Labels.Prefix)
+	}
+	if cfg.Labels.ReadyLabel != "myprefix:done" {
+		t.Errorf("ReadyLabel: expected 'myprefix:done', got %q", cfg.Labels.ReadyLabel)
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()

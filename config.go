@@ -24,6 +24,13 @@ type RetryConfig struct {
 	BaseDelaySec int `yaml:"base_delay_sec"`
 }
 
+// LabelsConfig holds Linear label assignment settings.
+type LabelsConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	Prefix     string `yaml:"prefix"`
+	ReadyLabel string `yaml:"ready_label"`
+}
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
 	Linear       LinearConfig           `yaml:"linear"`
@@ -32,6 +39,7 @@ type Config struct {
 	Scribe       ScribeConfig           `yaml:"scribe"`
 	Strictness   StrictnessConfig       `yaml:"strictness"`
 	Retry        RetryConfig            `yaml:"retry"`
+	Labels       LabelsConfig           `yaml:"labels"`
 	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates"`
 	Lang         string                 `yaml:"lang"`
 }
@@ -82,6 +90,11 @@ func DefaultConfig() Config {
 		Retry: RetryConfig{
 			MaxAttempts:  3,
 			BaseDelaySec: 2,
+		},
+		Labels: LabelsConfig{
+			Enabled:    true,
+			Prefix:     "sightjack",
+			ReadyLabel: "sightjack:ready",
 		},
 		Lang: "ja",
 	}
