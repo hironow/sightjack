@@ -942,8 +942,8 @@ func TestBuildSessionState(t *testing.T) {
 	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, nil)
 
 	// then
-	if state.Version != "0.6" {
-		t.Errorf("expected version 0.6, got %s", state.Version)
+	if state.Version != "0.7" {
+		t.Errorf("expected version 0.7, got %s", state.Version)
 	}
 	if state.SessionID != "test-123" {
 		t.Errorf("expected test-123, got %s", state.SessionID)
