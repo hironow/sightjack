@@ -633,3 +633,51 @@ func TestRenderNextGenPrompt_NoRejectedActions(t *testing.T) {
 		t.Errorf("Rejected section should be omitted when empty")
 	}
 }
+
+func TestMatchDoDTemplate(t *testing.T) {
+	templates := map[string]DoDTemplate{
+		"auth":  {Must: []string{"auth must"}, Should: []string{"auth should"}},
+		"infra": {Must: []string{"infra must"}},
+	}
+	tests := []struct {
+		clusterName string
+		wantMatch   bool
+		wantKey     string
+	}{
+		{"Auth", true, "auth"},
+		{"auth-service", true, "auth"},
+		{"Authentication", true, "auth"},
+		{"INFRA", true, "infra"},
+		{"frontend", false, ""},
+	}
+	for _, tt := range tests {
+		matched, key := MatchDoDTemplate(templates, tt.clusterName)
+		if matched != tt.wantMatch {
+			t.Errorf("MatchDoDTemplate(%q): matched=%v, want %v", tt.clusterName, matched, tt.wantMatch)
+		}
+		if key != tt.wantKey {
+			t.Errorf("MatchDoDTemplate(%q): key=%q, want %q", tt.clusterName, key, tt.wantKey)
+		}
+	}
+}
+
+func TestFormatDoDSection(t *testing.T) {
+	tmpl := DoDTemplate{
+		Must:   []string{"Unit tests", "Error handling"},
+		Should: []string{"Integration tests"},
+	}
+	section := FormatDoDSection(tmpl)
+	if !strings.Contains(section, "Unit tests") {
+		t.Error("expected Must items in section")
+	}
+	if !strings.Contains(section, "Integration tests") {
+		t.Error("expected Should items in section")
+	}
+}
+
+func TestFormatDoDSectionEmpty(t *testing.T) {
+	section := FormatDoDSection(DoDTemplate{})
+	if section != "" {
+		t.Errorf("expected empty section for empty template, got %q", section)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"strings"
 	"text/template"
 )
 
@@ -33,6 +34,7 @@ type WaveGeneratePromptData struct {
 	Completeness    string
 	Issues          string
 	Observations    string
+	DoDSection      string
 	OutputPath      string
 	StrictnessLevel string
 }
@@ -78,8 +80,42 @@ type NextGenPromptData struct {
 	CompletedWaves  string
 	ExistingADRs    []ExistingADR
 	RejectedActions string
+	DoDSection      string
 	OutputPath      string
 	StrictnessLevel string
+}
+
+// MatchDoDTemplate finds a DoD template matching the cluster name.
+// Matching uses case-insensitive prefix match. Returns (matched, key).
+func MatchDoDTemplate(templates map[string]DoDTemplate, clusterName string) (bool, string) {
+	lower := strings.ToLower(clusterName)
+	for key := range templates {
+		if strings.HasPrefix(lower, strings.ToLower(key)) {
+			return true, key
+		}
+	}
+	return false, ""
+}
+
+// FormatDoDSection formats a DoD template into a text section for prompt injection.
+func FormatDoDSection(tmpl DoDTemplate) string {
+	if len(tmpl.Must) == 0 && len(tmpl.Should) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	if len(tmpl.Must) > 0 {
+		b.WriteString("Must:\n")
+		for _, item := range tmpl.Must {
+			b.WriteString("- " + item + "\n")
+		}
+	}
+	if len(tmpl.Should) > 0 {
+		b.WriteString("Should:\n")
+		for _, item := range tmpl.Should {
+			b.WriteString("- " + item + "\n")
+		}
+	}
+	return b.String()
 }
 
 func renderTemplate(name string, data any) (string, error) {
