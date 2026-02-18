@@ -233,6 +233,8 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 	sem := make(chan struct{}, maxConcurrency)
 	results := make(chan scanResult, len(clusters))
 
+	// NOTE: i and cluster are safe to capture in the goroutine closure.
+	// Go 1.22+ scopes loop variables per iteration (go.mod requires go 1.25.0).
 	for i, cluster := range clusters {
 		sem <- struct{}{}
 		go func() {
