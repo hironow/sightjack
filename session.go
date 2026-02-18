@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 // CalcNewlyUnlocked computes how many waves were newly unlocked after completing a wave.
 // oldAvailable is the available count before the wave was completed (includes the completing wave).
 // newAvailable is the available count after completion and unlock evaluation.
@@ -25,6 +24,7 @@ func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
 	return newCount
 }
 
+// RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader) error {
 	if !dryRun && input == nil {
 		return fmt.Errorf("input reader is required for interactive session")

@@ -208,9 +208,6 @@ func RenderProgressBar(current float64, width int) string {
 		width = 20
 	}
 	filled := int(current * float64(width))
-	if filled > width {
-		filled = width
-	}
 	bar := strings.Repeat("=", filled) + strings.Repeat(".", width-filled)
 	return fmt.Sprintf("[%s] %d%%", bar, int(current*100))
 }

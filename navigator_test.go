@@ -132,6 +132,60 @@ func TestCenter_Japanese(t *testing.T) {
 	}
 }
 
+func TestRenderNavigator_ConsistentLineWidth(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25, Issues: make([]IssueDetail, 3)},
+		},
+		TotalIssues:  3,
+		Completeness: 0.25,
+	}
+
+	// when
+	output := RenderNavigator(result, "My Project")
+
+	// then: every non-empty line must have the same display width
+	lines := strings.Split(output, "\n")
+	expectedWidth := 2 + navigatorWidth // "|" or "+" on each side
+	for i, line := range lines {
+		if line == "" {
+			continue
+		}
+		dw := displayWidth(line)
+		if dw != expectedWidth {
+			t.Errorf("line %d: display width %d, want %d: %q", i+1, dw, expectedWidth, line)
+		}
+	}
+}
+
+func TestRenderNavigator_JapaneseName(t *testing.T) {
+	// given: Japanese project and cluster names
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "認証", Completeness: 0.5, Issues: make([]IssueDetail, 3)},
+		},
+		TotalIssues:  3,
+		Completeness: 0.5,
+	}
+
+	// when
+	output := RenderNavigator(result, "テストプロジェクト")
+
+	// then: every non-empty line must have consistent display width
+	lines := strings.Split(output, "\n")
+	expectedWidth := 2 + navigatorWidth
+	for i, line := range lines {
+		if line == "" {
+			continue
+		}
+		dw := displayWidth(line)
+		if dw != expectedWidth {
+			t.Errorf("line %d: display width %d, want %d: %q", i+1, dw, expectedWidth, line)
+		}
+	}
+}
+
 func TestRenderNavigator_LongClusterName(t *testing.T) {
 	result := &ScanResult{
 		Clusters: []ClusterScanResult{
