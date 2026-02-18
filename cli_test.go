@@ -730,6 +730,92 @@ func TestDisplayADRConflicts_MultipleConflicts(t *testing.T) {
 	}
 }
 
+func TestCompletedWaves_FiltersCompleted(t *testing.T) {
+	// given
+	waves := []Wave{
+		{ID: "w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
+		{ID: "w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
+		{ID: "w3", ClusterName: "API", Title: "Split", Status: "completed"},
+	}
+
+	// when
+	result := CompletedWaves(waves)
+
+	// then
+	if len(result) != 2 {
+		t.Fatalf("expected 2 completed, got %d", len(result))
+	}
+	if result[0].ID != "w1" {
+		t.Errorf("expected w1, got %s", result[0].ID)
+	}
+	if result[1].ID != "w3" {
+		t.Errorf("expected w3, got %s", result[1].ID)
+	}
+}
+
+func TestCompletedWaves_NoneCompleted(t *testing.T) {
+	// given
+	waves := []Wave{
+		{ID: "w1", Status: "available"},
+		{ID: "w2", Status: "locked"},
+	}
+
+	// when
+	result := CompletedWaves(waves)
+
+	// then
+	if len(result) != 0 {
+		t.Errorf("expected 0, got %d", len(result))
+	}
+}
+
+func TestDisplayCompletedWaveActions_ShowsActions(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	wave := Wave{
+		ClusterName: "Auth",
+		Title:       "DoD",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "ENG-101", Description: "Auth flow"},
+			{Type: "add_dependency", IssueID: "ENG-102", Description: "Token dep"},
+		},
+		Delta: WaveDelta{Before: 0.25, After: 0.40},
+	}
+
+	// when
+	DisplayCompletedWaveActions(&buf, wave)
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, "(completed)") {
+		t.Error("expected (completed) label")
+	}
+	if !strings.Contains(output, "add_dod") {
+		t.Error("expected action type")
+	}
+	if !strings.Contains(output, "ENG-101") {
+		t.Error("expected issue ID")
+	}
+	if !strings.Contains(output, "Actions applied (2)") {
+		t.Error("expected action count")
+	}
+}
+
+func TestDisplayCompletedWaveActions_NoActions(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	wave := Wave{ClusterName: "Auth", Title: "Empty"}
+
+	// when
+	DisplayCompletedWaveActions(&buf, wave)
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, "Actions applied (0)") {
+		t.Error("expected zero actions")
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{

@@ -186,6 +186,29 @@ func DisplayADRConflicts(w io.Writer, conflicts []ADRConflict) {
 	}
 }
 
+// CompletedWaves filters waves to only those with "completed" status.
+func CompletedWaves(waves []Wave) []Wave {
+	var result []Wave
+	for _, w := range waves {
+		if w.Status == "completed" {
+			result = append(result, w)
+		}
+	}
+	return result
+}
+
+// DisplayCompletedWaveActions shows the actions that were applied in a completed wave.
+func DisplayCompletedWaveActions(w io.Writer, wave Wave) {
+	fmt.Fprintf(w, "\n  --- %s - %s (completed) ---\n", wave.ClusterName, wave.Title)
+	fmt.Fprintf(w, "  Actions applied (%d):\n", len(wave.Actions))
+	for i, a := range wave.Actions {
+		fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
+	}
+	if wave.Delta != (WaveDelta{}) {
+		fmt.Fprintf(w, "\n  Result: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
+	}
+}
+
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
