@@ -185,8 +185,10 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 
 			switch choice {
 			case ApprovalApprove:
+				delete(sessionRejected, WaveKey(selected))
 				applyWave = true
 			case ApprovalReject:
+				delete(sessionRejected, WaveKey(selected))
 				LogInfo("Wave rejected.")
 			case ApprovalDiscuss:
 				topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
