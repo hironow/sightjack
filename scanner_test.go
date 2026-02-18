@@ -429,3 +429,59 @@ func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 		t.Errorf("expected 1 result, got %d", len(results))
 	}
 }
+
+func TestRunParallelDeepScan_ClosureWithClassifyMap(t *testing.T) {
+	// given: classify result with cluster names and issue IDs (simulates Pass 1 output)
+	classifyClusters := []ClusterClassification{
+		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
+		{Name: "Infra", IssueIDs: []string{"I-1"}},
+	}
+
+	// Build cluster lookup (same pattern as wired in RunScan)
+	classifyMap := make(map[string]ClusterClassification)
+	var scanClusters []ClusterScanResult
+	for _, cc := range classifyClusters {
+		classifyMap[cc.Name] = cc
+		scanClusters = append(scanClusters, ClusterScanResult{Name: cc.Name})
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 2
+
+	var scannedNames []string
+
+	// when: use closure that captures classifyMap (like the wired RunScan code does)
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
+		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+			cc, ok := classifyMap[cluster.Name]
+			if !ok {
+				return ClusterScanResult{}, fmt.Errorf("cluster %q not found in classifyMap", cluster.Name)
+			}
+			scannedNames = append(scannedNames, cc.Name)
+			return ClusterScanResult{
+				Name:         cc.Name,
+				Completeness: 0.5,
+				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
+			}, nil
+		})
+
+	// then
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d: %v", len(warnings), warnings)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	// Verify both clusters were scanned
+	nameSet := make(map[string]bool)
+	for _, r := range results {
+		nameSet[r.Name] = true
+	}
+	if !nameSet["Auth"] {
+		t.Error("expected Auth cluster in results")
+	}
+	if !nameSet["Infra"] {
+		t.Error("expected Infra cluster in results")
+	}
+}

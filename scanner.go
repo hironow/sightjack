@@ -93,48 +93,51 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// --- Pass 2: Deep scan per cluster (parallel) ---
 	LogScan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
-	clusters := make([]ClusterScanResult, len(classify.Clusters))
-
-	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(cfg.Scan.MaxConcurrency)
-
-	for i, cc := range classify.Clusters {
-		g.Go(func() error {
-			chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
-			var chunkResults []ClusterScanResult
-
-			for j, chunk := range chunks {
-				chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", i, sanitizeName(cc.Name), j))
-				prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
-					ClusterName:     cc.Name,
-					IssueIDs:        strings.Join(chunk, ", "),
-					OutputPath:      chunkFile,
-					StrictnessLevel: string(cfg.Strictness.Default),
-				})
-				if renderErr != nil {
-					return fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
-				}
-
-				LogScan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-				if _, runErr := RunClaude(gCtx, cfg, prompt, io.Discard); runErr != nil {
-					return fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
-				}
-
-				result, parseErr := ParseClusterScanResult(chunkFile)
-				if parseErr != nil {
-					return fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
-				}
-				chunkResults = append(chunkResults, *result)
-			}
-
-			clusters[i] = mergeClusterChunks(cc.Name, chunkResults)
-			LogOK("Cluster %s: %.0f%% complete", cc.Name, clusters[i].Completeness*100)
-			return nil
-		})
+	// Build cluster lookup for deep scan closure
+	classifyMap := make(map[string]ClusterClassification)
+	var scanClusters []ClusterScanResult
+	for _, cc := range classify.Clusters {
+		classifyMap[cc.Name] = cc
+		scanClusters = append(scanClusters, ClusterScanResult{Name: cc.Name})
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
+	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+		cc := classifyMap[cluster.Name]
+		chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
+		var chunkResults []ClusterScanResult
+
+		for j, chunk := range chunks {
+			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%s_c%02d.json", sanitizeName(cc.Name), j))
+			prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
+				ClusterName:     cc.Name,
+				IssueIDs:        strings.Join(chunk, ", "),
+				OutputPath:      chunkFile,
+				StrictnessLevel: string(cfg.Strictness.Default),
+			})
+			if renderErr != nil {
+				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
+			}
+
+			LogScan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
+			if _, runErr := RunClaude(ctx, cfg, prompt, io.Discard); runErr != nil {
+				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
+			}
+
+			result, parseErr := ParseClusterScanResult(chunkFile)
+			if parseErr != nil {
+				return ClusterScanResult{}, fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
+			}
+			chunkResults = append(chunkResults, *result)
+		}
+
+		merged := mergeClusterChunks(cc.Name, chunkResults)
+		LogOK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
+		return merged, nil
+	}
+
+	clusters, scanWarnings := RunParallelDeepScan(ctx, cfg, scanDir, scanClusters, deepScanFn)
+	if len(clusters) == 0 && len(scanWarnings) > 0 {
+		return nil, fmt.Errorf("all clusters failed during deep scan")
 	}
 
 	merged := MergeScanResults(clusters, classify.ShibitoWarnings)
