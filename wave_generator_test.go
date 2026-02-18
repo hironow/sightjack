@@ -94,3 +94,31 @@ func TestParseNextGenResult_MissingFile(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestGenerateNextWavesDryRun(t *testing.T) {
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	if err := os.MkdirAll(scanDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := DefaultConfig()
+	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.65,
+		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
+	}
+	completedWaves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
+
+	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil)
+	if err != nil {
+		t.Fatalf("dry-run: %v", err)
+	}
+
+	// Verify prompt file was created
+	promptFile := filepath.Join(scanDir, "nextgen_auth_auth-w1_prompt.md")
+	if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+		t.Error("prompt file should have been created")
+	}
+}
