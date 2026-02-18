@@ -309,6 +309,93 @@ func TestCountADRFiles_NonexistentDir(t *testing.T) {
 	}
 }
 
+func TestReadExistingADRs_Empty(t *testing.T) {
+	// given
+	dir := t.TempDir()
+
+	// when
+	adrs, err := ReadExistingADRs(dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(adrs) != 0 {
+		t.Errorf("expected 0 ADRs, got %d", len(adrs))
+	}
+}
+
+func TestReadExistingADRs_ReturnsContent(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "0001-auth-decision.md"), []byte("# 0001. Auth Decision\nAccepted"), 0644)
+	os.WriteFile(filepath.Join(dir, "0002-api-design.md"), []byte("# 0002. API Design\nAccepted"), 0644)
+	os.WriteFile(filepath.Join(dir, "README.md"), []byte("ignore this"), 0644) // non-ADR file
+
+	// when
+	adrs, err := ReadExistingADRs(dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(adrs) != 2 {
+		t.Fatalf("expected 2 ADRs, got %d", len(adrs))
+	}
+	if adrs[0].Filename != "0001-auth-decision.md" {
+		t.Errorf("expected 0001-auth-decision.md, got %s", adrs[0].Filename)
+	}
+	if !strings.Contains(adrs[0].Content, "Auth Decision") {
+		t.Error("expected ADR content to contain 'Auth Decision'")
+	}
+}
+
+func TestReadExistingADRs_DirNotExist(t *testing.T) {
+	// when
+	adrs, err := ReadExistingADRs("/nonexistent/dir")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error for missing dir: %v", err)
+	}
+	if len(adrs) != 0 {
+		t.Errorf("expected 0 ADRs, got %d", len(adrs))
+	}
+}
+
+func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+	adrDir := filepath.Join(dir, "docs", "adr")
+	os.MkdirAll(adrDir, 0755)
+	os.WriteFile(filepath.Join(adrDir, "0001-auth.md"), []byte("# Auth ADR"), 0644)
+
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "echo", TimeoutSec: 10},
+	}
+	wave := Wave{ID: "w1", ClusterName: "Auth", Title: "Test"}
+	resp := &ArchitectResponse{Analysis: "test", Reasoning: "test"}
+
+	// when
+	err := RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir)
+
+	// then
+	if err != nil {
+		t.Fatalf("dry-run: %v", err)
+	}
+	promptFiles, _ := filepath.Glob(filepath.Join(scanDir, "scribe_*_prompt.md"))
+	if len(promptFiles) == 0 {
+		t.Fatal("expected scribe prompt file to be created")
+	}
+	content, _ := os.ReadFile(promptFiles[0])
+	if !strings.Contains(string(content), "0001-auth.md") {
+		t.Error("expected existing ADR filename in dry-run prompt")
+	}
+}
+
 func TestNormalizeScribeResult_MatchingID(t *testing.T) {
 	// given: Claude returned matching adr_id
 	result := &ScribeResponse{ADRID: "0003", Title: "test"}

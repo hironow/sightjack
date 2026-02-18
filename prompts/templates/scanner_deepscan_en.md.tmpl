@@ -2,6 +2,12 @@ You are a Scanner Agent.
 Analyze the Issues belonging to the following cluster in detail
 and evaluate their completeness.
 
+## Strictness Level: {{.StrictnessLevel}}
+Adjust your analysis depth based on the current strictness level:
+- fog: Report DoD gaps as warnings only. NFR issues are informational.
+- alert: Propose sub-issues for Must-level DoD gaps. NFR gets dedicated attention.
+- lockdown: Flag ALL DoD gaps. Mark incomplete issues as blocked candidates.
+
 ## Target Cluster
 - Cluster Name: {{.ClusterName}}
 - Issue IDs: {{.IssueIDs}}

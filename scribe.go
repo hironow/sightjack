@@ -78,6 +78,40 @@ func CountADRFiles(adrDir string) int {
 	return count
 }
 
+// ExistingADR holds the filename and content of an existing ADR file.
+type ExistingADR struct {
+	Filename string
+	Content  string
+}
+
+// ReadExistingADRs reads all NNNN-*.md files from adrDir and returns their content.
+// Returns empty slice if directory doesn't exist or is empty.
+func ReadExistingADRs(adrDir string) ([]ExistingADR, error) {
+	entries, err := os.ReadDir(adrDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var adrs []ExistingADR
+	for _, e := range entries {
+		if e.IsDir() || !adrPattern.MatchString(e.Name()) {
+			continue
+		}
+		content, readErr := os.ReadFile(filepath.Join(adrDir, e.Name()))
+		if readErr != nil {
+			continue
+		}
+		adrs = append(adrs, ExistingADR{
+			Filename: e.Name(),
+			Content:  string(content),
+		})
+	}
+	return adrs, nil
+}
+
 // scribeFileName returns the output filename for a scribe run.
 func scribeFileName(wave Wave) string {
 	return fmt.Sprintf("scribe_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
@@ -102,16 +136,23 @@ func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *A
 		return fmt.Errorf("marshal wave actions: %w", err)
 	}
 
+	existingADRs, err := ReadExistingADRs(adrDir)
+	if err != nil {
+		return fmt.Errorf("read existing ADRs: %w", err)
+	}
+
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, scribeFileName(wave))
 	prompt, err := RenderScribeADRPrompt(cfg.Lang, ScribeADRPromptData{
-		ClusterName: wave.ClusterName,
-		WaveTitle:   wave.Title,
-		WaveActions: string(actionsJSON),
-		Analysis:    architectResp.Analysis,
-		Reasoning:   architectResp.Reasoning,
-		ADRNumber:   adrID,
-		OutputPath:  outputFile,
+		ClusterName:     wave.ClusterName,
+		WaveTitle:       wave.Title,
+		WaveActions:     string(actionsJSON),
+		Analysis:        architectResp.Analysis,
+		Reasoning:       architectResp.Reasoning,
+		ADRNumber:       adrID,
+		OutputPath:      outputFile,
+		StrictnessLevel: string(cfg.Strictness.Default),
+		ExistingADRs:    existingADRs,
 	})
 	if err != nil {
 		return fmt.Errorf("render scribe prompt: %w", err)
@@ -160,16 +201,23 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		return nil, fmt.Errorf("marshal wave actions: %w", err)
 	}
 
+	existingADRs, err := ReadExistingADRs(adrDir)
+	if err != nil {
+		return nil, fmt.Errorf("read existing ADRs: %w", err)
+	}
+
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, scribeFileName(wave))
 	prompt, err := RenderScribeADRPrompt(cfg.Lang, ScribeADRPromptData{
-		ClusterName: wave.ClusterName,
-		WaveTitle:   wave.Title,
-		WaveActions: string(actionsJSON),
-		Analysis:    architectResp.Analysis,
-		Reasoning:   architectResp.Reasoning,
-		ADRNumber:   adrID,
-		OutputPath:  outputFile,
+		ClusterName:     wave.ClusterName,
+		WaveTitle:       wave.Title,
+		WaveActions:     string(actionsJSON),
+		Analysis:        architectResp.Analysis,
+		Reasoning:       architectResp.Reasoning,
+		ADRNumber:       adrID,
+		OutputPath:      outputFile,
+		StrictnessLevel: string(cfg.Strictness.Default),
+		ExistingADRs:    existingADRs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render scribe prompt: %w", err)

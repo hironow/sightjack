@@ -2,6 +2,12 @@
 人間の議論トピックをクラスタとWaveの文脈で分析してください。
 議論の結果、Waveアクションの修正が必要であれば提案してください。
 
+## Strictness Level: {{.StrictnessLevel}}
+現在の厳格度レベルに応じて分析の深さを調整してください:
+- fog: DoD不足をWarningとして表示のみ。NFRは参考情報。
+- alert: Must級DoD欠落にはサブIssue提案。NFRにも専用の注意を。
+- lockdown: 全DoD不足をフラグ。未完了IssueをBlocked候補としてマーク。
+
 ## クラスタ
 {{.ClusterName}}
 
