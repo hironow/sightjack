@@ -131,6 +131,15 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Retry.BaseDelaySec < 1 {
 		cfg.Retry.BaseDelaySec = 2
 	}
+	if cfg.Labels.Enabled {
+		defCfg := DefaultConfig()
+		if cfg.Labels.Prefix == "" {
+			cfg.Labels.Prefix = defCfg.Labels.Prefix
+		}
+		if cfg.Labels.ReadyLabel == "" {
+			cfg.Labels.ReadyLabel = defCfg.Labels.ReadyLabel
+		}
+	}
 
 	return &cfg, nil
 }

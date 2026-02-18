@@ -472,6 +472,36 @@ labels:
 	}
 }
 
+func TestLoadConfigLabelsEnabled_EmptyValues_FallsBackToDefaults(t *testing.T) {
+	// given: labels enabled with explicitly empty prefix and ready_label
+	content := `
+linear:
+  team: test
+  project: test
+labels:
+  enabled: true
+  prefix: ""
+  ready_label: ""
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	// when
+	cfg, err := LoadConfig(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Labels.Prefix != "sightjack" {
+		t.Errorf("expected default prefix 'sightjack', got %q", cfg.Labels.Prefix)
+	}
+	if cfg.Labels.ReadyLabel != "sightjack:ready" {
+		t.Errorf("expected default ready label 'sightjack:ready', got %q", cfg.Labels.ReadyLabel)
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()

@@ -89,7 +89,7 @@ func waveApplyFileName(wave Wave) string {
 }
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
-// readyIssueIDs is a comma-separated list of issue IDs whose waves are all completed.
+// It writes the apply result to a JSON file and returns the parsed result.
 func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (*WaveApplyResult, error) {
 	applyFile := filepath.Join(scanDir, waveApplyFileName(wave))
 
