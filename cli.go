@@ -13,7 +13,7 @@ import (
 // ErrQuit signals the user chose to quit.
 var ErrQuit = errors.New("user quit")
 
-// ErrGoBack signals the user chose to go back to completed waves.
+// ErrGoBack signals the user chose to go back to the previous menu.
 var ErrGoBack = errors.New("go back")
 
 // ScanLine reads one line from s, returning early if ctx is cancelled.

@@ -145,7 +145,7 @@ func RenderMatrixNavigator(result *ScanResult, projectName string, waves []Wave,
 	b.WriteString("+" + compDash + "+\n")
 
 	// Legend
-	b.WriteString("  [=] completed  [ ] available  [x] locked\n")
+	b.WriteString("  [=] completed  [ ] available  [x] locked  [?] unknown\n")
 
 	// --- Footer (progress bar + metadata) ---
 	progressBar := RenderProgressBar(result.Completeness, 20)

@@ -145,6 +145,10 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 				continue
 			}
 			revisit, backErr := PromptCompletedWaveSelection(ctx, os.Stdout, scanner, completedList)
+			if backErr == ErrQuit {
+				LogInfo("Session paused. State saved.")
+				break
+			}
 			if backErr != nil {
 				continue
 			}
