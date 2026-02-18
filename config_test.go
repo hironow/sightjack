@@ -370,6 +370,66 @@ dod_templates:
 	}
 }
 
+func TestRetryConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Retry.MaxAttempts != 3 {
+		t.Errorf("expected MaxAttempts=3, got %d", cfg.Retry.MaxAttempts)
+	}
+	if cfg.Retry.BaseDelaySec != 2 {
+		t.Errorf("expected BaseDelaySec=2, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
+func TestLoadConfigWithRetry(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+retry:
+  max_attempts: 5
+  base_delay_sec: 1
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Retry.MaxAttempts != 5 {
+		t.Errorf("MaxAttempts: expected 5, got %d", cfg.Retry.MaxAttempts)
+	}
+	if cfg.Retry.BaseDelaySec != 1 {
+		t.Errorf("BaseDelaySec: expected 1, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
+func TestLoadConfigRetryValidation(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+retry:
+  max_attempts: 0
+  base_delay_sec: -1
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Retry.MaxAttempts != 3 {
+		t.Errorf("expected corrected MaxAttempts=3, got %d", cfg.Retry.MaxAttempts)
+	}
+	if cfg.Retry.BaseDelaySec != 2 {
+		t.Errorf("expected corrected BaseDelaySec=2, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()

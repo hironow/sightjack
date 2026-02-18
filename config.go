@@ -18,13 +18,20 @@ type DoDTemplate struct {
 	Should []string `yaml:"should"`
 }
 
+// RetryConfig holds exponential backoff retry settings for Claude subprocess calls.
+type RetryConfig struct {
+	MaxAttempts  int `yaml:"max_attempts"`
+	BaseDelaySec int `yaml:"base_delay_sec"`
+}
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
-	Linear     LinearConfig    `yaml:"linear"`
-	Scan       ScanConfig      `yaml:"scan"`
-	Claude     ClaudeConfig    `yaml:"claude"`
-	Scribe     ScribeConfig    `yaml:"scribe"`
+	Linear       LinearConfig           `yaml:"linear"`
+	Scan         ScanConfig             `yaml:"scan"`
+	Claude       ClaudeConfig           `yaml:"claude"`
+	Scribe       ScribeConfig           `yaml:"scribe"`
 	Strictness   StrictnessConfig       `yaml:"strictness"`
+	Retry        RetryConfig            `yaml:"retry"`
 	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates"`
 	Lang         string                 `yaml:"lang"`
 }
@@ -72,6 +79,10 @@ func DefaultConfig() Config {
 		Strictness: StrictnessConfig{
 			Default: StrictnessFog,
 		},
+		Retry: RetryConfig{
+			MaxAttempts:  3,
+			BaseDelaySec: 2,
+		},
 		Lang: "ja",
 	}
 }
@@ -100,6 +111,12 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if !cfg.Strictness.Default.Valid() {
 		cfg.Strictness.Default = StrictnessFog
+	}
+	if cfg.Retry.MaxAttempts < 1 {
+		cfg.Retry.MaxAttempts = 3
+	}
+	if cfg.Retry.BaseDelaySec < 1 {
+		cfg.Retry.BaseDelaySec = 2
 	}
 
 	return &cfg, nil
