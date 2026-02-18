@@ -18,6 +18,8 @@ type ClassifyPromptData struct {
 	CycleFilter     string
 	OutputPath      string
 	StrictnessLevel string
+	LabelsEnabled   bool
+	LabelPrefix     string
 }
 
 // DeepScanPromptData holds template data for the deep scan prompt.
@@ -47,6 +49,8 @@ type WaveApplyPromptData struct {
 	Actions         string
 	OutputPath      string
 	StrictnessLevel string
+	LabelsEnabled   bool
+	LabelPrefix     string
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.

@@ -38,4 +38,7 @@
 }
 ```
 
+{{if .LabelsEnabled}}
+全アクション適用後、Linear MCPを使用して各対象Issueに "{{.LabelPrefix}}:wave-done" ラベルを付与してください。
+{{end}}
 重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。

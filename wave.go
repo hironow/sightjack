@@ -104,6 +104,8 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (
 		Actions:         string(actionsJSON),
 		OutputPath:      applyFile,
 		StrictnessLevel: string(cfg.Strictness.Default),
+		LabelsEnabled:   cfg.Labels.Enabled,
+		LabelPrefix:     cfg.Labels.Prefix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render apply prompt: %w", err)

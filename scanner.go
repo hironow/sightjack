@@ -69,6 +69,8 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		CycleFilter:     cfg.Linear.Cycle,
 		OutputPath:      classifyOutput,
 		StrictnessLevel: string(cfg.Strictness.Default),
+		LabelsEnabled:   cfg.Labels.Enabled,
+		LabelPrefix:     cfg.Labels.Prefix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render classify prompt: %w", err)

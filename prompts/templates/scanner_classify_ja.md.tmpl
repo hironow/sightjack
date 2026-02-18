@@ -39,4 +39,7 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 }
 ```
 
+{{if .LabelsEnabled}}
+分類完了後、Linear MCPを使用して各分析済みIssueに "{{.LabelPrefix}}:analyzed" ラベルを付与してください。
+{{end}}
 重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。

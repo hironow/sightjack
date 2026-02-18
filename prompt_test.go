@@ -730,6 +730,67 @@ func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
 	}
 }
 
+func TestRenderClassifyPromptWithLabels(t *testing.T) {
+	data := ClassifyPromptData{
+		TeamFilter:      "test",
+		ProjectFilter:   "test",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   true,
+		LabelPrefix:     "sightjack",
+	}
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderClassifyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if !strings.Contains(result, "sightjack:analyzed") {
+			t.Errorf("lang=%s: expected label instruction in output", lang)
+		}
+	}
+}
+
+func TestRenderClassifyPromptWithoutLabels(t *testing.T) {
+	data := ClassifyPromptData{
+		TeamFilter:      "test",
+		ProjectFilter:   "test",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   false,
+	}
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderClassifyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if strings.Contains(result, "analyzed") {
+			t.Errorf("lang=%s: label instruction should not appear when disabled", lang)
+		}
+	}
+}
+
+func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
+	data := WaveApplyPromptData{
+		WaveID:          "w1",
+		ClusterName:     "auth",
+		Title:           "Wave 1",
+		Actions:         "[]",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   true,
+		LabelPrefix:     "sightjack",
+	}
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if !strings.Contains(result, "sightjack:wave-done") {
+			t.Errorf("lang=%s: expected label instruction in output", lang)
+		}
+	}
+}
+
 func TestRenderNextGenPromptWithDoD(t *testing.T) {
 	// given
 	data := NextGenPromptData{
