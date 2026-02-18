@@ -12,14 +12,21 @@ type StrictnessConfig struct {
 	Default StrictnessLevel `yaml:"default"`
 }
 
+// DoDTemplate holds must/should Definition of Done items for a category.
+type DoDTemplate struct {
+	Must   []string `yaml:"must"`
+	Should []string `yaml:"should"`
+}
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
 	Linear     LinearConfig    `yaml:"linear"`
 	Scan       ScanConfig      `yaml:"scan"`
 	Claude     ClaudeConfig    `yaml:"claude"`
 	Scribe     ScribeConfig    `yaml:"scribe"`
-	Strictness StrictnessConfig `yaml:"strictness"`
-	Lang       string          `yaml:"lang"`
+	Strictness   StrictnessConfig       `yaml:"strictness"`
+	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates"`
+	Lang         string                 `yaml:"lang"`
 }
 
 // ScribeConfig holds Scribe Agent settings.

@@ -323,6 +323,53 @@ strictness:
 	}
 }
 
+func TestDoDTemplatesInDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.DoDTemplates != nil {
+		t.Fatalf("expected nil DoDTemplates in default config, got %v", cfg.DoDTemplates)
+	}
+}
+
+func TestLoadConfigWithDoDTemplates(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+dod_templates:
+  auth:
+    must:
+      - "Unit tests for all public functions"
+      - "Error handling for all API calls"
+    should:
+      - "Integration test coverage"
+  infra:
+    must:
+      - "Terraform plan reviewed"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if len(cfg.DoDTemplates) != 2 {
+		t.Fatalf("expected 2 DoD templates, got %d", len(cfg.DoDTemplates))
+	}
+	auth := cfg.DoDTemplates["auth"]
+	if len(auth.Must) != 2 {
+		t.Errorf("auth.Must: expected 2, got %d", len(auth.Must))
+	}
+	if len(auth.Should) != 1 {
+		t.Errorf("auth.Should: expected 1, got %d", len(auth.Should))
+	}
+	infra := cfg.DoDTemplates["infra"]
+	if len(infra.Must) != 1 {
+		t.Errorf("infra.Must: expected 1, got %d", len(infra.Must))
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()
