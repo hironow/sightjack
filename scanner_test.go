@@ -582,3 +582,36 @@ func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 		t.Errorf("expected 0 results, got %d", len(results))
 	}
 }
+
+func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
+	// given: concurrency=1, cancel while second cluster waits for semaphore
+	clusters := []ClusterScanResult{
+		{Name: "slow"},
+		{Name: "should-not-run"},
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 1
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var callCount atomic.Int32
+
+	// when: first scan runs, cancels ctx during execution; second should not start
+	results, _ := RunParallelDeepScan(ctx, &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			callCount.Add(1)
+			if index == 0 {
+				cancel() // cancel while second cluster waits for semaphore
+			}
+			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+		})
+
+	// then: only the first cluster should have been scanned
+	if callCount.Load() != 1 {
+		t.Errorf("expected 1 call (only first cluster), got %d", callCount.Load())
+	}
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}

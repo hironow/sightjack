@@ -252,7 +252,14 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 		if ctx.Err() != nil {
 			break
 		}
-		sem <- struct{}{}
+		// Use select to respect cancellation while waiting for semaphore.
+		select {
+		case <-ctx.Done():
+		case sem <- struct{}{}:
+		}
+		if ctx.Err() != nil {
+			break
+		}
 		launched++
 		go func() {
 			defer func() { <-sem }()
