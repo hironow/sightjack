@@ -99,6 +99,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time) error {
 
 	// --- Interactive Loop ---
+	shibitoShown := false
 	for {
 		waves = EvaluateUnlocks(waves, completed)
 		available := AvailableWaves(waves, completed)
@@ -112,8 +113,11 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		fmt.Println()
 		fmt.Print(nav)
 
-		// Display shibito warnings (non-blocking, informational)
-		DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
+		// Display shibito warnings once (static data, does not change during session)
+		if !shibitoShown {
+			DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
+			shibitoShown = true
+		}
 
 		// Prompt wave selection
 		selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
