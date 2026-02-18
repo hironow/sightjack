@@ -444,6 +444,44 @@ func TestRenderMatrixNavigator_GridBorders(t *testing.T) {
 	}
 }
 
+func TestRenderMatrixNavigator_JapaneseClusterAlignment(t *testing.T) {
+	// given: Japanese cluster name (wide characters) should not break grid alignment
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "認証", Completeness: 0.50, Issues: make([]IssueDetail, 3)},
+			{Name: "API", Completeness: 0.40, Issues: make([]IssueDetail, 2)},
+		},
+		TotalIssues:  5,
+		Completeness: 0.45,
+	}
+	waves := []Wave{
+		{ID: "w1", ClusterName: "認証", Title: "Deps", Status: "available"},
+		{ID: "w2", ClusterName: "API", Title: "Split", Status: "completed"},
+	}
+
+	// when
+	nav := RenderMatrixNavigator(result, "テストプロジェクト", waves, 0, nil, "fog", 0)
+
+	// then: all grid lines (starting with + or |) must have the same display width
+	lines := strings.Split(nav, "\n")
+	var gridWidth int
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		if line[0] != '+' && line[0] != '|' {
+			continue
+		}
+		dw := displayWidth(line)
+		if gridWidth == 0 {
+			gridWidth = dw
+		}
+		if dw != gridWidth {
+			t.Errorf("grid line display width %d, want %d: %q", dw, gridWidth, line)
+		}
+	}
+}
+
 func TestRenderMatrixNavigator_ProgressBarInFooter(t *testing.T) {
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50}},

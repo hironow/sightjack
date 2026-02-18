@@ -97,11 +97,11 @@ func RenderMatrixNavigator(result *ScanResult, projectName string, waves []Wave,
 	b.WriteString("+" + compDash + "+\n")
 
 	// Header row
-	b.WriteString(fmt.Sprintf("| %-*s", matrixClusterCol-1, "Cluster"))
+	b.WriteString("| " + padRight("Cluster", matrixClusterCol-2) + " ")
 	for i := 1; i <= waveColumns; i++ {
-		b.WriteString(fmt.Sprintf("| %-*s", matrixWaveCol-1, fmt.Sprintf("W%d", i)))
+		b.WriteString("| " + padRight(fmt.Sprintf("W%d", i), matrixWaveCol-2) + " ")
 	}
-	b.WriteString(fmt.Sprintf("| %-*s", matrixCompCol-1, "Comp"))
+	b.WriteString("| " + padRight("Comp", matrixCompCol-2) + " ")
 	b.WriteString("|\n")
 
 	// Separator
@@ -120,25 +120,20 @@ func RenderMatrixNavigator(result *ScanResult, projectName string, waves []Wave,
 		if displayWidth(label) > matrixClusterCol-2 {
 			label = truncate(label, matrixClusterCol-2)
 		}
-		b.WriteString(fmt.Sprintf("| %-*s", matrixClusterCol-1, label))
+		b.WriteString("| " + padRight(label, matrixClusterCol-2) + " ")
 
 		clusterWaves := wavesByCluster[cluster.Name]
 		for i := 0; i < waveColumns; i++ {
 			if i < len(clusterWaves) {
 				sym := waveStatusSymbol3(clusterWaves[i].Status)
-				// Center the 3-char symbol in the wave column
-				pad := matrixWaveCol - 1 - 3
-				left := pad / 2
-				right := pad - left
-				cell := strings.Repeat(" ", left) + sym + strings.Repeat(" ", right)
-				b.WriteString("|" + cell)
+				b.WriteString("| " + center(sym, matrixWaveCol-2) + " ")
 			} else {
-				b.WriteString("|" + strings.Repeat(" ", matrixWaveCol-1))
+				b.WriteString("| " + strings.Repeat(" ", matrixWaveCol-2) + " ")
 			}
 		}
 
 		compStr := fmt.Sprintf("%d%%", pct)
-		b.WriteString(fmt.Sprintf("| %-*s", matrixCompCol-1, compStr))
+		b.WriteString("| " + padRight(compStr, matrixCompCol-2) + " ")
 		b.WriteString("|\n")
 	}
 
