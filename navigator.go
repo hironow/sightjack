@@ -158,6 +158,12 @@ func waveStatusSymbol(status string) string {
 
 // RenderProgressBar produces an ASCII progress bar: [====....] NN%
 func RenderProgressBar(current float64, width int) string {
+	if current < 0 {
+		current = 0
+	}
+	if current > 1 {
+		current = 1
+	}
 	if width <= 0 {
 		width = 20
 	}

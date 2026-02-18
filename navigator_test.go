@@ -423,6 +423,28 @@ func TestRenderProgressBar_Partial(t *testing.T) {
 	}
 }
 
+func TestRenderProgressBar_Overflow(t *testing.T) {
+	// given: current > 1.0 should clamp to 100%
+	result := RenderProgressBar(1.5, 20)
+
+	// then
+	expected := "[====================] 100%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Underflow(t *testing.T) {
+	// given: negative current should clamp to 0%
+	result := RenderProgressBar(-0.25, 20)
+
+	// then
+	expected := "[....................] 0%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
 func TestRenderNavigatorWithWaves_ShibitoZero_Hidden(t *testing.T) {
 	// given
 	result := &ScanResult{
