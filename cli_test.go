@@ -618,6 +618,118 @@ func TestPromptResume_InvalidInput(t *testing.T) {
 	}
 }
 
+func TestDisplayShibitoWarnings_Empty(t *testing.T) {
+	// given: nil warnings
+	var output bytes.Buffer
+
+	// when
+	DisplayShibitoWarnings(&output, nil)
+
+	// then: no output
+	if output.Len() != 0 {
+		t.Errorf("expected no output for nil warnings, got: %s", output.String())
+	}
+}
+
+func TestDisplayShibitoWarnings_EmptySlice(t *testing.T) {
+	// given: empty slice
+	var output bytes.Buffer
+
+	// when
+	DisplayShibitoWarnings(&output, []ShibitoWarning{})
+
+	// then: no output
+	if output.Len() != 0 {
+		t.Errorf("expected no output for empty warnings, got: %s", output.String())
+	}
+}
+
+func TestDisplayShibitoWarnings_MultipleWarnings(t *testing.T) {
+	// given
+	warnings := []ShibitoWarning{
+		{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-201", Description: "Login retry pattern reappeared", RiskLevel: "high"},
+		{ClosedIssueID: "ENG-30", CurrentIssueID: "ENG-180", Description: "Similar caching approach", RiskLevel: "medium"},
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayShibitoWarnings(&output, warnings)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "Shibito") {
+		t.Error("expected Shibito header in output")
+	}
+	if !strings.Contains(out, "ENG-50") {
+		t.Error("expected closed issue ID ENG-50")
+	}
+	if !strings.Contains(out, "ENG-201") {
+		t.Error("expected current issue ID ENG-201")
+	}
+	if !strings.Contains(out, "high") {
+		t.Error("expected risk level in output")
+	}
+	if !strings.Contains(out, "Login retry pattern reappeared") {
+		t.Error("expected description in output")
+	}
+	if !strings.Contains(out, "ENG-30") {
+		t.Error("expected second warning closed issue ID")
+	}
+}
+
+func TestDisplayADRConflicts_Empty(t *testing.T) {
+	// given: nil conflicts
+	var output bytes.Buffer
+
+	// when
+	DisplayADRConflicts(&output, nil)
+
+	// then: no output
+	if output.Len() != 0 {
+		t.Errorf("expected no output for nil conflicts, got: %s", output.String())
+	}
+}
+
+func TestDisplayADRConflicts_EmptySlice(t *testing.T) {
+	// given
+	var output bytes.Buffer
+
+	// when
+	DisplayADRConflicts(&output, []ADRConflict{})
+
+	// then
+	if output.Len() != 0 {
+		t.Errorf("expected no output for empty conflicts, got: %s", output.String())
+	}
+}
+
+func TestDisplayADRConflicts_MultipleConflicts(t *testing.T) {
+	// given
+	conflicts := []ADRConflict{
+		{ExistingADRID: "0001", Description: "Contradicts auth approach"},
+		{ExistingADRID: "0002", Description: "API versioning conflict"},
+	}
+	var output bytes.Buffer
+
+	// when
+	DisplayADRConflicts(&output, conflicts)
+
+	// then
+	out := output.String()
+	if !strings.Contains(out, "[Scribe]") {
+		t.Error("expected [Scribe] label in output")
+	}
+	if !strings.Contains(out, "0001") {
+		t.Error("expected existing ADR ID 0001")
+	}
+	if !strings.Contains(out, "Contradicts auth approach") {
+		t.Error("expected conflict description")
+	}
+	if !strings.Contains(out, "0002") {
+		t.Error("expected second ADR ID")
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{

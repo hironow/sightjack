@@ -164,6 +164,28 @@ func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, state *Ses
 	}
 }
 
+// DisplayShibitoWarnings shows shibito resurrection detection warnings.
+func DisplayShibitoWarnings(w io.Writer, warnings []ShibitoWarning) {
+	if len(warnings) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\n  [Shibito] Resurrection warnings:")
+	for _, warn := range warnings {
+		fmt.Fprintf(w, "    %s -> %s [%s]: %s\n",
+			warn.ClosedIssueID, warn.CurrentIssueID, warn.RiskLevel, warn.Description)
+	}
+}
+
+// DisplayADRConflicts shows potential conflicts between new and existing ADRs.
+func DisplayADRConflicts(w io.Writer, conflicts []ADRConflict) {
+	if len(conflicts) == 0 {
+		return
+	}
+	for _, c := range conflicts {
+		fmt.Fprintf(w, "  [Scribe] Warning: Potential conflict with ADR-%s: %s\n", c.ExistingADRID, c.Description)
+	}
+}
+
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)

@@ -1,12 +1,17 @@
 package sightjack
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // ClassifyResult is the output of Pass 1 (cluster classification).
 // Written by Claude Code to classify.json.
 type ClassifyResult struct {
-	Clusters    []ClusterClassification `json:"clusters"`
-	TotalIssues int                     `json:"total_issues"`
+	Clusters        []ClusterClassification `json:"clusters"`
+	TotalIssues     int                     `json:"total_issues"`
+	ShibitoWarnings []ShibitoWarning        `json:"shibito_warnings,omitempty"`
 }
 
 // ClusterClassification holds a cluster name and its issue IDs from Pass 1.
@@ -33,12 +38,22 @@ type IssueDetail struct {
 	Gaps         []string `json:"gaps"`
 }
 
+// ShibitoWarning represents a detected resurrection risk — a previously
+// closed issue pattern re-emerging in current issues.
+type ShibitoWarning struct {
+	ClosedIssueID  string `json:"closed_issue_id"`
+	CurrentIssueID string `json:"current_issue_id"`
+	Description    string `json:"description"`
+	RiskLevel      string `json:"risk_level"`
+}
+
 // ScanResult is the merged result of Pass 1 + Pass 2.
 type ScanResult struct {
-	Clusters     []ClusterScanResult
-	TotalIssues  int
-	Completeness float64
-	Observations []string
+	Clusters        []ClusterScanResult
+	TotalIssues     int
+	Completeness    float64
+	Observations    []string
+	ShibitoWarnings []ShibitoWarning `json:"shibito_warnings,omitempty"`
 }
 
 // CalculateCompleteness computes overall completeness as the average of cluster completeness values,
@@ -67,6 +82,7 @@ type SessionState struct {
 	Clusters     []ClusterState `json:"clusters"`
 	Waves        []WaveState    `json:"waves,omitempty"`
 	ADRCount       int    `json:"adr_count,omitempty"`
+	ShibitoCount   int    `json:"shibito_count,omitempty"`
 	ScanResultPath string `json:"scan_result_path,omitempty"`
 }
 
@@ -155,12 +171,47 @@ const (
 	ResumeChoiceRescan
 )
 
+// StrictnessLevel controls DoD analysis depth (SIREN difficulty system).
+type StrictnessLevel string
+
+const (
+	StrictnessFog      StrictnessLevel = "fog"
+	StrictnessAlert    StrictnessLevel = "alert"
+	StrictnessLockdown StrictnessLevel = "lockdown"
+)
+
+// ParseStrictnessLevel parses a string into a StrictnessLevel.
+// Case-insensitive. Returns error for unknown values.
+func ParseStrictnessLevel(s string) (StrictnessLevel, error) {
+	level := StrictnessLevel(strings.ToLower(s))
+	if !level.Valid() {
+		return "", fmt.Errorf("unknown strictness level: %q (valid: fog, alert, lockdown)", s)
+	}
+	return level, nil
+}
+
+// Valid returns true if the level is a known strictness value.
+func (l StrictnessLevel) Valid() bool {
+	switch l {
+	case StrictnessFog, StrictnessAlert, StrictnessLockdown:
+		return true
+	}
+	return false
+}
+
+// ADRConflict represents a detected contradiction between a new ADR and an existing one.
+type ADRConflict struct {
+	ExistingADRID string `json:"existing_adr_id"`
+	Description   string `json:"description"`
+}
+
 // ScribeResponse is the output of the Scribe Agent (ADR generation).
 type ScribeResponse struct {
-	ADRID     string `json:"adr_id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	Reasoning string `json:"reasoning"`
+	ADRID     string        `json:"adr_id"`
+	Title     string        `json:"title"`
+	Content   string        `json:"content"`
+	Reasoning string        `json:"reasoning"`
+	Conflicts []ADRConflict `json:"conflicts,omitempty"`
 }
 
 // ArchitectResponse is the output of an architect discussion round.

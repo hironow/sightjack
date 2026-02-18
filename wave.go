@@ -98,11 +98,12 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (
 	}
 
 	prompt, err := RenderWaveApplyPrompt(cfg.Lang, WaveApplyPromptData{
-		WaveID:      wave.ID,
-		ClusterName: wave.ClusterName,
-		Title:       wave.Title,
-		Actions:     string(actionsJSON),
-		OutputPath:  applyFile,
+		WaveID:          wave.ID,
+		ClusterName:     wave.ClusterName,
+		Title:           wave.Title,
+		Actions:         string(actionsJSON),
+		OutputPath:      applyFile,
+		StrictnessLevel: string(cfg.Strictness.Default),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render apply prompt: %w", err)

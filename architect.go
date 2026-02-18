@@ -35,11 +35,12 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 
 	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
 	prompt, err := RenderArchitectDiscussPrompt(cfg.Lang, ArchitectDiscussPromptData{
-		ClusterName: wave.ClusterName,
-		WaveTitle:   wave.Title,
-		WaveActions: string(actionsJSON),
-		Topic:       topic,
-		OutputPath:  outputFile,
+		ClusterName:     wave.ClusterName,
+		WaveTitle:       wave.Title,
+		WaveActions:     string(actionsJSON),
+		Topic:           topic,
+		OutputPath:      outputFile,
+		StrictnessLevel: string(cfg.Strictness.Default),
 	})
 	if err != nil {
 		return fmt.Errorf("render architect prompt: %w", err)
@@ -68,11 +69,12 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 	}
 
 	prompt, err := RenderArchitectDiscussPrompt(cfg.Lang, ArchitectDiscussPromptData{
-		ClusterName: wave.ClusterName,
-		WaveTitle:   wave.Title,
-		WaveActions: string(actionsJSON),
-		Topic:       topic,
-		OutputPath:  outputFile,
+		ClusterName:     wave.ClusterName,
+		WaveTitle:       wave.Title,
+		WaveActions:     string(actionsJSON),
+		Topic:           topic,
+		OutputPath:      outputFile,
+		StrictnessLevel: string(cfg.Strictness.Default),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render architect prompt: %w", err)

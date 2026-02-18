@@ -61,7 +61,7 @@ func RenderNavigator(result *ScanResult, projectName string) string {
 
 // RenderNavigatorWithWaves renders the Link Navigator with actual wave data.
 // Wave status symbols: [ ] available  [x] locked  [=] completed
-func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave, adrCount int, lastScanned *time.Time) string {
+func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave, adrCount int, lastScanned *time.Time, strictnessLevel string, shibitoCount int) string {
 	// Group waves by cluster name
 	wavesByCluster := make(map[string][]Wave)
 	for _, w := range waves {
@@ -79,7 +79,14 @@ func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wa
 	projRow := "  Project: " + projName + "  |  Completeness: " + fmt.Sprintf("%3d%%", completePct)
 	b.WriteString("|" + padRight(projRow, navigatorWidth) + "|\n")
 	adrRow := fmt.Sprintf("  ADRs: %d", adrCount)
+	if strictnessLevel != "" {
+		adrRow += fmt.Sprintf("  |  Strictness: %s", strictnessLevel)
+	}
 	b.WriteString("|" + padRight(adrRow, navigatorWidth) + "|\n")
+	if shibitoCount > 0 {
+		shibitoRow := fmt.Sprintf("  Shibito: %d", shibitoCount)
+		b.WriteString("|" + padRight(shibitoRow, navigatorWidth) + "|\n")
+	}
 	if lastScanned != nil {
 		sessionRow := fmt.Sprintf("  Session: resumed (last scan: %s)", lastScanned.Format("2006-01-02 15:04"))
 		b.WriteString("|" + padRight(sessionRow, navigatorWidth) + "|\n")

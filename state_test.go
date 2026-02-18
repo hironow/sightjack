@@ -330,6 +330,40 @@ func TestSessionState_ScanResultPath_OmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestLoadScanResult_PreV06Format_BackwardCompat(t *testing.T) {
+	// given: JSON with Go-default field names (pre-v0.6 format, no JSON tags)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "scan_result.json")
+	os.WriteFile(path, []byte(`{
+		"Clusters": [
+			{"Name": "Auth", "Completeness": 0.50, "Issues": [], "Observations": ["obs1"]}
+		],
+		"TotalIssues": 5,
+		"Completeness": 0.50,
+		"Observations": ["global obs"]
+	}`), 0644)
+
+	// when
+	result, err := LoadScanResult(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Clusters) != 1 {
+		t.Fatalf("expected 1 cluster, got %d", len(result.Clusters))
+	}
+	if result.Clusters[0].Name != "Auth" {
+		t.Errorf("expected cluster name Auth, got %s", result.Clusters[0].Name)
+	}
+	if result.TotalIssues != 5 {
+		t.Errorf("expected TotalIssues 5, got %d", result.TotalIssues)
+	}
+	if result.Completeness != 0.50 {
+		t.Errorf("expected Completeness 0.50, got %f", result.Completeness)
+	}
+}
+
 func TestLoadScanResult_MalformedJSON(t *testing.T) {
 	// given
 	dir := t.TempDir()

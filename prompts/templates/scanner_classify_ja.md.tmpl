@@ -2,6 +2,12 @@
 Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 論理的なクラスタ（機能グループ）に分類してください。
 
+## Strictness Level: {{.StrictnessLevel}}
+現在の厳格度レベルに応じて分析の深さを調整してください:
+- fog: DoD不足をWarningとして表示のみ。NFRは参考情報。
+- alert: Must級DoD欠落にはサブIssue提案。NFRにも専用の注意を。
+- lockdown: 全DoD不足をフラグ。未完了IssueをBlocked候補としてマーク。
+
 ## フィルター条件
 - チーム: {{.TeamFilter}}
 - プロジェクト: {{.ProjectFilter}}
@@ -14,6 +20,10 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 2. Issue のタイトル・ラベル・説明から論理的なクラスタに分類してください
 3. 各クラスタの名前と所属する Issue ID のリストを作成してください
 
+## 屍人（Shibito）復活チェック
+クローズ/キャンセル済みのIssueも確認し、現在のオープンIssueと類似するパターンを検出してください。
+以前解決した問題が再浮上している（復活）可能性がある場合、出力に含めてください。
+
 ## 出力
 以下の JSON を **{{.OutputPath}}** に書き込んでください:
 
@@ -22,7 +32,10 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
   "clusters": [
     { "name": "クラスタ名", "issue_ids": ["issue-id-1", "issue-id-2"] }
   ],
-  "total_issues": 数値
+  "total_issues": 数値,
+  "shibito_warnings": [
+    { "closed_issue_id": "ENG-045", "current_issue_id": "ENG-102", "description": "...", "risk_level": "high" }
+  ]
 }
 ```
 

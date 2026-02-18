@@ -350,6 +350,177 @@ func TestRenderScribeADRPrompt_Japanese(t *testing.T) {
 	}
 }
 
+func TestRenderClassifyPrompt_ContainsStrictnessLevel(t *testing.T) {
+	// given
+	data := ClassifyPromptData{
+		TeamFilter:      "TEST",
+		ProjectFilter:   "Test",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "alert",
+	}
+
+	// when
+	result, err := RenderClassifyPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "alert") {
+		t.Error("expected strictness level 'alert' in prompt")
+	}
+}
+
+func TestRenderWaveGeneratePrompt_ContainsStrictnessLevel(t *testing.T) {
+	// given
+	data := WaveGeneratePromptData{
+		ClusterName:     "Auth",
+		Completeness:    "25",
+		Issues:          "[]",
+		Observations:    "none",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "lockdown",
+	}
+
+	// when
+	result, err := RenderWaveGeneratePrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "lockdown") {
+		t.Error("expected strictness level 'lockdown' in prompt")
+	}
+}
+
+func TestRenderScribeADRPrompt_ContainsStrictnessLevel(t *testing.T) {
+	// given
+	data := ScribeADRPromptData{
+		ClusterName:     "Auth",
+		WaveTitle:       "Test",
+		WaveActions:     "[]",
+		Analysis:        "test",
+		Reasoning:       "test",
+		ADRNumber:       "0001",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	result, err := RenderScribeADRPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "fog") {
+		t.Error("expected strictness level 'fog' in prompt")
+	}
+}
+
+func TestRenderClassifyPrompt_ContainsShibitoSection(t *testing.T) {
+	// given
+	data := ClassifyPromptData{
+		TeamFilter:      "TEST",
+		ProjectFilter:   "Test",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "alert",
+	}
+
+	// when
+	result, err := RenderClassifyPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "shibito_warnings") {
+		t.Error("expected shibito_warnings in scanner prompt output schema")
+	}
+}
+
+func TestRenderClassifyPrompt_Japanese_ContainsShibitoSection(t *testing.T) {
+	// given
+	data := ClassifyPromptData{
+		TeamFilter:      "TEST",
+		ProjectFilter:   "Test",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	result, err := RenderClassifyPrompt("ja", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "shibito_warnings") {
+		t.Error("expected shibito_warnings in Japanese scanner prompt")
+	}
+}
+
+func TestRenderScribeADRPrompt_ContainsExistingADRs(t *testing.T) {
+	// given
+	data := ScribeADRPromptData{
+		ClusterName:     "Auth",
+		WaveTitle:       "Test",
+		WaveActions:     "[]",
+		Analysis:        "test",
+		Reasoning:       "test",
+		ADRNumber:       "0003",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "alert",
+		ExistingADRs: []ExistingADR{
+			{Filename: "0001-auth.md", Content: "# 0001. Auth\nAccepted"},
+			{Filename: "0002-api.md", Content: "# 0002. API\nAccepted"},
+		},
+	}
+
+	// when
+	result, err := RenderScribeADRPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "0001-auth.md") {
+		t.Error("expected existing ADR filename in prompt")
+	}
+	if !strings.Contains(result, "# 0001. Auth") {
+		t.Error("expected existing ADR content in prompt")
+	}
+	if !strings.Contains(result, "conflicts") {
+		t.Error("expected conflicts field in output schema")
+	}
+}
+
+func TestRenderScribeADRPrompt_NoExistingADRs(t *testing.T) {
+	// given
+	data := ScribeADRPromptData{
+		ClusterName:     "Auth",
+		WaveTitle:       "Test",
+		WaveActions:     "[]",
+		Analysis:        "test",
+		Reasoning:       "test",
+		ADRNumber:       "0001",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	result, err := RenderScribeADRPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if !strings.Contains(result, "Scribe Agent") {
+		t.Error("expected Scribe Agent in prompt")
+	}
+}
+
 func TestRenderScribeADRPrompt_UnsupportedLang(t *testing.T) {
 	// given
 	data := ScribeADRPromptData{

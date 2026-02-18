@@ -7,13 +7,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// StrictnessConfig holds DoD strictness level settings.
+type StrictnessConfig struct {
+	Default StrictnessLevel `yaml:"default"`
+}
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
-	Linear LinearConfig `yaml:"linear"`
-	Scan   ScanConfig   `yaml:"scan"`
-	Claude ClaudeConfig `yaml:"claude"`
-	Scribe ScribeConfig `yaml:"scribe"`
-	Lang   string       `yaml:"lang"`
+	Linear     LinearConfig    `yaml:"linear"`
+	Scan       ScanConfig      `yaml:"scan"`
+	Claude     ClaudeConfig    `yaml:"claude"`
+	Scribe     ScribeConfig    `yaml:"scribe"`
+	Strictness StrictnessConfig `yaml:"strictness"`
+	Lang       string          `yaml:"lang"`
 }
 
 // ScribeConfig holds Scribe Agent settings.
@@ -56,6 +62,9 @@ func DefaultConfig() Config {
 		Scribe: ScribeConfig{
 			Enabled: true,
 		},
+		Strictness: StrictnessConfig{
+			Default: StrictnessFog,
+		},
 		Lang: "ja",
 	}
 }
@@ -81,6 +90,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.Claude.TimeoutSec < 1 {
 		cfg.Claude.TimeoutSec = 300
+	}
+	if !cfg.Strictness.Default.Valid() {
+		cfg.Strictness.Default = StrictnessFog
 	}
 
 	return &cfg, nil

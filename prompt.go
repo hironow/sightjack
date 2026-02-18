@@ -12,55 +12,62 @@ var promptFS embed.FS
 
 // ClassifyPromptData holds template data for the classify prompt.
 type ClassifyPromptData struct {
-	TeamFilter    string
-	ProjectFilter string
-	CycleFilter   string
-	OutputPath    string
+	TeamFilter      string
+	ProjectFilter   string
+	CycleFilter     string
+	OutputPath      string
+	StrictnessLevel string
 }
 
 // DeepScanPromptData holds template data for the deep scan prompt.
 type DeepScanPromptData struct {
-	ClusterName string
-	IssueIDs    string
-	OutputPath  string
+	ClusterName     string
+	IssueIDs        string
+	OutputPath      string
+	StrictnessLevel string
 }
 
 // WaveGeneratePromptData holds template data for the wave generation prompt.
 type WaveGeneratePromptData struct {
-	ClusterName  string
-	Completeness string
-	Issues       string
-	Observations string
-	OutputPath   string
+	ClusterName     string
+	Completeness    string
+	Issues          string
+	Observations    string
+	OutputPath      string
+	StrictnessLevel string
 }
 
 // WaveApplyPromptData holds template data for the wave apply prompt.
 type WaveApplyPromptData struct {
-	WaveID      string
-	ClusterName string
-	Title       string
-	Actions     string
-	OutputPath  string
+	WaveID          string
+	ClusterName     string
+	Title           string
+	Actions         string
+	OutputPath      string
+	StrictnessLevel string
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.
 type ScribeADRPromptData struct {
-	ClusterName string
-	WaveTitle   string
-	WaveActions string
-	Analysis    string
-	Reasoning   string
-	ADRNumber   string
-	OutputPath  string
+	ClusterName     string
+	WaveTitle       string
+	WaveActions     string
+	Analysis        string
+	Reasoning       string
+	ADRNumber       string
+	OutputPath      string
+	StrictnessLevel string
+	ExistingADRs    []ExistingADR
 }
 
 // ArchitectDiscussPromptData holds template data for the architect discussion prompt.
 type ArchitectDiscussPromptData struct {
-	ClusterName string
-	WaveTitle   string
-	WaveActions string
-	Topic       string
-	OutputPath  string
+	ClusterName     string
+	WaveTitle       string
+	WaveActions     string
+	Topic           string
+	OutputPath      string
+	StrictnessLevel string
 }
 
 func renderTemplate(name string, data any) (string, error) {
