@@ -234,6 +234,37 @@ func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Sca
 	return completed[num-1], nil
 }
 
+// DisplayWaveCompletion shows a rich wave completion summary with grouped ripple effects.
+func DisplayWaveCompletion(w io.Writer, wave Wave, ripples []Ripple, overallCompleteness float64, newWavesAvailable int) {
+	fmt.Fprintf(w, "\n  Wave completed: %s - %s\n", wave.ClusterName, wave.Title)
+	fmt.Fprintf(w, "  Completeness: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
+
+	if len(ripples) > 0 {
+		fmt.Fprintln(w, "\n  Ripple effects:")
+		// Group by cluster
+		grouped := make(map[string][]Ripple)
+		var order []string
+		for _, r := range ripples {
+			if _, seen := grouped[r.ClusterName]; !seen {
+				order = append(order, r.ClusterName)
+			}
+			grouped[r.ClusterName] = append(grouped[r.ClusterName], r)
+		}
+		for _, name := range order {
+			fmt.Fprintf(w, "    %s:\n", name)
+			for _, r := range grouped[name] {
+				fmt.Fprintf(w, "      -> %s\n", r.Description)
+			}
+		}
+	}
+
+	if newWavesAvailable > 0 {
+		fmt.Fprintf(w, "\n  New waves available: %d\n", newWavesAvailable)
+	}
+
+	fmt.Fprintf(w, "  %s\n", RenderProgressBar(overallCompleteness, 20))
+}
+
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
