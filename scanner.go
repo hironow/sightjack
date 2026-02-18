@@ -80,8 +80,16 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify")
 	}
 
-	if _, err := RunClaude(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
-		return nil, fmt.Errorf("classify scan: %w", err)
+	// Use RunClaudeOnce when labels are enabled because classify applies
+	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
+	if cfg.Labels.Enabled {
+		if _, err := RunClaudeOnce(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
+			return nil, fmt.Errorf("classify scan: %w", err)
+		}
+	} else {
+		if _, err := RunClaude(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
+			return nil, fmt.Errorf("classify scan: %w", err)
+		}
 	}
 
 	classify, err := ParseClassifyResult(classifyOutput)
@@ -136,8 +144,11 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	}
 
 	clusters, scanWarnings := RunParallelDeepScan(ctx, cfg, scanDir, scanClusters, deepScanFn)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if len(clusters) == 0 && len(scanWarnings) > 0 {
-		return nil, fmt.Errorf("all clusters failed during deep scan")
+		return nil, fmt.Errorf("all clusters failed during deep scan: %v", scanWarnings)
 	}
 
 	merged := MergeScanResults(clusters, classify.ShibitoWarnings, scanWarnings)
@@ -236,8 +247,13 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 
 	// NOTE: i and cluster are safe to capture in the goroutine closure.
 	// Go 1.22+ scopes loop variables per iteration (go.mod requires go 1.25.0).
+	launched := 0
 	for i, cluster := range clusters {
+		if ctx.Err() != nil {
+			break
+		}
 		sem <- struct{}{}
+		launched++
 		go func() {
 			defer func() { <-sem }()
 			result, err := scanFn(ctx, cfg, scanDir, i, cluster)
@@ -247,7 +263,7 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 
 	var successful []ClusterScanResult
 	var warnings []string
-	for range clusters {
+	for range launched {
 		r := <-results
 		if r.err != nil {
 			msg := fmt.Sprintf("Cluster %q scan failed: %v", clusters[r.index].Name, r.err)

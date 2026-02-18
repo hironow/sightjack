@@ -63,3 +63,25 @@ func TestReadyIssueIDsAllCompleted(t *testing.T) {
 		t.Errorf("expected 2 ready issues, got %d", len(ready))
 	}
 }
+
+func TestReadyIssueIDs_Sorted(t *testing.T) {
+	// given: multiple completed issues that would be returned in random map order
+	waves := []Wave{
+		{ID: "w1", Status: "completed", Actions: []WaveAction{
+			{IssueID: "Z-1"},
+			{IssueID: "A-1"},
+			{IssueID: "M-1"},
+		}},
+	}
+
+	// when
+	ready := ReadyIssueIDs(waves)
+
+	// then: results are sorted
+	if len(ready) != 3 {
+		t.Fatalf("expected 3 ready issues, got %d", len(ready))
+	}
+	if ready[0] != "A-1" || ready[1] != "M-1" || ready[2] != "Z-1" {
+		t.Errorf("expected sorted [A-1, M-1, Z-1], got %v", ready)
+	}
+}

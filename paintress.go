@@ -1,7 +1,10 @@
 package sightjack
 
+import "sort"
+
 // ReadyIssueIDs returns issue IDs where ALL waves targeting them are completed.
 // An issue is ready when every wave containing that issue has status "completed".
+// Results are sorted for deterministic output.
 func ReadyIssueIDs(waves []Wave) []string {
 	// Track all waves per issue
 	issueWaves := make(map[string][]string) // issueID -> []waveStatus
@@ -24,5 +27,6 @@ func ReadyIssueIDs(waves []Wave) []string {
 			ready = append(ready, issueID)
 		}
 	}
+	sort.Strings(ready)
 	return ready
 }

@@ -101,7 +101,11 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 			return "", ctx.Err()
 		}
 		if attempt > 1 {
-			delay := baseDelay * time.Duration(1<<(attempt-2)) // exponential: base, 2*base, 4*base...
+			shift := attempt - 2
+			if shift > 30 {
+				shift = 30 // cap to prevent overflow of time.Duration
+			}
+			delay := baseDelay * time.Duration(1<<shift) // exponential: base, 2*base, 4*base...
 			LogInfo("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
 			select {
 			case <-ctx.Done():

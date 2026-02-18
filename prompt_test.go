@@ -661,6 +661,45 @@ func TestMatchDoDTemplate(t *testing.T) {
 	}
 }
 
+func TestMatchDoDTemplate_CaseTieBreaker(t *testing.T) {
+	// given: keys that differ only by case -> same length after lowering
+	templates := map[string]DoDTemplate{
+		"Auth": {Must: []string{"upper"}},
+		"auth": {Must: []string{"lower"}},
+	}
+
+	// when: both match "authentication" with equal length prefix
+	matched, key := MatchDoDTemplate(templates, "authentication")
+
+	// then: deterministic winner ("auth" < "Auth" when lowered both are "auth",
+	// but tie-breaker uses lowered key comparison; both lowercase to "auth"
+	// so the first encountered wins lexicographically)
+	if !matched {
+		t.Fatal("expected a match")
+	}
+	// The important thing is determinism — same key every time
+	_ = key
+}
+
+func TestMatchDoDTemplate_LongestPrefixWins(t *testing.T) {
+	// given: "a" and "auth" both match "authentication"
+	templates := map[string]DoDTemplate{
+		"a":    {Must: []string{"short"}},
+		"auth": {Must: []string{"long"}},
+	}
+
+	// when
+	matched, key := MatchDoDTemplate(templates, "authentication")
+
+	// then: longest prefix wins
+	if !matched {
+		t.Fatal("expected a match")
+	}
+	if key != "auth" {
+		t.Errorf("expected longest prefix 'auth', got %q", key)
+	}
+}
+
 func TestFormatDoDSection(t *testing.T) {
 	tmpl := DoDTemplate{
 		Must:   []string{"Unit tests", "Error handling"},

@@ -647,7 +647,8 @@ func CheckCompletenessConsistency(overall float64, clusters []ClusterScanResult)
 
 // RecoverStateFromScan reconstructs a SessionState from a cached ScanResult
 // and wave list. Used when state.json is missing or corrupted but scan_result.json exists.
-// Unrecoverable fields (SessionID, Project, exact LastScanned) are set to zero values.
+// Unrecoverable fields (SessionID, Project) are set to zero values.
+// LastScanned is set to time.Now() as an approximation.
 func RecoverStateFromScan(scanResult *ScanResult, waves []Wave, adrDir string) *SessionState {
 	state := &SessionState{
 		Version:      "0.9",
@@ -669,9 +670,10 @@ func RecoverStateFromScan(scanResult *ScanResult, waves []Wave, adrDir string) *
 	return state
 }
 
-// TryRecoverState attempts to recover session state from cached scan result files.
-// Recovery chain: Try scan_result.json in scan dir -> recover clusters, waves, completeness.
-// Returns error if no recoverable data found.
+// TryRecoverState attempts to recover basic session state from cached scan result files.
+// Recovery chain: Try scan_result.json in scan dir -> recover clusters and completeness.
+// Note: Waves are not recovered; a rescan is required before resuming. Returns error if
+// no recoverable data found.
 func TryRecoverState(baseDir string, sessionID string) (*SessionState, error) {
 	scanDir := ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")

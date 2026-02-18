@@ -550,3 +550,35 @@ func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
 		t.Errorf("expected one result with 1 issue, got %d", issueCountSet[1])
 	}
 }
+
+func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
+	// given: 5 clusters but context is already cancelled
+	clusters := make([]ClusterScanResult, 5)
+	for i := range clusters {
+		clusters[i] = ClusterScanResult{Name: fmt.Sprintf("c%d", i)}
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 1
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	var callCount atomic.Int32
+
+	// when
+	results, _ := RunParallelDeepScan(ctx, &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			callCount.Add(1)
+			return ClusterScanResult{Name: cluster.Name}, nil
+		})
+
+	// then: no goroutines should have been launched
+	if callCount.Load() != 0 {
+		t.Errorf("expected 0 calls with cancelled context, got %d", callCount.Load())
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}

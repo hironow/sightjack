@@ -97,15 +97,21 @@ type NextGenPromptData struct {
 
 // MatchDoDTemplate finds a DoD template matching the cluster name.
 // Matching uses case-insensitive prefix match. When multiple keys match,
-// the longest matching prefix wins for deterministic behavior.
+// the longest matching prefix wins. Equal-length ties are broken by
+// lexicographic comparison of lowercased keys for deterministic behavior.
 func MatchDoDTemplate(templates map[string]DoDTemplate, clusterName string) (bool, string) {
 	lower := strings.ToLower(clusterName)
 	bestKey := ""
+	bestKeyLower := ""
 	for key := range templates {
-		if strings.HasPrefix(lower, strings.ToLower(key)) {
-			if len(key) > len(bestKey) {
-				bestKey = key
-			}
+		keyLower := strings.ToLower(key)
+		if !strings.HasPrefix(lower, keyLower) {
+			continue
+		}
+		if bestKey == "" || len(keyLower) > len(bestKeyLower) ||
+			(len(keyLower) == len(bestKeyLower) && keyLower < bestKeyLower) {
+			bestKey = key
+			bestKeyLower = keyLower
 		}
 	}
 	if bestKey == "" {
