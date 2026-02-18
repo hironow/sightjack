@@ -681,3 +681,75 @@ func TestFormatDoDSectionEmpty(t *testing.T) {
 		t.Errorf("expected empty section for empty template, got %q", section)
 	}
 }
+
+func TestRenderWaveGeneratePromptWithDoD(t *testing.T) {
+	// given
+	data := WaveGeneratePromptData{
+		ClusterName:     "auth",
+		Completeness:    "50",
+		Issues:          "[]",
+		Observations:    "none",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		DoDSection:      "Must:\n- Unit tests\nShould:\n- Integration tests\n",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveGeneratePrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
+		}
+		if !strings.Contains(result, "Unit tests") {
+			t.Errorf("lang=%s: expected DoD section in output", lang)
+		}
+	}
+}
+
+func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
+	// given
+	data := WaveGeneratePromptData{
+		ClusterName:     "auth",
+		Completeness:    "50",
+		Issues:          "[]",
+		Observations:    "none",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		DoDSection:      "",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveGeneratePrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
+		}
+		if strings.Contains(result, "Definition of Done") || strings.Contains(result, "完成基準") {
+			t.Errorf("lang=%s: DoD section should not appear when empty", lang)
+		}
+	}
+}
+
+func TestRenderNextGenPromptWithDoD(t *testing.T) {
+	// given
+	data := NextGenPromptData{
+		ClusterName:     "auth",
+		Completeness:    "70",
+		Issues:          "[]",
+		CompletedWaves:  "[]",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		DoDSection:      "Must:\n- Terraform reviewed\n",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderNextGenPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
+		}
+		if !strings.Contains(result, "Terraform reviewed") {
+			t.Errorf("lang=%s: expected DoD section in output", lang)
+		}
+	}
+}

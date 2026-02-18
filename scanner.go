@@ -157,11 +157,19 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				return fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
 			}
 
+			var dodSection string
+			if cfg.DoDTemplates != nil {
+				if matched, key := MatchDoDTemplate(cfg.DoDTemplates, cluster.Name); matched {
+					dodSection = FormatDoDSection(cfg.DoDTemplates[key])
+				}
+			}
+
 			prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
 				ClusterName:     cluster.Name,
 				Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
 				Issues:          string(issuesJSON),
 				Observations:    strings.Join(cluster.Observations, "\n"),
+				DoDSection:      dodSection,
 				OutputPath:      waveFile,
 				StrictnessLevel: string(cfg.Strictness.Default),
 			})
