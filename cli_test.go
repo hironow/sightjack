@@ -816,6 +816,60 @@ func TestDisplayCompletedWaveActions_NoActions(t *testing.T) {
 	}
 }
 
+func TestPromptCompletedWaveSelection_ValidChoice(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("2\n")
+	scanner := bufio.NewScanner(input)
+	completed := []Wave{
+		{ID: "w1", ClusterName: "Auth", Title: "Deps", Delta: WaveDelta{Before: 0.25, After: 0.40}},
+		{ID: "w3", ClusterName: "API", Title: "Split", Delta: WaveDelta{Before: 0.30, After: 0.45}},
+	}
+
+	// when
+	selected, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.ID != "w3" {
+		t.Errorf("expected w3, got %s", selected.ID)
+	}
+}
+
+func TestPromptCompletedWaveSelection_Quit(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("q\n")
+	scanner := bufio.NewScanner(input)
+	completed := []Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+
+	// when
+	_, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+
+	// then
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit, got %v", err)
+	}
+}
+
+func TestPromptCompletedWaveSelection_Invalid(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("99\n")
+	scanner := bufio.NewScanner(input)
+	completed := []Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+
+	// when
+	_, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+
+	// then
+	if err == nil || err == ErrQuit {
+		t.Error("expected invalid selection error")
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{

@@ -209,6 +209,31 @@ func DisplayCompletedWaveActions(w io.Writer, wave Wave) {
 	}
 }
 
+// PromptCompletedWaveSelection displays completed waves and reads the user's choice.
+func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, completed []Wave) (Wave, error) {
+	fmt.Fprintln(w, "\n  Completed waves:")
+	for i, wave := range completed {
+		fmt.Fprintf(w, "    %d. %-6s W: %-20s (%2.0f%% -> %2.0f%%)\n",
+			i+1, wave.ClusterName, wave.Title,
+			wave.Delta.Before*100, wave.Delta.After*100)
+	}
+	fmt.Fprintf(w, "\n  Select [1-%d, q=back]: ", len(completed))
+
+	line, err := ScanLine(ctx, s)
+	if err != nil {
+		return Wave{}, ErrQuit
+	}
+	input := strings.TrimSpace(line)
+	if input == "q" {
+		return Wave{}, ErrQuit
+	}
+	num, parseErr := strconv.Atoi(input)
+	if parseErr != nil || num < 1 || num > len(completed) {
+		return Wave{}, fmt.Errorf("invalid selection: %s", input)
+	}
+	return completed[num-1], nil
+}
+
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
