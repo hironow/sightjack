@@ -240,6 +240,12 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 					break
 				}
 				selected.Actions = approved
+				// Recompute delta proportionally when actions were rejected
+				totalActions := len(approved) + len(rejected)
+				if totalActions > 0 && len(rejected) > 0 {
+					fraction := float64(len(approved)) / float64(totalActions)
+					selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
+				}
 				PropagateWaveUpdate(waves, selected)
 				sessionRejected[WaveKey(selected)] = rejected
 				applyWave = true
