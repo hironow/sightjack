@@ -90,7 +90,7 @@ func waveApplyFileName(wave Wave) string {
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // readyIssueIDs is a comma-separated list of issue IDs whose waves are all completed.
-func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, readyIssueIDs string) (*WaveApplyResult, error) {
+func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (*WaveApplyResult, error) {
 	applyFile := filepath.Join(scanDir, waveApplyFileName(wave))
 
 	actionsJSON, err := json.Marshal(wave.Actions)
@@ -107,8 +107,6 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, r
 		StrictnessLevel: string(cfg.Strictness.Default),
 		LabelsEnabled:   cfg.Labels.Enabled,
 		LabelPrefix:     cfg.Labels.Prefix,
-		ReadyLabel:      cfg.Labels.ReadyLabel,
-		ReadyIssueIDs:   readyIssueIDs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render apply prompt: %w", err)
@@ -126,6 +124,24 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, r
 
 	LogOK("Wave %s applied: %d actions", wave.ID, result.Applied)
 	return result, nil
+}
+
+// RunReadyLabel applies the ready label to issues whose all waves have completed.
+// This must only be called after a successful wave apply.
+func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string) error {
+	prompt, err := RenderReadyLabelPrompt(cfg.Lang, ReadyLabelPromptData{
+		ReadyLabel:    cfg.Labels.ReadyLabel,
+		ReadyIssueIDs: readyIssueIDs,
+	})
+	if err != nil {
+		return fmt.Errorf("render ready label prompt: %w", err)
+	}
+
+	LogScan("Applying ready labels to: %s", readyIssueIDs)
+	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout); err != nil {
+		return fmt.Errorf("ready label: %w", err)
+	}
+	return nil
 }
 
 // EvaluateUnlocks checks locked waves and unlocks them if all prerequisites are met.

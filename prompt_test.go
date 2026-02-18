@@ -791,8 +791,9 @@ func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
 	}
 }
 
-func TestRenderWaveApplyPromptWithReadyIssues(t *testing.T) {
-	// given
+func TestRenderWaveApplyPromptNoReadySection(t *testing.T) {
+	// given: wave_apply should NEVER contain ready-label instructions
+	// (ready labels are applied in a separate step after apply success)
 	data := WaveApplyPromptData{
 		WaveID:          "w1",
 		ClusterName:     "auth",
@@ -802,13 +803,30 @@ func TestRenderWaveApplyPromptWithReadyIssues(t *testing.T) {
 		StrictnessLevel: "fog",
 		LabelsEnabled:   true,
 		LabelPrefix:     "sightjack",
-		ReadyLabel:      "sightjack:ready",
-		ReadyIssueIDs:   "AUTH-1, AUTH-2",
 	}
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
 		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if strings.Contains(result, "ready") {
+			t.Errorf("lang=%s: wave_apply must not contain ready-label section", lang)
+		}
+	}
+}
+
+func TestRenderReadyLabelPrompt(t *testing.T) {
+	// given
+	data := ReadyLabelPromptData{
+		ReadyLabel:    "sightjack:ready",
+		ReadyIssueIDs: "AUTH-1, AUTH-2",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderReadyLabelPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -816,35 +834,24 @@ func TestRenderWaveApplyPromptWithReadyIssues(t *testing.T) {
 			t.Errorf("lang=%s: expected ready label in output", lang)
 		}
 		if !strings.Contains(result, "AUTH-1") {
-			t.Errorf("lang=%s: expected ready issue IDs in output", lang)
+			t.Errorf("lang=%s: expected issue IDs in output", lang)
 		}
 	}
 }
 
-func TestRenderWaveApplyPromptWithReadyIssuesEmpty(t *testing.T) {
-	// given: labels enabled but no ready issues — ready block should not appear
-	data := WaveApplyPromptData{
-		WaveID:          "w1",
-		ClusterName:     "auth",
-		Title:           "Wave 1",
-		Actions:         "[]",
-		OutputPath:      "/tmp/out.json",
-		StrictnessLevel: "fog",
-		LabelsEnabled:   true,
-		LabelPrefix:     "sightjack",
-		ReadyLabel:      "sightjack:ready",
-		ReadyIssueIDs:   "",
+func TestRenderReadyLabelPrompt_UnsupportedLang(t *testing.T) {
+	// given
+	data := ReadyLabelPromptData{
+		ReadyLabel:    "sightjack:ready",
+		ReadyIssueIDs: "AUTH-1",
 	}
 
-	// when / then
-	for _, lang := range []string{"en", "ja"} {
-		result, err := RenderWaveApplyPrompt(lang, data)
-		if err != nil {
-			t.Fatalf("lang=%s: %v", lang, err)
-		}
-		if strings.Contains(result, "sightjack:ready") {
-			t.Errorf("lang=%s: ready label should not appear when no ready issues", lang)
-		}
+	// when
+	_, err := RenderReadyLabelPrompt("fr", data)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for unsupported language")
 	}
 }
 

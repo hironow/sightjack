@@ -51,8 +51,12 @@ type WaveApplyPromptData struct {
 	StrictnessLevel string
 	LabelsEnabled   bool
 	LabelPrefix     string
-	ReadyLabel      string
-	ReadyIssueIDs   string
+}
+
+// ReadyLabelPromptData holds template data for the ready label prompt.
+type ReadyLabelPromptData struct {
+	ReadyLabel    string
+	ReadyIssueIDs string
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.
@@ -176,6 +180,12 @@ func RenderScribeADRPrompt(lang string, data ScribeADRPromptData) (string, error
 // RenderArchitectDiscussPrompt renders the architect discussion prompt for the given language.
 func RenderArchitectDiscussPrompt(lang string, data ArchitectDiscussPromptData) (string, error) {
 	name := fmt.Sprintf("prompts/templates/architect_discuss_%s.md.tmpl", lang)
+	return renderTemplate(name, data)
+}
+
+// RenderReadyLabelPrompt renders the ready label prompt for the given language.
+func RenderReadyLabelPrompt(lang string, data ReadyLabelPromptData) (string, error) {
+	name := fmt.Sprintf("prompts/templates/ready_label_%s.md.tmpl", lang)
 	return renderTemplate(name, data)
 }
 

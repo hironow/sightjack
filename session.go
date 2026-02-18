@@ -256,19 +256,8 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			continue
 		}
 
-		// Compute ready issues for Paintress Bridge label.
-		// Use ReadyIssueIDsAssuming to treat the selected wave as completed,
-		// so issues whose final wave is the current one are correctly detected.
-		var readyIssueStr string
-		if cfg.Labels.Enabled {
-			readyIDs := ReadyIssueIDsAssuming(waves, selected)
-			if len(readyIDs) > 0 {
-				readyIssueStr = strings.Join(readyIDs, ", ")
-			}
-		}
-
 		// --- Pass 4: Wave Apply ---
-		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, readyIssueStr)
+		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected)
 		if err != nil {
 			LogError("Apply failed: %v", err)
 			continue
@@ -281,6 +270,19 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
 			DisplayRippleEffects(os.Stdout, applyResult.Ripples)
 			continue
+		}
+
+		// Apply ready labels only after successful wave apply.
+		// ReadyIssueIDsAssuming treats the selected wave as completed,
+		// so issues whose final wave is the current one are correctly detected.
+		if cfg.Labels.Enabled {
+			readyIDs := ReadyIssueIDsAssuming(waves, selected)
+			if len(readyIDs) > 0 {
+				readyIssueStr := strings.Join(readyIDs, ", ")
+				if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
+					LogWarn("Ready label failed: %v", err)
+				}
+			}
 		}
 
 		// Mark wave completed using composite key (ClusterName:ID)
