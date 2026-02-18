@@ -280,6 +280,29 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
 		DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
+		// --- Post-completion: Generate next waves ---
+		var clusterForNextgen ClusterScanResult
+		for _, c := range scanResult.Clusters {
+			if c.Name == selected.ClusterName {
+				clusterForNextgen = c
+				break
+			}
+		}
+		completedWavesForCluster := completedWavesInCluster(waves, selected.ClusterName)
+		existingADRs, adrErr := ReadExistingADRs(adrDir)
+		if adrErr != nil {
+			LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
+		}
+		rejectedForWave := sessionRejected[WaveKey(selected)]
+		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave)
+		if nextgenErr != nil {
+			LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
+		} else if len(newWaves) > 0 {
+			waves = append(waves, newWaves...)
+			waves = EvaluateUnlocks(waves, completed)
+			LogOK("%d new wave(s) generated for %s", len(newWaves), selected.ClusterName)
+		}
+
 		// Save state after each wave completion (crash resilience)
 		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 			LogWarn("Failed to update cached scan result: %v", err)
@@ -536,4 +559,15 @@ func BuildWaveStates(waves []Wave) []WaveState {
 		}
 	}
 	return states
+}
+
+// completedWavesInCluster returns all completed waves for the given cluster.
+func completedWavesInCluster(waves []Wave, clusterName string) []Wave {
+	var result []Wave
+	for _, w := range waves {
+		if w.ClusterName == clusterName && w.Status == "completed" {
+			result = append(result, w)
+		}
+	}
+	return result
 }
