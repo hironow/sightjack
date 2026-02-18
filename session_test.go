@@ -1392,6 +1392,36 @@ func TestPartialApplyDelta(t *testing.T) {
 	}
 }
 
+func TestCheckCompletenessConsistency(t *testing.T) {
+	tests := []struct {
+		name     string
+		overall  float64
+		clusters []ClusterScanResult
+		wantWarn bool
+	}{
+		{"consistent", 0.5, []ClusterScanResult{
+			{Name: "a", Completeness: 0.4},
+			{Name: "b", Completeness: 0.6},
+		}, false},
+		{"inconsistent", 0.9, []ClusterScanResult{
+			{Name: "a", Completeness: 0.4},
+			{Name: "b", Completeness: 0.6},
+		}, true},
+		{"empty clusters", 0.0, nil, false},
+		{"within tolerance", 0.54, []ClusterScanResult{
+			{Name: "a", Completeness: 0.5},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CheckCompletenessConsistency(tt.overall, tt.clusters)
+			if got != tt.wantWarn {
+				t.Errorf("CheckCompletenessConsistency: got %v, want %v", got, tt.wantWarn)
+			}
+		})
+	}
+}
+
 func TestCanResume_MissingFile(t *testing.T) {
 	// given: state with ScanResultPath pointing to deleted file
 	state := &SessionState{ScanResultPath: "/nonexistent/scan_result.json"}

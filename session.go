@@ -340,6 +340,12 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		}
 	}
 
+	// Final consistency check
+	if CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
+		LogWarn("Completeness mismatch detected. Recalculating...")
+		scanResult.CalculateCompleteness()
+	}
+
 	// Save state + updated scan result
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		LogWarn("Failed to update cached scan result: %v", err)
@@ -598,6 +604,25 @@ func BuildWaveStates(waves []Wave) []WaveState {
 		}
 	}
 	return states
+}
+
+// CheckCompletenessConsistency verifies that the sum of cluster completeness
+// values matches the overall completeness. Returns true if mismatch detected.
+// Tolerance: 5 percentage points (accounts for rounding).
+func CheckCompletenessConsistency(overall float64, clusters []ClusterScanResult) bool {
+	if len(clusters) == 0 {
+		return false
+	}
+	var sum float64
+	for _, c := range clusters {
+		sum += c.Completeness
+	}
+	avg := sum / float64(len(clusters))
+	diff := overall - avg
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff > 0.05
 }
 
 // completedWavesInCluster returns all completed waves for the given cluster.
