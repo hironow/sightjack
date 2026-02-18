@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 )
 
@@ -385,12 +386,12 @@ func TestRunParallelDeepScanWithFailure(t *testing.T) {
 
 	dir := t.TempDir()
 	cfg := DefaultConfig()
-	callCount := 0
+	var callCount atomic.Int32
 
 	// when
 	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
 		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
-			callCount++
+			callCount.Add(1)
 			if cluster.Name == "auth" {
 				return ClusterScanResult{}, fmt.Errorf("auth scan failed")
 			}
@@ -407,8 +408,8 @@ func TestRunParallelDeepScanWithFailure(t *testing.T) {
 	if len(warnings) != 1 {
 		t.Errorf("expected 1 warning, got %d", len(warnings))
 	}
-	if callCount != 2 {
-		t.Errorf("expected 2 calls, got %d", callCount)
+	if callCount.Load() != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount.Load())
 	}
 }
 
@@ -449,8 +450,6 @@ func TestRunParallelDeepScan_ClosureWithClassifyMap(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Scan.MaxConcurrency = 2
 
-	var scannedNames []string
-
 	// when: use closure that captures classifyMap (like the wired RunScan code does)
 	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
 		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
@@ -458,7 +457,6 @@ func TestRunParallelDeepScan_ClosureWithClassifyMap(t *testing.T) {
 			if !ok {
 				return ClusterScanResult{}, fmt.Errorf("cluster %q not found in classifyMap", cluster.Name)
 			}
-			scannedNames = append(scannedNames, cc.Name)
 			return ClusterScanResult{
 				Name:         cc.Name,
 				Completeness: 0.5,

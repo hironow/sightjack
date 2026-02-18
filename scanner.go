@@ -93,21 +93,26 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// --- Pass 2: Deep scan per cluster (parallel) ---
 	LogScan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
-	// Build cluster lookup for deep scan closure
-	classifyMap := make(map[string]ClusterClassification)
+	// Build cluster lookup for deep scan closure (index ensures unique filenames)
+	type classifyEntry struct {
+		index int
+		cc    ClusterClassification
+	}
+	classifyMap := make(map[string]classifyEntry)
 	var scanClusters []ClusterScanResult
-	for _, cc := range classify.Clusters {
-		classifyMap[cc.Name] = cc
+	for i, cc := range classify.Clusters {
+		classifyMap[cc.Name] = classifyEntry{index: i, cc: cc}
 		scanClusters = append(scanClusters, ClusterScanResult{Name: cc.Name})
 	}
 
 	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
-		cc := classifyMap[cluster.Name]
+		entry := classifyMap[cluster.Name]
+		cc := entry.cc
 		chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
 		var chunkResults []ClusterScanResult
 
 		for j, chunk := range chunks {
-			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%s_c%02d.json", sanitizeName(cc.Name), j))
+			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", entry.index, sanitizeName(cc.Name), j))
 			prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),

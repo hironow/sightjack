@@ -92,14 +92,31 @@ func main() {
 		if !dryRun {
 			existingState, stateErr := sightjack.ReadState(baseDir)
 			if stateErr != nil {
-				// Try recovery from cached scan results
-				entries, _ := os.ReadDir(filepath.Join(baseDir, ".siren", "scans"))
-				if len(entries) > 0 {
-					lastEntry := entries[len(entries)-1]
-					recovered, recErr := sightjack.TryRecoverState(baseDir, lastEntry.Name())
-					if recErr == nil {
-						existingState = recovered
-						stateErr = nil
+				// Try recovery from cached scan results (pick newest by mtime)
+				scansDir := filepath.Join(baseDir, ".siren", "scans")
+				entries, dirErr := os.ReadDir(scansDir)
+				if dirErr == nil && len(entries) > 0 {
+					var newestName string
+					var newestMtime time.Time
+					for _, entry := range entries {
+						if !entry.IsDir() {
+							continue
+						}
+						info, infoErr := entry.Info()
+						if infoErr != nil {
+							continue
+						}
+						if newestName == "" || info.ModTime().After(newestMtime) {
+							newestName = entry.Name()
+							newestMtime = info.ModTime()
+						}
+					}
+					if newestName != "" {
+						recovered, recErr := sightjack.TryRecoverState(baseDir, newestName)
+						if recErr == nil {
+							existingState = recovered
+							stateErr = nil
+						}
 					}
 				}
 			}

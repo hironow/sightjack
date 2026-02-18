@@ -617,9 +617,9 @@ func BuildWaveStates(waves []Wave) []WaveState {
 	return states
 }
 
-// CheckCompletenessConsistency verifies that the sum of cluster completeness
-// values matches the overall completeness. Returns true if mismatch detected.
-// Tolerance: 5 percentage points (accounts for rounding).
+// CheckCompletenessConsistency verifies that the average of cluster completeness
+// values matches the overall completeness within a tolerance. Returns true if a
+// mismatch beyond the tolerance (5 percentage points) is detected.
 func CheckCompletenessConsistency(overall float64, clusters []ClusterScanResult) bool {
 	if len(clusters) == 0 {
 		return false
