@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -63,6 +64,15 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		return nil
 	}
 
+	// Capture scan timestamp once so it stays stable across wave completions
+	scanTime := time.Now()
+
+	// Cache ScanResult for resume
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to cache scan result: %v", err)
+	}
+
 	// --- Pass 3: Wave Generate ---
 	waves, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false)
 	if err != nil {
@@ -76,6 +86,18 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	adrDir := ADRDir(baseDir)
 	adrCount := CountADRFiles(adrDir)
 
+	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
+}
+
+// runInteractiveLoop runs the wave selection/approval/apply loop shared by
+// RunSession, RunResumeSession, and RunRescanSession.
+// resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
+// scanTimestamp is persisted in state as LastScanned and stays stable across saves.
+func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, scanDir, scanResultPath string,
+	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time) error {
+
 	// --- Interactive Loop ---
 	for {
 		waves = EvaluateUnlocks(waves, completed)
@@ -86,7 +108,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 
 		// Display Link Navigator
-		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount)
+		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt)
 		fmt.Println()
 		fmt.Print(nav)
 
@@ -194,15 +216,133 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 		scanResult.CalculateCompleteness()
 
+		// Save state after each wave completion (crash resilience)
+		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+			LogWarn("Failed to update cached scan result: %v", err)
+		}
+		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, &scanTimestamp)
+		midState.ScanResultPath = scanResultPath
+		if err := WriteState(baseDir, midState); err != nil {
+			LogWarn("Failed to save mid-session state: %v", err)
+		}
+
 		LogOK("Completeness: %.0f%%", scanResult.Completeness*100)
 	}
 
-	// Save state
+	// Save state + updated scan result
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to update cached scan result: %v", err)
+	}
+	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, &scanTimestamp)
+	state.ScanResultPath = scanResultPath
+	if err := WriteState(baseDir, state); err != nil {
+		LogWarn("Failed to save state: %v", err)
+	} else {
+		LogOK("State saved to %s", StatePath(baseDir))
+	}
+
+	return nil
+}
+
+// CanResume checks whether a saved session state supports resumption.
+// It returns false when the cached ScanResult path is empty (e.g. v0.4
+// state files) or the file no longer exists on disk.
+func CanResume(state *SessionState) bool {
+	if state.ScanResultPath == "" {
+		return false
+	}
+	_, err := os.Stat(state.ScanResultPath)
+	return err == nil
+}
+
+// ResumeSession loads a previous session's state and cached scan result,
+// restoring waves and completed map for the interactive loop.
+func ResumeSession(baseDir string, state *SessionState) (*ScanResult, []Wave, map[string]bool, int, error) {
+	if state.ScanResultPath == "" {
+		return nil, nil, nil, 0, fmt.Errorf("no cached scan result path in state")
+	}
+	scanResult, err := LoadScanResult(state.ScanResultPath)
+	if err != nil {
+		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
+	}
+	waves := RestoreWaves(state.Waves)
+	completed := BuildCompletedWaveMap(waves)
+	adrCount := CountADRFiles(ADRDir(baseDir))
+	return scanResult, waves, completed, adrCount, nil
+}
+
+// RunResumeSession resumes an existing session from saved state.
+func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader) error {
+	if input == nil {
+		return fmt.Errorf("input reader is required for interactive session")
+	}
+	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
+	if err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+	scanDir := ScanDir(baseDir, state.SessionID)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	scanner := bufio.NewScanner(input)
+	adrDir := ADRDir(baseDir)
+	lastScanned := state.LastScanned
+
+	LogOK("Resumed session: %d waves, %d completed", len(waves), len(completed))
+
+	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned)
+}
+
+// RunRescanSession performs a fresh scan then merges completed status from old state.
+func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState *SessionState, input io.Reader) error {
+	if input == nil {
+		return fmt.Errorf("input reader is required for interactive session")
+	}
+	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	scanDir, err := EnsureScanDir(baseDir, sessionID)
+	if err != nil {
+		return err
+	}
+	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, false)
+	if err != nil {
+		return fmt.Errorf("re-scan: %w", err)
+	}
+	scanTime := time.Now()
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to cache scan result: %v", err)
+	}
+	waves, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false)
+	if err != nil {
+		return fmt.Errorf("wave generate: %w", err)
+	}
+	oldCompleted := BuildCompletedWaveMap(RestoreWaves(oldState.Waves))
+	waves = MergeCompletedStatus(oldCompleted, waves)
+	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
+	completed := BuildCompletedWaveMap(waves)
+	adrDir := ADRDir(baseDir)
+	adrCount := CountADRFiles(adrDir)
+	scanner := bufio.NewScanner(input)
+
+	LogOK("Re-scanned: %d clusters, %d waves (%d previously completed)",
+		len(scanResult.Clusters), len(waves), len(completed))
+
+	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
+}
+
+// BuildSessionState creates a SessionState from current session data.
+// When lastScanned is non-nil the stored timestamp is preserved (resume);
+// otherwise it defaults to time.Now() (fresh scan).
+func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, waves []Wave, adrCount int, lastScanned *time.Time) *SessionState {
+	ts := time.Now()
+	if lastScanned != nil {
+		ts = *lastScanned
+	}
 	state := &SessionState{
-		Version:      "0.4",
+		Version:      "0.5",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
-		LastScanned:  time.Now(),
+		LastScanned:  ts,
 		Completeness: scanResult.Completeness,
 		Waves:        BuildWaveStates(waves),
 		ADRCount:     adrCount,
@@ -214,14 +354,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			IssueCount:   len(c.Issues),
 		})
 	}
-
-	if err := WriteState(baseDir, state); err != nil {
-		LogWarn("Failed to save state: %v", err)
-	} else {
-		LogOK("State saved to %s", StatePath(baseDir))
-	}
-
-	return nil
+	return state
 }
 
 // IsWaveApplyComplete returns true when the apply result has no errors,
@@ -290,6 +423,39 @@ func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 	return completed
 }
 
+// MergeCompletedStatus preserves completed status from a previous session
+// when waves are regenerated after a re-scan. Waves in newWaves that match
+// a key in oldCompleted are marked "completed". Waves that were in the old
+// session but not in newWaves are dropped (Linear removed them).
+func MergeCompletedStatus(oldCompleted map[string]bool, newWaves []Wave) []Wave {
+	result := make([]Wave, len(newWaves))
+	copy(result, newWaves)
+	for i, w := range result {
+		if oldCompleted[WaveKey(w)] {
+			result[i].Status = "completed"
+		}
+	}
+	return result
+}
+
+// RestoreWaves converts persisted WaveState list back into Wave list for session resume.
+func RestoreWaves(states []WaveState) []Wave {
+	waves := make([]Wave, len(states))
+	for i, s := range states {
+		waves[i] = Wave{
+			ID:            s.ID,
+			ClusterName:   s.ClusterName,
+			Title:         s.Title,
+			Description:   s.Description,
+			Actions:       s.Actions,
+			Prerequisites: s.Prerequisites,
+			Delta:         s.Delta,
+			Status:        s.Status,
+		}
+	}
+	return waves
+}
+
 // BuildWaveStates converts Wave list to WaveState list for persistence.
 func BuildWaveStates(waves []Wave) []WaveState {
 	states := make([]WaveState, len(waves))
@@ -301,6 +467,9 @@ func BuildWaveStates(waves []Wave) []WaveState {
 			Status:        w.Status,
 			Prerequisites: w.Prerequisites,
 			ActionCount:   len(w.Actions),
+			Actions:       w.Actions,
+			Description:   w.Description,
+			Delta:         w.Delta,
 		}
 	}
 	return states

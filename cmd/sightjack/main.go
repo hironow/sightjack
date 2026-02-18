@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
-var version = "0.3.0-dev"
+var version = "0.5.0-dev"
 
 func main() {
 	// Extract subcommand before flag parsing so flags after the subcommand are honored.
@@ -85,6 +86,47 @@ func main() {
 			sightjack.LogError("Failed to get working directory: %v", err)
 			os.Exit(1)
 		}
+
+		// Check for existing state (resume detection)
+		if !dryRun {
+			existingState, stateErr := sightjack.ReadState(baseDir)
+			if stateErr == nil {
+				scanner := bufio.NewScanner(os.Stdin)
+				for {
+					choice, promptErr := sightjack.PromptResume(ctx, os.Stdout, scanner, existingState)
+					if promptErr == sightjack.ErrQuit {
+						return
+					}
+					if promptErr != nil {
+						sightjack.LogWarn("Invalid input: %v", promptErr)
+						continue // re-prompt instead of falling through
+					}
+					switch choice {
+					case sightjack.ResumeChoiceResume:
+						if !sightjack.CanResume(existingState) {
+							sightjack.LogWarn("Cached scan data missing — starting fresh session instead.")
+							goto freshSession
+						}
+						if err := sightjack.RunResumeSession(ctx, cfg, baseDir, existingState, os.Stdin); err != nil {
+							sightjack.LogError("Resume failed: %v", err)
+							os.Exit(1)
+						}
+						return
+					case sightjack.ResumeChoiceRescan:
+						if err := sightjack.RunRescanSession(ctx, cfg, baseDir, existingState, os.Stdin); err != nil {
+							sightjack.LogError("Re-scan resume failed: %v", err)
+							os.Exit(1)
+						}
+						return
+					case sightjack.ResumeChoiceNew:
+						goto freshSession
+					}
+				}
+			}
+		}
+	freshSession:
+
+		// Fresh session
 		sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 		var sessionInput io.Reader
 		if !dryRun {

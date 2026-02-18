@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsWaveApplyComplete_NoErrors(t *testing.T) {
@@ -715,6 +716,301 @@ func TestApplyModifiedWave_PreservesOriginalDeltaWhenZero(t *testing.T) {
 	}
 }
 
+func TestMergeCompletedStatus_PreservesCompleted(t *testing.T) {
+	// given: old completed waves
+	oldCompleted := map[string]bool{
+		"Auth:auth-w1": true,
+		"API:api-w1":   true,
+	}
+	// given: new waves from re-scan (auth-w1 still exists, api-w2 is new)
+	newWaves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "locked"},
+		{ID: "api-w2", ClusterName: "API", Title: "New Wave", Status: "available"},
+	}
+
+	// when
+	merged := MergeCompletedStatus(oldCompleted, newWaves)
+
+	// then: auth-w1 should be completed (was in old)
+	for _, w := range merged {
+		if WaveKey(w) == "Auth:auth-w1" && w.Status != "completed" {
+			t.Errorf("expected Auth:auth-w1 completed, got %s", w.Status)
+		}
+	}
+	// then: api-w1 not in new waves (dropped from Linear) — not present at all
+	for _, w := range merged {
+		if WaveKey(w) == "API:api-w1" {
+			t.Error("API:api-w1 should not appear in merged result")
+		}
+	}
+	// then: auth-w2 and api-w2 keep original status
+	for _, w := range merged {
+		if WaveKey(w) == "Auth:auth-w2" && w.Status != "locked" {
+			t.Errorf("expected Auth:auth-w2 locked, got %s", w.Status)
+		}
+		if WaveKey(w) == "API:api-w2" && w.Status != "available" {
+			t.Errorf("expected API:api-w2 available, got %s", w.Status)
+		}
+	}
+}
+
+func TestMergeCompletedStatus_EmptyOld(t *testing.T) {
+	// given: no old completed waves
+	oldCompleted := map[string]bool{}
+	newWaves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "available"},
+	}
+
+	// when
+	merged := MergeCompletedStatus(oldCompleted, newWaves)
+
+	// then: all waves keep original status
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(merged))
+	}
+	if merged[0].Status != "available" {
+		t.Errorf("expected available, got %s", merged[0].Status)
+	}
+}
+
+func TestMergeCompletedStatus_EmptyNew(t *testing.T) {
+	// given: old waves completed but new scan returns nothing
+	oldCompleted := map[string]bool{"Auth:auth-w1": true}
+	var newWaves []Wave
+
+	// when
+	merged := MergeCompletedStatus(oldCompleted, newWaves)
+
+	// then
+	if len(merged) != 0 {
+		t.Errorf("expected 0 waves, got %d", len(merged))
+	}
+}
+
+func TestBuildWaveStates_IncludesFullFields(t *testing.T) {
+	// given
+	waves := []Wave{
+		{
+			ID:            "auth-w1",
+			ClusterName:   "Auth",
+			Title:         "Deps",
+			Status:        "completed",
+			Prerequisites: []string{"Auth:auth-w0"},
+			Actions: []WaveAction{
+				{Type: "add_dependency", IssueID: "ENG-101", Description: "dep"},
+				{Type: "add_dod", IssueID: "ENG-102", Description: "dod"},
+			},
+			Description: "Order dependencies first",
+			Delta:       WaveDelta{Before: 0.20, After: 0.40},
+		},
+	}
+
+	// when
+	states := BuildWaveStates(waves)
+
+	// then
+	s := states[0]
+	if len(s.Actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(s.Actions))
+	}
+	if s.Description != "Order dependencies first" {
+		t.Errorf("expected description, got %s", s.Description)
+	}
+	if s.Delta.Before != 0.20 || s.Delta.After != 0.40 {
+		t.Errorf("expected delta {0.20, 0.40}, got {%v, %v}", s.Delta.Before, s.Delta.After)
+	}
+}
+
+func TestRestoreWaves_ConvertsWaveStatesToWaves(t *testing.T) {
+	// given
+	states := []WaveState{
+		{
+			ID:            "auth-w1",
+			ClusterName:   "Auth",
+			Title:         "Deps",
+			Status:        "completed",
+			Prerequisites: []string{"Auth:auth-w0"},
+			ActionCount:   2,
+			Actions: []WaveAction{
+				{Type: "add_dependency", IssueID: "ENG-101", Description: "dep"},
+				{Type: "add_dod", IssueID: "ENG-102", Description: "dod"},
+			},
+			Description: "Order dependencies first",
+			Delta:       WaveDelta{Before: 0.20, After: 0.40},
+		},
+		{
+			ID:          "auth-w2",
+			ClusterName: "Auth",
+			Title:       "DoD",
+			Status:      "available",
+			ActionCount: 1,
+			Actions:     []WaveAction{{Type: "add_dod", IssueID: "ENG-103", Description: "dod2"}},
+			Delta:       WaveDelta{Before: 0.40, After: 0.60},
+		},
+	}
+
+	// when
+	waves := RestoreWaves(states)
+
+	// then
+	if len(waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(waves))
+	}
+	w := waves[0]
+	if w.ID != "auth-w1" {
+		t.Errorf("expected auth-w1, got %s", w.ID)
+	}
+	if w.ClusterName != "Auth" {
+		t.Errorf("expected Auth, got %s", w.ClusterName)
+	}
+	if w.Status != "completed" {
+		t.Errorf("expected completed, got %s", w.Status)
+	}
+	if len(w.Actions) != 2 {
+		t.Errorf("expected 2 actions, got %d", len(w.Actions))
+	}
+	if w.Description != "Order dependencies first" {
+		t.Errorf("expected description, got %s", w.Description)
+	}
+	if w.Delta.Before != 0.20 {
+		t.Errorf("expected delta before 0.20, got %v", w.Delta.Before)
+	}
+}
+
+func TestRestoreWaves_EmptyInput(t *testing.T) {
+	// given
+	var states []WaveState
+
+	// when
+	waves := RestoreWaves(states)
+
+	// then
+	if waves == nil {
+		t.Fatal("expected non-nil slice")
+	}
+	if len(waves) != 0 {
+		t.Errorf("expected empty slice, got %d", len(waves))
+	}
+}
+
+func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
+	// given: dry-run should NOT write scan_result.json (no real scan happened)
+	baseDir := t.TempDir()
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Scan:   ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Linear: LinearConfig{Team: "ENG", Project: "Test"},
+		Scribe: ScribeConfig{Enabled: true},
+	}
+	sessionID := "test-no-cache"
+	ctx := context.Background()
+
+	// when
+	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	scanDir := ScanDir(baseDir, sessionID)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if _, err := os.Stat(scanResultPath); !os.IsNotExist(err) {
+		t.Error("scan_result.json should not exist in dry-run mode")
+	}
+}
+
+func TestBuildSessionState(t *testing.T) {
+	// given
+	scanResult := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.50, Issues: make([]IssueDetail, 3)},
+		},
+		Completeness: 0.50,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed",
+			Actions: []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d"}},
+			Delta:   WaveDelta{Before: 0.25, After: 0.50}},
+	}
+	cfg := &Config{Linear: LinearConfig{Project: "TestProject"}}
+	sessionID := "test-123"
+	adrCount := 2
+
+	// when
+	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, nil)
+
+	// then
+	if state.Version != "0.5" {
+		t.Errorf("expected version 0.5, got %s", state.Version)
+	}
+	if state.SessionID != "test-123" {
+		t.Errorf("expected test-123, got %s", state.SessionID)
+	}
+	if state.Completeness != 0.50 {
+		t.Errorf("expected 0.50, got %f", state.Completeness)
+	}
+	if state.ADRCount != 2 {
+		t.Errorf("expected 2, got %d", state.ADRCount)
+	}
+	if len(state.Clusters) != 1 {
+		t.Fatalf("expected 1 cluster, got %d", len(state.Clusters))
+	}
+	if state.Clusters[0].Name != "Auth" {
+		t.Errorf("expected cluster name Auth, got %s", state.Clusters[0].Name)
+	}
+	if state.Clusters[0].Completeness != 0.50 {
+		t.Errorf("expected cluster completeness 0.50, got %f", state.Clusters[0].Completeness)
+	}
+	if state.Clusters[0].IssueCount != 3 {
+		t.Errorf("expected issue count 3, got %d", state.Clusters[0].IssueCount)
+	}
+	if len(state.Waves) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(state.Waves))
+	}
+	if state.Waves[0].ID != "auth-w1" {
+		t.Errorf("expected wave ID auth-w1, got %s", state.Waves[0].ID)
+	}
+	if state.Project != "TestProject" {
+		t.Errorf("expected project TestProject, got %s", state.Project)
+	}
+}
+
+func TestBuildSessionState_PreservesLastScanned(t *testing.T) {
+	// given: a specific lastScanned time (simulating resume)
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50, Issues: make([]IssueDetail, 1)}},
+		Completeness: 0.50,
+	}
+	waves := []Wave{{ID: "w1", ClusterName: "Auth", Status: "available"}}
+	cfg := &Config{Linear: LinearConfig{Project: "P"}}
+	originalScanTime := time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC)
+
+	// when: BuildSessionState is called with a prior lastScanned
+	state := BuildSessionState(cfg, "s1", scanResult, waves, 0, &originalScanTime)
+
+	// then: LastScanned should be the original, not time.Now()
+	if !state.LastScanned.Equal(originalScanTime) {
+		t.Errorf("expected LastScanned %v, got %v", originalScanTime, state.LastScanned)
+	}
+}
+
+func TestBuildSessionState_NilLastScannedUsesNow(t *testing.T) {
+	// given
+	scanResult := &ScanResult{Completeness: 0.50}
+	cfg := &Config{Linear: LinearConfig{Project: "P"}}
+	before := time.Now()
+
+	// when: nil lastScanned means fresh session
+	state := BuildSessionState(cfg, "s1", scanResult, nil, 0, nil)
+
+	// then: LastScanned should be approximately now
+	if state.LastScanned.Before(before) {
+		t.Errorf("expected LastScanned >= %v, got %v", before, state.LastScanned)
+	}
+}
+
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
 	originalActions := []WaveAction{
@@ -744,5 +1040,248 @@ func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	}
 	if result.Actions[0].IssueID != "ENG-101" {
 		t.Errorf("expected first action ENG-101, got %s", result.Actions[0].IssueID)
+	}
+}
+
+func TestResumeSession_RestoresWavesFromState(t *testing.T) {
+	// given: a saved state with completed and available waves + cached scan result
+	baseDir := t.TempDir()
+
+	// Create scan result cache
+	scanDir := ScanDir(baseDir, "old-session")
+	os.MkdirAll(scanDir, 0755)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	scanResult := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.50, Issues: []IssueDetail{
+				{ID: "ENG-101", Identifier: "ENG-101", Title: "Login", Completeness: 0.50},
+			}},
+		},
+		TotalIssues:  1,
+		Completeness: 0.50,
+	}
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("write scan result: %v", err)
+	}
+
+	// Create state pointing to that scan result
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		Project:        "TestProject",
+		LastScanned:    time.Now(),
+		Completeness:   0.50,
+		ScanResultPath: scanResultPath,
+		Clusters: []ClusterState{
+			{Name: "Auth", Completeness: 0.50, IssueCount: 1},
+		},
+		Waves: []WaveState{
+			{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed",
+				ActionCount: 1,
+				Actions:     []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d"}},
+				Delta:       WaveDelta{Before: 0.25, After: 0.50}},
+			{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available",
+				ActionCount: 1,
+				Actions:     []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d2"}},
+				Delta:       WaveDelta{Before: 0.50, After: 0.75}},
+		},
+		ADRCount: 2,
+	}
+	if err := WriteState(baseDir, state); err != nil {
+		t.Fatalf("write state: %v", err)
+	}
+
+	// when: ResumeSession loads state and returns waves + scan result
+	resumedScanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(waves))
+	}
+	if waves[0].Status != "completed" {
+		t.Errorf("expected auth-w1 completed, got %s", waves[0].Status)
+	}
+	if !completed["Auth:auth-w1"] {
+		t.Error("expected Auth:auth-w1 in completed map")
+	}
+	if resumedScanResult.Completeness != 0.50 {
+		t.Errorf("expected completeness 0.50, got %f", resumedScanResult.Completeness)
+	}
+	if adrCount != 0 {
+		t.Errorf("expected adrCount 0 (no ADR files on disk), got %d", adrCount)
+	}
+}
+
+func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
+	// given: nil input should return error
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Linear: LinearConfig{Team: "ENG", Project: "Test"},
+	}
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: "/some/path.json",
+	}
+
+	// when
+	err := RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nil input")
+	}
+	if !strings.Contains(err.Error(), "input") {
+		t.Errorf("expected input-related error, got: %v", err)
+	}
+}
+
+func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
+	// given: nil input should return error
+	cfg := &Config{
+		Lang:   "en",
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Linear: LinearConfig{Team: "ENG", Project: "Test"},
+	}
+	state := &SessionState{
+		Version:   "0.5",
+		SessionID: "old-session",
+	}
+
+	// when
+	err := RunRescanSession(context.Background(), cfg, t.TempDir(), state, nil)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nil input")
+	}
+	if !strings.Contains(err.Error(), "input") {
+		t.Errorf("expected input-related error, got: %v", err)
+	}
+}
+
+func TestResumeSession_ErrorOnMissingScanResultPath(t *testing.T) {
+	// given: state with empty scan result path
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: "",
+	}
+
+	// when
+	_, _, _, _, err := ResumeSession(t.TempDir(), state)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for empty scan result path")
+	}
+	if !strings.Contains(err.Error(), "no cached scan result path") {
+		t.Errorf("expected scan result path error, got: %v", err)
+	}
+}
+
+func TestResumeSession_ErrorOnMissingScanResultFile(t *testing.T) {
+	// given: state with non-existent scan result path
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: "/nonexistent/scan_result.json",
+	}
+
+	// when
+	_, _, _, _, err := ResumeSession(t.TempDir(), state)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for missing scan result file")
+	}
+	if !strings.Contains(err.Error(), "load cached scan result") {
+		t.Errorf("expected load error, got: %v", err)
+	}
+}
+
+func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
+	// given: state says ADRCount=2, but filesystem has 3 ADR files
+	baseDir := t.TempDir()
+	scanDir := filepath.Join(baseDir, ".siren", "scans", "old-session")
+	os.MkdirAll(scanDir, 0755)
+
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50, Issues: []IssueDetail{{ID: "E1", Identifier: "E1", Title: "t"}}}},
+		TotalIssues:  1,
+		Completeness: 0.50,
+	}
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("write scan result: %v", err)
+	}
+
+	// Create 3 ADR files on filesystem
+	adrDir := ADRDir(baseDir)
+	os.MkdirAll(adrDir, 0755)
+	for _, name := range []string{"0001-first.md", "0002-second.md", "0003-third.md"} {
+		os.WriteFile(filepath.Join(adrDir, name), []byte("# ADR"), 0644)
+	}
+
+	state := &SessionState{
+		Version:        "0.5",
+		SessionID:      "old-session",
+		ScanResultPath: scanResultPath,
+		Waves:          []WaveState{{ID: "w1", ClusterName: "Auth", Status: "available"}},
+		ADRCount:       2, // stale: says 2 but filesystem has 3
+	}
+	if err := WriteState(baseDir, state); err != nil {
+		t.Fatalf("write state: %v", err)
+	}
+
+	// when
+	_, _, _, adrCount, err := ResumeSession(baseDir, state)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if adrCount != 3 {
+		t.Errorf("expected adrCount 3 (from filesystem), got %d", adrCount)
+	}
+}
+
+func TestCanResume_ValidState(t *testing.T) {
+	// given: state with valid ScanResultPath pointing to existing file
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
+	os.MkdirAll(scanDir, 0755)
+	path := filepath.Join(scanDir, "scan_result.json")
+	os.WriteFile(path, []byte(`{}`), 0644)
+
+	state := &SessionState{ScanResultPath: path}
+
+	// when / then
+	if !CanResume(state) {
+		t.Error("expected CanResume true for valid state")
+	}
+}
+
+func TestCanResume_EmptyPath(t *testing.T) {
+	// given: state with empty ScanResultPath (v0.4 upgrade)
+	state := &SessionState{ScanResultPath: ""}
+
+	// when / then
+	if CanResume(state) {
+		t.Error("expected CanResume false for empty path")
+	}
+}
+
+func TestCanResume_MissingFile(t *testing.T) {
+	// given: state with ScanResultPath pointing to deleted file
+	state := &SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
+
+	// when / then
+	if CanResume(state) {
+		t.Error("expected CanResume false for missing file")
 	}
 }
