@@ -29,11 +29,9 @@ func BuildClaudeArgs(cfg *Config, prompt string) []string {
 	return args
 }
 
-// RunClaude executes the Claude CLI as a subprocess, streaming its output to
-// w in real time and returning the full output when complete.
-// Pass os.Stdout for interactive single-process usage, or io.Discard for
-// parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+// runClaudeOnce executes the Claude CLI as a subprocess once, streaming its
+// output to w in real time and returning the full output when complete.
+func runClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
 	timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -81,6 +79,44 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 	}
 
 	return output.String(), nil
+}
+
+// RunClaude executes the Claude CLI as a subprocess with exponential backoff
+// retry. It streams output to w in real time and returns the full output when
+// complete.
+// Pass os.Stdout for interactive single-process usage, or io.Discard for
+// parallel invocations where interleaved output would be unreadable.
+func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+	maxAttempts := cfg.Retry.MaxAttempts
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+	baseDelay := time.Duration(cfg.Retry.BaseDelaySec) * time.Second
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		if attempt > 1 {
+			delay := baseDelay * time.Duration(1<<(attempt-2)) // exponential: base, 2*base, 4*base...
+			LogInfo("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		output, err := runClaudeOnce(ctx, cfg, prompt, w)
+		if err == nil {
+			return output, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			return output, err
+		}
+	}
+	return "", fmt.Errorf("claude failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
