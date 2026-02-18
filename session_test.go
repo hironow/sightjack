@@ -1527,3 +1527,57 @@ func TestCanResume_MissingFile(t *testing.T) {
 		t.Error("expected CanResume false for missing file")
 	}
 }
+
+func TestTryRecoverState(t *testing.T) {
+	dir := t.TempDir()
+
+	// given: a cached scan result without a state.json
+	sessionID := "test-session"
+	scanDir, err := EnsureScanDir(dir, sessionID)
+	if err != nil {
+		t.Fatalf("EnsureScanDir: %v", err)
+	}
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "auth", Completeness: 0.5}},
+		Completeness: 0.5,
+	}
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("WriteScanResult: %v", err)
+	}
+
+	// when
+	recovered, recErr := TryRecoverState(dir, sessionID)
+
+	// then
+	if recErr != nil {
+		t.Fatalf("TryRecoverState: %v", recErr)
+	}
+	if recovered == nil {
+		t.Fatal("expected recovered state, got nil")
+	}
+	if recovered.Completeness != 0.5 {
+		t.Errorf("Completeness: expected 0.5, got %f", recovered.Completeness)
+	}
+	if recovered.SessionID != sessionID {
+		t.Errorf("SessionID: expected %s, got %s", sessionID, recovered.SessionID)
+	}
+	if recovered.ScanResultPath != scanResultPath {
+		t.Errorf("ScanResultPath: expected %s, got %s", scanResultPath, recovered.ScanResultPath)
+	}
+}
+
+func TestTryRecoverStateNoFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// when
+	recovered, err := TryRecoverState(dir, "nonexistent")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nonexistent session")
+	}
+	if recovered != nil {
+		t.Error("expected nil state")
+	}
+}

@@ -658,6 +658,27 @@ func RecoverStateFromScan(scanResult *ScanResult, waves []Wave, adrDir string) *
 	return state
 }
 
+// TryRecoverState attempts to recover session state from cached scan result files.
+// Recovery chain: Try scan_result.json in scan dir -> recover clusters, waves, completeness.
+// Returns error if no recoverable data found.
+func TryRecoverState(baseDir string, sessionID string) (*SessionState, error) {
+	scanDir := ScanDir(baseDir, sessionID)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+
+	scanResult, err := LoadScanResult(scanResultPath)
+	if err != nil {
+		return nil, fmt.Errorf("no recoverable scan data: %w", err)
+	}
+
+	LogWarn("State file missing. Recovered from cached scan result.")
+
+	adrDir := ADRDir(baseDir)
+	state := RecoverStateFromScan(scanResult, nil, adrDir)
+	state.SessionID = sessionID
+	state.ScanResultPath = scanResultPath
+	return state, nil
+}
+
 // completedWavesInCluster returns all completed waves for the given cluster.
 func completedWavesInCluster(waves []Wave, clusterName string) []Wave {
 	var result []Wave

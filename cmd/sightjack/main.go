@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -90,6 +91,18 @@ func main() {
 		// Check for existing state (resume detection)
 		if !dryRun {
 			existingState, stateErr := sightjack.ReadState(baseDir)
+			if stateErr != nil {
+				// Try recovery from cached scan results
+				entries, _ := os.ReadDir(filepath.Join(baseDir, ".siren", "scans"))
+				if len(entries) > 0 {
+					lastEntry := entries[len(entries)-1]
+					recovered, recErr := sightjack.TryRecoverState(baseDir, lastEntry.Name())
+					if recErr == nil {
+						existingState = recovered
+						stateErr = nil
+					}
+				}
+			}
 			if stateErr == nil {
 				scanner := bufio.NewScanner(os.Stdin)
 				for {
