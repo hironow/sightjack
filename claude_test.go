@@ -101,6 +101,31 @@ func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	}
 }
 
+func TestRunClaudeOnceNoRetry(t *testing.T) {
+	callCount := 0
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		return exec.Command("false") // exits non-zero
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
+	}
+
+	// when
+	_, err := RunClaudeOnce(context.Background(), cfg, "test", io.Discard)
+
+	// then: should fail immediately without retrying
+	if err == nil {
+		t.Fatal("expected error from RunClaudeOnce")
+	}
+	if callCount != 1 {
+		t.Errorf("RunClaudeOnce should not retry; expected 1 call, got %d", callCount)
+	}
+}
+
 func TestRunClaudeRetriesOnFailure(t *testing.T) {
 	callCount := 0
 	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {

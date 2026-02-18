@@ -113,7 +113,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (
 	}
 
 	LogScan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout); err != nil {
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
 
@@ -138,7 +138,7 @@ func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string) error
 	}
 
 	LogScan("Applying ready labels to: %s", readyIssueIDs)
-	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout); err != nil {
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout); err != nil {
 		return fmt.Errorf("ready label: %w", err)
 	}
 	return nil

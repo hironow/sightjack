@@ -29,9 +29,11 @@ func BuildClaudeArgs(cfg *Config, prompt string) []string {
 	return args
 }
 
-// runClaudeOnce executes the Claude CLI as a subprocess once, streaming its
-// output to w in real time and returning the full output when complete.
-func runClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+// RunClaudeOnce executes the Claude CLI as a subprocess once without retry.
+// Use this for prompts that perform non-idempotent mutations (e.g. applying
+// labels or updating descriptions via Linear MCP) where retrying after a
+// partial success could duplicate side effects.
+func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
 	timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -107,7 +109,7 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 			case <-time.After(delay):
 			}
 		}
-		output, err := runClaudeOnce(ctx, cfg, prompt, w)
+		output, err := RunClaudeOnce(ctx, cfg, prompt, w)
 		if err == nil {
 			return output, nil
 		}
