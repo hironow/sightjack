@@ -73,6 +73,12 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 				return fmt.Errorf("scribe dry-run: %w", err)
 			}
 		}
+		// Also generate nextgen prompt for dry-run
+		sampleCompletedWaves := []Wave{sampleWave}
+		sampleCluster := ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
+		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil); err != nil {
+			return fmt.Errorf("nextgen dry-run: %w", err)
+		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
 	}
@@ -113,6 +119,11 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 
 	// --- Interactive Loop ---
 	shibitoShown := false
+	// sessionRejected tracks user-rejected actions per wave (keyed by WaveKey).
+	// Scoped per-wave intentionally: rejected actions are only fed back to the
+	// nextgen call triggered by that specific wave's completion, not accumulated
+	// across the entire cluster.
+	sessionRejected := make(map[string][]WaveAction)
 	for {
 		waves = EvaluateUnlocks(waves, completed)
 		available := AvailableWaves(waves, completed)
@@ -174,8 +185,10 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 
 			switch choice {
 			case ApprovalApprove:
+				delete(sessionRejected, WaveKey(selected))
 				applyWave = true
 			case ApprovalReject:
+				delete(sessionRejected, WaveKey(selected))
 				LogInfo("Wave rejected.")
 			case ApprovalDiscuss:
 				topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
@@ -213,6 +226,29 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 					}
 				}
 				continue // back to approval prompt with (possibly modified) wave
+			case ApprovalSelective:
+				approved, rejected, selErr := PromptSelectiveApproval(ctx, os.Stdout, scanner, selected)
+				if selErr == ErrQuit {
+					break
+				}
+				if selErr != nil {
+					LogWarn("Selective approval error: %v", selErr)
+					continue
+				}
+				if len(approved) == 0 {
+					LogInfo("No actions selected. Wave skipped.")
+					break
+				}
+				selected.Actions = approved
+				// Recompute delta proportionally when actions were rejected
+				totalActions := len(approved) + len(rejected)
+				if totalActions > 0 && len(rejected) > 0 {
+					fraction := float64(len(approved)) / float64(totalActions)
+					selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
+				}
+				PropagateWaveUpdate(waves, selected)
+				sessionRejected[WaveKey(selected)] = rejected
+				applyWave = true
 			}
 			break
 		}
@@ -250,6 +286,11 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		for i, c := range scanResult.Clusters {
 			if c.Name == selected.ClusterName {
 				scanResult.Clusters[i].Completeness = selected.Delta.After
+				// Note: per-issue completeness is NOT updated here because
+				// action types vary (add_dod vs add_dependency) and we lack
+				// accurate per-issue deltas. The nextgen prompt already
+				// receives CompletedWaves JSON listing all applied actions,
+				// which is sufficient for the LLM to avoid re-proposals.
 				break
 			}
 		}
@@ -260,6 +301,32 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		newAvailable := len(AvailableWaves(waves, completed))
 		newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
 		DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
+
+		// --- Post-completion: Generate next waves ---
+		var clusterForNextgen ClusterScanResult
+		for _, c := range scanResult.Clusters {
+			if c.Name == selected.ClusterName {
+				clusterForNextgen = c
+				break
+			}
+		}
+		if clusterForNextgen.Name == "" {
+			LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
+		} else {
+			completedWavesForCluster := completedWavesInCluster(waves, selected.ClusterName)
+			existingADRs, adrErr := ReadExistingADRs(adrDir)
+			if adrErr != nil {
+				LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
+			}
+			rejectedForWave := sessionRejected[WaveKey(selected)]
+			newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave)
+			if nextgenErr != nil {
+				LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
+			} else if len(newWaves) > 0 {
+				waves = append(waves, newWaves...)
+				waves = EvaluateUnlocks(waves, completed)
+			}
+		}
 
 		// Save state after each wave completion (crash resilience)
 		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
@@ -382,7 +449,7 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		ts = *lastScanned
 	}
 	state := &SessionState{
-		Version:      "0.7",
+		Version:      "0.8",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  ts,
@@ -517,4 +584,15 @@ func BuildWaveStates(waves []Wave) []WaveState {
 		}
 	}
 	return states
+}
+
+// completedWavesInCluster returns all completed waves for the given cluster.
+func completedWavesInCluster(waves []Wave, clusterName string) []Wave {
+	var result []Wave
+	for _, w := range waves {
+		if w.ClusterName == clusterName && w.Status == "completed" {
+			result = append(result, w)
+		}
+	}
+	return result
 }

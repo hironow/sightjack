@@ -138,6 +138,13 @@ type WaveGenerateResult struct {
 	Waves       []Wave `json:"waves"`
 }
 
+// NextGenResult is the output of post-completion wave generation.
+type NextGenResult struct {
+	ClusterName string `json:"cluster_name"`
+	Waves       []Wave `json:"waves"`
+	Reasoning   string `json:"reasoning"`
+}
+
 // WaveApplyResult is the Pass 4 output per wave.
 type WaveApplyResult struct {
 	WaveID  string   `json:"wave_id"`
@@ -160,6 +167,7 @@ const (
 	ApprovalReject
 	ApprovalDiscuss
 	ApprovalQuit
+	ApprovalSelective
 )
 
 // ResumeChoice represents the user's choice when a previous session is detected.

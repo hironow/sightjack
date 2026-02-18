@@ -537,3 +537,99 @@ func TestRenderScribeADRPrompt_UnsupportedLang(t *testing.T) {
 		t.Fatal("expected error for unsupported language")
 	}
 }
+
+func TestRenderNextGenPrompt_English(t *testing.T) {
+	// given
+	data := NextGenPromptData{
+		ClusterName:     "Auth",
+		Completeness:    "65",
+		Issues:          `[{"id":"ENG-101"}]`,
+		CompletedWaves:  `[{"id":"auth-w1","title":"Initial setup"}]`,
+		ExistingADRs:    []ExistingADR{{Filename: "0001-jwt.md", Content: "# JWT decision"}},
+		RejectedActions: `[{"type":"add_dod","issue_id":"ENG-102","description":"Rejected action"}]`,
+		OutputPath:      "/tmp/nextgen.json",
+		StrictnessLevel: "alert",
+	}
+
+	// when
+	result, err := RenderNextGenPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	for _, want := range []string{"Auth", "65", "ENG-101", "auth-w1", "0001-jwt.md", "JWT decision", "Rejected action", "/tmp/nextgen.json", "alert"} {
+		if !strings.Contains(result, want) {
+			t.Errorf("missing %q in output", want)
+		}
+	}
+}
+
+func TestRenderNextGenPrompt_Japanese(t *testing.T) {
+	// given
+	data := NextGenPromptData{
+		ClusterName:     "API",
+		Completeness:    "50",
+		Issues:          `[]`,
+		CompletedWaves:  `[]`,
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	result, err := RenderNextGenPrompt("ja", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(result, "API") {
+		t.Errorf("missing cluster name in output")
+	}
+}
+
+func TestRenderNextGenPrompt_NoADRs(t *testing.T) {
+	// given
+	data := NextGenPromptData{
+		ClusterName:     "DB",
+		Completeness:    "40",
+		Issues:          `[]`,
+		CompletedWaves:  `[]`,
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	result, err := RenderNextGenPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if strings.Contains(result, "Existing ADRs") {
+		t.Errorf("ADR section should be omitted when no ADRs exist")
+	}
+}
+
+func TestRenderNextGenPrompt_NoRejectedActions(t *testing.T) {
+	// given
+	data := NextGenPromptData{
+		ClusterName:     "DB",
+		Completeness:    "40",
+		Issues:          `[]`,
+		CompletedWaves:  `[]`,
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	result, err := RenderNextGenPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if strings.Contains(result, "Rejected Actions") {
+		t.Errorf("Rejected section should be omitted when empty")
+	}
+}

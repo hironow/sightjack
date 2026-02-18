@@ -75,7 +75,7 @@ func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave
 		fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
 	}
 	fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
-	fmt.Fprint(w, "\n  [a] Approve all  [r] Reject  [d] Discuss  [q] Back to navigator: ")
+	fmt.Fprint(w, "\n  [a] Approve all  [s] Selective  [r] Reject  [d] Discuss  [q] Back to navigator: ")
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
@@ -89,10 +89,75 @@ func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave
 		return ApprovalReject, nil
 	case "d":
 		return ApprovalDiscuss, nil
+	case "s":
+		return ApprovalSelective, nil
 	case "q":
 		return ApprovalQuit, ErrQuit
 	default:
 		return ApprovalQuit, fmt.Errorf("invalid input: %s", input)
+	}
+}
+
+// PromptSelectiveApproval displays wave actions with toggle checkboxes.
+// Returns approved and rejected action lists.
+func PromptSelectiveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave Wave) ([]WaveAction, []WaveAction, error) {
+	if len(wave.Actions) == 0 {
+		return nil, nil, nil
+	}
+	selected := make([]bool, len(wave.Actions))
+	for i := range selected {
+		selected[i] = true // default: all selected
+	}
+
+	for {
+		// Display current state
+		fmt.Fprintf(w, "\n  --- %s - %s ---\n", wave.ClusterName, wave.Title)
+		for i, a := range wave.Actions {
+			mark := "x"
+			if !selected[i] {
+				mark = " "
+			}
+			fmt.Fprintf(w, "    %d. [%s] [%s] %s: %s\n", i+1, mark, a.Type, a.IssueID, a.Description)
+		}
+		fmt.Fprintf(w, "\n  Toggle [1-%d, a=all, n=none, done=confirm, q=quit]: ", len(wave.Actions))
+
+		line, err := ScanLine(ctx, s)
+		if err != nil {
+			return nil, nil, ErrQuit
+		}
+		input := strings.TrimSpace(strings.ToLower(line))
+
+		switch input {
+		case "q":
+			return nil, nil, ErrQuit
+		case "done":
+			var approved, rejected []WaveAction
+			for i, a := range wave.Actions {
+				if selected[i] {
+					approved = append(approved, a)
+				} else {
+					rejected = append(rejected, a)
+				}
+			}
+			return approved, rejected, nil
+		case "a":
+			for i := range selected {
+				selected[i] = true
+			}
+			continue
+		case "n":
+			for i := range selected {
+				selected[i] = false
+			}
+			continue
+		default:
+			num, parseErr := strconv.Atoi(input)
+			if parseErr != nil || num < 1 || num > len(wave.Actions) {
+				fmt.Fprintf(w, "  Invalid input: %s\n", input)
+				continue
+			}
+			selected[num-1] = !selected[num-1]
+		}
 	}
 }
 

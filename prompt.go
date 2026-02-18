@@ -70,6 +70,18 @@ type ArchitectDiscussPromptData struct {
 	StrictnessLevel string
 }
 
+// NextGenPromptData holds template data for post-completion wave generation.
+type NextGenPromptData struct {
+	ClusterName     string
+	Completeness    string
+	Issues          string
+	CompletedWaves  string
+	ExistingADRs    []ExistingADR
+	RejectedActions string
+	OutputPath      string
+	StrictnessLevel string
+}
+
 func renderTemplate(name string, data any) (string, error) {
 	tmpl, err := template.ParseFS(promptFS, name)
 	if err != nil {
@@ -115,5 +127,11 @@ func RenderScribeADRPrompt(lang string, data ScribeADRPromptData) (string, error
 // RenderArchitectDiscussPrompt renders the architect discussion prompt for the given language.
 func RenderArchitectDiscussPrompt(lang string, data ArchitectDiscussPromptData) (string, error) {
 	name := fmt.Sprintf("prompts/templates/architect_discuss_%s.md.tmpl", lang)
+	return renderTemplate(name, data)
+}
+
+// RenderNextGenPrompt renders the next-gen wave generation prompt.
+func RenderNextGenPrompt(lang string, data NextGenPromptData) (string, error) {
+	name := fmt.Sprintf("prompts/templates/wave_nextgen_%s.md.tmpl", lang)
 	return renderTemplate(name, data)
 }
