@@ -791,6 +791,63 @@ func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
 	}
 }
 
+func TestRenderWaveApplyPromptWithReadyIssues(t *testing.T) {
+	// given
+	data := WaveApplyPromptData{
+		WaveID:          "w1",
+		ClusterName:     "auth",
+		Title:           "Wave 1",
+		Actions:         "[]",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   true,
+		LabelPrefix:     "sightjack",
+		ReadyLabel:      "sightjack:ready",
+		ReadyIssueIDs:   "AUTH-1, AUTH-2",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if !strings.Contains(result, "sightjack:ready") {
+			t.Errorf("lang=%s: expected ready label in output", lang)
+		}
+		if !strings.Contains(result, "AUTH-1") {
+			t.Errorf("lang=%s: expected ready issue IDs in output", lang)
+		}
+	}
+}
+
+func TestRenderWaveApplyPromptWithReadyIssuesEmpty(t *testing.T) {
+	// given: labels enabled but no ready issues — ready block should not appear
+	data := WaveApplyPromptData{
+		WaveID:          "w1",
+		ClusterName:     "auth",
+		Title:           "Wave 1",
+		Actions:         "[]",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   true,
+		LabelPrefix:     "sightjack",
+		ReadyLabel:      "sightjack:ready",
+		ReadyIssueIDs:   "",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if strings.Contains(result, "sightjack:ready") {
+			t.Errorf("lang=%s: ready label should not appear when no ready issues", lang)
+		}
+	}
+}
+
 func TestRenderNextGenPromptWithDoD(t *testing.T) {
 	// given
 	data := NextGenPromptData{

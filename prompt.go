@@ -51,6 +51,8 @@ type WaveApplyPromptData struct {
 	StrictnessLevel string
 	LabelsEnabled   bool
 	LabelPrefix     string
+	ReadyLabel      string
+	ReadyIssueIDs   string
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.

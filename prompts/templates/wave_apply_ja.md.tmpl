@@ -41,4 +41,8 @@
 {{if .LabelsEnabled}}
 全アクション適用後、Linear MCPを使用して各対象Issueに "{{.LabelPrefix}}:wave-done" ラベルを付与してください。
 {{end}}
+{{if and .LabelsEnabled .ReadyIssueIDs}}
+以下のIssueは全てのWaveが完了しています。Linear MCPを使用して "{{.ReadyLabel}}" ラベルを付与してください:
+{{.ReadyIssueIDs}}
+{{end}}
 重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。

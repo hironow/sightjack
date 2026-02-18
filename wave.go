@@ -89,7 +89,8 @@ func waveApplyFileName(wave Wave) string {
 }
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
-func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (*WaveApplyResult, error) {
+// readyIssueIDs is a comma-separated list of issue IDs whose waves are all completed.
+func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, readyIssueIDs string) (*WaveApplyResult, error) {
 	applyFile := filepath.Join(scanDir, waveApplyFileName(wave))
 
 	actionsJSON, err := json.Marshal(wave.Actions)
@@ -106,6 +107,8 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (
 		StrictnessLevel: string(cfg.Strictness.Default),
 		LabelsEnabled:   cfg.Labels.Enabled,
 		LabelPrefix:     cfg.Labels.Prefix,
+		ReadyLabel:      cfg.Labels.ReadyLabel,
+		ReadyIssueIDs:   readyIssueIDs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render apply prompt: %w", err)

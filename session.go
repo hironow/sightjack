@@ -256,8 +256,17 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			continue
 		}
 
+		// Compute ready issues for Paintress Bridge label
+		var readyIssueStr string
+		if cfg.Labels.Enabled {
+			readyIDs := ReadyIssueIDs(waves)
+			if len(readyIDs) > 0 {
+				readyIssueStr = strings.Join(readyIDs, ", ")
+			}
+		}
+
 		// --- Pass 4: Wave Apply ---
-		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected)
+		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, readyIssueStr)
 		if err != nil {
 			LogError("Apply failed: %v", err)
 			continue
