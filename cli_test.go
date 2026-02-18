@@ -962,6 +962,127 @@ func TestPromptWaveSelection_BackOption(t *testing.T) {
 	}
 }
 
+func TestPromptWaveApproval_Selective(t *testing.T) {
+	wave := Wave{
+		ClusterName: "Auth",
+		Title:       "JWT middleware",
+		Actions:     []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"}},
+		Delta:       WaveDelta{Before: 0.3, After: 0.5},
+	}
+	input := strings.NewReader("s\n")
+	scanner := bufio.NewScanner(input)
+	var buf bytes.Buffer
+
+	choice, err := PromptWaveApproval(context.Background(), &buf, scanner, wave)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if choice != ApprovalSelective {
+		t.Errorf("expected ApprovalSelective, got %d", choice)
+	}
+}
+
+func TestPromptSelectiveApproval_AllSelected(t *testing.T) {
+	actions := []WaveAction{
+		{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"},
+		{Type: "add_dep", IssueID: "ENG-102", Description: "Add dependency"},
+	}
+	wave := Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	input := strings.NewReader("done\n")
+	scanner := bufio.NewScanner(input)
+	var buf bytes.Buffer
+
+	approved, rejected, err := PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if len(approved) != 2 {
+		t.Errorf("approved: got %d, want 2", len(approved))
+	}
+	if len(rejected) != 0 {
+		t.Errorf("rejected: got %d, want 0", len(rejected))
+	}
+}
+
+func TestPromptSelectiveApproval_ToggleOne(t *testing.T) {
+	actions := []WaveAction{
+		{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"},
+		{Type: "add_dep", IssueID: "ENG-102", Description: "Add dependency"},
+		{Type: "create", IssueID: "ENG-103", Description: "Create sub-issue"},
+	}
+	wave := Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	input := strings.NewReader("3\ndone\n")
+	scanner := bufio.NewScanner(input)
+	var buf bytes.Buffer
+
+	approved, rejected, err := PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if len(approved) != 2 {
+		t.Errorf("approved: got %d, want 2", len(approved))
+	}
+	if len(rejected) != 1 {
+		t.Errorf("rejected: got %d, want 1", len(rejected))
+	}
+	if rejected[0].IssueID != "ENG-103" {
+		t.Errorf("rejected[0].IssueID: got %q, want %q", rejected[0].IssueID, "ENG-103")
+	}
+}
+
+func TestPromptSelectiveApproval_SelectNoneThenDone(t *testing.T) {
+	actions := []WaveAction{
+		{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"},
+	}
+	wave := Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	input := strings.NewReader("n\ndone\n")
+	scanner := bufio.NewScanner(input)
+	var buf bytes.Buffer
+
+	approved, rejected, err := PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if len(approved) != 0 {
+		t.Errorf("approved: got %d, want 0", len(approved))
+	}
+	if len(rejected) != 1 {
+		t.Errorf("rejected: got %d, want 1", len(rejected))
+	}
+}
+
+func TestPromptSelectiveApproval_SelectAll(t *testing.T) {
+	actions := []WaveAction{
+		{Type: "add_dod", IssueID: "ENG-101", Description: "Spec"},
+		{Type: "add_dep", IssueID: "ENG-102", Description: "Dep"},
+	}
+	wave := Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	input := strings.NewReader("n\na\ndone\n")
+	scanner := bufio.NewScanner(input)
+	var buf bytes.Buffer
+
+	approved, _, err := PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if len(approved) != 2 {
+		t.Errorf("approved: got %d, want 2", len(approved))
+	}
+}
+
+func TestPromptSelectiveApproval_Quit(t *testing.T) {
+	actions := []WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "Spec"}}
+	wave := Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	input := strings.NewReader("q\n")
+	scanner := bufio.NewScanner(input)
+	var buf bytes.Buffer
+
+	_, _, err := PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	if err != ErrQuit {
+		t.Errorf("expected ErrQuit, got %v", err)
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{
