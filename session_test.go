@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1357,6 +1358,37 @@ func TestCanResume_EmptyPath(t *testing.T) {
 	// when / then
 	if CanResume(state) {
 		t.Error("expected CanResume false for empty path")
+	}
+}
+
+func TestPartialApplyDelta(t *testing.T) {
+	tests := []struct {
+		name      string
+		applied   int
+		total     int
+		before    float64
+		after     float64
+		wantAfter float64
+	}{
+		{"full success", 5, 5, 0.3, 0.6, 0.6},
+		{"partial 3/5", 3, 5, 0.3, 0.6, 0.48},
+		{"zero applied", 0, 5, 0.3, 0.6, 0.3},
+		{"zero total (legacy)", 0, 0, 0.3, 0.6, 0.6},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given
+			result := &WaveApplyResult{Applied: tt.applied, TotalCount: tt.total}
+			delta := WaveDelta{Before: tt.before, After: tt.after}
+
+			// when
+			got := PartialApplyDelta(result, delta)
+
+			// then
+			if fmt.Sprintf("%.4f", got) != fmt.Sprintf("%.4f", tt.wantAfter) {
+				t.Errorf("PartialApplyDelta: got %.4f, want %.4f", got, tt.wantAfter)
+			}
+		})
 	}
 }
 

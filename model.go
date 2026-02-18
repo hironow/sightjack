@@ -147,10 +147,11 @@ type NextGenResult struct {
 
 // WaveApplyResult is the Pass 4 output per wave.
 type WaveApplyResult struct {
-	WaveID  string   `json:"wave_id"`
-	Applied int      `json:"applied"`
-	Errors  []string `json:"errors"`
-	Ripples []Ripple `json:"ripples"`
+	WaveID     string   `json:"wave_id"`
+	Applied    int      `json:"applied"`
+	TotalCount int      `json:"total_count,omitempty"`
+	Errors     []string `json:"errors"`
+	Ripples    []Ripple `json:"ripples"`
 }
 
 // Ripple is a cross-cluster effect from applying a wave.

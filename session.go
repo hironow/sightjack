@@ -285,7 +285,8 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		// Update cluster completeness from delta, then recalculate overall
 		for i, c := range scanResult.Clusters {
 			if c.Name == selected.ClusterName {
-				scanResult.Clusters[i].Completeness = selected.Delta.After
+				adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
+				scanResult.Clusters[i].Completeness = adjustedAfter
 				// Note: per-issue completeness is NOT updated here because
 				// action types vary (add_dod vs add_dependency) and we lack
 				// accurate per-issue deltas. The nextgen prompt already
@@ -466,6 +467,19 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		})
 	}
 	return state
+}
+
+// PartialApplyDelta computes the adjusted delta for a partially applied wave.
+// When TotalCount is 0 (legacy result), the original delta.After is returned.
+func PartialApplyDelta(result *WaveApplyResult, delta WaveDelta) float64 {
+	if result.TotalCount == 0 || result.Applied >= result.TotalCount {
+		return delta.After
+	}
+	if result.Applied == 0 {
+		return delta.Before
+	}
+	successRate := float64(result.Applied) / float64(result.TotalCount)
+	return delta.Before + (delta.After-delta.Before)*successRate
 }
 
 // IsWaveApplyComplete returns true when the apply result has no errors,
