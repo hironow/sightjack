@@ -305,18 +305,22 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 				break
 			}
 		}
-		completedWavesForCluster := completedWavesInCluster(waves, selected.ClusterName)
-		existingADRs, adrErr := ReadExistingADRs(adrDir)
-		if adrErr != nil {
-			LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
-		}
-		rejectedForWave := sessionRejected[WaveKey(selected)]
-		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave)
-		if nextgenErr != nil {
-			LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
-		} else if len(newWaves) > 0 {
-			waves = append(waves, newWaves...)
-			waves = EvaluateUnlocks(waves, completed)
+		if clusterForNextgen.Name == "" {
+			LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
+		} else {
+			completedWavesForCluster := completedWavesInCluster(waves, selected.ClusterName)
+			existingADRs, adrErr := ReadExistingADRs(adrDir)
+			if adrErr != nil {
+				LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
+			}
+			rejectedForWave := sessionRejected[WaveKey(selected)]
+			newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave)
+			if nextgenErr != nil {
+				LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
+			} else if len(newWaves) > 0 {
+				waves = append(waves, newWaves...)
+				waves = EvaluateUnlocks(waves, completed)
+			}
 		}
 
 		// Save state after each wave completion (crash resilience)
