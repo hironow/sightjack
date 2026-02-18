@@ -63,10 +63,11 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
 	classifyPrompt, err := RenderClassifyPrompt(cfg.Lang, ClassifyPromptData{
-		TeamFilter:    cfg.Linear.Team,
-		ProjectFilter: cfg.Linear.Project,
-		CycleFilter:   cfg.Linear.Cycle,
-		OutputPath:    classifyOutput,
+		TeamFilter:      cfg.Linear.Team,
+		ProjectFilter:   cfg.Linear.Project,
+		CycleFilter:     cfg.Linear.Cycle,
+		OutputPath:      classifyOutput,
+		StrictnessLevel: string(cfg.Strictness.Default),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render classify prompt: %w", err)
@@ -102,9 +103,10 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 			for j, chunk := range chunks {
 				chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", i, sanitizeName(cc.Name), j))
 				prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
-					ClusterName: cc.Name,
-					IssueIDs:    strings.Join(chunk, ", "),
-					OutputPath:  chunkFile,
+					ClusterName:     cc.Name,
+					IssueIDs:        strings.Join(chunk, ", "),
+					OutputPath:      chunkFile,
+					StrictnessLevel: string(cfg.Strictness.Default),
 				})
 				if renderErr != nil {
 					return fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
@@ -155,11 +157,12 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 			}
 
 			prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
-				ClusterName:  cluster.Name,
-				Completeness: fmt.Sprintf("%.0f", cluster.Completeness*100),
-				Issues:       string(issuesJSON),
-				Observations: strings.Join(cluster.Observations, "\n"),
-				OutputPath:   waveFile,
+				ClusterName:     cluster.Name,
+				Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
+				Issues:          string(issuesJSON),
+				Observations:    strings.Join(cluster.Observations, "\n"),
+				OutputPath:      waveFile,
+				StrictnessLevel: string(cfg.Strictness.Default),
 			})
 			if err != nil {
 				return fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)

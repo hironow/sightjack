@@ -221,7 +221,7 @@ func TestRenderNavigatorWithWaves(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "[ ]") {
@@ -248,7 +248,7 @@ func TestRenderNavigatorWithWaves_CompletedWave(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "[=]") {
@@ -268,7 +268,7 @@ func TestRenderNavigatorWithWaves_ADRCountZero(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "ADRs: 0") {
@@ -288,7 +288,7 @@ func TestRenderNavigatorWithWaves_ADRCountPositive(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 5, nil)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 5, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "ADRs: 5") {
@@ -309,7 +309,7 @@ func TestRenderNavigatorWithWaves_ResumeInfo(t *testing.T) {
 	lastScanned := time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC)
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 3, &lastScanned)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 3, &lastScanned, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "Session: resumed") {
@@ -332,10 +332,64 @@ func TestRenderNavigatorWithWaves_NoResumeInfo(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil)
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then: no resume line
 	if strings.Contains(nav, "Session:") {
 		t.Error("should not contain 'Session:' for fresh session")
+	}
+}
+
+func TestRenderNavigatorWithWaves_StrictnessBadge(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+		TotalIssues:  3,
+		Completeness: 0.25,
+	}
+	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "alert", 0)
+
+	// then
+	if !strings.Contains(nav, "Strictness: alert") {
+		t.Error("expected 'Strictness: alert' in navigator")
+	}
+}
+
+func TestRenderNavigatorWithWaves_ShibitoCount(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+		TotalIssues:  3,
+		Completeness: 0.25,
+	}
+	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 3)
+
+	// then
+	if !strings.Contains(nav, "Shibito: 3") {
+		t.Error("expected 'Shibito: 3' in navigator")
+	}
+}
+
+func TestRenderNavigatorWithWaves_ShibitoZero_Hidden(t *testing.T) {
+	// given
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+		TotalIssues:  3,
+		Completeness: 0.25,
+	}
+	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
+
+	// when
+	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
+
+	// then: shibito count should not appear when 0
+	if strings.Contains(nav, "Shibito") {
+		t.Error("should not show 'Shibito' when count is 0")
 	}
 }

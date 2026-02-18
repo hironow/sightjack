@@ -942,8 +942,8 @@ func TestBuildSessionState(t *testing.T) {
 	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, nil)
 
 	// then
-	if state.Version != "0.5" {
-		t.Errorf("expected version 0.5, got %s", state.Version)
+	if state.Version != "0.6" {
+		t.Errorf("expected version 0.6, got %s", state.Version)
 	}
 	if state.SessionID != "test-123" {
 		t.Errorf("expected test-123, got %s", state.SessionID)
@@ -1008,6 +1008,41 @@ func TestBuildSessionState_NilLastScannedUsesNow(t *testing.T) {
 	// then: LastScanned should be approximately now
 	if state.LastScanned.Before(before) {
 		t.Errorf("expected LastScanned >= %v, got %v", before, state.LastScanned)
+	}
+}
+
+func TestBuildSessionState_ShibitoCount(t *testing.T) {
+	// given
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50, Issues: make([]IssueDetail, 1)}},
+		Completeness: 0.50,
+		ShibitoWarnings: []ShibitoWarning{
+			{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-201", Description: "Login pattern", RiskLevel: "high"},
+			{ClosedIssueID: "ENG-30", CurrentIssueID: "ENG-180", Description: "Caching", RiskLevel: "medium"},
+		},
+	}
+	cfg := &Config{Linear: LinearConfig{Project: "P"}}
+
+	// when
+	state := BuildSessionState(cfg, "s1", scanResult, nil, 0, nil)
+
+	// then
+	if state.ShibitoCount != 2 {
+		t.Errorf("expected ShibitoCount 2, got %d", state.ShibitoCount)
+	}
+}
+
+func TestBuildSessionState_ShibitoCountZero(t *testing.T) {
+	// given: no shibito warnings
+	scanResult := &ScanResult{Completeness: 0.50}
+	cfg := &Config{Linear: LinearConfig{Project: "P"}}
+
+	// when
+	state := BuildSessionState(cfg, "s1", scanResult, nil, 0, nil)
+
+	// then
+	if state.ShibitoCount != 0 {
+		t.Errorf("expected ShibitoCount 0, got %d", state.ShibitoCount)
 	}
 }
 

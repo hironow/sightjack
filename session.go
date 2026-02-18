@@ -108,9 +108,12 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		}
 
 		// Display Link Navigator
-		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt)
+		nav := RenderNavigatorWithWaves(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
 		fmt.Println()
 		fmt.Print(nav)
+
+		// Display shibito warnings (non-blocking, informational)
+		DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
 
 		// Prompt wave selection
 		selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
@@ -166,6 +169,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 							LogWarn("Scribe failed (non-fatal): %v", scribeErr)
 						} else {
 							DisplayScribeResponse(os.Stdout, scribeResp)
+							DisplayADRConflicts(os.Stdout, scribeResp.Conflicts)
 							adrCount++
 						}
 					}
@@ -339,13 +343,14 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		ts = *lastScanned
 	}
 	state := &SessionState{
-		Version:      "0.5",
+		Version:      "0.6",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  ts,
 		Completeness: scanResult.Completeness,
 		Waves:        BuildWaveStates(waves),
 		ADRCount:     adrCount,
+		ShibitoCount: len(scanResult.ShibitoWarnings),
 	}
 	for _, c := range scanResult.Clusters {
 		state.Clusters = append(state.Clusters, ClusterState{
