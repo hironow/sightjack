@@ -838,17 +838,17 @@ func TestPromptCompletedWaveSelection_ValidChoice(t *testing.T) {
 	}
 }
 
-func TestPromptCompletedWaveSelection_Quit(t *testing.T) {
+func TestPromptCompletedWaveSelection_Back(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	input := strings.NewReader("q\n")
+	input := strings.NewReader("b\n")
 	scanner := bufio.NewScanner(input)
 	completed := []Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
 
 	// when
 	_, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
 
-	// then: q returns ErrGoBack (back to main navigator)
+	// then: b returns ErrGoBack (back to main navigator)
 	if err != ErrGoBack {
 		t.Errorf("expected ErrGoBack, got %v", err)
 	}
