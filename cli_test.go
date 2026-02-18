@@ -848,9 +848,9 @@ func TestPromptCompletedWaveSelection_Quit(t *testing.T) {
 	// when
 	_, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
 
-	// then
-	if err != ErrQuit {
-		t.Errorf("expected ErrQuit, got %v", err)
+	// then: q returns ErrGoBack (back to main navigator)
+	if err != ErrGoBack {
+		t.Errorf("expected ErrGoBack, got %v", err)
 	}
 }
 

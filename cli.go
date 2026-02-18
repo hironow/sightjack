@@ -223,7 +223,7 @@ func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Sca
 			i+1, wave.ClusterName, wave.Title,
 			wave.Delta.Before*100, wave.Delta.After*100)
 	}
-	fmt.Fprintf(w, "\n  Select [1-%d, q=back]: ", len(completed))
+	fmt.Fprintf(w, "\n  Select [1-%d, q=quit]: ", len(completed))
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
@@ -231,7 +231,7 @@ func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Sca
 	}
 	input := strings.TrimSpace(line)
 	if input == "q" {
-		return Wave{}, ErrQuit
+		return Wave{}, ErrGoBack
 	}
 	num, parseErr := strconv.Atoi(input)
 	if parseErr != nil || num < 1 || num > len(completed) {
