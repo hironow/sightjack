@@ -276,6 +276,53 @@ linear:
 	}
 }
 
+func TestLoadConfig_StrictnessInvalid_FallsBackToFog(t *testing.T) {
+	// given: config with an invalid strictness value
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(`
+linear:
+  team: TEST
+  project: Test
+strictness:
+  default: banana
+`), 0644)
+
+	// when
+	cfg, err := LoadConfig(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Strictness.Default != StrictnessFog {
+		t.Errorf("expected fog fallback for invalid value, got %s", cfg.Strictness.Default)
+	}
+}
+
+func TestLoadConfig_StrictnessEmpty_FallsBackToFog(t *testing.T) {
+	// given: config with empty strictness block
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(`
+linear:
+  team: TEST
+  project: Test
+strictness:
+`), 0644)
+
+	// when
+	cfg, err := LoadConfig(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Strictness.Default != StrictnessFog {
+		t.Errorf("expected fog fallback for empty strictness, got %s", cfg.Strictness.Default)
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()

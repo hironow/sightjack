@@ -48,11 +48,11 @@ type ShibitoWarning struct {
 
 // ScanResult is the merged result of Pass 1 + Pass 2.
 type ScanResult struct {
-	Clusters        []ClusterScanResult `json:"clusters"`
-	TotalIssues     int                 `json:"total_issues"`
-	Completeness    float64             `json:"completeness"`
-	Observations    []string            `json:"observations"`
-	ShibitoWarnings []ShibitoWarning    `json:"shibito_warnings,omitempty"`
+	Clusters        []ClusterScanResult
+	TotalIssues     int
+	Completeness    float64
+	Observations    []string
+	ShibitoWarnings []ShibitoWarning `json:"shibito_warnings,omitempty"`
 }
 
 // CalculateCompleteness computes overall completeness as the average of cluster completeness values,

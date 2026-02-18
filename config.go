@@ -91,6 +91,9 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Claude.TimeoutSec < 1 {
 		cfg.Claude.TimeoutSec = 300
 	}
+	if !cfg.Strictness.Default.Valid() {
+		cfg.Strictness.Default = StrictnessFog
+	}
 
 	return &cfg, nil
 }
