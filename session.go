@@ -381,6 +381,9 @@ func CanResume(state *SessionState) bool {
 	if state.ScanResultPath == "" {
 		return false
 	}
+	if len(state.Waves) == 0 {
+		return false
+	}
 	_, err := os.Stat(state.ScanResultPath)
 	return err == nil
 }

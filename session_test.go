@@ -1336,18 +1336,37 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 }
 
 func TestCanResume_ValidState(t *testing.T) {
-	// given: state with valid ScanResultPath pointing to existing file
+	// given: state with valid ScanResultPath and non-empty Waves
 	dir := t.TempDir()
 	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
 	os.MkdirAll(scanDir, 0755)
 	path := filepath.Join(scanDir, "scan_result.json")
 	os.WriteFile(path, []byte(`{}`), 0644)
 
-	state := &SessionState{ScanResultPath: path}
+	state := &SessionState{
+		ScanResultPath: path,
+		Waves:          []WaveState{{ID: "w1", ClusterName: "auth", Status: "pending"}},
+	}
 
 	// when / then
 	if !CanResume(state) {
-		t.Error("expected CanResume true for valid state")
+		t.Error("expected CanResume true for valid state with waves")
+	}
+}
+
+func TestCanResume_EmptyWaves(t *testing.T) {
+	// given: state with valid ScanResultPath but no waves (recovered state)
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
+	os.MkdirAll(scanDir, 0755)
+	path := filepath.Join(scanDir, "scan_result.json")
+	os.WriteFile(path, []byte(`{}`), 0644)
+
+	state := &SessionState{ScanResultPath: path, Waves: nil}
+
+	// when / then
+	if CanResume(state) {
+		t.Error("expected CanResume false when waves are empty")
 	}
 }
 
