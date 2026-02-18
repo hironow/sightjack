@@ -430,7 +430,7 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		ts = *lastScanned
 	}
 	state := &SessionState{
-		Version:      "0.7",
+		Version:      "0.8",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  ts,
