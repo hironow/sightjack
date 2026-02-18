@@ -232,6 +232,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 
 		if !IsWaveApplyComplete(applyResult) {
 			LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
+			DisplayRippleEffects(os.Stdout, applyResult.Ripples)
 			continue
 		}
 
