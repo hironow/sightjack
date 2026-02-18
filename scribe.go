@@ -102,7 +102,7 @@ func ReadExistingADRs(adrDir string) ([]ExistingADR, error) {
 		}
 		content, readErr := os.ReadFile(filepath.Join(adrDir, e.Name()))
 		if readErr != nil {
-			continue
+			return nil, fmt.Errorf("read ADR %s: %w", e.Name(), readErr)
 		}
 		adrs = append(adrs, ExistingADR{
 			Filename: e.Name(),

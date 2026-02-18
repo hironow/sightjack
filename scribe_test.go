@@ -363,6 +363,29 @@ func TestReadExistingADRs_DirNotExist(t *testing.T) {
 	}
 }
 
+func TestReadExistingADRs_UnreadableFile_ReturnsError(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("test requires non-root user")
+	}
+
+	// given: ADR file exists but is unreadable
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "0001-readable.md"), []byte("ok"), 0644)
+	unreadable := filepath.Join(dir, "0002-unreadable.md")
+	os.WriteFile(unreadable, []byte("secret"), 0000)
+
+	// when
+	_, err := ReadExistingADRs(dir)
+
+	// then: should return error, not silently skip
+	if err == nil {
+		t.Fatal("expected error for unreadable ADR file")
+	}
+	if !strings.Contains(err.Error(), "0002-unreadable.md") {
+		t.Errorf("expected filename in error, got: %v", err)
+	}
+}
+
 func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 	// given
 	dir := t.TempDir()
