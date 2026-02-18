@@ -499,6 +499,20 @@ func TestNextGenResult_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestApprovalSelective_IsDistinctValue(t *testing.T) {
+	choices := []ApprovalChoice{ApprovalApprove, ApprovalReject, ApprovalDiscuss, ApprovalQuit, ApprovalSelective}
+	seen := make(map[ApprovalChoice]bool)
+	for _, c := range choices {
+		if seen[c] {
+			t.Errorf("duplicate ApprovalChoice value: %d", c)
+		}
+		seen[c] = true
+	}
+	if len(seen) != 5 {
+		t.Errorf("expected 5 distinct choices, got %d", len(seen))
+	}
+}
+
 func TestScribeResponse_ZeroValues(t *testing.T) {
 	// given: all zero-value fields
 	data := `{"adr_id":"","title":"","content":"","reasoning":""}`

@@ -167,6 +167,7 @@ const (
 	ApprovalReject
 	ApprovalDiscuss
 	ApprovalQuit
+	ApprovalSelective
 )
 
 // ResumeChoice represents the user's choice when a previous session is detected.
