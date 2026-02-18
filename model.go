@@ -54,6 +54,7 @@ type ScanResult struct {
 	Completeness    float64
 	Observations    []string
 	ShibitoWarnings []ShibitoWarning `json:"shibito_warnings,omitempty"`
+	ScanWarnings    []string         `json:"scan_warnings,omitempty"`
 }
 
 // CalculateCompleteness computes overall completeness as the average of cluster completeness values,

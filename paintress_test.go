@@ -53,48 +53,6 @@ func TestReadyIssueIDsNoCompleted(t *testing.T) {
 	}
 }
 
-func TestReadyIssueIDsAssuming(t *testing.T) {
-	waves := []Wave{
-		{ID: "w1", ClusterName: "auth", Status: "completed",
-			Actions: []WaveAction{
-				{IssueID: "AUTH-1"},
-				{IssueID: "AUTH-2"},
-			}},
-		{ID: "w2", ClusterName: "auth", Status: "available",
-			Actions: []WaveAction{
-				{IssueID: "AUTH-2"},
-				{IssueID: "AUTH-3"},
-			}},
-		{ID: "w3", ClusterName: "auth", Status: "available",
-			Actions: []WaveAction{
-				{IssueID: "AUTH-3"},
-			}},
-	}
-
-	// Assuming w2 will complete:
-	// AUTH-1: w1(completed) -> ready
-	// AUTH-2: w1(completed) + w2(assumed completed) -> ready
-	// AUTH-3: w2(assumed completed) + w3(available) -> NOT ready
-	ready := ReadyIssueIDsAssuming(waves, Wave{ID: "w2", ClusterName: "auth"})
-
-	if len(ready) != 2 {
-		t.Fatalf("expected 2 ready issues, got %d: %v", len(ready), ready)
-	}
-	readySet := make(map[string]bool)
-	for _, id := range ready {
-		readySet[id] = true
-	}
-	if !readySet["AUTH-1"] {
-		t.Error("expected AUTH-1 to be ready")
-	}
-	if !readySet["AUTH-2"] {
-		t.Error("expected AUTH-2 to be ready")
-	}
-	if readySet["AUTH-3"] {
-		t.Error("expected AUTH-3 to NOT be ready")
-	}
-}
-
 func TestReadyIssueIDsAllCompleted(t *testing.T) {
 	waves := []Wave{
 		{ID: "w1", Status: "completed", Actions: []WaveAction{{IssueID: "A-1"}}},

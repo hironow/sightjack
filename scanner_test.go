@@ -317,7 +317,7 @@ func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
 	}
 
 	// when
-	result := MergeScanResults(clusters, warnings)
+	result := MergeScanResults(clusters, warnings, nil)
 
 	// then
 	if len(result.ShibitoWarnings) != 1 {
@@ -336,7 +336,7 @@ func TestMergeScanResults(t *testing.T) {
 	}
 
 	// when
-	result := MergeScanResults(clusters, nil)
+	result := MergeScanResults(clusters, nil, nil)
 
 	// then
 	if result.TotalIssues != 10 {
@@ -347,6 +347,25 @@ func TestMergeScanResults(t *testing.T) {
 	}
 	if len(result.Clusters) != 2 {
 		t.Errorf("expected 2 clusters, got %d", len(result.Clusters))
+	}
+}
+
+func TestMergeScanResults_WithScanWarnings(t *testing.T) {
+	// given: partial scan success — some clusters failed
+	clusters := []ClusterScanResult{
+		{Name: "Auth", Completeness: 0.5, Issues: make([]IssueDetail, 3)},
+	}
+	scanWarnings := []string{`Cluster "Infra" scan failed: timeout`}
+
+	// when
+	result := MergeScanResults(clusters, nil, scanWarnings)
+
+	// then
+	if len(result.ScanWarnings) != 1 {
+		t.Fatalf("expected 1 scan warning, got %d", len(result.ScanWarnings))
+	}
+	if result.ScanWarnings[0] != scanWarnings[0] {
+		t.Errorf("expected %q, got %q", scanWarnings[0], result.ScanWarnings[0])
 	}
 }
 

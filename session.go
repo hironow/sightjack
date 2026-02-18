@@ -40,7 +40,6 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	if err != nil {
 		return fmt.Errorf("scan: %w", err)
 	}
-
 	// In dry-run mode, RunScan writes classify prompt but returns nil ScanResult.
 	// Continue to Pass 3 with sample cluster data so wave-generation prompts are also generated.
 	if dryRun {
@@ -81,6 +80,10 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
+	}
+
+	for _, w := range scanResult.ScanWarnings {
+		LogWarn("Partial scan: %s", w)
 	}
 
 	// Capture scan timestamp once so it stays stable across wave completions
@@ -272,19 +275,6 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			continue
 		}
 
-		// Apply ready labels only after successful wave apply.
-		// ReadyIssueIDsAssuming treats the selected wave as completed,
-		// so issues whose final wave is the current one are correctly detected.
-		if cfg.Labels.Enabled {
-			readyIDs := ReadyIssueIDsAssuming(waves, selected)
-			if len(readyIDs) > 0 {
-				readyIssueStr := strings.Join(readyIDs, ", ")
-				if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
-					LogWarn("Ready label failed: %v", err)
-				}
-			}
-		}
-
 		// Mark wave completed using composite key (ClusterName:ID)
 		completed[WaveKey(selected)] = true
 		selectedKey := WaveKey(selected)
@@ -339,6 +329,17 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			} else if len(newWaves) > 0 {
 				waves = append(waves, newWaves...)
 				waves = EvaluateUnlocks(waves, completed)
+			}
+		}
+
+		// Apply ready labels after nextgen so the final wave list is used.
+		if cfg.Labels.Enabled {
+			readyIDs := ReadyIssueIDs(waves)
+			if len(readyIDs) > 0 {
+				readyIssueStr := strings.Join(readyIDs, ", ")
+				if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
+					LogWarn("Ready label failed: %v", err)
+				}
 			}
 		}
 
@@ -438,6 +439,9 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, false)
 	if err != nil {
 		return fmt.Errorf("re-scan: %w", err)
+	}
+	for _, w := range scanResult.ScanWarnings {
+		LogWarn("Partial scan: %s", w)
 	}
 	scanTime := time.Now()
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
