@@ -13,6 +13,9 @@ import (
 // ErrQuit signals the user chose to quit.
 var ErrQuit = errors.New("user quit")
 
+// ErrGoBack signals the user chose to go back to completed waves.
+var ErrGoBack = errors.New("go back")
+
 // ScanLine reads one line from s, returning early if ctx is cancelled.
 // The goroutine blocked on s.Scan() may outlive the call when the context
 // fires first; this is acceptable for a CLI tool that exits shortly after.
@@ -44,7 +47,7 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 			i+1, wave.ClusterName, wave.Title,
 			wave.Delta.Before*100, wave.Delta.After*100)
 	}
-	fmt.Fprintf(w, "\nSelect wave [1-%d, q=quit]: ", len(waves))
+	fmt.Fprintf(w, "\nSelect wave [1-%d, b=back, q=quit]: ", len(waves))
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
@@ -53,6 +56,9 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 	input := strings.TrimSpace(line)
 	if input == "q" {
 		return Wave{}, ErrQuit
+	}
+	if input == "b" {
+		return Wave{}, ErrGoBack
 	}
 	num, parseErr := strconv.Atoi(input)
 	if parseErr != nil || num < 1 || num > len(waves) {

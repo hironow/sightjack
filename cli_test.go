@@ -946,6 +946,22 @@ func TestDisplayWaveCompletion_ZeroNewWaves(t *testing.T) {
 	}
 }
 
+func TestPromptWaveSelection_BackOption(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("b\n")
+	scanner := bufio.NewScanner(input)
+	waves := []Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+
+	// when
+	_, err := PromptWaveSelection(context.Background(), &buf, scanner, waves)
+
+	// then
+	if err != ErrGoBack {
+		t.Errorf("expected ErrGoBack, got %v", err)
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{
