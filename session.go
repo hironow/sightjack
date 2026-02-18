@@ -634,6 +634,30 @@ func CheckCompletenessConsistency(overall float64, clusters []ClusterScanResult)
 	return diff > 0.05
 }
 
+// RecoverStateFromScan reconstructs a SessionState from a cached ScanResult
+// and wave list. Used when state.json is missing or corrupted but scan_result.json exists.
+// Unrecoverable fields (SessionID, Project, exact LastScanned) are set to zero values.
+func RecoverStateFromScan(scanResult *ScanResult, waves []Wave, adrDir string) *SessionState {
+	state := &SessionState{
+		Version:      "0.9",
+		Completeness: scanResult.Completeness,
+		LastScanned:  time.Now(),
+		ADRCount:     CountADRFiles(adrDir),
+		ShibitoCount: len(scanResult.ShibitoWarnings),
+	}
+	for _, c := range scanResult.Clusters {
+		state.Clusters = append(state.Clusters, ClusterState{
+			Name:         c.Name,
+			Completeness: c.Completeness,
+			IssueCount:   len(c.Issues),
+		})
+	}
+	if len(waves) > 0 {
+		state.Waves = BuildWaveStates(waves)
+	}
+	return state
+}
+
 // completedWavesInCluster returns all completed waves for the given cluster.
 func completedWavesInCluster(waves []Wave, clusterName string) []Wave {
 	var result []Wave

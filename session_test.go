@@ -1422,6 +1422,102 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 	}
 }
 
+func TestRecoverStateFromScan(t *testing.T) {
+	// given
+	scanResult := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "auth", Completeness: 0.4, Issues: []IssueDetail{{ID: "A-1"}}},
+			{Name: "infra", Completeness: 0.6, Issues: []IssueDetail{{ID: "I-1"}, {ID: "I-2"}}},
+		},
+		Completeness: 0.5,
+	}
+	waves := []Wave{
+		{ID: "w1", ClusterName: "auth", Status: "completed"},
+		{ID: "w2", ClusterName: "auth", Status: "available"},
+	}
+
+	dir := t.TempDir()
+	adrDir := filepath.Join(dir, "docs", "adr")
+	os.MkdirAll(adrDir, 0755)
+	os.WriteFile(filepath.Join(adrDir, "0001-test.md"), []byte("adr"), 0644)
+	os.WriteFile(filepath.Join(adrDir, "0002-test2.md"), []byte("adr2"), 0644)
+
+	// when
+	state := RecoverStateFromScan(scanResult, waves, adrDir)
+
+	// then
+	if state.Completeness != 0.5 {
+		t.Errorf("Completeness: expected 0.5, got %f", state.Completeness)
+	}
+	if len(state.Clusters) != 2 {
+		t.Errorf("Clusters: expected 2, got %d", len(state.Clusters))
+	}
+	if state.Clusters[0].Name != "auth" {
+		t.Errorf("Clusters[0].Name: expected auth, got %s", state.Clusters[0].Name)
+	}
+	if state.Clusters[0].IssueCount != 1 {
+		t.Errorf("Clusters[0].IssueCount: expected 1, got %d", state.Clusters[0].IssueCount)
+	}
+	if state.Clusters[1].IssueCount != 2 {
+		t.Errorf("Clusters[1].IssueCount: expected 2, got %d", state.Clusters[1].IssueCount)
+	}
+	if state.ADRCount != 2 {
+		t.Errorf("ADRCount: expected 2, got %d", state.ADRCount)
+	}
+	if len(state.Waves) != 2 {
+		t.Errorf("Waves: expected 2, got %d", len(state.Waves))
+	}
+	if state.Version != "0.9" {
+		t.Errorf("Version: expected 0.9, got %s", state.Version)
+	}
+	if state.ShibitoCount != 0 {
+		t.Errorf("ShibitoCount: expected 0, got %d", state.ShibitoCount)
+	}
+}
+
+func TestRecoverStateFromScanEmpty(t *testing.T) {
+	// given
+	scanResult := &ScanResult{}
+
+	// when
+	state := RecoverStateFromScan(scanResult, nil, "/nonexistent")
+
+	// then
+	if state.Completeness != 0 {
+		t.Errorf("Completeness: expected 0, got %f", state.Completeness)
+	}
+	if len(state.Clusters) != 0 {
+		t.Errorf("Clusters: expected 0, got %d", len(state.Clusters))
+	}
+	if len(state.Waves) != 0 {
+		t.Errorf("Waves: expected 0, got %d", len(state.Waves))
+	}
+	if state.ADRCount != 0 {
+		t.Errorf("ADRCount: expected 0, got %d", state.ADRCount)
+	}
+}
+
+func TestRecoverStateFromScan_ShibitoWarnings(t *testing.T) {
+	// given: scan result with shibito warnings
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "auth", Completeness: 0.3, Issues: []IssueDetail{{ID: "A-1"}}}},
+		Completeness: 0.3,
+		ShibitoWarnings: []ShibitoWarning{
+			{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-201", Description: "Login pattern", RiskLevel: "high"},
+			{ClosedIssueID: "ENG-30", CurrentIssueID: "ENG-180", Description: "Caching", RiskLevel: "medium"},
+			{ClosedIssueID: "ENG-10", CurrentIssueID: "ENG-100", Description: "Auth flow", RiskLevel: "low"},
+		},
+	}
+
+	// when
+	state := RecoverStateFromScan(scanResult, nil, "/nonexistent")
+
+	// then
+	if state.ShibitoCount != 3 {
+		t.Errorf("ShibitoCount: expected 3, got %d", state.ShibitoCount)
+	}
+}
+
 func TestCanResume_MissingFile(t *testing.T) {
 	// given: state with ScanResultPath pointing to deleted file
 	state := &SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
