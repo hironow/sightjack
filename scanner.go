@@ -39,8 +39,9 @@ func ParseClusterScanResult(path string) (*ClusterScanResult, error) {
 }
 
 // MergeScanResults combines per-cluster deep scan results into a single ScanResult.
-func MergeScanResults(clusters []ClusterScanResult) ScanResult {
-	result := ScanResult{Clusters: clusters}
+// shibitoWarnings are propagated from the Pass 1 classify result.
+func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWarning) ScanResult {
+	result := ScanResult{Clusters: clusters, ShibitoWarnings: shibitoWarnings}
 	result.CalculateCompleteness()
 
 	for _, c := range clusters {
@@ -134,7 +135,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		return nil, err
 	}
 
-	merged := MergeScanResults(clusters)
+	merged := MergeScanResults(clusters, classify.ShibitoWarnings)
 	return &merged, nil
 }
 

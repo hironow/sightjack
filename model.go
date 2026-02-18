@@ -9,8 +9,9 @@ import (
 // ClassifyResult is the output of Pass 1 (cluster classification).
 // Written by Claude Code to classify.json.
 type ClassifyResult struct {
-	Clusters    []ClusterClassification `json:"clusters"`
-	TotalIssues int                     `json:"total_issues"`
+	Clusters        []ClusterClassification `json:"clusters"`
+	TotalIssues     int                     `json:"total_issues"`
+	ShibitoWarnings []ShibitoWarning        `json:"shibito_warnings,omitempty"`
 }
 
 // ClusterClassification holds a cluster name and its issue IDs from Pass 1.

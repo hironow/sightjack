@@ -264,6 +264,67 @@ func TestRunWaveGenerate_ParsesResults(t *testing.T) {
 	}
 }
 
+func TestParseClassifyResult_WithShibitoWarnings(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	path := filepath.Join(dir, "classify.json")
+	content := `{
+		"clusters": [
+			{"name": "Auth", "issue_ids": ["id1"]}
+		],
+		"total_issues": 1,
+		"shibito_warnings": [
+			{
+				"closed_issue_id": "ENG-50",
+				"current_issue_id": "ENG-120",
+				"description": "Login timeout pattern re-emerging",
+				"risk_level": "high"
+			}
+		]
+	}`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	result, err := ParseClassifyResult(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.ShibitoWarnings) != 1 {
+		t.Fatalf("expected 1 shibito warning, got %d", len(result.ShibitoWarnings))
+	}
+	if result.ShibitoWarnings[0].ClosedIssueID != "ENG-50" {
+		t.Errorf("expected ENG-50, got %s", result.ShibitoWarnings[0].ClosedIssueID)
+	}
+	if result.ShibitoWarnings[0].RiskLevel != "high" {
+		t.Errorf("expected high, got %s", result.ShibitoWarnings[0].RiskLevel)
+	}
+}
+
+func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: make([]IssueDetail, 3)},
+	}
+	warnings := []ShibitoWarning{
+		{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-120", Description: "pattern", RiskLevel: "high"},
+	}
+
+	// when
+	result := MergeScanResults(clusters, warnings)
+
+	// then
+	if len(result.ShibitoWarnings) != 1 {
+		t.Fatalf("expected 1 shibito warning, got %d", len(result.ShibitoWarnings))
+	}
+	if result.ShibitoWarnings[0].ClosedIssueID != "ENG-50" {
+		t.Errorf("expected ENG-50, got %s", result.ShibitoWarnings[0].ClosedIssueID)
+	}
+}
+
 func TestMergeScanResults(t *testing.T) {
 	// given
 	clusters := []ClusterScanResult{
@@ -272,7 +333,7 @@ func TestMergeScanResults(t *testing.T) {
 	}
 
 	// when
-	result := MergeScanResults(clusters)
+	result := MergeScanResults(clusters, nil)
 
 	// then
 	if result.TotalIssues != 10 {
