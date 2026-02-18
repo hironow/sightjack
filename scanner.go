@@ -93,26 +93,21 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// --- Pass 2: Deep scan per cluster (parallel) ---
 	LogScan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
-	// Build cluster lookup for deep scan closure (index ensures unique filenames)
-	type classifyEntry struct {
-		index int
-		cc    ClusterClassification
-	}
-	classifyMap := make(map[string]classifyEntry)
-	var scanClusters []ClusterScanResult
+	// Build scan cluster list from classify results. The index parameter in
+	// DeepScanFunc maps directly to classify.Clusters, so duplicate cluster
+	// names are handled safely without a name-keyed map.
+	scanClusters := make([]ClusterScanResult, len(classify.Clusters))
 	for i, cc := range classify.Clusters {
-		classifyMap[cc.Name] = classifyEntry{index: i, cc: cc}
-		scanClusters = append(scanClusters, ClusterScanResult{Name: cc.Name})
+		scanClusters[i] = ClusterScanResult{Name: cc.Name}
 	}
 
-	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
-		entry := classifyMap[cluster.Name]
-		cc := entry.cc
+	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+		cc := classify.Clusters[index]
 		chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
 		var chunkResults []ClusterScanResult
 
 		for j, chunk := range chunks {
-			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", entry.index, sanitizeName(cc.Name), j))
+			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, sanitizeName(cc.Name), j))
 			prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
@@ -215,8 +210,9 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 }
 
 // DeepScanFunc is the function signature for scanning a single cluster.
-// Used by RunParallelDeepScan for testability.
-type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error)
+// The index parameter identifies the cluster's position in the original slice,
+// enabling safe lookup even when duplicate cluster names exist.
+type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error)
 
 // RunParallelDeepScan executes deep scan across clusters using goroutines with
 // semaphore-based concurrency control. Failed clusters get LogWarn and are skipped;
@@ -244,7 +240,7 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 		sem <- struct{}{}
 		go func() {
 			defer func() { <-sem }()
-			result, err := scanFn(ctx, cfg, scanDir, cluster)
+			result, err := scanFn(ctx, cfg, scanDir, i, cluster)
 			results <- scanResult{index: i, cluster: result, err: err}
 		}()
 	}

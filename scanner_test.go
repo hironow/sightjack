@@ -364,7 +364,7 @@ func TestRunParallelDeepScan(t *testing.T) {
 
 	// when
 	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
 			return ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
 		})
 
@@ -390,7 +390,7 @@ func TestRunParallelDeepScanWithFailure(t *testing.T) {
 
 	// when
 	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
 			callCount.Add(1)
 			if cluster.Name == "auth" {
 				return ClusterScanResult{}, fmt.Errorf("auth scan failed")
@@ -421,7 +421,7 @@ func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 
 	// when
 	results, _ := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
 			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
 		})
 
@@ -431,32 +431,26 @@ func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 	}
 }
 
-func TestRunParallelDeepScan_ClosureWithClassifyMap(t *testing.T) {
+func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
 	// given: classify result with cluster names and issue IDs (simulates Pass 1 output)
 	classifyClusters := []ClusterClassification{
 		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
 		{Name: "Infra", IssueIDs: []string{"I-1"}},
 	}
 
-	// Build cluster lookup (same pattern as wired in RunScan)
-	classifyMap := make(map[string]ClusterClassification)
-	var scanClusters []ClusterScanResult
-	for _, cc := range classifyClusters {
-		classifyMap[cc.Name] = cc
-		scanClusters = append(scanClusters, ClusterScanResult{Name: cc.Name})
+	scanClusters := make([]ClusterScanResult, len(classifyClusters))
+	for i, cc := range classifyClusters {
+		scanClusters[i] = ClusterScanResult{Name: cc.Name}
 	}
 
 	dir := t.TempDir()
 	cfg := DefaultConfig()
 	cfg.Scan.MaxConcurrency = 2
 
-	// when: use closure that captures classifyMap (like the wired RunScan code does)
+	// when: use index-based lookup (same pattern as wired in RunScan)
 	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
-		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
-			cc, ok := classifyMap[cluster.Name]
-			if !ok {
-				return ClusterScanResult{}, fmt.Errorf("cluster %q not found in classifyMap", cluster.Name)
-			}
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			cc := classifyClusters[index]
 			return ClusterScanResult{
 				Name:         cc.Name,
 				Completeness: 0.5,
@@ -471,7 +465,6 @@ func TestRunParallelDeepScan_ClosureWithClassifyMap(t *testing.T) {
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
 	}
-	// Verify both clusters were scanned
 	nameSet := make(map[string]bool)
 	for _, r := range results {
 		nameSet[r.Name] = true
@@ -481,5 +474,60 @@ func TestRunParallelDeepScan_ClosureWithClassifyMap(t *testing.T) {
 	}
 	if !nameSet["Infra"] {
 		t.Error("expected Infra cluster in results")
+	}
+}
+
+func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
+	// given: classifier returns duplicate cluster names with different issue IDs
+	classifyClusters := []ClusterClassification{
+		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
+		{Name: "Auth", IssueIDs: []string{"A-3"}},
+	}
+
+	scanClusters := make([]ClusterScanResult, len(classifyClusters))
+	for i, cc := range classifyClusters {
+		scanClusters[i] = ClusterScanResult{Name: cc.Name}
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+
+	// when: index-based lookup ensures each duplicate gets its own issue IDs
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			cc := classifyClusters[index]
+			return ClusterScanResult{
+				Name:         cc.Name,
+				Completeness: float64(len(cc.IssueIDs)) * 0.25,
+				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
+			}, nil
+		})
+
+	// then: both clusters scanned with correct issue counts (order is non-deterministic)
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d", len(warnings))
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	// Collect completeness values (order may vary)
+	completenessSet := make(map[float64]int)
+	issueCountSet := make(map[int]int)
+	for _, r := range results {
+		completenessSet[r.Completeness]++
+		issueCountSet[len(r.Issues)]++
+	}
+	// One Auth has 2 issues (completeness 0.5), the other has 1 issue (completeness 0.25)
+	if completenessSet[0.5] != 1 {
+		t.Errorf("expected one result with completeness 0.5, got %d", completenessSet[0.5])
+	}
+	if completenessSet[0.25] != 1 {
+		t.Errorf("expected one result with completeness 0.25, got %d", completenessSet[0.25])
+	}
+	if issueCountSet[2] != 1 {
+		t.Errorf("expected one result with 2 issues, got %d", issueCountSet[2])
+	}
+	if issueCountSet[1] != 1 {
+		t.Errorf("expected one result with 1 issue, got %d", issueCountSet[1])
 	}
 }
