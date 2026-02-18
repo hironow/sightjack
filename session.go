@@ -113,6 +113,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 
 	// --- Interactive Loop ---
 	shibitoShown := false
+	sessionRejected := make(map[string][]WaveAction)
 	for {
 		waves = EvaluateUnlocks(waves, completed)
 		available := AvailableWaves(waves, completed)
@@ -213,6 +214,24 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 					}
 				}
 				continue // back to approval prompt with (possibly modified) wave
+			case ApprovalSelective:
+				approved, rejected, selErr := PromptSelectiveApproval(ctx, os.Stdout, scanner, selected)
+				if selErr == ErrQuit {
+					break
+				}
+				if selErr != nil {
+					LogWarn("Selective approval error: %v", selErr)
+					continue
+				}
+				if len(approved) == 0 {
+					LogInfo("No actions selected. Wave skipped.")
+					break
+				}
+				selected.Actions = approved
+				if len(rejected) > 0 {
+					sessionRejected[WaveKey(selected)] = rejected
+				}
+				applyWave = true
 			}
 			break
 		}
