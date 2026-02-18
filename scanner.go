@@ -206,6 +206,55 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 	return MergeWaveResults(waveResults), nil
 }
 
+// DeepScanFunc is the function signature for scanning a single cluster.
+// Used by RunParallelDeepScan for testability.
+type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error)
+
+// RunParallelDeepScan executes deep scan across clusters using goroutines with
+// semaphore-based concurrency control. Failed clusters get LogWarn and are skipped;
+// remaining clusters continue. Returns successful results and warning messages.
+func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
+	clusters []ClusterScanResult, scanFn DeepScanFunc) ([]ClusterScanResult, []string) {
+
+	maxConcurrency := cfg.Scan.MaxConcurrency
+	if maxConcurrency < 1 {
+		maxConcurrency = 1
+	}
+
+	type scanResult struct {
+		index   int
+		cluster ClusterScanResult
+		err     error
+	}
+
+	sem := make(chan struct{}, maxConcurrency)
+	results := make(chan scanResult, len(clusters))
+
+	for i, cluster := range clusters {
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem }()
+			result, err := scanFn(ctx, cfg, scanDir, cluster)
+			results <- scanResult{index: i, cluster: result, err: err}
+		}()
+	}
+
+	var successful []ClusterScanResult
+	var warnings []string
+	for range clusters {
+		r := <-results
+		if r.err != nil {
+			msg := fmt.Sprintf("Cluster %q scan failed: %v", clusters[r.index].Name, r.err)
+			LogWarn("%s", msg)
+			warnings = append(warnings, msg)
+			continue
+		}
+		successful = append(successful, r.cluster)
+	}
+
+	return successful, warnings
+}
+
 // chunkSlice splits items into sub-slices of at most size elements.
 func chunkSlice(items []string, size int) [][]string {
 	if len(items) == 0 {

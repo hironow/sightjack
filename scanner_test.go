@@ -1,6 +1,8 @@
 package sightjack
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -344,5 +346,86 @@ func TestMergeScanResults(t *testing.T) {
 	}
 	if len(result.Clusters) != 2 {
 		t.Errorf("expected 2 clusters, got %d", len(result.Clusters))
+	}
+}
+
+func TestRunParallelDeepScan(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{
+		{Name: "auth", Issues: []IssueDetail{{ID: "A-1"}}},
+		{Name: "infra", Issues: []IssueDetail{{ID: "I-1"}}},
+		{Name: "frontend", Issues: []IssueDetail{{ID: "F-1"}}},
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 2
+
+	// when
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+			return ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
+		})
+
+	// then
+	if len(results) != 3 {
+		t.Errorf("expected 3 results, got %d", len(results))
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d", len(warnings))
+	}
+}
+
+func TestRunParallelDeepScanWithFailure(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{
+		{Name: "auth"},
+		{Name: "infra"},
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	callCount := 0
+
+	// when
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+			callCount++
+			if cluster.Name == "auth" {
+				return ClusterScanResult{}, fmt.Errorf("auth scan failed")
+			}
+			return ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
+		})
+
+	// then
+	if len(results) != 1 {
+		t.Errorf("expected 1 successful result, got %d", len(results))
+	}
+	if len(results) > 0 && results[0].Name != "infra" {
+		t.Errorf("expected 'infra', got %q", results[0].Name)
+	}
+	if len(warnings) != 1 {
+		t.Errorf("expected 1 warning, got %d", len(warnings))
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount)
+	}
+}
+
+func TestRunParallelDeepScanSingleCluster(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{{Name: "only"}}
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+
+	// when
+	results, _ := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, cluster ClusterScanResult) (ClusterScanResult, error) {
+			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+		})
+
+	// then
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
 	}
 }
