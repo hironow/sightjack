@@ -1,6 +1,10 @@
 package sightjack
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // ClassifyResult is the output of Pass 1 (cluster classification).
 // Written by Claude Code to classify.json.
@@ -154,6 +158,34 @@ const (
 	ResumeChoiceNew
 	ResumeChoiceRescan
 )
+
+// StrictnessLevel controls DoD analysis depth (SIREN difficulty system).
+type StrictnessLevel string
+
+const (
+	StrictnessFog      StrictnessLevel = "fog"
+	StrictnessAlert    StrictnessLevel = "alert"
+	StrictnessLockdown StrictnessLevel = "lockdown"
+)
+
+// ParseStrictnessLevel parses a string into a StrictnessLevel.
+// Case-insensitive. Returns error for unknown values.
+func ParseStrictnessLevel(s string) (StrictnessLevel, error) {
+	level := StrictnessLevel(strings.ToLower(s))
+	if !level.Valid() {
+		return "", fmt.Errorf("unknown strictness level: %q (valid: fog, alert, lockdown)", s)
+	}
+	return level, nil
+}
+
+// Valid returns true if the level is a known strictness value.
+func (l StrictnessLevel) Valid() bool {
+	switch l {
+	case StrictnessFog, StrictnessAlert, StrictnessLockdown:
+		return true
+	}
+	return false
+}
 
 // ScribeResponse is the output of the Scribe Agent (ADR generation).
 type ScribeResponse struct {

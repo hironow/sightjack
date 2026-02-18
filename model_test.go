@@ -323,6 +323,48 @@ func TestScribeResponse_JSONRoundTrip(t *testing.T) {
 	}
 }
 
+func TestParseStrictnessLevel_ValidValues(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected StrictnessLevel
+	}{
+		{"fog", StrictnessFog},
+		{"alert", StrictnessAlert},
+		{"lockdown", StrictnessLockdown},
+		{"FOG", StrictnessFog},
+		{"Alert", StrictnessAlert},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			level, err := ParseStrictnessLevel(tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if level != tt.expected {
+				t.Errorf("expected %s, got %s", tt.expected, level)
+			}
+		})
+	}
+}
+
+func TestParseStrictnessLevel_Invalid(t *testing.T) {
+	_, err := ParseStrictnessLevel("nightmare")
+	if err == nil {
+		t.Fatal("expected error for invalid strictness level")
+	}
+}
+
+func TestStrictnessLevel_Valid(t *testing.T) {
+	valid := StrictnessFog
+	invalid := StrictnessLevel("nightmare")
+	if !valid.Valid() {
+		t.Error("expected fog to be valid")
+	}
+	if invalid.Valid() {
+		t.Error("expected nightmare to be invalid")
+	}
+}
+
 func TestScribeResponse_ZeroValues(t *testing.T) {
 	// given: all zero-value fields
 	data := `{"adr_id":"","title":"","content":"","reasoning":""}`
