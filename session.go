@@ -119,6 +119,10 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 
 	// --- Interactive Loop ---
 	shibitoShown := false
+	// sessionRejected tracks user-rejected actions per wave (keyed by WaveKey).
+	// Scoped per-wave intentionally: rejected actions are only fed back to the
+	// nextgen call triggered by that specific wave's completion, not accumulated
+	// across the entire cluster.
 	sessionRejected := make(map[string][]WaveAction)
 	for {
 		waves = EvaluateUnlocks(waves, completed)
@@ -306,7 +310,6 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		} else if len(newWaves) > 0 {
 			waves = append(waves, newWaves...)
 			waves = EvaluateUnlocks(waves, completed)
-			LogOK("%d new wave(s) generated for %s", len(newWaves), selected.ClusterName)
 		}
 
 		// Save state after each wave completion (crash resilience)

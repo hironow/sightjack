@@ -101,6 +101,9 @@ func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave
 // PromptSelectiveApproval displays wave actions with toggle checkboxes.
 // Returns approved and rejected action lists.
 func PromptSelectiveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave Wave) ([]WaveAction, []WaveAction, error) {
+	if len(wave.Actions) == 0 {
+		return nil, nil, nil
+	}
 	selected := make([]bool, len(wave.Actions))
 	for i := range selected {
 		selected[i] = true // default: all selected
