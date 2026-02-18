@@ -481,6 +481,24 @@ func TestScribeResponse_Conflicts_Present(t *testing.T) {
 	}
 }
 
+func TestNextGenResult_UnmarshalJSON(t *testing.T) {
+	raw := `{"cluster_name":"Auth","waves":[{"id":"auth-w3","cluster_name":"Auth","title":"Security hardening","description":"Final security pass","actions":[{"type":"add_dod","issue_id":"ENG-101","description":"Add security checklist","detail":"..."}],"prerequisites":["auth-w2"],"delta":{"before":0.65,"after":0.80},"status":"available"}],"reasoning":"Auth cluster needs final security pass"}`
+
+	var result NextGenResult
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result.ClusterName != "Auth" {
+		t.Errorf("cluster_name: got %q, want %q", result.ClusterName, "Auth")
+	}
+	if len(result.Waves) != 1 {
+		t.Fatalf("waves: got %d, want 1", len(result.Waves))
+	}
+	if result.Reasoning != "Auth cluster needs final security pass" {
+		t.Errorf("reasoning: got %q", result.Reasoning)
+	}
+}
+
 func TestScribeResponse_ZeroValues(t *testing.T) {
 	// given: all zero-value fields
 	data := `{"adr_id":"","title":"","content":"","reasoning":""}`
