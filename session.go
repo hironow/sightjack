@@ -12,6 +12,19 @@ import (
 )
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
+// CalcNewlyUnlocked computes how many waves were newly unlocked after completing a wave.
+// oldAvailable is the available count before the wave was completed (includes the completing wave).
+// newAvailable is the available count after completion and unlock evaluation.
+func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
+	// oldAvailable includes the wave being completed, so subtract 1 to get
+	// the baseline of waves that were already available before this action.
+	newCount := newAvailable - (oldAvailable - 1)
+	if newCount < 0 {
+		return 0
+	}
+	return newCount
+}
+
 func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader) error {
 	if !dryRun && input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
@@ -240,10 +253,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		// Display rich completion summary with grouped ripple effects
 		waves = EvaluateUnlocks(waves, completed)
 		newAvailable := len(AvailableWaves(waves, completed))
-		newCount := newAvailable - oldAvailable
-		if newCount < 0 {
-			newCount = 0
-		}
+		newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
 		DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 		// Save state after each wave completion (crash resilience)

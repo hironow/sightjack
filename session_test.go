@@ -921,6 +921,55 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	}
 }
 
+func TestCalcNewlyUnlocked_CompletingWaveUnlocksOne(t *testing.T) {
+	// given: 1 available wave (the one being completed), completing it unlocks 1 new wave
+	// oldAvailable = 1 (includes the completing wave)
+	// After completion: completing wave removed, 1 new wave unlocked → newAvailable = 1
+	// Expected: 1 newly unlocked wave
+	oldAvailable := 1
+	newAvailable := 1
+
+	// when
+	got := CalcNewlyUnlocked(oldAvailable, newAvailable)
+
+	// then
+	if got != 1 {
+		t.Errorf("expected 1 newly unlocked wave, got %d", got)
+	}
+}
+
+func TestCalcNewlyUnlocked_CompletingWaveUnlocksTwo(t *testing.T) {
+	// given: 2 available waves, completing one unlocks 2 more
+	// oldAvailable = 2, after: 1 remaining + 2 unlocked = 3 → newAvailable = 3
+	// Expected: 2 newly unlocked waves
+	oldAvailable := 2
+	newAvailable := 3
+
+	// when
+	got := CalcNewlyUnlocked(oldAvailable, newAvailable)
+
+	// then
+	if got != 2 {
+		t.Errorf("expected 2 newly unlocked waves, got %d", got)
+	}
+}
+
+func TestCalcNewlyUnlocked_CompletingWaveUnlocksNone(t *testing.T) {
+	// given: 3 available waves, completing one unlocks nothing
+	// oldAvailable = 3, after: 2 remaining + 0 unlocked = 2 → newAvailable = 2
+	// Expected: 0 newly unlocked waves
+	oldAvailable := 3
+	newAvailable := 2
+
+	// when
+	got := CalcNewlyUnlocked(oldAvailable, newAvailable)
+
+	// then
+	if got != 0 {
+		t.Errorf("expected 0 newly unlocked waves, got %d", got)
+	}
+}
+
 func TestBuildSessionState(t *testing.T) {
 	// given
 	scanResult := &ScanResult{
