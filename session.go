@@ -286,20 +286,11 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		for i, c := range scanResult.Clusters {
 			if c.Name == selected.ClusterName {
 				scanResult.Clusters[i].Completeness = selected.Delta.After
-				// Refresh issue-level completeness for applied actions so
-				// the nextgen prompt reflects post-apply state.
-				appliedIssueIDs := make(map[string]bool)
-				for _, a := range selected.Actions {
-					appliedIssueIDs[a.IssueID] = true
-				}
-				for j := range scanResult.Clusters[i].Issues {
-					issue := &scanResult.Clusters[i].Issues[j]
-					if appliedIssueIDs[issue.ID] || appliedIssueIDs[issue.Identifier] {
-						if issue.Completeness < selected.Delta.After {
-							issue.Completeness = selected.Delta.After
-						}
-					}
-				}
+				// Note: per-issue completeness is NOT updated here because
+				// action types vary (add_dod vs add_dependency) and we lack
+				// accurate per-issue deltas. The nextgen prompt already
+				// receives CompletedWaves JSON listing all applied actions,
+				// which is sufficient for the LLM to avoid re-proposals.
 				break
 			}
 		}
