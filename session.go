@@ -125,6 +125,19 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			LogInfo("Session paused. State saved.")
 			break
 		}
+		if err == ErrGoBack {
+			completedList := CompletedWaves(waves)
+			if len(completedList) == 0 {
+				LogInfo("No completed waves to revisit.")
+				continue
+			}
+			revisit, backErr := PromptCompletedWaveSelection(ctx, os.Stdout, scanner, completedList)
+			if backErr != nil {
+				continue
+			}
+			DisplayCompletedWaveActions(os.Stdout, revisit)
+			continue
+		}
 		if err != nil {
 			LogWarn("Invalid selection: %v", err)
 			continue
@@ -197,8 +210,8 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			continue
 		}
 
-		// Display ripple effects
-		DisplayRippleEffects(os.Stdout, applyResult.Ripples)
+		// Count new waves unlocked by this completion
+		oldAvailable := len(AvailableWaves(waves, completed))
 
 		if !IsWaveApplyComplete(applyResult) {
 			LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
@@ -224,6 +237,15 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		}
 		scanResult.CalculateCompleteness()
 
+		// Display rich completion summary with grouped ripple effects
+		waves = EvaluateUnlocks(waves, completed)
+		newAvailable := len(AvailableWaves(waves, completed))
+		newCount := newAvailable - oldAvailable
+		if newCount < 0 {
+			newCount = 0
+		}
+		DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
+
 		// Save state after each wave completion (crash resilience)
 		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 			LogWarn("Failed to update cached scan result: %v", err)
@@ -233,8 +255,6 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		if err := WriteState(baseDir, midState); err != nil {
 			LogWarn("Failed to save mid-session state: %v", err)
 		}
-
-		LogOK("Completeness: %.0f%%", scanResult.Completeness*100)
 	}
 
 	// Save state + updated scan result
