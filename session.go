@@ -256,10 +256,12 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			continue
 		}
 
-		// Compute ready issues for Paintress Bridge label
+		// Compute ready issues for Paintress Bridge label.
+		// Use ReadyIssueIDsAssuming to treat the selected wave as completed,
+		// so issues whose final wave is the current one are correctly detected.
 		var readyIssueStr string
 		if cfg.Labels.Enabled {
-			readyIDs := ReadyIssueIDs(waves)
+			readyIDs := ReadyIssueIDsAssuming(waves, selected)
 			if len(readyIDs) > 0 {
 				readyIssueStr = strings.Join(readyIDs, ", ")
 			}
