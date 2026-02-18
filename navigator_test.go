@@ -376,6 +376,53 @@ func TestRenderNavigatorWithWaves_ShibitoCount(t *testing.T) {
 	}
 }
 
+func TestRenderProgressBar_Half(t *testing.T) {
+	// given
+	current := 0.50
+
+	// when
+	result := RenderProgressBar(current, 20)
+
+	// then
+	expected := "[==========..........] 50%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Zero(t *testing.T) {
+	// given / when
+	result := RenderProgressBar(0.0, 20)
+
+	// then
+	expected := "[....................] 0%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Full(t *testing.T) {
+	// given / when
+	result := RenderProgressBar(1.0, 20)
+
+	// then
+	expected := "[====================] 100%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Partial(t *testing.T) {
+	// given: 62% with width 20 -> 12.4 -> 12 filled
+	result := RenderProgressBar(0.62, 20)
+
+	// then
+	expected := "[============........] 62%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
 func TestRenderNavigatorWithWaves_ShibitoZero_Hidden(t *testing.T) {
 	// given
 	result := &ScanResult{
