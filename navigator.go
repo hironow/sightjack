@@ -10,6 +10,10 @@ const (
 	navigatorWidth = 60
 	maxClusterName = 20
 	waveColumns    = 4
+
+	matrixClusterCol = 20
+	matrixWaveCol    = 8
+	matrixCompCol    = 6
 )
 
 // RenderNavigator produces an ASCII Link Navigator display inspired by
@@ -59,9 +63,9 @@ func RenderNavigator(result *ScanResult, projectName string) string {
 	return b.String()
 }
 
-// RenderNavigatorWithWaves renders the Link Navigator with actual wave data.
-// Wave status symbols: [ ] available  [x] locked  [=] completed
-func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wave, adrCount int, lastScanned *time.Time, strictnessLevel string, shibitoCount int) string {
+// RenderMatrixNavigator renders the Link Navigator as a Pure ASCII matrix grid.
+// Wave status symbols: [ ] available  [x] locked  [=] completed  [?] unknown
+func RenderMatrixNavigator(result *ScanResult, projectName string, waves []Wave, adrCount int, lastScanned *time.Time, strictnessLevel string, shibitoCount int) string {
 	// Group waves by cluster name
 	wavesByCluster := make(map[string][]Wave)
 	for _, w := range waves {
@@ -70,61 +74,88 @@ func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wa
 
 	var b strings.Builder
 
-	completePct := int(result.Completeness * 100)
-
-	border := strings.Repeat("=", navigatorWidth)
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
-	b.WriteString(fmt.Sprintf("|%s|\n", center("SIGHTJACK - Link Navigator", navigatorWidth)))
-	projName := padRight(truncate(projectName, 20), 20)
-	projRow := "  Project: " + projName + "  |  Completeness: " + fmt.Sprintf("%3d%%", completePct)
-	b.WriteString("|" + padRight(projRow, navigatorWidth) + "|\n")
-	adrRow := fmt.Sprintf("  ADRs: %d", adrCount)
-	if strictnessLevel != "" {
-		adrRow += fmt.Sprintf("  |  Strictness: %s", strictnessLevel)
-	}
-	b.WriteString("|" + padRight(adrRow, navigatorWidth) + "|\n")
-	if shibitoCount > 0 {
-		shibitoRow := fmt.Sprintf("  Shibito: %d", shibitoCount)
-		b.WriteString("|" + padRight(shibitoRow, navigatorWidth) + "|\n")
-	}
+	// --- Header block (free-form, above the grid) ---
+	b.WriteString("  SIGHTJACK - Link Navigator\n")
+	b.WriteString(fmt.Sprintf("  Project: %s\n", projectName))
 	if lastScanned != nil {
-		sessionRow := fmt.Sprintf("  Session: resumed (last scan: %s)", lastScanned.Format("2006-01-02 15:04"))
-		b.WriteString("|" + padRight(sessionRow, navigatorWidth) + "|\n")
+		b.WriteString(fmt.Sprintf("  Session: resumed (last scan: %s)\n", lastScanned.Format("2006-01-02 15:04")))
 	}
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
+	if shibitoCount > 0 {
+		b.WriteString(fmt.Sprintf("  Shibito: %d\n", shibitoCount))
+	}
 
-	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))
-	header := fmt.Sprintf("  %-*s", maxClusterName, "Cluster")
+	// --- Grid ---
+	clusterDash := strings.Repeat("-", matrixClusterCol)
+	waveDash := strings.Repeat("-", matrixWaveCol)
+	compDash := strings.Repeat("-", matrixCompCol)
+
+	// Top border
+	b.WriteString("+" + clusterDash)
+	for range waveColumns {
+		b.WriteString("+" + waveDash)
+	}
+	b.WriteString("+" + compDash + "+\n")
+
+	// Header row
+	b.WriteString(fmt.Sprintf("| %-*s", matrixClusterCol-1, "Cluster"))
 	for i := 1; i <= waveColumns; i++ {
-		header += fmt.Sprintf(" W%d  ", i)
+		b.WriteString(fmt.Sprintf("| %-*s", matrixWaveCol-1, fmt.Sprintf("W%d", i)))
 	}
-	header += "  Comp."
-	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, header))
+	b.WriteString(fmt.Sprintf("| %-*s", matrixCompCol-1, "Comp"))
+	b.WriteString("|\n")
 
-	separator := "  " + strings.Repeat("-", navigatorWidth-4)
-	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, separator))
+	// Separator
+	b.WriteString("+" + clusterDash)
+	for range waveColumns {
+		b.WriteString("+" + waveDash)
+	}
+	b.WriteString("+" + compDash + "+\n")
 
+	// Data rows
 	for _, cluster := range result.Clusters {
 		pct := int(cluster.Completeness * 100)
-		name := padRight(truncate(cluster.Name, maxClusterName), maxClusterName)
-		row := "  " + name
+		name := truncate(cluster.Name, matrixClusterCol-2)
+		issueCount := len(cluster.Issues)
+		label := fmt.Sprintf("%s (%d)", name, issueCount)
+		if displayWidth(label) > matrixClusterCol-2 {
+			label = truncate(label, matrixClusterCol-2)
+		}
+		b.WriteString(fmt.Sprintf("| %-*s", matrixClusterCol-1, label))
 
 		clusterWaves := wavesByCluster[cluster.Name]
 		for i := 0; i < waveColumns; i++ {
 			if i < len(clusterWaves) {
-				row += waveStatusSymbol(clusterWaves[i].Status)
+				sym := waveStatusSymbol3(clusterWaves[i].Status)
+				// Center the 3-char symbol in the wave column
+				pad := matrixWaveCol - 1 - 3
+				left := pad / 2
+				right := pad - left
+				cell := strings.Repeat(" ", left) + sym + strings.Repeat(" ", right)
+				b.WriteString("|" + cell)
 			} else {
-				row += "     " // empty cell (5 chars, matches waveStatusSymbol width)
+				b.WriteString("|" + strings.Repeat(" ", matrixWaveCol-1))
 			}
 		}
-		row += fmt.Sprintf("  %3d%%", pct)
-		b.WriteString("|" + padRight(" "+row, navigatorWidth) + "|\n")
+
+		compStr := fmt.Sprintf("%d%%", pct)
+		b.WriteString(fmt.Sprintf("| %-*s", matrixCompCol-1, compStr))
+		b.WriteString("|\n")
 	}
 
-	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
-	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, " [ ] available  [x] locked  [=] completed"))
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
+	// Bottom border
+	b.WriteString("+" + clusterDash)
+	for range waveColumns {
+		b.WriteString("+" + waveDash)
+	}
+	b.WriteString("+" + compDash + "+\n")
+
+	// Legend
+	b.WriteString("  [=] completed  [ ] available  [x] locked\n")
+
+	// --- Footer (progress bar + metadata) ---
+	progressBar := RenderProgressBar(result.Completeness, 20)
+	footer := fmt.Sprintf("  %s  |  ADR: %d  |  Strictness: %s\n", progressBar, adrCount, strictnessLevel)
+	b.WriteString(footer)
 
 	// Wave listing: show wave titles grouped by cluster
 	for _, cluster := range result.Clusters {
@@ -134,7 +165,7 @@ func RenderNavigatorWithWaves(result *ScanResult, projectName string, waves []Wa
 		}
 		for i, w := range clusterWaves {
 			line := fmt.Sprintf("  %s W%d: %s %s",
-				cluster.Name, i+1, waveStatusSymbol(w.Status), w.Title)
+				cluster.Name, i+1, waveStatusSymbol3(w.Status), w.Title)
 			b.WriteString(line + "\n")
 		}
 	}
@@ -153,6 +184,20 @@ func waveStatusSymbol(status string) string {
 		return " [=] "
 	default:
 		return " [?] "
+	}
+}
+
+// waveStatusSymbol3 returns a compact 3-character symbol for a wave's status.
+func waveStatusSymbol3(status string) string {
+	switch status {
+	case "available":
+		return "[ ]"
+	case "locked":
+		return "[x]"
+	case "completed":
+		return "[=]"
+	default:
+		return "[?]"
 	}
 }
 
