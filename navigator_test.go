@@ -204,7 +204,7 @@ func TestRenderNavigator_LongClusterName(t *testing.T) {
 	}
 }
 
-func TestRenderNavigatorWithWaves(t *testing.T) {
+func TestRenderMatrixNavigator_Basic(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters: []ClusterScanResult{
@@ -221,7 +221,7 @@ func TestRenderNavigatorWithWaves(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "[ ]") {
@@ -235,7 +235,7 @@ func TestRenderNavigatorWithWaves(t *testing.T) {
 	}
 }
 
-func TestRenderNavigatorWithWaves_CompletedWave(t *testing.T) {
+func TestRenderMatrixNavigator_CompletedWave(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.40}},
@@ -248,7 +248,7 @@ func TestRenderNavigatorWithWaves_CompletedWave(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "[=]") {
@@ -256,7 +256,7 @@ func TestRenderNavigatorWithWaves_CompletedWave(t *testing.T) {
 	}
 }
 
-func TestRenderNavigatorWithWaves_ADRCountZero(t *testing.T) {
+func TestRenderMatrixNavigator_ADRCountZero(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
@@ -268,15 +268,15 @@ func TestRenderNavigatorWithWaves_ADRCountZero(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
-	if !strings.Contains(nav, "ADRs: 0") {
-		t.Error("expected 'ADRs: 0' in navigator")
+	if !strings.Contains(nav, "ADR: 0") {
+		t.Error("expected 'ADR: 0' in navigator footer")
 	}
 }
 
-func TestRenderNavigatorWithWaves_ADRCountPositive(t *testing.T) {
+func TestRenderMatrixNavigator_ADRCountPositive(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50}},
@@ -288,15 +288,15 @@ func TestRenderNavigatorWithWaves_ADRCountPositive(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 5, nil, "fog", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 5, nil, "fog", 0)
 
 	// then
-	if !strings.Contains(nav, "ADRs: 5") {
-		t.Error("expected 'ADRs: 5' in navigator")
+	if !strings.Contains(nav, "ADR: 5") {
+		t.Error("expected 'ADR: 5' in navigator footer")
 	}
 }
 
-func TestRenderNavigatorWithWaves_ResumeInfo(t *testing.T) {
+func TestRenderMatrixNavigator_ResumeInfo(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.62}},
@@ -309,18 +309,18 @@ func TestRenderNavigatorWithWaves_ResumeInfo(t *testing.T) {
 	lastScanned := time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC)
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 3, &lastScanned, "fog", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 3, &lastScanned, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "Session: resumed") {
-		t.Error("expected 'Session: resumed' in navigator")
+		t.Error("expected 'Session: resumed' in header")
 	}
 	if !strings.Contains(nav, "2026-02-17 15:30") {
-		t.Error("expected last scan timestamp in navigator")
+		t.Error("expected last scan timestamp in header")
 	}
 }
 
-func TestRenderNavigatorWithWaves_NoResumeInfo(t *testing.T) {
+func TestRenderMatrixNavigator_NoResumeInfo(t *testing.T) {
 	// given: nil lastScanned means fresh session
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
@@ -332,7 +332,7 @@ func TestRenderNavigatorWithWaves_NoResumeInfo(t *testing.T) {
 	}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then: no resume line
 	if strings.Contains(nav, "Session:") {
@@ -340,7 +340,7 @@ func TestRenderNavigatorWithWaves_NoResumeInfo(t *testing.T) {
 	}
 }
 
-func TestRenderNavigatorWithWaves_StrictnessBadge(t *testing.T) {
+func TestRenderMatrixNavigator_StrictnessBadge(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
@@ -350,15 +350,15 @@ func TestRenderNavigatorWithWaves_StrictnessBadge(t *testing.T) {
 	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "alert", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "alert", 0)
 
 	// then
 	if !strings.Contains(nav, "Strictness: alert") {
-		t.Error("expected 'Strictness: alert' in navigator")
+		t.Error("expected 'Strictness: alert' in footer")
 	}
 }
 
-func TestRenderNavigatorWithWaves_ShibitoCount(t *testing.T) {
+func TestRenderMatrixNavigator_ShibitoCount(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
@@ -368,15 +368,84 @@ func TestRenderNavigatorWithWaves_ShibitoCount(t *testing.T) {
 	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 3)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 3)
 
 	// then
 	if !strings.Contains(nav, "Shibito: 3") {
-		t.Error("expected 'Shibito: 3' in navigator")
+		t.Error("expected 'Shibito: 3' in header")
 	}
 }
 
-func TestRenderNavigatorWithWaves_ShibitoZero_Hidden(t *testing.T) {
+func TestRenderProgressBar_Half(t *testing.T) {
+	// given
+	current := 0.50
+
+	// when
+	result := RenderProgressBar(current, 20)
+
+	// then
+	expected := "[==========..........] 50%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Zero(t *testing.T) {
+	// given / when
+	result := RenderProgressBar(0.0, 20)
+
+	// then
+	expected := "[....................] 0%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Full(t *testing.T) {
+	// given / when
+	result := RenderProgressBar(1.0, 20)
+
+	// then
+	expected := "[====================] 100%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Partial(t *testing.T) {
+	// given: 62% with width 20 -> 12.4 -> 12 filled
+	result := RenderProgressBar(0.62, 20)
+
+	// then
+	expected := "[============........] 62%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Overflow(t *testing.T) {
+	// given: current > 1.0 should clamp to 100%
+	result := RenderProgressBar(1.5, 20)
+
+	// then
+	expected := "[====================] 100%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderProgressBar_Underflow(t *testing.T) {
+	// given: negative current should clamp to 0%
+	result := RenderProgressBar(-0.25, 20)
+
+	// then
+	expected := "[....................] 0%"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestRenderMatrixNavigator_ShibitoZero_Hidden(t *testing.T) {
 	// given
 	result := &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
@@ -386,10 +455,101 @@ func TestRenderNavigatorWithWaves_ShibitoZero_Hidden(t *testing.T) {
 	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
 
 	// when
-	nav := RenderNavigatorWithWaves(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then: shibito count should not appear when 0
 	if strings.Contains(nav, "Shibito") {
 		t.Error("should not show 'Shibito' when count is 0")
+	}
+}
+
+func TestRenderMatrixNavigator_GridBorders(t *testing.T) {
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.65, Issues: make([]IssueDetail, 4)},
+			{Name: "API", Completeness: 0.58, Issues: make([]IssueDetail, 6)},
+		},
+		TotalIssues:  10,
+		Completeness: 0.615,
+	}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
+		{ID: "api-w1", ClusterName: "API", Title: "Split", Status: "completed"},
+	}
+	nav := RenderMatrixNavigator(result, "TestProject", waves, 4, nil, "fog", 0)
+	if !strings.Contains(nav, "+--") {
+		t.Error("expected '+--' grid border")
+	}
+	if !strings.Contains(nav, "| Cluster") {
+		t.Error("expected '| Cluster' header row")
+	}
+	if !strings.Contains(nav, "| W1") {
+		t.Error("expected '| W1' column header")
+	}
+	if !strings.Contains(nav, "[=]") {
+		t.Error("expected [=] for completed wave")
+	}
+	if !strings.Contains(nav, "[ ]") {
+		t.Error("expected [ ] for available wave")
+	}
+	if !strings.Contains(nav, "61%") {
+		t.Error("expected 61% in progress bar")
+	}
+}
+
+func TestRenderMatrixNavigator_JapaneseClusterAlignment(t *testing.T) {
+	// given: Japanese cluster name (wide characters) should not break grid alignment
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "認証", Completeness: 0.50, Issues: make([]IssueDetail, 3)},
+			{Name: "API", Completeness: 0.40, Issues: make([]IssueDetail, 2)},
+		},
+		TotalIssues:  5,
+		Completeness: 0.45,
+	}
+	waves := []Wave{
+		{ID: "w1", ClusterName: "認証", Title: "Deps", Status: "available"},
+		{ID: "w2", ClusterName: "API", Title: "Split", Status: "completed"},
+	}
+
+	// when
+	nav := RenderMatrixNavigator(result, "テストプロジェクト", waves, 0, nil, "fog", 0)
+
+	// then: all grid lines (starting with + or |) must have the same display width
+	lines := strings.Split(nav, "\n")
+	var gridWidth int
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		if line[0] != '+' && line[0] != '|' {
+			continue
+		}
+		dw := displayWidth(line)
+		if gridWidth == 0 {
+			gridWidth = dw
+		}
+		if dw != gridWidth {
+			t.Errorf("grid line display width %d, want %d: %q", dw, gridWidth, line)
+		}
+	}
+}
+
+func TestRenderMatrixNavigator_ProgressBarInFooter(t *testing.T) {
+	result := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50}},
+		Completeness: 0.50,
+	}
+	waves := []Wave{{ID: "w1", ClusterName: "Auth", Title: "T", Status: "available"}}
+	nav := RenderMatrixNavigator(result, "P", waves, 2, nil, "alert", 0)
+	if !strings.Contains(nav, "ADR: 2") {
+		t.Error("expected ADR count in footer")
+	}
+	if !strings.Contains(nav, "Strictness: alert") {
+		t.Error("expected strictness in footer")
+	}
+	if !strings.Contains(nav, "50%") {
+		t.Error("expected 50% in progress bar")
 	}
 }

@@ -730,6 +730,238 @@ func TestDisplayADRConflicts_MultipleConflicts(t *testing.T) {
 	}
 }
 
+func TestCompletedWaves_FiltersCompleted(t *testing.T) {
+	// given
+	waves := []Wave{
+		{ID: "w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
+		{ID: "w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
+		{ID: "w3", ClusterName: "API", Title: "Split", Status: "completed"},
+	}
+
+	// when
+	result := CompletedWaves(waves)
+
+	// then
+	if len(result) != 2 {
+		t.Fatalf("expected 2 completed, got %d", len(result))
+	}
+	if result[0].ID != "w1" {
+		t.Errorf("expected w1, got %s", result[0].ID)
+	}
+	if result[1].ID != "w3" {
+		t.Errorf("expected w3, got %s", result[1].ID)
+	}
+}
+
+func TestCompletedWaves_NoneCompleted(t *testing.T) {
+	// given
+	waves := []Wave{
+		{ID: "w1", Status: "available"},
+		{ID: "w2", Status: "locked"},
+	}
+
+	// when
+	result := CompletedWaves(waves)
+
+	// then
+	if len(result) != 0 {
+		t.Errorf("expected 0, got %d", len(result))
+	}
+}
+
+func TestDisplayCompletedWaveActions_ShowsActions(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	wave := Wave{
+		ClusterName: "Auth",
+		Title:       "DoD",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "ENG-101", Description: "Auth flow"},
+			{Type: "add_dependency", IssueID: "ENG-102", Description: "Token dep"},
+		},
+		Delta: WaveDelta{Before: 0.25, After: 0.40},
+	}
+
+	// when
+	DisplayCompletedWaveActions(&buf, wave)
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, "(completed)") {
+		t.Error("expected (completed) label")
+	}
+	if !strings.Contains(output, "add_dod") {
+		t.Error("expected action type")
+	}
+	if !strings.Contains(output, "ENG-101") {
+		t.Error("expected issue ID")
+	}
+	if !strings.Contains(output, "Actions applied (2)") {
+		t.Error("expected action count")
+	}
+}
+
+func TestDisplayCompletedWaveActions_NoActions(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	wave := Wave{ClusterName: "Auth", Title: "Empty"}
+
+	// when
+	DisplayCompletedWaveActions(&buf, wave)
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, "Actions applied (0)") {
+		t.Error("expected zero actions")
+	}
+}
+
+func TestPromptCompletedWaveSelection_ValidChoice(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("2\n")
+	scanner := bufio.NewScanner(input)
+	completed := []Wave{
+		{ID: "w1", ClusterName: "Auth", Title: "Deps", Delta: WaveDelta{Before: 0.25, After: 0.40}},
+		{ID: "w3", ClusterName: "API", Title: "Split", Delta: WaveDelta{Before: 0.30, After: 0.45}},
+	}
+
+	// when
+	selected, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.ID != "w3" {
+		t.Errorf("expected w3, got %s", selected.ID)
+	}
+}
+
+func TestPromptCompletedWaveSelection_Back(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("b\n")
+	scanner := bufio.NewScanner(input)
+	completed := []Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+
+	// when
+	_, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+
+	// then: b returns ErrGoBack (back to main navigator)
+	if err != ErrGoBack {
+		t.Errorf("expected ErrGoBack, got %v", err)
+	}
+}
+
+func TestPromptCompletedWaveSelection_Invalid(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("99\n")
+	scanner := bufio.NewScanner(input)
+	completed := []Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+
+	// when
+	_, err := PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+
+	// then
+	if err == nil || err == ErrQuit {
+		t.Error("expected invalid selection error")
+	}
+}
+
+func TestDisplayWaveCompletion_Basic(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	wave := Wave{ClusterName: "Auth", Title: "DoD", Delta: WaveDelta{Before: 0.40, After: 0.65}}
+	ripples := []Ripple{
+		{ClusterName: "DB", Description: "Wave 2 unlocked"},
+		{ClusterName: "DB", Description: "Schema dependency added"},
+		{ClusterName: "API", Description: "DoD updated: token validation"},
+	}
+
+	// when
+	DisplayWaveCompletion(&buf, wave, ripples, 0.52, 2)
+
+	// then
+	output := buf.String()
+	if !strings.Contains(output, "Auth") {
+		t.Error("expected cluster name")
+	}
+	if !strings.Contains(output, "DoD") {
+		t.Error("expected wave title")
+	}
+	if !strings.Contains(output, "40%") {
+		t.Error("expected before completeness")
+	}
+	if !strings.Contains(output, "65%") {
+		t.Error("expected after completeness")
+	}
+	// Grouped by cluster
+	if !strings.Contains(output, "DB:") {
+		t.Error("expected DB cluster group header")
+	}
+	if !strings.Contains(output, "API:") {
+		t.Error("expected API cluster group header")
+	}
+	if !strings.Contains(output, "New waves available: 2") {
+		t.Error("expected new waves count")
+	}
+	if !strings.Contains(output, "52%") {
+		t.Error("expected overall completeness in progress bar")
+	}
+}
+
+func TestDisplayWaveCompletion_NoRipples(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	wave := Wave{ClusterName: "Auth", Title: "Deps", Delta: WaveDelta{Before: 0.25, After: 0.40}}
+
+	// when
+	DisplayWaveCompletion(&buf, wave, nil, 0.36, 0)
+
+	// then
+	output := buf.String()
+	if strings.Contains(output, "Ripple") {
+		t.Error("should not show ripple section when empty")
+	}
+	if strings.Contains(output, "New waves") {
+		t.Error("should not show new waves when 0")
+	}
+}
+
+func TestDisplayWaveCompletion_ZeroNewWaves(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	wave := Wave{ClusterName: "Auth", Title: "DoD", Delta: WaveDelta{Before: 0.40, After: 0.65}}
+	ripples := []Ripple{{ClusterName: "DB", Description: "Updated"}}
+
+	// when
+	DisplayWaveCompletion(&buf, wave, ripples, 0.50, 0)
+
+	// then
+	output := buf.String()
+	if strings.Contains(output, "New waves") {
+		t.Error("should not show new waves when 0")
+	}
+}
+
+func TestPromptWaveSelection_BackOption(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	input := strings.NewReader("b\n")
+	scanner := bufio.NewScanner(input)
+	waves := []Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+
+	// when
+	_, err := PromptWaveSelection(context.Background(), &buf, scanner, waves)
+
+	// then
+	if err != ErrGoBack {
+		t.Errorf("expected ErrGoBack, got %v", err)
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{

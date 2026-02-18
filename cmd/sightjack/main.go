@@ -15,7 +15,7 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
-var version = "0.6.0-dev"
+var version = "0.7.0-dev"
 
 func main() {
 	// Extract subcommand before flag parsing so flags after the subcommand are honored.

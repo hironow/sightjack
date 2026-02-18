@@ -13,6 +13,9 @@ import (
 // ErrQuit signals the user chose to quit.
 var ErrQuit = errors.New("user quit")
 
+// ErrGoBack signals the user chose to go back to the previous menu.
+var ErrGoBack = errors.New("go back")
+
 // ScanLine reads one line from s, returning early if ctx is cancelled.
 // The goroutine blocked on s.Scan() may outlive the call when the context
 // fires first; this is acceptable for a CLI tool that exits shortly after.
@@ -44,7 +47,7 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 			i+1, wave.ClusterName, wave.Title,
 			wave.Delta.Before*100, wave.Delta.After*100)
 	}
-	fmt.Fprintf(w, "\nSelect wave [1-%d, q=quit]: ", len(waves))
+	fmt.Fprintf(w, "\nSelect wave [1-%d, b=back, q=quit]: ", len(waves))
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
@@ -53,6 +56,9 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 	input := strings.TrimSpace(line)
 	if input == "q" {
 		return Wave{}, ErrQuit
+	}
+	if input == "b" {
+		return Wave{}, ErrGoBack
 	}
 	num, parseErr := strconv.Atoi(input)
 	if parseErr != nil || num < 1 || num > len(waves) {
@@ -184,6 +190,85 @@ func DisplayADRConflicts(w io.Writer, conflicts []ADRConflict) {
 	for _, c := range conflicts {
 		fmt.Fprintf(w, "  [Scribe] Warning: Potential conflict with ADR-%s: %s\n", c.ExistingADRID, c.Description)
 	}
+}
+
+// CompletedWaves filters waves to only those with "completed" status.
+func CompletedWaves(waves []Wave) []Wave {
+	var result []Wave
+	for _, w := range waves {
+		if w.Status == "completed" {
+			result = append(result, w)
+		}
+	}
+	return result
+}
+
+// DisplayCompletedWaveActions shows the actions that were applied in a completed wave.
+func DisplayCompletedWaveActions(w io.Writer, wave Wave) {
+	fmt.Fprintf(w, "\n  --- %s - %s (completed) ---\n", wave.ClusterName, wave.Title)
+	fmt.Fprintf(w, "  Actions applied (%d):\n", len(wave.Actions))
+	for i, a := range wave.Actions {
+		fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
+	}
+	if wave.Delta != (WaveDelta{}) {
+		fmt.Fprintf(w, "\n  Result: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
+	}
+}
+
+// PromptCompletedWaveSelection displays completed waves and reads the user's choice.
+func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, completed []Wave) (Wave, error) {
+	fmt.Fprintln(w, "\n  Completed waves:")
+	for i, wave := range completed {
+		fmt.Fprintf(w, "    %d. %-6s W: %-20s (%2.0f%% -> %2.0f%%)\n",
+			i+1, wave.ClusterName, wave.Title,
+			wave.Delta.Before*100, wave.Delta.After*100)
+	}
+	fmt.Fprintf(w, "\n  Select [1-%d, b=back]: ", len(completed))
+
+	line, err := ScanLine(ctx, s)
+	if err != nil {
+		return Wave{}, ErrQuit
+	}
+	input := strings.TrimSpace(line)
+	if input == "b" {
+		return Wave{}, ErrGoBack
+	}
+	num, parseErr := strconv.Atoi(input)
+	if parseErr != nil || num < 1 || num > len(completed) {
+		return Wave{}, fmt.Errorf("invalid selection: %s", input)
+	}
+	return completed[num-1], nil
+}
+
+// DisplayWaveCompletion shows a rich wave completion summary with grouped ripple effects.
+func DisplayWaveCompletion(w io.Writer, wave Wave, ripples []Ripple, overallCompleteness float64, newWavesAvailable int) {
+	fmt.Fprintf(w, "\n  Wave completed: %s - %s\n", wave.ClusterName, wave.Title)
+	fmt.Fprintf(w, "  Completeness: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
+
+	if len(ripples) > 0 {
+		fmt.Fprintln(w, "\n  Ripple effects:")
+		// Group by cluster
+		grouped := make(map[string][]Ripple)
+		var order []string
+		for _, r := range ripples {
+			if _, seen := grouped[r.ClusterName]; !seen {
+				order = append(order, r.ClusterName)
+			}
+			grouped[r.ClusterName] = append(grouped[r.ClusterName], r)
+		}
+		for _, name := range order {
+			fmt.Fprintf(w, "    %s:\n", name)
+			for _, r := range grouped[name] {
+				fmt.Fprintf(w, "      -> %s\n", r.Description)
+			}
+		}
+	}
+
+	if newWavesAvailable > 0 {
+		fmt.Fprintf(w, "\n  New waves available: %d\n", newWavesAvailable)
+	}
+
+	fmt.Fprintf(w, "  %s\n", RenderProgressBar(overallCompleteness, 20))
 }
 
 // DisplayScribeResponse shows the scribe's ADR generation result.
