@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -362,6 +363,121 @@ func TestStrictnessLevel_Valid(t *testing.T) {
 	}
 	if invalid.Valid() {
 		t.Error("expected nightmare to be invalid")
+	}
+}
+
+func TestShibitoWarning_JSONRoundTrip(t *testing.T) {
+	// given
+	original := ShibitoWarning{
+		ClosedIssueID:  "ENG-045",
+		CurrentIssueID: "ENG-102",
+		Description:    "Token management circular dependency re-emerging",
+		RiskLevel:      "high",
+	}
+
+	// when
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ShibitoWarning
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if decoded.ClosedIssueID != "ENG-045" {
+		t.Errorf("expected ENG-045, got %s", decoded.ClosedIssueID)
+	}
+	if decoded.RiskLevel != "high" {
+		t.Errorf("expected high, got %s", decoded.RiskLevel)
+	}
+}
+
+func TestScanResult_ShibitoWarnings_OmittedWhenEmpty(t *testing.T) {
+	// given
+	result := ScanResult{Completeness: 0.5}
+
+	// when
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	// then
+	if strings.Contains(string(data), "shibito_warnings") {
+		t.Error("expected shibito_warnings to be omitted when empty")
+	}
+}
+
+func TestADRConflict_JSONRoundTrip(t *testing.T) {
+	// given
+	original := ADRConflict{
+		ExistingADRID: "0002",
+		Description:   "Contradicts ADR-0002 decision on session storage",
+	}
+
+	// when
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ADRConflict
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if decoded.ExistingADRID != "0002" {
+		t.Errorf("expected 0002, got %s", decoded.ExistingADRID)
+	}
+	if decoded.Description != "Contradicts ADR-0002 decision on session storage" {
+		t.Errorf("unexpected description: %s", decoded.Description)
+	}
+}
+
+func TestScribeResponse_Conflicts_OmittedWhenEmpty(t *testing.T) {
+	// given
+	resp := ScribeResponse{ADRID: "0001", Title: "test"}
+
+	// when
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	// then
+	if strings.Contains(string(data), "conflicts") {
+		t.Error("expected conflicts to be omitted when empty")
+	}
+}
+
+func TestScribeResponse_Conflicts_Present(t *testing.T) {
+	// given
+	resp := ScribeResponse{
+		ADRID: "0003",
+		Title: "test",
+		Conflicts: []ADRConflict{
+			{ExistingADRID: "0001", Description: "contradicts auth decision"},
+		},
+	}
+
+	// when
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ScribeResponse
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if len(decoded.Conflicts) != 1 {
+		t.Fatalf("expected 1 conflict, got %d", len(decoded.Conflicts))
+	}
+	if decoded.Conflicts[0].ExistingADRID != "0001" {
+		t.Errorf("expected 0001, got %s", decoded.Conflicts[0].ExistingADRID)
 	}
 }
 

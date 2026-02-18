@@ -220,6 +220,62 @@ scribe:
 	}
 }
 
+func TestDefaultConfig_StrictnessFog(t *testing.T) {
+	// when
+	cfg := DefaultConfig()
+
+	// then
+	if cfg.Strictness.Default != StrictnessFog {
+		t.Errorf("expected fog, got %s", cfg.Strictness.Default)
+	}
+}
+
+func TestLoadConfig_StrictnessAlert(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(`
+linear:
+  team: TEST
+  project: Test
+strictness:
+  default: alert
+`), 0644)
+
+	// when
+	cfg, err := LoadConfig(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Strictness.Default != StrictnessAlert {
+		t.Errorf("expected alert, got %s", cfg.Strictness.Default)
+	}
+}
+
+func TestLoadConfig_StrictnessMissing_DefaultsFog(t *testing.T) {
+	// given: config without strictness section
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(`
+linear:
+  team: TEST
+  project: Test
+`), 0644)
+
+	// when
+	cfg, err := LoadConfig(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Strictness.Default != StrictnessFog {
+		t.Errorf("expected fog default, got %s", cfg.Strictness.Default)
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()

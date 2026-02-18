@@ -37,12 +37,22 @@ type IssueDetail struct {
 	Gaps         []string `json:"gaps"`
 }
 
+// ShibitoWarning represents a detected resurrection risk — a previously
+// closed issue pattern re-emerging in current issues.
+type ShibitoWarning struct {
+	ClosedIssueID  string `json:"closed_issue_id"`
+	CurrentIssueID string `json:"current_issue_id"`
+	Description    string `json:"description"`
+	RiskLevel      string `json:"risk_level"`
+}
+
 // ScanResult is the merged result of Pass 1 + Pass 2.
 type ScanResult struct {
-	Clusters     []ClusterScanResult
-	TotalIssues  int
-	Completeness float64
-	Observations []string
+	Clusters        []ClusterScanResult `json:"clusters"`
+	TotalIssues     int                 `json:"total_issues"`
+	Completeness    float64             `json:"completeness"`
+	Observations    []string            `json:"observations"`
+	ShibitoWarnings []ShibitoWarning    `json:"shibito_warnings,omitempty"`
 }
 
 // CalculateCompleteness computes overall completeness as the average of cluster completeness values,
@@ -187,12 +197,19 @@ func (l StrictnessLevel) Valid() bool {
 	return false
 }
 
+// ADRConflict represents a detected contradiction between a new ADR and an existing one.
+type ADRConflict struct {
+	ExistingADRID string `json:"existing_adr_id"`
+	Description   string `json:"description"`
+}
+
 // ScribeResponse is the output of the Scribe Agent (ADR generation).
 type ScribeResponse struct {
-	ADRID     string `json:"adr_id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	Reasoning string `json:"reasoning"`
+	ADRID     string        `json:"adr_id"`
+	Title     string        `json:"title"`
+	Content   string        `json:"content"`
+	Reasoning string        `json:"reasoning"`
+	Conflicts []ADRConflict `json:"conflicts,omitempty"`
 }
 
 // ArchitectResponse is the output of an architect discussion round.
