@@ -364,6 +364,83 @@ func TestLoadScanResult_PreV06Format_BackwardCompat(t *testing.T) {
 	}
 }
 
+func TestState_OldVersionRoundTrip(t *testing.T) {
+	// given: state.json written by an older version (v0.0.9 format)
+	// The current code should read it without error — version is just a string field.
+	dir := t.TempDir()
+	oldState := SessionState{
+		Version:      "0.0.9",
+		SessionID:    "old-session",
+		Project:      "legacy",
+		LastScanned:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		Completeness: 0.75,
+		Clusters: []ClusterState{
+			{Name: "Auth", Completeness: 0.80, IssueCount: 3},
+		},
+		Waves: []WaveState{
+			{ID: "w1", ClusterName: "Auth", Status: "completed", ActionCount: 2},
+		},
+		ADRCount:    1,
+		ShibitoCount: 0,
+	}
+
+	// when: write with old version and read back
+	if err := WriteState(dir, &oldState); err != nil {
+		t.Fatalf("WriteState: %v", err)
+	}
+	loaded, err := ReadState(dir)
+	if err != nil {
+		t.Fatalf("ReadState: %v", err)
+	}
+
+	// then: all fields preserved, version remains "0.0.9" (not auto-upgraded)
+	if loaded.Version != "0.0.9" {
+		t.Errorf("expected version 0.0.9, got %s", loaded.Version)
+	}
+	if loaded.Project != "legacy" {
+		t.Errorf("expected project legacy, got %s", loaded.Project)
+	}
+	if loaded.Completeness != 0.75 {
+		t.Errorf("expected completeness 0.75, got %f", loaded.Completeness)
+	}
+	if len(loaded.Waves) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(loaded.Waves))
+	}
+	if loaded.Waves[0].Status != "completed" {
+		t.Errorf("expected wave completed, got %s", loaded.Waves[0].Status)
+	}
+}
+
+func TestState_FutureFieldsIgnored(t *testing.T) {
+	// given: state.json with extra fields not in current struct (forward compatibility)
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, ".siren")
+	os.MkdirAll(stateDir, 0755)
+	rawJSON := `{
+		"version": "0.1.0",
+		"session_id": "future-session",
+		"project": "future",
+		"completeness": 0.90,
+		"unknown_field": "should be ignored",
+		"nested_unknown": {"a": 1}
+	}`
+	os.WriteFile(filepath.Join(stateDir, "state.json"), []byte(rawJSON), 0644)
+
+	// when
+	loaded, err := ReadState(dir)
+
+	// then: should load without error, unknown fields silently ignored
+	if err != nil {
+		t.Fatalf("ReadState: %v", err)
+	}
+	if loaded.Version != "0.1.0" {
+		t.Errorf("expected version 0.1.0, got %s", loaded.Version)
+	}
+	if loaded.Completeness != 0.90 {
+		t.Errorf("expected completeness 0.90, got %f", loaded.Completeness)
+	}
+}
+
 func TestLoadScanResult_MalformedJSON(t *testing.T) {
 	// given
 	dir := t.TempDir()

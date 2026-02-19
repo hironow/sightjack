@@ -1083,6 +1083,58 @@ func TestPromptSelectiveApproval_Quit(t *testing.T) {
 	}
 }
 
+func TestDisplayCompletedWaveActions(t *testing.T) {
+	// given: a completed wave with multiple actions
+	wave := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Dependency Ordering",
+		Status:      "completed",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "ENG-101 blocks ENG-102"},
+			{Type: "add_dod", IssueID: "ENG-102", Description: "Token lifecycle defined"},
+			{Type: "add_dod", IssueID: "ENG-103", Description: "Reset flow documented"},
+		},
+	}
+	var buf bytes.Buffer
+
+	// when
+	DisplayCompletedWaveActions(&buf, wave)
+
+	// then: output should contain wave title and all action descriptions
+	output := buf.String()
+	if !strings.Contains(output, "Dependency Ordering") {
+		t.Errorf("expected wave title in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "ENG-101") {
+		t.Errorf("expected ENG-101 in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "ENG-103") {
+		t.Errorf("expected ENG-103 in output, got:\n%s", output)
+	}
+}
+
+func TestDisplayCompletedWaveActions_Empty(t *testing.T) {
+	// given: a completed wave with no actions
+	wave := Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Title:       "Empty Wave",
+		Status:      "completed",
+		Actions:     nil,
+	}
+	var buf bytes.Buffer
+
+	// when
+	DisplayCompletedWaveActions(&buf, wave)
+
+	// then: should not panic, should still show wave title
+	output := buf.String()
+	if !strings.Contains(output, "Empty Wave") {
+		t.Errorf("expected wave title in output, got:\n%s", output)
+	}
+}
+
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
 	resp := &ScribeResponse{
