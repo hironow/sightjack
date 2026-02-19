@@ -275,6 +275,7 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 
 	var successful []ClusterScanResult
 	var warnings []string
+	// NOTE: "for range integer" is valid Go 1.22+ syntax (go.mod requires go 1.25.0).
 	for range launched {
 		r := <-results
 		if r.err != nil {
