@@ -349,6 +349,7 @@ func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun 
 		LastScanned:     time.Now(),
 		Completeness:    result.Completeness,
 		StrictnessLevel: string(cfg.Strictness.Default),
+		ShibitoCount:    len(result.ShibitoWarnings),
 	}
 	for _, c := range result.Clusters {
 		state.Clusters = append(state.Clusters, sightjack.ClusterState{
