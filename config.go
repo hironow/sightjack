@@ -164,6 +164,11 @@ func LoadConfig(path string) (*Config, error) {
 	if !cfg.Strictness.Default.Valid() {
 		cfg.Strictness.Default = StrictnessFog
 	}
+	for label, level := range cfg.Strictness.Overrides {
+		if !level.Valid() {
+			return nil, fmt.Errorf("invalid strictness override for %q: %q", label, level)
+		}
+	}
 	if cfg.Retry.MaxAttempts < 1 {
 		cfg.Retry.MaxAttempts = 3
 	}

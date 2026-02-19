@@ -680,6 +680,30 @@ strictness:
 	}
 }
 
+func TestLoadConfig_StrictnessOverrides_InvalidValueReturnsError(t *testing.T) {
+	// given: config with an invalid strictness override value
+	content := `
+linear:
+  team: test
+  project: test
+strictness:
+  default: fog
+  overrides:
+    security: nightmare
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	// when
+	_, err := LoadConfig(path)
+
+	// then: should return an error for the invalid override value
+	if err == nil {
+		t.Fatal("expected error for invalid strictness override, got nil")
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()
