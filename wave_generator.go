@@ -137,6 +137,6 @@ func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		RejectedActions: rejectedStr,
 		DoDSection:      dodSection,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{completedWave.ClusterName})),
 	})
 }

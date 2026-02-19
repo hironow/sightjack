@@ -151,7 +151,7 @@ func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *A
 		Reasoning:       architectResp.Reasoning,
 		ADRNumber:       adrID,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
 		ExistingADRs:    existingADRs,
 	})
 	if err != nil {
@@ -216,7 +216,7 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		Reasoning:       architectResp.Reasoning,
 		ADRNumber:       adrID,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
 		ExistingADRs:    existingADRs,
 	})
 	if err != nil {

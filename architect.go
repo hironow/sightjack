@@ -40,7 +40,7 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 		WaveActions:     string(actionsJSON),
 		Topic:           topic,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
 	})
 	if err != nil {
 		return fmt.Errorf("render architect prompt: %w", err)
@@ -74,7 +74,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 		WaveActions:     string(actionsJSON),
 		Topic:           topic,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render architect prompt: %w", err)

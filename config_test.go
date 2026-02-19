@@ -595,6 +595,22 @@ func TestResolveStrictness_NoMatchingLabels(t *testing.T) {
 	}
 }
 
+func TestResolveStrictness_ClusterNameAsLabel(t *testing.T) {
+	// given: overrides keyed by cluster name
+	cfg := StrictnessConfig{
+		Default:   StrictnessFog,
+		Overrides: map[string]StrictnessLevel{"Security": StrictnessLockdown},
+	}
+
+	// when: cluster name passed as label
+	result := ResolveStrictness(cfg, []string{"Security"})
+
+	// then: override should match the cluster name
+	if result != StrictnessLockdown {
+		t.Errorf("expected lockdown for Security cluster, got %s", result)
+	}
+}
+
 func TestLoadConfig_StrictnessOverrides(t *testing.T) {
 	// given: config with strictness overrides
 	content := `

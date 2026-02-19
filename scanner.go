@@ -120,7 +120,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
 				OutputPath:      chunkFile,
-				StrictnessLevel: string(cfg.Strictness.Default),
+				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{cc.Name})),
 			})
 			if renderErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
@@ -182,7 +182,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				Observations:    strings.Join(cluster.Observations, "\n"),
 				DoDSection:      dodSection,
 				OutputPath:      waveFile,
-				StrictnessLevel: string(cfg.Strictness.Default),
+				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{cluster.Name})),
 			})
 			if err != nil {
 				return fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)

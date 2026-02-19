@@ -107,7 +107,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (
 		Actions:         string(actionsJSON),
 		DoDSection:      dodSection,
 		OutputPath:      applyFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
 		LabelsEnabled:   cfg.Labels.Enabled,
 		LabelPrefix:     cfg.Labels.Prefix,
 	})
