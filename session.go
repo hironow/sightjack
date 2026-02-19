@@ -14,7 +14,7 @@ import (
 // StateFormatVersion is the version string written into SessionState files.
 // Centralised so that all code paths (scan, session, recovery) produce
 // consistent state files.
-const StateFormatVersion = "0.91"
+const StateFormatVersion = "0.0.10"
 
 // CalcNewlyUnlocked computes how many waves were newly unlocked after completing a wave.
 // oldAvailable is the available count before the wave was completed (includes the completing wave).
