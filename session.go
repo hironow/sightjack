@@ -498,12 +498,12 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		ts = *lastScanned
 	}
 	state := &SessionState{
-		Version:      StateFormatVersion,
-		SessionID:    sessionID,
-		Project:      cfg.Linear.Project,
-		LastScanned:  ts,
-		Completeness: scanResult.Completeness,
-		Waves:        BuildWaveStates(waves),
+		Version:         StateFormatVersion,
+		SessionID:       sessionID,
+		Project:         cfg.Linear.Project,
+		LastScanned:     ts,
+		Completeness:    scanResult.Completeness,
+		Waves:           BuildWaveStates(waves),
 		ADRCount:        adrCount,
 		ShibitoCount:    len(scanResult.ShibitoWarnings),
 		StrictnessLevel: string(cfg.Strictness.Default),

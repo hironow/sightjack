@@ -380,7 +380,7 @@ func TestState_OldVersionRoundTrip(t *testing.T) {
 		Waves: []WaveState{
 			{ID: "w1", ClusterName: "Auth", Status: "completed", ActionCount: 2},
 		},
-		ADRCount:    1,
+		ADRCount:     1,
 		ShibitoCount: 0,
 	}
 

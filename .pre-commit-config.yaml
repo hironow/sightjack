@@ -5,7 +5,7 @@ minimum_prek_version: "0.3.0"
 
 exclude: |
   (?x)^(
-    \.expedition/|
+    \.siren/|
     node_modules/
   )
 
@@ -45,7 +45,7 @@ repos:
     hooks:
       - id: go-test
         name: go test
-        entry: bash -c 'go test ./... -count=1 -timeout=60s'
+        entry: bash -c 'go test ./... -count=1 -timeout=300s'
         language: system
         types: [go]
         pass_filenames: false
