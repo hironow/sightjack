@@ -992,8 +992,8 @@ func TestBuildSessionState(t *testing.T) {
 	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, nil)
 
 	// then
-	if state.Version != "0.9" {
-		t.Errorf("expected version 0.9, got %s", state.Version)
+	if state.Version != StateFormatVersion {
+		t.Errorf("expected version %s, got %s", StateFormatVersion, state.Version)
 	}
 	if state.SessionID != "test-123" {
 		t.Errorf("expected test-123, got %s", state.SessionID)
@@ -1486,8 +1486,8 @@ func TestRecoverStateFromScan(t *testing.T) {
 	if len(state.Waves) != 2 {
 		t.Errorf("Waves: expected 2, got %d", len(state.Waves))
 	}
-	if state.Version != "0.9" {
-		t.Errorf("Version: expected 0.9, got %s", state.Version)
+	if state.Version != StateFormatVersion {
+		t.Errorf("Version: expected %s, got %s", StateFormatVersion, state.Version)
 	}
 	if state.ShibitoCount != 0 {
 		t.Errorf("ShibitoCount: expected 0, got %d", state.ShibitoCount)
