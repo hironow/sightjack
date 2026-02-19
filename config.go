@@ -9,6 +9,8 @@ import (
 )
 
 // StrictnessConfig holds DoD strictness level settings.
+// Overrides are keyed by cluster name (case-insensitive).
+// Per-label overrides require issue labels in the data model (planned for v0.1.0).
 type StrictnessConfig struct {
 	Default   StrictnessLevel            `yaml:"default"`
 	Overrides map[string]StrictnessLevel `yaml:"overrides"`
@@ -85,9 +87,10 @@ func strictnessRank(level StrictnessLevel) int {
 	}
 }
 
-// ResolveStrictness determines the effective strictness level for a set of labels.
-// When overrides match one or more labels, the strictest matching override wins
-// (lockdown > alert > fog), even if it is less strict than the default.
+// ResolveStrictness determines the effective strictness level for a set of keys.
+// Keys are currently cluster names; per-label resolution is planned for v0.1.0.
+// Matching is case-insensitive. When multiple keys match, the strictest override
+// wins (lockdown > alert > fog), even if less strict than the default.
 // Returns the default level only when no overrides match.
 func ResolveStrictness(cfg StrictnessConfig, labels []string) StrictnessLevel {
 	if len(cfg.Overrides) == 0 || len(labels) == 0 {

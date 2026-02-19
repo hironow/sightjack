@@ -646,9 +646,9 @@ execution:
 
 strictness:
   default: fog
-  overrides:
-    release-candidate: lockdown
-    spike: fog
+  overrides:                        # keyed by cluster name (case-insensitive)
+    Security: lockdown
+    Documentation: fog
 
 adr:
   storage: "linear_document"     # linear_document | local_markdown | both
