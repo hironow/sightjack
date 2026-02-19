@@ -1710,6 +1710,57 @@ func TestMergeCompletedStatus_AllCompleted(t *testing.T) {
 	}
 }
 
+func TestResumeScanDir_DerivedFromScanResultPath(t *testing.T) {
+	// given: state with ScanResultPath pointing to legacy .siren/scans/ directory
+	state := &SessionState{
+		SessionID:      "old-session",
+		ScanResultPath: "/project/.siren/scans/old-session/scan_result.json",
+	}
+
+	// when
+	got := ResumeScanDir(state, "/project")
+
+	// then: should derive scanDir from ScanResultPath, not from ScanDir()
+	want := "/project/.siren/scans/old-session"
+	if got != want {
+		t.Errorf("ResumeScanDir: expected %q, got %q", want, got)
+	}
+}
+
+func TestResumeScanDir_EmptyScanResultPath_FallsBack(t *testing.T) {
+	// given: state with empty ScanResultPath (v0.4 upgrade)
+	state := &SessionState{
+		SessionID:      "new-session",
+		ScanResultPath: "",
+	}
+
+	// when
+	got := ResumeScanDir(state, "/project")
+
+	// then: should fall back to ScanDir()
+	want := ScanDir("/project", "new-session")
+	if got != want {
+		t.Errorf("ResumeScanDir: expected %q, got %q", want, got)
+	}
+}
+
+func TestResumeScanDir_CurrentPathFormat(t *testing.T) {
+	// given: state with ScanResultPath using current .siren/.run/ format
+	state := &SessionState{
+		SessionID:      "current-session",
+		ScanResultPath: "/project/.siren/.run/current-session/scan_result.json",
+	}
+
+	// when
+	got := ResumeScanDir(state, "/project")
+
+	// then: should derive from ScanResultPath
+	want := "/project/.siren/.run/current-session"
+	if got != want {
+		t.Errorf("ResumeScanDir: expected %q, got %q", want, got)
+	}
+}
+
 func TestTryRecoverStateNoFiles(t *testing.T) {
 	dir := t.TempDir()
 

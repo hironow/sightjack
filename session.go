@@ -470,6 +470,18 @@ func ResumeSession(baseDir string, state *SessionState) (*ScanResult, []Wave, ma
 	return scanResult, waves, completed, adrCount, nil
 }
 
+// ResumeScanDir returns the scan directory for a resumed session.
+// It derives the directory from state.ScanResultPath when available,
+// preserving the original path even if the directory layout has changed
+// (e.g. .siren/scans/ → .siren/.run/). Falls back to ScanDir() when
+// ScanResultPath is empty.
+func ResumeScanDir(state *SessionState, baseDir string) string {
+	if state.ScanResultPath != "" {
+		return filepath.Dir(state.ScanResultPath)
+	}
+	return ScanDir(baseDir, state.SessionID)
+}
+
 // RunResumeSession resumes an existing session from saved state.
 func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader) error {
 	if input == nil {
@@ -479,7 +491,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	if err != nil {
 		return fmt.Errorf("resume: %w", err)
 	}
-	scanDir := ScanDir(baseDir, state.SessionID)
+	scanDir := ResumeScanDir(state, baseDir)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	scanner := bufio.NewScanner(input)
 	adrDir := ADRDir(baseDir)
