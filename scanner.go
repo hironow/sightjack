@@ -273,18 +273,30 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 		}()
 	}
 
-	var successful []ClusterScanResult
+	// Collect results indexed by original position to preserve deterministic ordering.
+	type indexedResult struct {
+		cluster ClusterScanResult
+		err     error
+	}
+	ordered := make([]*indexedResult, len(clusters))
 	var warnings []string
 	// NOTE: "for range integer" is valid Go 1.22+ syntax (go.mod requires go 1.25.0).
 	for range launched {
 		r := <-results
+		ordered[r.index] = &indexedResult{cluster: r.cluster, err: r.err}
 		if r.err != nil {
 			msg := fmt.Sprintf("Cluster %q scan failed: %v", clusters[r.index].Name, r.err)
 			LogWarn("%s", msg)
 			warnings = append(warnings, msg)
-			continue
 		}
-		successful = append(successful, r.cluster)
+	}
+
+	// Build successful slice in original cluster order.
+	var successful []ClusterScanResult
+	for _, ir := range ordered {
+		if ir != nil && ir.err == nil {
+			successful = append(successful, ir.cluster)
+		}
 	}
 
 	return successful, warnings

@@ -109,7 +109,8 @@ func MatchDoDTemplate(templates map[string]DoDTemplate, clusterName string) (boo
 			continue
 		}
 		if bestKey == "" || len(keyLower) > len(bestKeyLower) ||
-			(len(keyLower) == len(bestKeyLower) && keyLower < bestKeyLower) {
+			(len(keyLower) == len(bestKeyLower) &&
+				(keyLower < bestKeyLower || (keyLower == bestKeyLower && key < bestKey))) {
 			bestKey = key
 			bestKeyLower = keyLower
 		}

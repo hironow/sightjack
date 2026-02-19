@@ -671,14 +671,21 @@ func TestMatchDoDTemplate_CaseTieBreaker(t *testing.T) {
 	// when: both match "authentication" with equal length prefix
 	matched, key := MatchDoDTemplate(templates, "authentication")
 
-	// then: deterministic winner ("auth" < "Auth" when lowered both are "auth",
-	// but tie-breaker uses lowered key comparison; both lowercase to "auth"
-	// so the first encountered wins lexicographically)
+	// then: "Auth" < "auth" in ASCII, so "Auth" wins the original-key tie-breaker
 	if !matched {
 		t.Fatal("expected a match")
 	}
-	// The important thing is determinism — same key every time
-	_ = key
+	if key != "Auth" {
+		t.Errorf("expected deterministic winner 'Auth', got %q", key)
+	}
+
+	// Verify determinism across multiple calls (map iteration order varies)
+	for i := 0; i < 50; i++ {
+		_, k := MatchDoDTemplate(templates, "authentication")
+		if k != key {
+			t.Fatalf("non-deterministic on iteration %d: got %q, want %q", i, k, key)
+		}
+	}
 }
 
 func TestMatchDoDTemplate_LongestPrefixWins(t *testing.T) {
