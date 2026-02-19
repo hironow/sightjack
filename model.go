@@ -75,17 +75,17 @@ func (r *ScanResult) CalculateCompleteness() {
 
 // SessionState is the thin state file persisted to .siren/state.json.
 type SessionState struct {
-	Version      string         `json:"version"`
-	SessionID    string         `json:"session_id"`
-	Project      string         `json:"project"`
-	LastScanned  time.Time      `json:"last_scanned"`
-	Completeness float64        `json:"completeness"`
-	Clusters     []ClusterState `json:"clusters"`
-	Waves        []WaveState    `json:"waves,omitempty"`
-	ADRCount       int    `json:"adr_count,omitempty"`
-	ShibitoCount   int    `json:"shibito_count,omitempty"`
-	StrictnessLevel string `json:"strictness_level,omitempty"`
-	ScanResultPath string `json:"scan_result_path,omitempty"`
+	Version         string         `json:"version"`
+	SessionID       string         `json:"session_id"`
+	Project         string         `json:"project"`
+	LastScanned     time.Time      `json:"last_scanned"`
+	Completeness    float64        `json:"completeness"`
+	Clusters        []ClusterState `json:"clusters"`
+	Waves           []WaveState    `json:"waves,omitempty"`
+	ADRCount        int            `json:"adr_count,omitempty"`
+	ShibitoCount    int            `json:"shibito_count,omitempty"`
+	StrictnessLevel string         `json:"strictness_level,omitempty"`
+	ScanResultPath  string         `json:"scan_result_path,omitempty"`
 }
 
 // ClusterState is the per-cluster state within SessionState.

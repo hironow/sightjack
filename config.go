@@ -3,6 +3,7 @@ package sightjack
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -95,10 +96,13 @@ func ResolveStrictness(cfg StrictnessConfig, labels []string) StrictnessLevel {
 	matched := false
 	var best StrictnessLevel
 	for _, label := range labels {
-		if level, ok := cfg.Overrides[label]; ok {
-			if !matched || strictnessRank(level) > strictnessRank(best) {
-				best = level
-				matched = true
+		lower := strings.ToLower(label)
+		for key, level := range cfg.Overrides {
+			if strings.ToLower(key) == lower {
+				if !matched || strictnessRank(level) > strictnessRank(best) {
+					best = level
+					matched = true
+				}
 			}
 		}
 	}

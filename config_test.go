@@ -646,6 +646,22 @@ func TestResolveStrictness_ClusterNameAsLabel(t *testing.T) {
 	}
 }
 
+func TestResolveStrictness_CaseInsensitiveMatch(t *testing.T) {
+	// given: override key in lowercase, label in mixed case
+	cfg := StrictnessConfig{
+		Default:   StrictnessFog,
+		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	}
+
+	// when: label has different casing
+	result := ResolveStrictness(cfg, []string{"Security"})
+
+	// then: should match case-insensitively
+	if result != StrictnessLockdown {
+		t.Errorf("expected lockdown (case-insensitive match), got %s", result)
+	}
+}
+
 func TestLoadConfig_StrictnessOverrides(t *testing.T) {
 	// given: config with strictness overrides
 	content := `
