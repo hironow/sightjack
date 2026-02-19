@@ -406,6 +406,53 @@ func TestConfigExplicitlySet_WithShortFlag(t *testing.T) {
 	}
 }
 
+func TestResolveConfigPath_RelativeWithBaseDir(t *testing.T) {
+	// given: relative config path with a different baseDir
+	configPath := ".siren/config.yaml"
+	baseDir := "/repo"
+	explicitlySet := true
+
+	// when
+	got := resolveConfigPath(configPath, baseDir, explicitlySet)
+
+	// then: should resolve relative to baseDir, not cwd
+	want := "/repo/.siren/config.yaml"
+	if got != want {
+		t.Errorf("resolveConfigPath: expected %q, got %q", want, got)
+	}
+}
+
+func TestResolveConfigPath_AbsoluteUnchanged(t *testing.T) {
+	// given: absolute config path
+	configPath := "/custom/config.yaml"
+	baseDir := "/repo"
+	explicitlySet := true
+
+	// when
+	got := resolveConfigPath(configPath, baseDir, explicitlySet)
+
+	// then: should remain unchanged
+	if got != configPath {
+		t.Errorf("resolveConfigPath: expected %q, got %q", configPath, got)
+	}
+}
+
+func TestResolveConfigPath_NotExplicit_UsesDefault(t *testing.T) {
+	// given: config not explicitly set
+	configPath := ".siren/config.yaml"
+	baseDir := "/repo"
+	explicitlySet := false
+
+	// when
+	got := resolveConfigPath(configPath, baseDir, explicitlySet)
+
+	// then: should use ConfigPath(baseDir)
+	want := sightjack.ConfigPath(baseDir)
+	if got != want {
+		t.Errorf("resolveConfigPath: expected %q, got %q", want, got)
+	}
+}
+
 func TestRunInit_OutputContainsPrompts(t *testing.T) {
 	// given
 	dir := t.TempDir()

@@ -77,10 +77,7 @@ func main() {
 		baseDir = wd
 	}
 
-	// Default configPath relative to baseDir when not explicitly set.
-	if !configExplicitlySet(fs) {
-		configPath = sightjack.ConfigPath(baseDir)
-	}
+	configPath = resolveConfigPath(configPath, baseDir, configExplicitlySet(fs))
 
 	sightjack.SetVerbose(verbose)
 
@@ -223,6 +220,19 @@ func setUsage(fs *flag.FlagSet) {
 
 // configExplicitlySet returns true if -c or --config was explicitly passed
 // on the command line (as opposed to using the default value).
+// resolveConfigPath returns the final config path.
+// When not explicitly set, it defaults to ConfigPath(baseDir).
+// When explicitly set with a relative path, it resolves against baseDir.
+func resolveConfigPath(configPath, baseDir string, explicitlySet bool) string {
+	if !explicitlySet {
+		return sightjack.ConfigPath(baseDir)
+	}
+	if !filepath.IsAbs(configPath) {
+		return filepath.Join(baseDir, configPath)
+	}
+	return configPath
+}
+
 func configExplicitlySet(fs *flag.FlagSet) bool {
 	explicit := false
 	fs.Visit(func(f *flag.Flag) {
