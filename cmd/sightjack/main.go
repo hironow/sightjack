@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,12 +17,13 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
-var version = "0.0.11"
+var version = "0.0.12"
 
 func main() {
-	// Extract subcommand before flag parsing so flags after the subcommand are honored.
+	// Extract subcommand and optional path before flag parsing so flags
+	// after the subcommand are honored.
 	// e.g. "sightjack scan --dry-run" and "sightjack --dry-run scan" both work.
-	subcmd, flagArgs, extractErr := extractSubcommand(os.Args[1:])
+	subcmd, repoPath, flagArgs, extractErr := extractSubcommand(os.Args[1:])
 	if extractErr != nil {
 		fmt.Fprintln(os.Stderr, extractErr)
 		os.Exit(1)
@@ -53,41 +55,51 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|show|session] [flags]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|show|session|init] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
+	}
+
+	// Resolve baseDir from path argument or cwd.
+	var baseDir string
+	if repoPath != "" {
+		absPath, err := filepath.Abs(repoPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid path: %v\n", err)
+			os.Exit(1)
+		}
+		baseDir = absPath
+	} else {
+		wd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to get working directory: %v\n", err)
+			os.Exit(1)
+		}
+		baseDir = wd
+	}
+
+	// Default configPath relative to baseDir when not explicitly set.
+	if configPath == "sightjack.yaml" {
+		configPath = filepath.Join(baseDir, "sightjack.yaml")
 	}
 
 	sightjack.SetVerbose(verbose)
 
 	switch subcmd {
 	case "scan":
-		cfg, err := sightjack.LoadConfig(configPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-			os.Exit(1)
-		}
+		cfg := loadConfigOrExit(configPath)
 		if lang != "" {
 			cfg.Lang = lang
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
-		runScan(ctx, cfg, dryRun)
+		runScan(ctx, cfg, baseDir, dryRun)
 	case "session":
-		cfg, err := sightjack.LoadConfig(configPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-			os.Exit(1)
-		}
+		cfg := loadConfigOrExit(configPath)
 		if lang != "" {
 			cfg.Lang = lang
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
-		baseDir, err := os.Getwd()
-		if err != nil {
-			sightjack.LogError("Failed to get working directory: %v", err)
-			os.Exit(1)
-		}
 
 		// Check for existing state (resume detection)
 		if !dryRun {
@@ -162,7 +174,12 @@ func main() {
 			os.Exit(1)
 		}
 	case "show":
-		runShow()
+		runShow(baseDir)
+	case "init":
+		if err := runInit(baseDir, os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -172,21 +189,24 @@ func setUsage(fs *flag.FlagSet) {
 	fs.Usage = func() {
 		out := fs.Output()
 		fmt.Fprintf(out, "sightjack — SIREN-inspired issue architecture tool for Linear\n\n")
-		fmt.Fprintf(out, "Usage: sightjack [command] [flags]\n\n")
+		fmt.Fprintf(out, "Usage: sightjack [command] [flags] [path]\n\n")
 		fmt.Fprintf(out, "Commands:\n")
 		fmt.Fprintf(out, "  scan      Classify and deep-scan Linear issues (default)\n")
 		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
-		fmt.Fprintf(out, "  show      Display last scan results\n\n")
+		fmt.Fprintf(out, "  show      Display last scan results\n")
+		fmt.Fprintf(out, "  init      Create sightjack.yaml interactively\n\n")
 		fmt.Fprintf(out, "Flags:\n")
 		fs.PrintDefaults()
 	}
 }
 
-// extractSubcommand finds the first known subcommand in args, returning it and the remaining flags.
-// Returns an error if a non-flag positional argument is found that isn't a known command.
+// extractSubcommand finds the first known subcommand and an optional path
+// argument in args, returning them along with the remaining flags.
+// A non-flag positional that isn't a known command is treated as a path.
+// At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
-func extractSubcommand(args []string) (string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "show": true, "session": true}
+func extractSubcommand(args []string) (string, string, []string, error) {
+	knownCmds := map[string]bool{"scan": true, "show": true, "session": true, "init": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
@@ -200,6 +220,7 @@ func extractSubcommand(args []string) (string, []string, error) {
 	}
 
 	var subcmd string
+	var path string
 	var filtered []string
 	skipNext := false
 	lastBoolFlag := "" // non-empty when the previous token was a boolean flag
@@ -234,26 +255,38 @@ func extractSubcommand(args []string) (string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|show|session] [flags]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|show|session|init] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
 		}
-		return "", nil, fmt.Errorf("unknown command: %s\nUsage: sightjack [scan|show|session]", arg)
+		// Non-flag, non-command positional — treat as path.
+		if path != "" {
+			return "", "", nil, fmt.Errorf("unexpected argument: %s\nOnly one path argument is allowed.", arg)
+		}
+		path = arg
 	}
 	if subcmd == "" {
 		subcmd = "scan"
 	}
-	return subcmd, filtered, nil
+	return subcmd, path, filtered, nil
 }
 
-func runScan(ctx context.Context, cfg *sightjack.Config, dryRun bool) {
-	baseDir, err := os.Getwd()
+// loadConfigOrExit loads the config file and exits with a helpful message on failure.
+func loadConfigOrExit(configPath string) *sightjack.Config {
+	cfg, err := sightjack.LoadConfig(configPath)
 	if err != nil {
-		sightjack.LogError("Failed to get working directory: %v", err)
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "Config not found: %s\nRun 'sightjack init' to create one.\n", configPath)
+		} else {
+			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		}
 		os.Exit(1)
 	}
+	return cfg
+}
 
+func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool) {
 	sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
 
 	sightjack.LogInfo("Starting sightjack scan...")
@@ -301,13 +334,7 @@ func runScan(ctx context.Context, cfg *sightjack.Config, dryRun bool) {
 	sightjack.LogOK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
 }
 
-func runShow() {
-	baseDir, err := os.Getwd()
-	if err != nil {
-		sightjack.LogError("Failed to get working directory: %v", err)
-		os.Exit(1)
-	}
-
+func runShow(baseDir string) {
 	state, err := sightjack.ReadState(baseDir)
 	if err != nil {
 		sightjack.LogError("No previous scan found: %v", err)
@@ -340,4 +367,65 @@ func runShow() {
 	fmt.Println()
 	fmt.Print(nav)
 	sightjack.LogInfo("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
+}
+
+// runInit creates a sightjack.yaml interactively by reading from r and
+// writing prompts to w. Returns an error if the config file already exists.
+func runInit(baseDir string, r io.Reader, w io.Writer) error {
+	cfgPath := filepath.Join(baseDir, "sightjack.yaml")
+	if _, err := os.Stat(cfgPath); err == nil {
+		return fmt.Errorf("sightjack.yaml already exists in %s", baseDir)
+	}
+
+	scanner := bufio.NewScanner(r)
+
+	fmt.Fprintln(w, "sightjack init — create sightjack.yaml")
+	fmt.Fprintln(w)
+
+	// team (required)
+	var team string
+	for team == "" {
+		fmt.Fprint(w, "Linear team name: ")
+		if !scanner.Scan() {
+			return fmt.Errorf("unexpected end of input")
+		}
+		team = strings.TrimSpace(scanner.Text())
+	}
+
+	// project (required)
+	var project string
+	for project == "" {
+		fmt.Fprint(w, "Linear project name: ")
+		if !scanner.Scan() {
+			return fmt.Errorf("unexpected end of input")
+		}
+		project = strings.TrimSpace(scanner.Text())
+	}
+
+	// lang (default: ja)
+	fmt.Fprint(w, "Language (ja/en) [ja]: ")
+	lang := "ja"
+	if scanner.Scan() {
+		if v := strings.TrimSpace(scanner.Text()); v != "" {
+			lang = v
+		}
+	}
+
+	// strictness (default: fog)
+	fmt.Fprint(w, "Strictness (fog/alert/lockdown) [fog]: ")
+	strictness := "fog"
+	if scanner.Scan() {
+		if v := strings.TrimSpace(scanner.Text()); v != "" {
+			strictness = v
+		}
+	}
+
+	content := sightjack.RenderInitConfig(team, project, lang, strictness)
+	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Created sightjack.yaml\n")
+	return nil
 }
