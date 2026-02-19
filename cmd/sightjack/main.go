@@ -16,7 +16,7 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
-var version = "0.9.0-dev"
+var version = "0.91.0-dev"
 
 func main() {
 	// Extract subcommand before flag parsing so flags after the subcommand are honored.
@@ -36,6 +36,7 @@ func main() {
 	)
 
 	fs := flag.NewFlagSet("sightjack", flag.ExitOnError)
+	setUsage(fs)
 	fs.StringVar(&configPath, "config", "sightjack.yaml", "Config file path")
 	fs.StringVar(&configPath, "c", "sightjack.yaml", "Config file path (shorthand)")
 	fs.StringVar(&lang, "lang", "", "Language override (ja/en)")
@@ -165,6 +166,22 @@ func main() {
 	}
 }
 
+// setUsage configures a custom usage function for the FlagSet that shows
+// available subcommands alongside the standard flag defaults.
+func setUsage(fs *flag.FlagSet) {
+	fs.Usage = func() {
+		out := fs.Output()
+		fmt.Fprintf(out, "sightjack — SIREN-inspired issue architecture tool for Linear\n\n")
+		fmt.Fprintf(out, "Usage: sightjack [command] [flags]\n\n")
+		fmt.Fprintf(out, "Commands:\n")
+		fmt.Fprintf(out, "  scan      Classify and deep-scan Linear issues (default)\n")
+		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
+		fmt.Fprintf(out, "  show      Display last scan results\n\n")
+		fmt.Fprintf(out, "Flags:\n")
+		fs.PrintDefaults()
+	}
+}
+
 // extractSubcommand finds the first known subcommand in args, returning it and the remaining flags.
 // Returns an error if a non-flag positional argument is found that isn't a known command.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
@@ -260,7 +277,7 @@ func runScan(ctx context.Context, cfg *sightjack.Config, dryRun bool) {
 
 	// Save state
 	state := &sightjack.SessionState{
-		Version:      "0.1",
+		Version:      sightjack.StateFormatVersion,
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  time.Now(),

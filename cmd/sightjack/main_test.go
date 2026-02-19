@@ -1,9 +1,32 @@
 package main
 
 import (
+	"bytes"
+	"flag"
 	"slices"
+	"strings"
 	"testing"
 )
+
+func TestUsageOutput_ContainsSubcommands(t *testing.T) {
+	// given: a FlagSet with our custom usage function
+	var buf bytes.Buffer
+	fs := flag.NewFlagSet("sightjack", flag.ContinueOnError)
+	fs.SetOutput(&buf)
+	fs.String("config", "sightjack.yaml", "Config file path")
+	setUsage(fs)
+
+	// when: usage is triggered
+	fs.Usage()
+
+	// then: output contains all subcommands
+	output := buf.String()
+	for _, cmd := range []string{"scan", "session", "show"} {
+		if !strings.Contains(output, cmd) {
+			t.Errorf("expected usage output to contain %q, got:\n%s", cmd, output)
+		}
+	}
+}
 
 func TestExtractSubcommand_BoolFlagWithValue(t *testing.T) {
 	tests := []struct {
