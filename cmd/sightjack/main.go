@@ -55,7 +55,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|show|session|init] [flags] [path]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -260,7 +260,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|show|session|init] [flags] [path]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|show|session|init|doctor] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
@@ -441,6 +441,10 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 			break
 		}
 		fmt.Fprintf(w, "  invalid strictness %q (valid: fog, alert, lockdown)\n", v)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("read input: %w", err)
 	}
 
 	content := sightjack.RenderInitConfig(team, project, lang, strictness)
