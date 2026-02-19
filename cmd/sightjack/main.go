@@ -384,7 +384,7 @@ func runShow(baseDir string) {
 		result.Clusters = append(result.Clusters, sightjack.ClusterScanResult{
 			Name:         c.Name,
 			Completeness: c.Completeness,
-			Issues:       make([]sightjack.IssueDetail, c.IssueCount),
+			IssueCount:   c.IssueCount,
 		})
 		result.TotalIssues += c.IssueCount
 	}

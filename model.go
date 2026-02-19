@@ -29,6 +29,16 @@ type ClusterScanResult struct {
 	Issues       []IssueDetail `json:"issues"`
 	Observations []string      `json:"observations"`
 	Labels       []string      `json:"labels,omitempty"`
+	IssueCount   int           `json:"-"` // computed; used when Issues is nil (e.g. show command)
+}
+
+// NumIssues returns the number of issues. It prefers len(Issues) when
+// the slice is populated and falls back to the IssueCount field.
+func (c ClusterScanResult) NumIssues() int {
+	if len(c.Issues) > 0 {
+		return len(c.Issues)
+	}
+	return c.IssueCount
 }
 
 // IssueDetail holds the deep scan analysis of a single issue.

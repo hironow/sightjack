@@ -554,6 +554,46 @@ func TestScanResult_StrictnessKeys(t *testing.T) {
 	}
 }
 
+func TestClusterScanResult_NumIssues_FromSlice(t *testing.T) {
+	// given: cluster with populated Issues slice
+	c := ClusterScanResult{
+		Name:   "Auth",
+		Issues: make([]IssueDetail, 5),
+	}
+
+	// when/then
+	if got := c.NumIssues(); got != 5 {
+		t.Errorf("NumIssues() = %d, want 5", got)
+	}
+}
+
+func TestClusterScanResult_NumIssues_FromIssueCount(t *testing.T) {
+	// given: cluster with IssueCount but no Issues slice (show command case)
+	c := ClusterScanResult{
+		Name:       "Auth",
+		IssueCount: 8,
+	}
+
+	// when/then
+	if got := c.NumIssues(); got != 8 {
+		t.Errorf("NumIssues() = %d, want 8", got)
+	}
+}
+
+func TestClusterScanResult_NumIssues_SliceTakesPrecedence(t *testing.T) {
+	// given: both Issues and IssueCount set — slice wins
+	c := ClusterScanResult{
+		Name:       "Auth",
+		Issues:     make([]IssueDetail, 3),
+		IssueCount: 10,
+	}
+
+	// when/then
+	if got := c.NumIssues(); got != 3 {
+		t.Errorf("NumIssues() = %d, want 3 (slice takes precedence)", got)
+	}
+}
+
 func TestScanResult_ClusterLabels_NilWhenNoLabels(t *testing.T) {
 	// given: cluster without labels
 	result := &ScanResult{
