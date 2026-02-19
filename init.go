@@ -2,7 +2,7 @@ package sightjack
 
 import "fmt"
 
-// RenderInitConfig generates a minimal sightjack.yaml content string.
+// RenderInitConfig generates a minimal config.yaml content string.
 // Only user-specified values are written; remaining fields are filled
 // by DefaultConfig when LoadConfig reads the file.
 func RenderInitConfig(team, project, lang, strictness string) string {

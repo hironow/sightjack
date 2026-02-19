@@ -253,7 +253,7 @@ func TestExtractOutputPath(t *testing.T) {
 		prompt string
 		want   string
 	}{
-		{"classify path", "Write JSON output to /tmp/test123/.siren/scans/s1/classify.json", "/tmp/test123/.siren/scans/s1/classify.json"},
+		{"classify path", "Write JSON output to /tmp/test123/.siren/.run/s1/classify.json", "/tmp/test123/.siren/.run/s1/classify.json"},
 		{"cluster path", "Output: /tmp/abc/cluster_00_auth_c00.json end", "/tmp/abc/cluster_00_auth_c00.json"},
 		{"no path", "Just some prompt text without a path", ""},
 	}

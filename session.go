@@ -86,7 +86,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default)); err != nil {
 			return fmt.Errorf("nextgen dry-run: %w", err)
 		}
-		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
+		LogOK("Dry-run complete. Check .siren/.run/ for generated prompts.")
 		return nil
 	}
 

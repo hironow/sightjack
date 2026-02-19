@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 func TestUsageOutput_ContainsSubcommands(t *testing.T) {
@@ -15,7 +17,7 @@ func TestUsageOutput_ContainsSubcommands(t *testing.T) {
 	var buf bytes.Buffer
 	fs := flag.NewFlagSet("sightjack", flag.ContinueOnError)
 	fs.SetOutput(&buf)
-	fs.String("config", "sightjack.yaml", "Config file path")
+	fs.String("config", ".siren/config.yaml", "Config file path")
 	setUsage(fs)
 
 	// when: usage is triggered
@@ -203,7 +205,7 @@ func TestRunInit_CreatesConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
-	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	cfgPath := sightjack.ConfigPath(dir)
 	data, readErr := os.ReadFile(cfgPath)
 	if readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
@@ -230,7 +232,7 @@ func TestRunInit_DefaultValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(dir, "sightjack.yaml"))
+	data, _ := os.ReadFile(sightjack.ConfigPath(dir))
 	content := string(data)
 	if !strings.Contains(content, `lang: "ja"`) {
 		t.Errorf("expected default lang 'ja' in config, got:\n%s", content)
@@ -241,9 +243,10 @@ func TestRunInit_DefaultValues(t *testing.T) {
 }
 
 func TestRunInit_ExistingConfigError(t *testing.T) {
-	// given: directory with existing sightjack.yaml
+	// given: directory with existing .siren/config.yaml
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "sightjack.yaml"), []byte("existing"), 0644)
+	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
+	os.WriteFile(sightjack.ConfigPath(dir), []byte("existing"), 0644)
 	input := strings.NewReader("Team\nProject\n\n\n")
 	var output bytes.Buffer
 
@@ -272,7 +275,7 @@ func TestRunInit_InvalidLang_RepromptsUntilValid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(dir, "sightjack.yaml"))
+	data, _ := os.ReadFile(sightjack.ConfigPath(dir))
 	content := string(data)
 	if !strings.Contains(content, `lang: "en"`) {
 		t.Errorf("expected lang 'en' in config, got:\n%s", content)
@@ -296,7 +299,7 @@ func TestRunInit_InvalidStrictness_RepromptsUntilValid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(dir, "sightjack.yaml"))
+	data, _ := os.ReadFile(sightjack.ConfigPath(dir))
 	content := string(data)
 	if !strings.Contains(content, "default: alert") {
 		t.Errorf("expected strictness 'alert' in config, got:\n%s", content)
@@ -346,7 +349,7 @@ func TestRunInit_StrictnessCaseInsensitive(t *testing.T) {
 			if err != nil {
 				t.Fatalf("runInit failed: %v", err)
 			}
-			data, _ := os.ReadFile(filepath.Join(dir, "sightjack.yaml"))
+			data, _ := os.ReadFile(sightjack.ConfigPath(dir))
 			content := string(data)
 			if !strings.Contains(content, "default: "+input.want) {
 				t.Errorf("expected strictness %q in config, got:\n%s", input.want, content)
@@ -358,8 +361,8 @@ func TestRunInit_StrictnessCaseInsensitive(t *testing.T) {
 func TestConfigExplicitlySet_NotSet(t *testing.T) {
 	// given: flags parsed without -c
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	fs.String("config", "sightjack.yaml", "")
-	fs.String("c", "sightjack.yaml", "")
+	fs.String("config", ".siren/config.yaml", "")
+	fs.String("c", ".siren/config.yaml", "")
 	fs.Parse([]string{})
 
 	// when
@@ -374,8 +377,8 @@ func TestConfigExplicitlySet_NotSet(t *testing.T) {
 func TestConfigExplicitlySet_WithConfigFlag(t *testing.T) {
 	// given: flags parsed with --config
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	fs.String("config", "sightjack.yaml", "")
-	fs.String("c", "sightjack.yaml", "")
+	fs.String("config", ".siren/config.yaml", "")
+	fs.String("c", ".siren/config.yaml", "")
 	fs.Parse([]string{"--config", "custom.yaml"})
 
 	// when
@@ -390,8 +393,8 @@ func TestConfigExplicitlySet_WithConfigFlag(t *testing.T) {
 func TestConfigExplicitlySet_WithShortFlag(t *testing.T) {
 	// given: flags parsed with -c
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	fs.String("config", "sightjack.yaml", "")
-	fs.String("c", "sightjack.yaml", "")
+	fs.String("config", ".siren/config.yaml", "")
+	fs.String("c", ".siren/config.yaml", "")
 	fs.Parse([]string{"-c", "sightjack.yaml"})
 
 	// when
@@ -417,7 +420,30 @@ func TestRunInit_OutputContainsPrompts(t *testing.T) {
 	if !strings.Contains(out, "Linear team name") {
 		t.Errorf("expected 'Linear team name' prompt in output, got:\n%s", out)
 	}
-	if !strings.Contains(out, "Created sightjack.yaml") {
+	if !strings.Contains(out, "Created .siren/config.yaml") {
 		t.Errorf("expected success message in output, got:\n%s", out)
+	}
+}
+
+func TestRunInit_CreatesGitIgnore(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	input := strings.NewReader("Team\nProject\n\n\n")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then: .siren/.gitignore should exist
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+	data, readErr := os.ReadFile(filepath.Join(dir, ".siren", ".gitignore"))
+	if readErr != nil {
+		t.Fatalf(".gitignore not created: %v", readErr)
+	}
+	content := string(data)
+	if !strings.Contains(content, "state.json") {
+		t.Errorf("expected state.json in .gitignore, got:\n%s", content)
 	}
 }

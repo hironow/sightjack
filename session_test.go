@@ -1326,7 +1326,7 @@ func TestResumeSession_ErrorOnMissingScanResultFile(t *testing.T) {
 func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 	// given: state says ADRCount=2, but filesystem has 3 ADR files
 	baseDir := t.TempDir()
-	scanDir := filepath.Join(baseDir, ".siren", "scans", "old-session")
+	scanDir := filepath.Join(baseDir, ".siren", ".run", "old-session")
 	os.MkdirAll(scanDir, 0755)
 
 	scanResult := &ScanResult{
@@ -1372,7 +1372,7 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 func TestCanResume_ValidState(t *testing.T) {
 	// given: state with valid ScanResultPath and non-empty Waves
 	dir := t.TempDir()
-	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
+	scanDir := filepath.Join(dir, ".siren", ".run", "s1")
 	os.MkdirAll(scanDir, 0755)
 	path := filepath.Join(scanDir, "scan_result.json")
 	os.WriteFile(path, []byte(`{}`), 0644)
@@ -1391,7 +1391,7 @@ func TestCanResume_ValidState(t *testing.T) {
 func TestCanResume_EmptyWaves(t *testing.T) {
 	// given: state with valid ScanResultPath but no waves (recovered state)
 	dir := t.TempDir()
-	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
+	scanDir := filepath.Join(dir, ".siren", ".run", "s1")
 	os.MkdirAll(scanDir, 0755)
 	path := filepath.Join(scanDir, "scan_result.json")
 	os.WriteFile(path, []byte(`{}`), 0644)

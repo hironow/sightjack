@@ -151,8 +151,12 @@ Legend:
 # Build and install
 go install github.com/hironow/sightjack/cmd/sightjack@latest
 
-# Create config
-cat > sightjack.yaml <<EOF
+# Create config interactively
+sightjack init
+
+# Or create manually
+mkdir -p .siren
+cat > .siren/config.yaml <<EOF
 linear:
   team: "ENG"
   project: "My Project"
@@ -163,7 +167,7 @@ EOF
 sightjack session
 ```
 
-Sightjack creates `.siren/` and all state files automatically at runtime.
+Sightjack creates `.siren/` and all state/run files automatically at runtime.
 
 ## Usage
 
@@ -185,7 +189,7 @@ sightjack session --dry-run
 sightjack session --lang ja
 
 # Custom config path
-sightjack session --config custom.yaml
+sightjack session --config .siren/config.yaml
 
 # Verbose logging
 sightjack session --verbose
@@ -195,7 +199,7 @@ sightjack session --verbose
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--config` | `-c` | `sightjack.yaml` | Config file path |
+| `--config` | `-c` | `.siren/config.yaml` | Config file path |
 | `--lang` | `-l` | config (`ja`) | Language override (`en` / `ja`) |
 | `--verbose` | `-v` | `false` | Verbose logging |
 | `--dry-run` | | `false` | Generate prompts without executing Claude |
@@ -204,7 +208,7 @@ sightjack session --verbose
 ## Configuration
 
 ```yaml
-# sightjack.yaml
+# .siren/config.yaml
 linear:
   team: "ENG"            # Linear team key
   project: "My Project"  # Linear project name
@@ -258,9 +262,9 @@ lang: "ja"               # Language (en/ja)
 +-- navigator.go             Matrix Navigator rendering
 +-- cli.go                   Interactive prompts (selection, approval, discuss)
 +-- claude.go                Claude Code subprocess runner
-+-- config.go                sightjack.yaml parser + defaults
++-- config.go                Config parser + defaults (.siren/config.yaml)
 +-- model.go                 Core types (Cluster, Issue, Wave, Action, etc.)
-+-- state.go                 State persistence (.siren/state.json)
++-- state.go                 State persistence + path helpers (.siren/)
 +-- prompt.go                Go template renderer for AI prompts
 +-- logger.go                Colored logging (LogOK, LogWarn, LogError, LogInfo)
 +-- *_test.go                Tests (227+)

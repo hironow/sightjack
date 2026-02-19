@@ -105,6 +105,89 @@ func TestStatePath(t *testing.T) {
 	}
 }
 
+func TestConfigPath(t *testing.T) {
+	// when
+	path := ConfigPath("/project")
+
+	// then
+	expected := filepath.Join("/project", ".siren", "config.yaml")
+	if path != expected {
+		t.Errorf("expected %s, got %s", expected, path)
+	}
+}
+
+func TestWriteGitIgnore(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, stateDir)
+	os.MkdirAll(sirenDir, 0755)
+
+	// when
+	err := WriteGitIgnore(dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("WriteGitIgnore failed: %v", err)
+	}
+	data, readErr := os.ReadFile(filepath.Join(sirenDir, ".gitignore"))
+	if readErr != nil {
+		t.Fatalf("read .gitignore: %v", readErr)
+	}
+	content := string(data)
+	if !strings.Contains(content, "state.json") {
+		t.Errorf("expected state.json in .gitignore, got:\n%s", content)
+	}
+	if !strings.Contains(content, ".run/") {
+		t.Errorf("expected .run/ in .gitignore, got:\n%s", content)
+	}
+}
+
+func TestWriteGitIgnore_Idempotent(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, stateDir)
+	os.MkdirAll(sirenDir, 0755)
+
+	// when: call twice
+	if err := WriteGitIgnore(dir); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+	if err := WriteGitIgnore(dir); err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+
+	// then: content should not be duplicated
+	data, _ := os.ReadFile(filepath.Join(sirenDir, ".gitignore"))
+	content := string(data)
+	if strings.Count(content, "state.json") != 1 {
+		t.Errorf("expected state.json exactly once, got:\n%s", content)
+	}
+	if strings.Count(content, ".run/") != 1 {
+		t.Errorf("expected .run/ exactly once, got:\n%s", content)
+	}
+}
+
+func TestEnsureScanDir_CreatesGitIgnore(t *testing.T) {
+	// given
+	dir := t.TempDir()
+
+	// when
+	_, err := EnsureScanDir(dir, "test-session")
+
+	// then
+	if err != nil {
+		t.Fatalf("EnsureScanDir failed: %v", err)
+	}
+	data, readErr := os.ReadFile(filepath.Join(dir, stateDir, ".gitignore"))
+	if readErr != nil {
+		t.Fatalf(".gitignore not created: %v", readErr)
+	}
+	content := string(data)
+	if !strings.Contains(content, "state.json") {
+		t.Errorf("expected state.json in .gitignore, got:\n%s", content)
+	}
+}
+
 func TestSessionState_ADRCount_Positive(t *testing.T) {
 	// given
 	state := SessionState{
@@ -296,7 +379,7 @@ func TestSessionState_ScanResultPath_RoundTrip(t *testing.T) {
 	state := &SessionState{
 		Version:        "0.5",
 		SessionID:      "test-scan-path",
-		ScanResultPath: ".siren/scans/session-123/scan_result.json",
+		ScanResultPath: ".siren/.run/session-123/scan_result.json",
 	}
 
 	// when
@@ -309,7 +392,7 @@ func TestSessionState_ScanResultPath_RoundTrip(t *testing.T) {
 	}
 
 	// then
-	if loaded.ScanResultPath != ".siren/scans/session-123/scan_result.json" {
+	if loaded.ScanResultPath != ".siren/.run/session-123/scan_result.json" {
 		t.Errorf("expected scan result path, got %s", loaded.ScanResultPath)
 	}
 }

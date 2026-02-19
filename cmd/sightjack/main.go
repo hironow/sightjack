@@ -39,8 +39,8 @@ func main() {
 
 	fs := flag.NewFlagSet("sightjack", flag.ExitOnError)
 	setUsage(fs)
-	fs.StringVar(&configPath, "config", "sightjack.yaml", "Config file path")
-	fs.StringVar(&configPath, "c", "sightjack.yaml", "Config file path (shorthand)")
+	fs.StringVar(&configPath, "config", ".siren/config.yaml", "Config file path")
+	fs.StringVar(&configPath, "c", ".siren/config.yaml", "Config file path (shorthand)")
 	fs.StringVar(&lang, "lang", "", "Language override (ja/en)")
 	fs.StringVar(&lang, "l", "", "Language override (shorthand)")
 	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
@@ -79,7 +79,7 @@ func main() {
 
 	// Default configPath relative to baseDir when not explicitly set.
 	if !configExplicitlySet(fs) {
-		configPath = filepath.Join(baseDir, "sightjack.yaml")
+		configPath = sightjack.ConfigPath(baseDir)
 	}
 
 	sightjack.SetVerbose(verbose)
@@ -117,7 +117,7 @@ func main() {
 				// lexicographic order matches creation time. Iterate in descending
 				// order and use the first directory with recoverable data, so a
 				// crashed/corrupt newest session doesn't block recovery from older ones.
-				scansDir := filepath.Join(baseDir, ".siren", "scans")
+				scansDir := filepath.Join(baseDir, ".siren", ".run")
 				entries, dirErr := os.ReadDir(scansDir)
 				if dirErr == nil && len(entries) > 0 {
 					for i := len(entries) - 1; i >= 0; i-- {
@@ -214,7 +214,7 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "  scan      Classify and deep-scan Linear issues (default)\n")
 		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
-		fmt.Fprintf(out, "  init      Create sightjack.yaml interactively\n")
+		fmt.Fprintf(out, "  init      Create .siren/config.yaml interactively\n")
 		fmt.Fprintf(out, "  doctor    Check environment and tool availability\n\n")
 		fmt.Fprintf(out, "Flags:\n")
 		fs.PrintDefaults()
@@ -332,7 +332,7 @@ func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun 
 	}
 
 	if dryRun {
-		sightjack.LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
+		sightjack.LogOK("Dry-run complete. Check .siren/.run/ for generated prompts.")
 		return
 	}
 
@@ -403,17 +403,17 @@ func runShow(baseDir string) {
 	sightjack.LogInfo("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
 }
 
-// runInit creates a sightjack.yaml interactively by reading from r and
+// runInit creates .siren/config.yaml interactively by reading from r and
 // writing prompts to w. Returns an error if the config file already exists.
 func runInit(baseDir string, r io.Reader, w io.Writer) error {
-	cfgPath := filepath.Join(baseDir, "sightjack.yaml")
+	cfgPath := sightjack.ConfigPath(baseDir)
 	if _, err := os.Stat(cfgPath); err == nil {
-		return fmt.Errorf("sightjack.yaml already exists in %s", baseDir)
+		return fmt.Errorf(".siren/config.yaml already exists in %s", baseDir)
 	}
 
 	scanner := bufio.NewScanner(r)
 
-	fmt.Fprintln(w, "sightjack init — create sightjack.yaml")
+	fmt.Fprintln(w, "sightjack init — create .siren/config.yaml")
 	fmt.Fprintln(w)
 
 	// team (required)
@@ -476,13 +476,22 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 		return fmt.Errorf("read input: %w", err)
 	}
 
+	// Ensure .siren/ directory exists
+	sirenDir := filepath.Join(baseDir, ".siren")
+	if err := os.MkdirAll(sirenDir, 0755); err != nil {
+		return fmt.Errorf("create .siren dir: %w", err)
+	}
+
 	content := sightjack.RenderInitConfig(team, project, lang, strictness)
 	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 
+	// Write .gitignore (best-effort)
+	_ = sightjack.WriteGitIgnore(baseDir)
+
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Created sightjack.yaml\n")
+	fmt.Fprintf(w, "Created .siren/config.yaml\n")
 	return nil
 }
 
