@@ -23,7 +23,7 @@ func TestUsageOutput_ContainsSubcommands(t *testing.T) {
 
 	// then: output contains all subcommands
 	output := buf.String()
-	for _, cmd := range []string{"scan", "session", "show", "init"} {
+	for _, cmd := range []string{"scan", "session", "show", "init", "doctor"} {
 		if !strings.Contains(output, cmd) {
 			t.Errorf("expected usage output to contain %q, got:\n%s", cmd, output)
 		}
@@ -151,6 +151,17 @@ func TestExtractSubcommand(t *testing.T) {
 			wantCmd:   "scan",
 			wantPath:  "/tmp/repo",
 			wantFlags: []string{"-c", "custom.yaml"},
+		},
+		{
+			name:    "doctor without path",
+			args:    []string{"doctor"},
+			wantCmd: "doctor",
+		},
+		{
+			name:     "doctor with path",
+			args:     []string{"doctor", "/tmp/repo"},
+			wantCmd:  "doctor",
+			wantPath: "/tmp/repo",
 		},
 	}
 

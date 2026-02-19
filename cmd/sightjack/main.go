@@ -180,6 +180,10 @@ func main() {
 			fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 			os.Exit(1)
 		}
+	case "doctor":
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		runDoctor(ctx, configPath)
 	}
 }
 
@@ -194,7 +198,8 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "  scan      Classify and deep-scan Linear issues (default)\n")
 		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
-		fmt.Fprintf(out, "  init      Create sightjack.yaml interactively\n\n")
+		fmt.Fprintf(out, "  init      Create sightjack.yaml interactively\n")
+		fmt.Fprintf(out, "  doctor    Check environment and tool availability\n\n")
 		fmt.Fprintf(out, "Flags:\n")
 		fs.PrintDefaults()
 	}
@@ -206,7 +211,7 @@ func setUsage(fs *flag.FlagSet) {
 // At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "show": true, "session": true, "init": true}
+	knownCmds := map[string]bool{"scan": true, "show": true, "session": true, "init": true, "doctor": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
@@ -428,4 +433,39 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Created sightjack.yaml\n")
 	return nil
+}
+
+func runDoctor(ctx context.Context, configPath string) {
+	fmt.Println("sightjack doctor — environment health check")
+	fmt.Println()
+
+	results := sightjack.RunDoctor(ctx, configPath)
+
+	var fails, skips int
+	for _, r := range results {
+		fmt.Printf("[%s] %s: %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		switch r.Status {
+		case sightjack.CheckFail:
+			fails++
+		case sightjack.CheckSkip:
+			skips++
+		}
+	}
+
+	fmt.Println()
+	if fails == 0 && skips == 0 {
+		fmt.Println("All checks passed.")
+	} else {
+		parts := []string{}
+		if fails > 0 {
+			parts = append(parts, fmt.Sprintf("%d check(s) failed", fails))
+		}
+		if skips > 0 {
+			parts = append(parts, fmt.Sprintf("%d skipped", skips))
+		}
+		fmt.Println(strings.Join(parts, ", ") + ".")
+		if fails > 0 {
+			os.Exit(1)
+		}
+	}
 }
