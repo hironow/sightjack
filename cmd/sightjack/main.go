@@ -374,13 +374,13 @@ func runShow(baseDir string) {
 
 	// Restore waves from state for matrix navigator
 	waves := sightjack.RestoreWaves(state.Waves)
-	lastScanned := state.LastScanned
 
 	strictness := state.StrictnessLevel
 	if strictness == "" {
 		strictness = "fog" // backward compat: older state files lack this field
 	}
-	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, &lastScanned, strictness, state.ShibitoCount)
+	// show is not a resume flow — pass nil for lastScanned to suppress "Session: resumed" banner
+	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, nil, strictness, state.ShibitoCount)
 	fmt.Println()
 	fmt.Print(nav)
 	sightjack.LogInfo("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
