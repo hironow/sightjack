@@ -9,7 +9,8 @@ import (
 
 // StrictnessConfig holds DoD strictness level settings.
 type StrictnessConfig struct {
-	Default StrictnessLevel `yaml:"default"`
+	Default   StrictnessLevel            `yaml:"default"`
+	Overrides map[string]StrictnessLevel `yaml:"overrides"`
 }
 
 // DoDTemplate holds must/should Definition of Done items for a category.
@@ -67,6 +68,38 @@ type ClaudeConfig struct {
 	Command    string `yaml:"command"`
 	Model      string `yaml:"model"`
 	TimeoutSec int    `yaml:"timeout_sec"`
+}
+
+// strictnessRank returns a numeric rank for ordering: higher = stricter.
+func strictnessRank(level StrictnessLevel) int {
+	switch level {
+	case StrictnessFog:
+		return 0
+	case StrictnessAlert:
+		return 1
+	case StrictnessLockdown:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// ResolveStrictness determines the effective strictness level for a set of labels.
+// When overrides match one or more labels, the strictest matching level wins
+// (lockdown > alert > fog). Returns the default level when no overrides match.
+func ResolveStrictness(cfg StrictnessConfig, labels []string) StrictnessLevel {
+	if len(cfg.Overrides) == 0 || len(labels) == 0 {
+		return cfg.Default
+	}
+	best := cfg.Default
+	for _, label := range labels {
+		if level, ok := cfg.Overrides[label]; ok {
+			if strictnessRank(level) > strictnessRank(best) {
+				best = level
+			}
+		}
+	}
+	return best
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.

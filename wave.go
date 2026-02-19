@@ -98,11 +98,14 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (
 		return nil, fmt.Errorf("marshal wave actions: %w", err)
 	}
 
+	dodSection := ResolveDoDSection(cfg.DoDTemplates, wave.ClusterName)
+
 	prompt, err := RenderWaveApplyPrompt(cfg.Lang, WaveApplyPromptData{
 		WaveID:          wave.ID,
 		ClusterName:     wave.ClusterName,
 		Title:           wave.Title,
 		Actions:         string(actionsJSON),
+		DoDSection:      dodSection,
 		OutputPath:      applyFile,
 		StrictnessLevel: string(cfg.Strictness.Default),
 		LabelsEnabled:   cfg.Labels.Enabled,

@@ -173,12 +173,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				return fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
 			}
 
-			var dodSection string
-			if cfg.DoDTemplates != nil {
-				if matched, key := MatchDoDTemplate(cfg.DoDTemplates, cluster.Name); matched {
-					dodSection = FormatDoDSection(cfg.DoDTemplates[key])
-				}
-			}
+			dodSection := ResolveDoDSection(cfg.DoDTemplates, cluster.Name)
 
 			prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
 				ClusterName:     cluster.Name,

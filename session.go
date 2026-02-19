@@ -14,7 +14,7 @@ import (
 // StateFormatVersion is the version string written into SessionState files.
 // Centralised so that all code paths (scan, session, recovery) produce
 // consistent state files.
-const StateFormatVersion = "0.0.10"
+const StateFormatVersion = "0.0.11"
 
 // CalcNewlyUnlocked computes how many waves were newly unlocked after completing a wave.
 // oldAvailable is the available count before the wave was completed (includes the completing wave).
@@ -322,6 +322,8 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		}
 		if clusterForNextgen.Name == "" {
 			LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
+		} else if !NeedsMoreWaves(clusterForNextgen, waves) {
+			LogDebug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
 		} else {
 			completedWavesForCluster := completedWavesInCluster(waves, selected.ClusterName)
 			existingADRs, adrErr := ReadExistingADRs(adrDir)

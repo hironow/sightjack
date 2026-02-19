@@ -104,3 +104,48 @@ func TestLogLine_WithColor(t *testing.T) {
 		t.Errorf("expected color reset in output")
 	}
 }
+
+func TestLogError_WritesToStderr(t *testing.T) {
+	// given: capture logLineTo output with ERR prefix
+	var buf bytes.Buffer
+	logLineTo(&buf, " ERR", colorRed, "something failed: %s", "timeout")
+	line := buf.String()
+
+	// then: should contain ERR prefix and message
+	if !strings.Contains(line, " ERR") {
+		t.Errorf("expected ERR prefix, got: %s", line)
+	}
+	if !strings.Contains(line, "something failed: timeout") {
+		t.Errorf("expected error message, got: %s", line)
+	}
+}
+
+func TestLogWarn_WritesToStderr(t *testing.T) {
+	// given: capture logLineTo output with WARN prefix
+	var buf bytes.Buffer
+	logLineTo(&buf, "WARN", colorYellow, "low disk space")
+	line := buf.String()
+
+	// then: should contain WARN prefix and message
+	if !strings.Contains(line, "WARN") {
+		t.Errorf("expected WARN prefix, got: %s", line)
+	}
+	if !strings.Contains(line, "low disk space") {
+		t.Errorf("expected warning message, got: %s", line)
+	}
+}
+
+func TestLogInfo_WritesToStdout(t *testing.T) {
+	// given: capture logLineTo output with INFO prefix
+	var buf bytes.Buffer
+	logLineTo(&buf, "INFO", colorCyan, "starting scan")
+	line := buf.String()
+
+	// then: should contain INFO prefix and message
+	if !strings.Contains(line, "INFO") {
+		t.Errorf("expected INFO prefix, got: %s", line)
+	}
+	if !strings.Contains(line, "starting scan") {
+		t.Errorf("expected info message, got: %s", line)
+	}
+}

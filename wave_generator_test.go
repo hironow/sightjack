@@ -1,6 +1,7 @@
 package sightjack
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,6 +93,218 @@ func TestParseNextGenResult_MissingFile(t *testing.T) {
 	_, err := ParseNextGenResult("/nonexistent/file.json")
 	if err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestBuildNextGenPrompt_WithDoDTemplates(t *testing.T) {
+	// given: config with DoD templates matching cluster
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := DefaultConfig()
+	cfg.DoDTemplates = map[string]DoDTemplate{
+		"Auth": {Must: []string{"Unit tests required"}, Should: []string{"Integration tests"}},
+	}
+	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.65,
+		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
+	}
+
+	// when
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("buildNextGenPrompt: %v", err)
+	}
+	if !strings.Contains(prompt, "Unit tests required") {
+		t.Error("expected DoD Must item in prompt")
+	}
+	if !strings.Contains(prompt, "Integration tests") {
+		t.Error("expected DoD Should item in prompt")
+	}
+}
+
+func TestBuildNextGenPrompt_WithRejectedActions(t *testing.T) {
+	// given: rejected actions from a previous wave
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := DefaultConfig()
+	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.65,
+		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+	}
+	rejected := []WaveAction{
+		{Type: "add_dod", IssueID: "ENG-101", Description: "Rejected DoD"},
+	}
+
+	// when
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected)
+
+	// then
+	if err != nil {
+		t.Fatalf("buildNextGenPrompt: %v", err)
+	}
+	if !strings.Contains(prompt, "Rejected DoD") {
+		t.Error("expected rejected action description in prompt")
+	}
+	if !strings.Contains(prompt, "ENG-101") {
+		t.Error("expected rejected action issue ID in prompt")
+	}
+}
+
+func TestBuildNextGenPrompt_NilOptionals(t *testing.T) {
+	// given: all optional fields are nil/empty
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := DefaultConfig()
+	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.5,
+		Issues:       []IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+	}
+
+	// when: nil DoD, nil ADRs, nil rejected, nil completedWaves
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil)
+
+	// then: should not panic and should produce valid prompt
+	if err != nil {
+		t.Fatalf("buildNextGenPrompt: %v", err)
+	}
+	if !strings.Contains(prompt, "Auth") {
+		t.Error("expected cluster name in prompt")
+	}
+	if !strings.Contains(prompt, "50") {
+		t.Error("expected completeness percentage in prompt")
+	}
+}
+
+func TestBuildNextGenPrompt_WithExistingADRs(t *testing.T) {
+	// given: existing ADRs
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := DefaultConfig()
+	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.65,
+		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+	}
+	adrs := []ExistingADR{
+		{Filename: "0001-use-jwt.md", Content: "We chose JWT for auth tokens."},
+	}
+
+	// when
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("buildNextGenPrompt: %v", err)
+	}
+	if !strings.Contains(prompt, "0001-use-jwt.md") {
+		t.Error("expected ADR filename in prompt")
+	}
+	if !strings.Contains(prompt, "JWT for auth tokens") {
+		t.Error("expected ADR content in prompt")
+	}
+}
+
+func TestNeedsMoreWaves_HighCompleteness_False(t *testing.T) {
+	// given: cluster completeness >= 0.95
+	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.96}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
+	}
+
+	// when
+	result := NeedsMoreWaves(cluster, waves)
+
+	// then
+	if result {
+		t.Error("expected false when completeness >= 0.95")
+	}
+}
+
+func TestNeedsMoreWaves_RemainingWaves_False(t *testing.T) {
+	// given: available waves still exist
+	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
+		{ID: "auth-w2", ClusterName: "Auth", Status: "available"},
+	}
+
+	// when
+	result := NeedsMoreWaves(cluster, waves)
+
+	// then
+	if result {
+		t.Error("expected false when available waves remain")
+	}
+}
+
+func TestNeedsMoreWaves_WaveCapReached_False(t *testing.T) {
+	// given: 8 waves already exist for this cluster
+	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.6}
+	var waves []Wave
+	for i := range 8 {
+		waves = append(waves, Wave{
+			ID:          fmt.Sprintf("auth-w%d", i+1),
+			ClusterName: "Auth",
+			Status:      "completed",
+		})
+	}
+
+	// when
+	result := NeedsMoreWaves(cluster, waves)
+
+	// then
+	if result {
+		t.Error("expected false when wave cap (8) reached")
+	}
+}
+
+func TestNeedsMoreWaves_LowCompleteness_NoRemaining_True(t *testing.T) {
+	// given: low completeness, all waves completed, under cap
+	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
+	}
+
+	// when
+	result := NeedsMoreWaves(cluster, waves)
+
+	// then
+	if !result {
+		t.Error("expected true when completeness low, no remaining waves, under cap")
+	}
+}
+
+func TestNeedsMoreWaves_IgnoresOtherClusterWaves(t *testing.T) {
+	// given: waves from other clusters should not affect count
+	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
+		{ID: "infra-w1", ClusterName: "Infra", Status: "available"},
+	}
+
+	// when
+	result := NeedsMoreWaves(cluster, waves)
+
+	// then
+	if !result {
+		t.Error("expected true: other cluster's waves should not count")
 	}
 }
 

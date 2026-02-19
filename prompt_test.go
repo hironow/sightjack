@@ -863,6 +863,57 @@ func TestRenderWaveApplyPromptNoReadySection(t *testing.T) {
 	}
 }
 
+func TestRenderWaveApplyPrompt_WithDoDSection(t *testing.T) {
+	// given: wave apply prompt with DoD section
+	data := WaveApplyPromptData{
+		WaveID:          "auth-w1",
+		ClusterName:     "Auth",
+		Title:           "Dependency Ordering",
+		Actions:         `[{"type":"add_dod","issue_id":"ENG-101"}]`,
+		OutputPath:      "/tmp/apply.json",
+		StrictnessLevel: "alert",
+		DoDSection:      "Must:\n- Unit tests required\nShould:\n- Integration tests\n",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if !strings.Contains(result, "Unit tests required") {
+			t.Errorf("lang=%s: expected DoD Must item in prompt", lang)
+		}
+		if !strings.Contains(result, "Integration tests") {
+			t.Errorf("lang=%s: expected DoD Should item in prompt", lang)
+		}
+	}
+}
+
+func TestRenderWaveApplyPrompt_WithoutDoDSection(t *testing.T) {
+	// given: wave apply prompt without DoD section
+	data := WaveApplyPromptData{
+		WaveID:          "auth-w1",
+		ClusterName:     "Auth",
+		Title:           "Dependency Ordering",
+		Actions:         `[{"type":"add_dod","issue_id":"ENG-101"}]`,
+		OutputPath:      "/tmp/apply.json",
+		StrictnessLevel: "fog",
+		DoDSection:      "",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if strings.Contains(result, "Definition of Done") || strings.Contains(result, "完成基準") {
+			t.Errorf("lang=%s: DoD section should not appear when empty", lang)
+		}
+	}
+}
+
 func TestRenderReadyLabelPrompt(t *testing.T) {
 	// given
 	data := ReadyLabelPromptData{

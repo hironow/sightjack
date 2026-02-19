@@ -9,6 +9,39 @@ import (
 	"path/filepath"
 )
 
+// maxWavesPerCluster is the cap on total waves per cluster.
+// Beyond this count, nextgen is skipped to prevent infinite wave growth.
+const maxWavesPerCluster = 8
+
+// NeedsMoreWaves returns true when post-completion wave generation should run
+// for the given cluster. It returns false (skip nextgen) when any of:
+//   - cluster completeness >= 0.95 (effectively done)
+//   - available (non-completed) waves still remain for the cluster
+//   - total wave count for the cluster >= maxWavesPerCluster
+func NeedsMoreWaves(cluster ClusterScanResult, waves []Wave) bool {
+	if cluster.Completeness >= 0.95 {
+		return false
+	}
+	var clusterTotal int
+	hasAvailable := false
+	for _, w := range waves {
+		if w.ClusterName != cluster.Name {
+			continue
+		}
+		clusterTotal++
+		if w.Status == "available" || w.Status == "locked" {
+			hasAvailable = true
+		}
+	}
+	if hasAvailable {
+		return false
+	}
+	if clusterTotal >= maxWavesPerCluster {
+		return false
+	}
+	return true
+}
+
 // nextgenFileName returns the output filename for a nextgen wave generation run.
 func nextgenFileName(wave Wave) string {
 	return fmt.Sprintf("nextgen_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
@@ -93,12 +126,7 @@ func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		rejectedStr = string(rejectedJSON)
 	}
 
-	var dodSection string
-	if cfg.DoDTemplates != nil {
-		if matched, key := MatchDoDTemplate(cfg.DoDTemplates, completedWave.ClusterName); matched {
-			dodSection = FormatDoDSection(cfg.DoDTemplates[key])
-		}
-	}
+	dodSection := ResolveDoDSection(cfg.DoDTemplates, completedWave.ClusterName)
 
 	return RenderNextGenPrompt(cfg.Lang, NextGenPromptData{
 		ClusterName:     completedWave.ClusterName,

@@ -16,7 +16,7 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
-var version = "0.0.10"
+var version = "0.0.11"
 
 func main() {
 	// Extract subcommand before flag parsing so flags after the subcommand are honored.
@@ -314,7 +314,7 @@ func runShow() {
 		os.Exit(1)
 	}
 
-	// Reconstruct minimal ScanResult from state
+	// Reconstruct ScanResult from state
 	result := &sightjack.ScanResult{
 		Completeness: state.Completeness,
 	}
@@ -322,11 +322,16 @@ func runShow() {
 		result.Clusters = append(result.Clusters, sightjack.ClusterScanResult{
 			Name:         c.Name,
 			Completeness: c.Completeness,
+			Issues:       make([]sightjack.IssueDetail, c.IssueCount),
 		})
 		result.TotalIssues += c.IssueCount
 	}
 
-	nav := sightjack.RenderNavigator(result, state.Project)
+	// Restore waves from state for matrix navigator
+	waves := sightjack.RestoreWaves(state.Waves)
+	lastScanned := state.LastScanned
+
+	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, &lastScanned, "fog", state.ShibitoCount)
 	fmt.Println()
 	fmt.Print(nav)
 	sightjack.LogInfo("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))

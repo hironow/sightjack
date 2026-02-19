@@ -47,6 +47,7 @@ type WaveApplyPromptData struct {
 	ClusterName     string
 	Title           string
 	Actions         string
+	DoDSection      string
 	OutputPath      string
 	StrictnessLevel string
 	LabelsEnabled   bool
@@ -119,6 +120,21 @@ func MatchDoDTemplate(templates map[string]DoDTemplate, clusterName string) (boo
 		return false, ""
 	}
 	return true, bestKey
+}
+
+// ResolveDoDSection looks up a DoD template matching clusterName and formats
+// it as a text section. Returns "" when no matching template is found or when
+// the templates map is nil. This consolidates the MatchDoDTemplate + FormatDoDSection
+// pattern used in scanner, wave_generator, and wave.
+func ResolveDoDSection(templates map[string]DoDTemplate, clusterName string) string {
+	if templates == nil {
+		return ""
+	}
+	matched, key := MatchDoDTemplate(templates, clusterName)
+	if !matched {
+		return ""
+	}
+	return FormatDoDSection(templates[key])
 }
 
 // FormatDoDSection formats a DoD template into a text section for prompt injection.

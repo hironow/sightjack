@@ -58,8 +58,8 @@ func formatLogLine(w io.Writer, prefix, color string, format string, args ...any
 	}
 }
 
-func logLine(prefix, color string, format string, args ...any) {
-	formatLogLine(os.Stdout, prefix, color, format, args...)
+func logLineTo(w io.Writer, prefix, color string, format string, args ...any) {
+	formatLogLine(w, prefix, color, format, args...)
 	logMu.Lock()
 	defer logMu.Unlock()
 	if logFile != nil {
@@ -69,15 +69,15 @@ func logLine(prefix, color string, format string, args ...any) {
 	}
 }
 
-func LogInfo(format string, args ...any)  { logLine("INFO", colorCyan, format, args...) }
-func LogOK(format string, args ...any)    { logLine(" OK ", colorGreen, format, args...) }
-func LogWarn(format string, args ...any)  { logLine("WARN", colorYellow, format, args...) }
-func LogError(format string, args ...any) { logLine(" ERR", colorRed, format, args...) }
-func LogScan(format string, args ...any)  { logLine("SCAN", colorBlue, format, args...) }
-func LogNav(format string, args ...any)   { logLine(" NAV", colorPurple, format, args...) }
+func LogInfo(format string, args ...any)  { logLineTo(os.Stdout, "INFO", colorCyan, format, args...) }
+func LogOK(format string, args ...any)    { logLineTo(os.Stdout, " OK ", colorGreen, format, args...) }
+func LogWarn(format string, args ...any)  { logLineTo(os.Stderr, "WARN", colorYellow, format, args...) }
+func LogError(format string, args ...any) { logLineTo(os.Stderr, " ERR", colorRed, format, args...) }
+func LogScan(format string, args ...any)  { logLineTo(os.Stdout, "SCAN", colorBlue, format, args...) }
+func LogNav(format string, args ...any)   { logLineTo(os.Stdout, " NAV", colorPurple, format, args...) }
 func LogDebug(format string, args ...any) {
 	if verboseMode {
-		logLine("DBUG", colorCyan, format, args...)
+		logLineTo(os.Stdout, "DBUG", colorCyan, format, args...)
 	}
 }
 

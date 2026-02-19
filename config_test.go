@@ -502,6 +502,133 @@ labels:
 	}
 }
 
+func TestResolveStrictness_DefaultWhenNoOverrides(t *testing.T) {
+	// given: config with no overrides
+	cfg := StrictnessConfig{Default: StrictnessFog}
+
+	// when
+	result := ResolveStrictness(cfg, []string{"feature", "bug"})
+
+	// then
+	if result != StrictnessFog {
+		t.Errorf("expected fog, got %s", result)
+	}
+}
+
+func TestResolveStrictness_SingleLabelMatch(t *testing.T) {
+	// given: override for "security" label
+	cfg := StrictnessConfig{
+		Default:   StrictnessFog,
+		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	}
+
+	// when
+	result := ResolveStrictness(cfg, []string{"feature", "security"})
+
+	// then
+	if result != StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", result)
+	}
+}
+
+func TestResolveStrictness_StrictestWins(t *testing.T) {
+	// given: multiple matching overrides with different levels
+	cfg := StrictnessConfig{
+		Default: StrictnessFog,
+		Overrides: map[string]StrictnessLevel{
+			"enhancement": StrictnessAlert,
+			"security":    StrictnessLockdown,
+		},
+	}
+
+	// when: both labels match
+	result := ResolveStrictness(cfg, []string{"enhancement", "security"})
+
+	// then: lockdown > alert, so lockdown wins
+	if result != StrictnessLockdown {
+		t.Errorf("expected lockdown (strictest), got %s", result)
+	}
+}
+
+func TestResolveStrictness_NilOverrides(t *testing.T) {
+	// given: nil overrides map
+	cfg := StrictnessConfig{Default: StrictnessAlert}
+
+	// when
+	result := ResolveStrictness(cfg, []string{"anything"})
+
+	// then
+	if result != StrictnessAlert {
+		t.Errorf("expected alert default, got %s", result)
+	}
+}
+
+func TestResolveStrictness_EmptyLabels(t *testing.T) {
+	// given: overrides exist but no labels provided
+	cfg := StrictnessConfig{
+		Default:   StrictnessFog,
+		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	}
+
+	// when
+	result := ResolveStrictness(cfg, nil)
+
+	// then
+	if result != StrictnessFog {
+		t.Errorf("expected fog default, got %s", result)
+	}
+}
+
+func TestResolveStrictness_NoMatchingLabels(t *testing.T) {
+	// given: overrides exist but labels don't match
+	cfg := StrictnessConfig{
+		Default:   StrictnessFog,
+		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	}
+
+	// when
+	result := ResolveStrictness(cfg, []string{"feature", "backend"})
+
+	// then
+	if result != StrictnessFog {
+		t.Errorf("expected fog default, got %s", result)
+	}
+}
+
+func TestLoadConfig_StrictnessOverrides(t *testing.T) {
+	// given: config with strictness overrides
+	content := `
+linear:
+  team: test
+  project: test
+strictness:
+  default: fog
+  overrides:
+    security: lockdown
+    performance: alert
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	// when
+	cfg, err := LoadConfig(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if len(cfg.Strictness.Overrides) != 2 {
+		t.Fatalf("expected 2 overrides, got %d", len(cfg.Strictness.Overrides))
+	}
+	if cfg.Strictness.Overrides["security"] != StrictnessLockdown {
+		t.Errorf("security: expected lockdown, got %s", cfg.Strictness.Overrides["security"])
+	}
+	if cfg.Strictness.Overrides["performance"] != StrictnessAlert {
+		t.Errorf("performance: expected alert, got %s", cfg.Strictness.Overrides["performance"])
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()
