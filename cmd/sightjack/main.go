@@ -198,7 +198,7 @@ func main() {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
-		runDoctor(ctx, configPath)
+		runDoctor(ctx, configPath, baseDir)
 		sightjack.EndRootSpan(ctx)
 	}
 }
@@ -495,11 +495,11 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 	return nil
 }
 
-func runDoctor(ctx context.Context, configPath string) {
+func runDoctor(ctx context.Context, configPath string, baseDir string) {
 	fmt.Println("sightjack doctor — environment health check")
 	fmt.Println()
 
-	results := sightjack.RunDoctor(ctx, configPath)
+	results := sightjack.RunDoctor(ctx, configPath, baseDir)
 
 	var fails, skips int
 	for _, r := range results {

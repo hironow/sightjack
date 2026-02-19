@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -113,15 +115,46 @@ func checkLinearMCP(ctx context.Context, cfg *Config) CheckResult {
 	}
 }
 
+// checkStateDir verifies that the .siren/ state directory exists or can be
+// created, and that it is writable. Uses a temporary file probe to confirm.
+func checkStateDir(baseDir string) CheckResult {
+	dir := filepath.Join(baseDir, stateDir)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return CheckResult{
+			Name:    "State Dir",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("cannot create %s: %v", dir, err),
+		}
+	}
+	probe := filepath.Join(dir, ".doctor_probe")
+	if err := os.WriteFile(probe, []byte("ok"), 0644); err != nil {
+		return CheckResult{
+			Name:    "State Dir",
+			Status:  CheckFail,
+			Message: fmt.Sprintf("%s is not writable: %v", dir, err),
+		}
+	}
+	os.Remove(probe)
+	return CheckResult{
+		Name:    "State Dir",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%s writable", dir),
+	}
+}
+
 // RunDoctor executes all health checks and returns the results.
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
-func RunDoctor(ctx context.Context, configPath string) []CheckResult {
+// baseDir is used to verify the .siren/ state directory is writable.
+func RunDoctor(ctx context.Context, configPath string, baseDir string) []CheckResult {
 	var results []CheckResult
 
 	// 1. Config check
 	cfgResult := checkConfig(configPath)
 	results = append(results, cfgResult)
+
+	// 2. State directory check
+	results = append(results, checkStateDir(baseDir))
 
 	var cfg *Config
 	if cfgResult.Status == CheckOK {
@@ -129,7 +162,7 @@ func RunDoctor(ctx context.Context, configPath string) []CheckResult {
 		cfg, _ = LoadConfig(configPath)
 	}
 
-	// 2. claude binary check
+	// 3. claude binary check
 	claudeName := "claude"
 	if cfg != nil && cfg.Claude.Command != "" {
 		claudeName = cfg.Claude.Command
@@ -137,10 +170,10 @@ func RunDoctor(ctx context.Context, configPath string) []CheckResult {
 	claudeResult := checkTool(ctx, claudeName)
 	results = append(results, claudeResult)
 
-	// 3. git binary check
+	// 4. git binary check
 	results = append(results, checkTool(ctx, "git"))
 
-	// 4. Linear MCP connectivity (skip if claude unavailable)
+	// 5. Linear MCP connectivity (skip if claude unavailable)
 	if claudeResult.Status != CheckOK {
 		results = append(results, CheckResult{
 			Name:    "Linear MCP",
