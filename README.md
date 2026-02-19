@@ -196,7 +196,7 @@ sightjack session --verbose
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--config` | `-c` | `sightjack.yaml` | Config file path |
-| `--lang` | `-l` | | Language override (`en` / `ja`) |
+| `--lang` | `-l` | config (`ja`) | Language override (`en` / `ja`) |
 | `--verbose` | `-v` | `false` | Verbose logging |
 | `--dry-run` | | `false` | Generate prompts without executing Claude |
 | `--version` | | | Show version and exit |
@@ -211,13 +211,13 @@ linear:
   cycle: ""              # Optional: filter by cycle
 
 scan:
-  chunk_size: 50         # Issues per scan chunk
+  chunk_size: 20         # Issues per scan chunk
   max_concurrency: 3     # Parallel scan workers
 
 claude:
   command: "claude"      # Claude CLI command
   model: ""              # Model override (optional)
-  timeout_sec: 120       # Per-invocation timeout
+  timeout_sec: 300       # Per-invocation timeout
 
 scribe:
   enabled: true          # ADR generation via Scribe agent
@@ -227,17 +227,20 @@ strictness:
 
 retry:
   max_attempts: 3        # Retry on Claude failures
-  backoff_sec: 5         # Backoff between retries
+  base_delay_sec: 2      # Base backoff between retries
 
 labels:
-  enabled: false         # Auto-label ready issues in Linear
+  enabled: true          # Auto-label ready issues in Linear
 
 dod_templates:           # Custom DoD templates by issue type
   api_endpoint:
-    - "Error responses (4xx/5xx) defined"
-    - "Auth/authz requirements specified"
+    must:
+      - "Error responses (4xx/5xx) defined"
+      - "Auth/authz requirements specified"
+    should:
+      - "Rate limiting documented"
 
-lang: "en"               # Language (en/ja)
+lang: "ja"               # Language (en/ja)
 ```
 
 ## File Structure
