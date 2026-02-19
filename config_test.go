@@ -720,6 +720,22 @@ strictness:
 	}
 }
 
+func TestValidLang_AcceptsJaAndEn(t *testing.T) {
+	for _, lang := range []string{"ja", "en"} {
+		if !ValidLang(lang) {
+			t.Errorf("expected ValidLang(%q) = true", lang)
+		}
+	}
+}
+
+func TestValidLang_RejectsInvalid(t *testing.T) {
+	for _, lang := range []string{"jp", "EN", "english", "fr", ""} {
+		if ValidLang(lang) {
+			t.Errorf("expected ValidLang(%q) = false", lang)
+		}
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()

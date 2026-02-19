@@ -145,6 +145,16 @@ func DefaultConfig() Config {
 	}
 }
 
+// ValidLang returns true if lang is a supported language code.
+// Only "ja" and "en" are valid (used as template suffixes).
+func ValidLang(lang string) bool {
+	switch lang {
+	case "ja", "en":
+		return true
+	}
+	return false
+}
+
 // LoadConfig reads a YAML config file and returns a Config with defaults
 // applied for any fields not specified in the file.
 func LoadConfig(path string) (*Config, error) {

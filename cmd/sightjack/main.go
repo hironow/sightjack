@@ -408,21 +408,39 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 	}
 
 	// lang (default: ja)
-	fmt.Fprint(w, "Language (ja/en) [ja]: ")
 	lang := "ja"
-	if scanner.Scan() {
-		if v := strings.TrimSpace(scanner.Text()); v != "" {
-			lang = v
+	for {
+		fmt.Fprint(w, "Language (ja/en) [ja]: ")
+		if !scanner.Scan() {
+			break
 		}
+		v := strings.TrimSpace(scanner.Text())
+		if v == "" {
+			break // keep default
+		}
+		if sightjack.ValidLang(v) {
+			lang = v
+			break
+		}
+		fmt.Fprintf(w, "  invalid language %q (valid: ja, en)\n", v)
 	}
 
 	// strictness (default: fog)
-	fmt.Fprint(w, "Strictness (fog/alert/lockdown) [fog]: ")
 	strictness := "fog"
-	if scanner.Scan() {
-		if v := strings.TrimSpace(scanner.Text()); v != "" {
-			strictness = v
+	for {
+		fmt.Fprint(w, "Strictness (fog/alert/lockdown) [fog]: ")
+		if !scanner.Scan() {
+			break
 		}
+		v := strings.TrimSpace(scanner.Text())
+		if v == "" {
+			break // keep default
+		}
+		if _, err := sightjack.ParseStrictnessLevel(v); err == nil {
+			strictness = strings.ToLower(v)
+			break
+		}
+		fmt.Fprintf(w, "  invalid strictness %q (valid: fog, alert, lockdown)\n", v)
 	}
 
 	content := sightjack.RenderInitConfig(team, project, lang, strictness)

@@ -259,6 +259,53 @@ func TestRunInit_ExistingConfigError(t *testing.T) {
 	}
 }
 
+func TestRunInit_InvalidLang_RepromptsUntilValid(t *testing.T) {
+	// given: first answer is invalid "jp", second is valid "en"
+	dir := t.TempDir()
+	input := strings.NewReader("Team\nProject\njp\nen\n\n")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then: should succeed with the valid value
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "sightjack.yaml"))
+	content := string(data)
+	if !strings.Contains(content, `lang: "en"`) {
+		t.Errorf("expected lang 'en' in config, got:\n%s", content)
+	}
+	// output should contain an error message about invalid lang
+	if !strings.Contains(output.String(), "invalid") {
+		t.Errorf("expected 'invalid' error in output, got:\n%s", output.String())
+	}
+}
+
+func TestRunInit_InvalidStrictness_RepromptsUntilValid(t *testing.T) {
+	// given: first strictness answer is invalid "strict", second is valid "alert"
+	dir := t.TempDir()
+	input := strings.NewReader("Team\nProject\n\nstrict\nalert\n")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then: should succeed with the valid value
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "sightjack.yaml"))
+	content := string(data)
+	if !strings.Contains(content, "default: alert") {
+		t.Errorf("expected strictness 'alert' in config, got:\n%s", content)
+	}
+	if !strings.Contains(output.String(), "invalid") {
+		t.Errorf("expected 'invalid' error in output, got:\n%s", output.String())
+	}
+}
+
 func TestRunInit_OutputContainsPrompts(t *testing.T) {
 	// given
 	dir := t.TempDir()
