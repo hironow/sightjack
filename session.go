@@ -127,6 +127,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	// nextgen call triggered by that specific wave's completion, not accumulated
 	// across the entire cluster.
 	sessionRejected := make(map[string][]WaveAction)
+	labeledReady := make(map[string]bool) // tracks issues already labeled ready
 	for {
 		waves = EvaluateUnlocks(waves, completed)
 		available := AvailableWaves(waves, completed)
@@ -333,12 +334,23 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		}
 
 		// Apply ready labels after nextgen so the final wave list is used.
+		// Only label newly ready issues to avoid redundant API calls.
 		if cfg.Labels.Enabled {
 			readyIDs := ReadyIssueIDs(waves)
-			if len(readyIDs) > 0 {
-				readyIssueStr := strings.Join(readyIDs, ", ")
+			var newlyReady []string
+			for _, id := range readyIDs {
+				if !labeledReady[id] {
+					newlyReady = append(newlyReady, id)
+				}
+			}
+			if len(newlyReady) > 0 {
+				readyIssueStr := strings.Join(newlyReady, ", ")
 				if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
 					LogWarn("Ready label failed: %v", err)
+				} else {
+					for _, id := range newlyReady {
+						labeledReady[id] = true
+					}
 				}
 			}
 		}
@@ -672,8 +684,9 @@ func RecoverStateFromScan(scanResult *ScanResult, waves []Wave, adrDir string) *
 
 // TryRecoverState attempts to recover basic session state from cached scan result files.
 // Recovery chain: Try scan_result.json in scan dir -> recover clusters and completeness.
-// Note: Waves are not recovered; a rescan is required before resuming. Returns error if
-// no recoverable data found.
+// Note: Waves are not recovered, so the returned state will have an empty Waves slice.
+// This means CanResume will return false, directing the user to a rescan flow rather
+// than a direct resume. Returns error if no recoverable data found.
 func TryRecoverState(baseDir string, sessionID string) (*SessionState, error) {
 	scanDir := ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")

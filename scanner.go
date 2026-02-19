@@ -253,11 +253,16 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 			break
 		}
 		// Use select to respect cancellation while waiting for semaphore.
+		acquired := false
 		select {
 		case <-ctx.Done():
 		case sem <- struct{}{}:
+			acquired = true
 		}
-		if ctx.Err() != nil {
+		if !acquired || ctx.Err() != nil {
+			if acquired {
+				<-sem // release the slot we just took
+			}
 			break
 		}
 		launched++
