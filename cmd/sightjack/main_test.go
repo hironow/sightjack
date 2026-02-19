@@ -306,6 +306,55 @@ func TestRunInit_InvalidStrictness_RepromptsUntilValid(t *testing.T) {
 	}
 }
 
+func TestRunInit_EOFDuringTeam_ReturnsError(t *testing.T) {
+	// given: stdin closes before team is entered
+	dir := t.TempDir()
+	input := strings.NewReader("")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for EOF during team input")
+	}
+	if !strings.Contains(err.Error(), "unexpected end of input") {
+		t.Errorf("expected 'unexpected end of input' error, got: %v", err)
+	}
+}
+
+func TestRunInit_StrictnessCaseInsensitive(t *testing.T) {
+	// given: mixed-case strictness values should be accepted
+	for _, input := range []struct {
+		value string
+		want  string
+	}{
+		{"Alert", "alert"},
+		{"LOCKDOWN", "lockdown"},
+		{"Fog", "fog"},
+	} {
+		t.Run(input.value, func(t *testing.T) {
+			dir := t.TempDir()
+			r := strings.NewReader("Team\nProject\n\n" + input.value + "\n")
+			var output bytes.Buffer
+
+			// when
+			err := runInit(dir, r, &output)
+
+			// then
+			if err != nil {
+				t.Fatalf("runInit failed: %v", err)
+			}
+			data, _ := os.ReadFile(filepath.Join(dir, "sightjack.yaml"))
+			content := string(data)
+			if !strings.Contains(content, "default: "+input.want) {
+				t.Errorf("expected strictness %q in config, got:\n%s", input.want, content)
+			}
+		})
+	}
+}
+
 func TestRunInit_OutputContainsPrompts(t *testing.T) {
 	// given
 	dir := t.TempDir()

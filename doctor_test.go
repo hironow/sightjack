@@ -160,6 +160,82 @@ func TestCheckLinearMCP_NilConfig_Skips(t *testing.T) {
 	}
 }
 
+func TestRunDoctor_ConfigFailure_LinearMCPSkipped(t *testing.T) {
+	// given: nonexistent config path → config check fails, cfg=nil
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "ok")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	ctx := context.Background()
+
+	// when
+	results := RunDoctor(ctx, "/nonexistent/sightjack.yaml")
+
+	// then: should have 4 results
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+	// Config should fail
+	if results[0].Status != CheckFail {
+		t.Errorf("Config: expected FAIL, got %v", results[0].Status)
+	}
+	// Linear MCP should be OK or Skip depending on cfg=nil path
+	// When cfg is nil, checkLinearMCP returns Skip
+	mcp := results[3]
+	if mcp.Name != "Linear MCP" {
+		t.Errorf("expected 'Linear MCP', got %q", mcp.Name)
+	}
+	if mcp.Status != CheckSkip {
+		t.Errorf("Linear MCP: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
+	}
+}
+
+func TestRunDoctor_ClaudeUnavailable_LinearMCPSkipped(t *testing.T) {
+	// given: claude binary does not exist → Linear MCP should be skipped
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("echo", "ok")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	// Set claude command to a nonexistent binary
+	os.WriteFile(cfgPath, []byte(`
+linear:
+  team: "Test"
+  project: "Project"
+claude:
+  command: "nonexistent-claude-binary-xyz"
+`), 0644)
+
+	ctx := context.Background()
+
+	// when
+	results := RunDoctor(ctx, cfgPath)
+
+	// then
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+	// Config should pass
+	if results[0].Status != CheckOK {
+		t.Errorf("Config: expected OK, got %v", results[0].Status)
+	}
+	// claude check should fail (nonexistent binary)
+	if results[1].Status != CheckFail {
+		t.Errorf("claude: expected FAIL, got %v: %s", results[1].Status, results[1].Message)
+	}
+	// Linear MCP should be skipped because claude is unavailable
+	mcp := results[3]
+	if mcp.Status != CheckSkip {
+		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
+	}
+	if !strings.Contains(mcp.Message, "claude not available") {
+		t.Errorf("expected 'claude not available' in message, got: %s", mcp.Message)
+	}
+}
+
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock claude for MCP check
 	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
