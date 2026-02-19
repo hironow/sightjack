@@ -1,6 +1,28 @@
 package sightjack
 
-import "sort"
+import (
+	"context"
+	"sort"
+)
+
+// PaintressHandoff defines the integration contract for the Paintress agent (v1.0).
+// Implementations receive ready issue IDs and execute them via Claude Code agents.
+type PaintressHandoff interface {
+	// HandoffReady delivers a batch of ready issue IDs to the Paintress agent
+	// for autonomous execution. Returns an error if the handoff fails.
+	HandoffReady(ctx context.Context, issueIDs []string) error
+
+	// ReportIssue reports a finding (e.g. blocker, question, anomaly) back
+	// to the orchestrator for a specific issue during execution.
+	ReportIssue(ctx context.Context, issueID string, finding string) error
+}
+
+// HandoffResult tracks the outcome of a Paintress handoff for a single issue.
+type HandoffResult struct {
+	IssueID string // Linear issue identifier
+	Status  string // "success", "failed", "skipped"
+	Error   string // non-empty when Status is "failed"
+}
 
 // ReadyIssueIDs returns issue IDs where ALL waves targeting them are completed.
 // An issue is ready when every wave containing that issue has status "completed".
