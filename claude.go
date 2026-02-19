@@ -34,9 +34,15 @@ func BuildClaudeArgs(cfg *Config, prompt string) []string {
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
 func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
-	timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	// Apply per-call timeout only when the caller has not already set a deadline.
+	// RunClaude wraps the entire retry loop in a single timeout, so individual
+	// attempts inherit the remaining budget without resetting it.
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	args := BuildClaudeArgs(cfg, prompt)
 	cmd := newCmd(ctx, cfg.Claude.Command, args...)
@@ -94,6 +100,12 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 		maxAttempts = 1
 	}
 	baseDelay := time.Duration(cfg.Retry.BaseDelaySec) * time.Second
+
+	// Wrap the entire retry loop in a single timeout so total wall time
+	// is bounded by TimeoutSec regardless of MaxAttempts.
+	timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
