@@ -64,7 +64,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			Title:       "Sample Wave",
 			Actions:     []WaveAction{{Type: "add_dod", IssueID: "SAMPLE-1", Description: "Sample DoD"}},
 		}
-		if err := RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic"); err != nil {
+		if err := RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic", string(cfg.Strictness.Default)); err != nil {
 			return fmt.Errorf("architect discuss dry-run: %w", err)
 		}
 		// Also generate scribe ADR prompt for dry-run
@@ -73,14 +73,14 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 				Analysis:  "Sample architect analysis for dry-run",
 				Reasoning: "Sample reasoning",
 			}
-			if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, ADRDir(baseDir)); err != nil {
+			if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, ADRDir(baseDir), string(cfg.Strictness.Default)); err != nil {
 				return fmt.Errorf("scribe dry-run: %w", err)
 			}
 		}
 		// Also generate nextgen prompt for dry-run
 		sampleCompletedWaves := []Wave{sampleWave}
 		sampleCluster := ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
-		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil); err != nil {
+		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default)); err != nil {
 			return fmt.Errorf("nextgen dry-run: %w", err)
 		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
@@ -180,6 +180,9 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			continue
 		}
 
+		// Resolve strictness using cluster name + labels from scan result
+		resolvedStrictness := string(ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
+
 		// Prompt wave approval (with discuss loop)
 		var applyWave bool
 		for {
@@ -208,7 +211,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 					LogWarn("Invalid topic: %v", topicErr)
 					continue
 				}
-				result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic)
+				result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness)
 				if discussErr != nil {
 					LogError("Architect discussion failed: %v", discussErr)
 					continue
@@ -220,7 +223,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 					// Trigger Scribe to generate ADR for the modification
 					// (runs even for locked waves — the decision itself is worth recording)
 					if cfg.Scribe.Enabled {
-						scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir)
+						scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness)
 						if scribeErr != nil {
 							LogWarn("Scribe failed (non-fatal): %v", scribeErr)
 						} else {
@@ -266,7 +269,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		}
 
 		// --- Pass 4: Wave Apply ---
-		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected)
+		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness)
 		if err != nil {
 			LogError("Apply failed: %v", err)
 			continue
@@ -331,7 +334,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 				LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
 			}
 			rejectedForWave := sessionRejected[WaveKey(selected)]
-			newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave)
+			newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness)
 			if nextgenErr != nil {
 				LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
 			} else if len(newWaves) > 0 {

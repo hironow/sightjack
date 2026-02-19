@@ -148,7 +148,7 @@ func TestRunScribeADRDryRun(t *testing.T) {
 	}
 
 	// when
-	err := RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir)
+	err := RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog")
 
 	// then
 	if err != nil {
@@ -403,7 +403,7 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 	resp := &ArchitectResponse{Analysis: "test", Reasoning: "test"}
 
 	// when
-	err := RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir)
+	err := RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog")
 
 	// then
 	if err != nil {

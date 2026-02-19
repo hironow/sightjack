@@ -106,7 +106,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// names are handled safely without a name-keyed map.
 	scanClusters := make([]ClusterScanResult, len(classify.Clusters))
 	for i, cc := range classify.Clusters {
-		scanClusters[i] = ClusterScanResult{Name: cc.Name}
+		scanClusters[i] = ClusterScanResult{Name: cc.Name, Labels: cc.Labels}
 	}
 
 	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
@@ -120,7 +120,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
 				OutputPath:      chunkFile,
-				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{cc.Name})),
+				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, append([]string{cc.Name}, cc.Labels...))),
 			})
 			if renderErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
@@ -139,6 +139,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		}
 
 		merged := mergeClusterChunks(cc.Name, chunkResults)
+		merged.Labels = cc.Labels
 		LogOK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
 		return merged, nil
 	}
@@ -182,7 +183,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				Observations:    strings.Join(cluster.Observations, "\n"),
 				DoDSection:      dodSection,
 				OutputPath:      waveFile,
-				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{cluster.Name})),
+				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, append([]string{cluster.Name}, cluster.Labels...))),
 			})
 			if err != nil {
 				return fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)

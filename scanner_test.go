@@ -39,6 +39,39 @@ func TestParseClassifyResult(t *testing.T) {
 	}
 }
 
+func TestParseClassifyResult_WithLabels(t *testing.T) {
+	// given: classify output includes labels per cluster
+	dir := t.TempDir()
+	path := filepath.Join(dir, "classify.json")
+	content := `{
+		"clusters": [
+			{"name": "Auth", "issue_ids": ["id1"], "labels": ["security", "backend"]},
+			{"name": "UI", "issue_ids": ["id2"], "labels": ["frontend"]}
+		],
+		"total_issues": 2
+	}`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	result, err := ParseClassifyResult(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Clusters[0].Labels) != 2 {
+		t.Fatalf("expected 2 labels for Auth, got %d", len(result.Clusters[0].Labels))
+	}
+	if result.Clusters[0].Labels[0] != "security" {
+		t.Errorf("expected first label 'security', got %s", result.Clusters[0].Labels[0])
+	}
+	if len(result.Clusters[1].Labels) != 1 {
+		t.Fatalf("expected 1 label for UI, got %d", len(result.Clusters[1].Labels))
+	}
+}
+
 func TestParseClusterScanResult(t *testing.T) {
 	// given
 	dir := t.TempDir()

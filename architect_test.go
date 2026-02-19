@@ -114,7 +114,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	}
 
 	// when
-	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic")
+	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog")
 
 	// then
 	if err != nil {
@@ -199,7 +199,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	}
 
 	// when
-	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic")
+	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog")
 
 	// then
 	if err != nil {

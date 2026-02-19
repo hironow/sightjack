@@ -67,8 +67,8 @@ func ParseNextGenResult(path string) (*NextGenResult, error) {
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt to a file instead of executing Claude.
-func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction) error {
-	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions)
+func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string) error {
+	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness)
 	if err != nil {
 		return err
 	}
@@ -77,11 +77,11 @@ func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cl
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction) ([]Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string) ([]Wave, error) {
 	clearNextgenOutput(scanDir, completedWave)
 	outputFile := filepath.Join(scanDir, nextgenFileName(completedWave))
 
-	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions)
+	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 }
 
 // buildNextGenPrompt constructs the prompt for post-completion wave generation.
-func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction) (string, error) {
+func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string) (string, error) {
 	outputFile := filepath.Join(scanDir, nextgenFileName(completedWave))
 
 	issuesJSON, err := json.Marshal(cluster.Issues)
@@ -137,6 +137,6 @@ func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		RejectedActions: rejectedStr,
 		DoDSection:      dodSection,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{completedWave.ClusterName})),
+		StrictnessLevel: strictness,
 	})
 }

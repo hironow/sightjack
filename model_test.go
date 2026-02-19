@@ -529,6 +529,46 @@ func TestWaveApplyResultTotalCount(t *testing.T) {
 	}
 }
 
+func TestScanResult_StrictnessKeys(t *testing.T) {
+	// given: scan result with labeled clusters
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Labels: []string{"security", "backend"}},
+			{Name: "UI", Labels: []string{"frontend"}},
+		},
+	}
+
+	// when/then: keys include cluster name + labels
+	keys := result.StrictnessKeys("Auth")
+	if len(keys) != 3 {
+		t.Fatalf("expected 3 keys, got %d: %v", len(keys), keys)
+	}
+	if keys[0] != "Auth" || keys[1] != "security" || keys[2] != "backend" {
+		t.Errorf("unexpected keys: %v", keys)
+	}
+
+	// unknown cluster returns just the name
+	keys2 := result.StrictnessKeys("Unknown")
+	if len(keys2) != 1 || keys2[0] != "Unknown" {
+		t.Errorf("expected [Unknown], got %v", keys2)
+	}
+}
+
+func TestScanResult_ClusterLabels_NilWhenNoLabels(t *testing.T) {
+	// given: cluster without labels
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth"},
+		},
+	}
+
+	// when/then
+	labels := result.ClusterLabels("Auth")
+	if labels != nil {
+		t.Errorf("expected nil labels, got %v", labels)
+	}
+}
+
 func TestScribeResponse_ZeroValues(t *testing.T) {
 	// given: all zero-value fields
 	data := `{"adr_id":"","title":"","content":"","reasoning":""}`

@@ -6,5 +6,7 @@ coverage.out
 .siren/
 # claude local settings
 .claude/*.local.*
-
+# git worktrees
+.worktrees/
+# golang
 .gocache/

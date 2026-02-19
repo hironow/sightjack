@@ -27,7 +27,7 @@ func architectDiscussFileName(wave Wave) string {
 }
 
 // RunArchitectDiscussDryRun saves the architect prompt to a file instead of executing Claude.
-func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic string) error {
+func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic string, strictness string) error {
 	actionsJSON, err := json.Marshal(wave.Actions)
 	if err != nil {
 		return fmt.Errorf("marshal wave actions: %w", err)
@@ -40,7 +40,7 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 		WaveActions:     string(actionsJSON),
 		Topic:           topic,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
+		StrictnessLevel: strictness,
 	})
 	if err != nil {
 		return fmt.Errorf("render architect prompt: %w", err)
@@ -59,7 +59,7 @@ func clearArchitectOutput(scanDir string, wave Wave) {
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
-func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string) (*ArchitectResponse, error) {
+func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string, strictness string) (*ArchitectResponse, error) {
 	clearArchitectOutput(scanDir, wave)
 	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
 
@@ -74,7 +74,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 		WaveActions:     string(actionsJSON),
 		Topic:           topic,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
+		StrictnessLevel: strictness,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render architect prompt: %w", err)

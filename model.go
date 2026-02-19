@@ -18,6 +18,7 @@ type ClassifyResult struct {
 type ClusterClassification struct {
 	Name     string   `json:"name"`
 	IssueIDs []string `json:"issue_ids"`
+	Labels   []string `json:"labels,omitempty"`
 }
 
 // ClusterScanResult is the output of Pass 2 (per-cluster deep scan).
@@ -27,6 +28,7 @@ type ClusterScanResult struct {
 	Completeness float64       `json:"completeness"`
 	Issues       []IssueDetail `json:"issues"`
 	Observations []string      `json:"observations"`
+	Labels       []string      `json:"labels,omitempty"`
 }
 
 // IssueDetail holds the deep scan analysis of a single issue.
@@ -55,6 +57,21 @@ type ScanResult struct {
 	Observations    []string
 	ShibitoWarnings []ShibitoWarning `json:"shibito_warnings,omitempty"`
 	ScanWarnings    []string         `json:"scan_warnings,omitempty"`
+}
+
+// ClusterLabels returns the labels for a named cluster, or nil if not found.
+func (r *ScanResult) ClusterLabels(clusterName string) []string {
+	for _, c := range r.Clusters {
+		if c.Name == clusterName {
+			return c.Labels
+		}
+	}
+	return nil
+}
+
+// StrictnessKeys returns the lookup keys for ResolveStrictness: cluster name + labels.
+func (r *ScanResult) StrictnessKeys(clusterName string) []string {
+	return append([]string{clusterName}, r.ClusterLabels(clusterName)...)
 }
 
 // CalculateCompleteness computes overall completeness as the average of cluster completeness values,

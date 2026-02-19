@@ -19,6 +19,7 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 1. Linear MCP で Issue 一覧を取得してください
 2. Issue のタイトル・ラベル・説明から論理的なクラスタに分類してください
 3. 各クラスタの名前と所属する Issue ID のリストを作成してください
+4. 各クラスタについて、所属する全Issueの Linear ラベルの和集合を "labels" 配列に含めてください
 
 ## 屍人（Shibito）復活チェック
 クローズ/キャンセル済みのIssueも確認し、現在のオープンIssueと類似するパターンを検出してください。
@@ -30,7 +31,7 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 ```json
 {
   "clusters": [
-    { "name": "クラスタ名", "issue_ids": ["issue-id-1", "issue-id-2"] }
+    { "name": "クラスタ名", "issue_ids": ["issue-id-1", "issue-id-2"], "labels": ["label1", "label2"] }
   ],
   "total_issues": 数値,
   "shibito_warnings": [

@@ -114,7 +114,7 @@ func TestBuildNextGenPrompt_WithDoDTemplates(t *testing.T) {
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil)
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog")
 
 	// then
 	if err != nil {
@@ -146,7 +146,7 @@ func TestBuildNextGenPrompt_WithRejectedActions(t *testing.T) {
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected)
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected, "fog")
 
 	// then
 	if err != nil {
@@ -175,7 +175,7 @@ func TestBuildNextGenPrompt_NilOptionals(t *testing.T) {
 	}
 
 	// when: nil DoD, nil ADRs, nil rejected, nil completedWaves
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil)
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog")
 
 	// then: should not panic and should produce valid prompt
 	if err != nil {
@@ -207,7 +207,7 @@ func TestBuildNextGenPrompt_WithExistingADRs(t *testing.T) {
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil)
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil, "fog")
 
 	// then
 	if err != nil {
@@ -324,7 +324,7 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 	}
 	completedWaves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
 
-	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil)
+	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog")
 	if err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}

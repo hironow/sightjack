@@ -90,7 +90,7 @@ func waveApplyFileName(wave Wave) string {
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
-func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (*WaveApplyResult, error) {
+func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, strictness string) (*WaveApplyResult, error) {
 	applyFile := filepath.Join(scanDir, waveApplyFileName(wave))
 
 	actionsJSON, err := json.Marshal(wave.Actions)
@@ -107,7 +107,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave) (
 		Actions:         string(actionsJSON),
 		DoDSection:      dodSection,
 		OutputPath:      applyFile,
-		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName})),
+		StrictnessLevel: strictness,
 		LabelsEnabled:   cfg.Labels.Enabled,
 		LabelPrefix:     cfg.Labels.Prefix,
 	})
