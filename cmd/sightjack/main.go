@@ -78,7 +78,7 @@ func main() {
 	}
 
 	// Default configPath relative to baseDir when not explicitly set.
-	if configPath == "sightjack.yaml" {
+	if !configExplicitlySet(fs) {
 		configPath = filepath.Join(baseDir, "sightjack.yaml")
 	}
 
@@ -203,6 +203,18 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "Flags:\n")
 		fs.PrintDefaults()
 	}
+}
+
+// configExplicitlySet returns true if -c or --config was explicitly passed
+// on the command line (as opposed to using the default value).
+func configExplicitlySet(fs *flag.FlagSet) bool {
+	explicit := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "config" || f.Name == "c" {
+			explicit = true
+		}
+	})
+	return explicit
 }
 
 // extractSubcommand finds the first known subcommand and an optional path

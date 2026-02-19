@@ -355,6 +355,54 @@ func TestRunInit_StrictnessCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestConfigExplicitlySet_NotSet(t *testing.T) {
+	// given: flags parsed without -c
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("config", "sightjack.yaml", "")
+	fs.String("c", "sightjack.yaml", "")
+	fs.Parse([]string{})
+
+	// when
+	result := configExplicitlySet(fs)
+
+	// then
+	if result {
+		t.Error("expected false when -c not set")
+	}
+}
+
+func TestConfigExplicitlySet_WithConfigFlag(t *testing.T) {
+	// given: flags parsed with --config
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("config", "sightjack.yaml", "")
+	fs.String("c", "sightjack.yaml", "")
+	fs.Parse([]string{"--config", "custom.yaml"})
+
+	// when
+	result := configExplicitlySet(fs)
+
+	// then
+	if !result {
+		t.Error("expected true when --config explicitly set")
+	}
+}
+
+func TestConfigExplicitlySet_WithShortFlag(t *testing.T) {
+	// given: flags parsed with -c
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("config", "sightjack.yaml", "")
+	fs.String("c", "sightjack.yaml", "")
+	fs.Parse([]string{"-c", "sightjack.yaml"})
+
+	// when
+	result := configExplicitlySet(fs)
+
+	// then: even though the value matches the default, it was explicitly set
+	if !result {
+		t.Error("expected true when -c explicitly set to default value")
+	}
+}
+
 func TestRunInit_OutputContainsPrompts(t *testing.T) {
 	// given
 	dir := t.TempDir()
