@@ -2,7 +2,7 @@
 
 **An interactive session that sends AI agents to sightjack your Linear issues — seeing their blind spots, ordering their dependencies, and architecturing them until every issue is ready for autonomous execution.**
 
-Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to bring issue completeness from ~30% to ~85%. After that, [Paintress](https://github.com/hironow/paintress) takes over to implement them.
+Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to bring issue completeness from ~30% to ~85%.
 
 ```bash
 sightjack session
@@ -143,7 +143,7 @@ Legend:
 | Scanner | Classify + DeepScan + WaveGenerate | Sightjack (seeing through issues) |
 | Architect | Design discussion during wave approval | Character dialogue |
 | Scribe | ADR generation from design decisions | Archive collection |
-| Paintress (v1.0) | Handoff ready issues for implementation | Next expedition |
+| (Handoff) | Ready-issue labeling for downstream tools | Next expedition |
 
 ## Setup
 
@@ -248,7 +248,7 @@ lang: "en"               # Language (en/ja)
 +-- scanner.go               Scanner Agent (classify + deep-scan)
 +-- architect.go             Architect Agent (design discussion)
 +-- scribe.go                Scribe Agent (ADR generation)
-+-- paintress.go             Paintress handoff interface (v1.0 prep)
++-- paintress.go             Handoff interface for downstream tools
 +-- session.go               Session lifecycle (run, resume, rescan)
 +-- wave.go                  Wave model + unlock evaluation
 +-- wave_generator.go        Wave generation + nextgen (dynamic evolution)
