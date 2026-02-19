@@ -268,16 +268,15 @@ lang: "ja"               # Language (en/ja)
 +-- prompt.go                Go template renderer for AI prompts
 +-- logger.go                Colored logging (LogOK, LogWarn, LogError, LogInfo)
 +-- *_test.go                Tests (227+)
-+-- prompts/
-    +-- templates/
-        +-- scanner_classify_{en,ja}.md.tmpl
-        +-- scanner_deepscan_{en,ja}.md.tmpl
-        +-- wave_generate_{en,ja}.md.tmpl
-        +-- wave_apply_{en,ja}.md.tmpl
-        +-- wave_nextgen_{en,ja}.md.tmpl
-        +-- architect_discuss_{en,ja}.md.tmpl
-        +-- scribe_adr_{en,ja}.md.tmpl
-        +-- ready_label_{en,ja}.md.tmpl
++-- templates/
+    +-- scanner_classify_{en,ja}.md.tmpl
+    +-- scanner_deepscan_{en,ja}.md.tmpl
+    +-- wave_generate_{en,ja}.md.tmpl
+    +-- wave_apply_{en,ja}.md.tmpl
+    +-- wave_nextgen_{en,ja}.md.tmpl
+    +-- architect_discuss_{en,ja}.md.tmpl
+    +-- scribe_adr_{en,ja}.md.tmpl
+    +-- ready_label_{en,ja}.md.tmpl
 ```
 
 ## Prerequisites
