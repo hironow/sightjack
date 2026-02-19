@@ -595,6 +595,41 @@ func TestResolveStrictness_NoMatchingLabels(t *testing.T) {
 	}
 }
 
+func TestResolveStrictness_OverrideCanLowerStrictness(t *testing.T) {
+	// given: default is lockdown, but override lowers "Docs" to fog
+	cfg := StrictnessConfig{
+		Default:   StrictnessLockdown,
+		Overrides: map[string]StrictnessLevel{"Docs": StrictnessFog},
+	}
+
+	// when: label matches the lower override
+	result := ResolveStrictness(cfg, []string{"Docs"})
+
+	// then: override wins even though it's less strict than default
+	if result != StrictnessFog {
+		t.Errorf("expected fog override to win over lockdown default, got %s", result)
+	}
+}
+
+func TestResolveStrictness_MultipleMatchesPickStrictest(t *testing.T) {
+	// given: default lockdown, two matching overrides at different levels
+	cfg := StrictnessConfig{
+		Default: StrictnessLockdown,
+		Overrides: map[string]StrictnessLevel{
+			"Docs":     StrictnessFog,
+			"Security": StrictnessAlert,
+		},
+	}
+
+	// when: both labels match
+	result := ResolveStrictness(cfg, []string{"Docs", "Security"})
+
+	// then: strictest among matched overrides (alert > fog), not default
+	if result != StrictnessAlert {
+		t.Errorf("expected alert (strictest matched override), got %s", result)
+	}
+}
+
 func TestResolveStrictness_ClusterNameAsLabel(t *testing.T) {
 	// given: overrides keyed by cluster name
 	cfg := StrictnessConfig{

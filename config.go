@@ -85,19 +85,25 @@ func strictnessRank(level StrictnessLevel) int {
 }
 
 // ResolveStrictness determines the effective strictness level for a set of labels.
-// When overrides match one or more labels, the strictest matching level wins
-// (lockdown > alert > fog). Returns the default level when no overrides match.
+// When overrides match one or more labels, the strictest matching override wins
+// (lockdown > alert > fog), even if it is less strict than the default.
+// Returns the default level only when no overrides match.
 func ResolveStrictness(cfg StrictnessConfig, labels []string) StrictnessLevel {
 	if len(cfg.Overrides) == 0 || len(labels) == 0 {
 		return cfg.Default
 	}
-	best := cfg.Default
+	matched := false
+	var best StrictnessLevel
 	for _, label := range labels {
 		if level, ok := cfg.Overrides[label]; ok {
-			if strictnessRank(level) > strictnessRank(best) {
+			if !matched || strictnessRank(level) > strictnessRank(best) {
 				best = level
+				matched = true
 			}
 		}
+	}
+	if !matched {
+		return cfg.Default
 	}
 	return best
 }
