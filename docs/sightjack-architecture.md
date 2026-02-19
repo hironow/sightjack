@@ -676,7 +676,7 @@ dod_templates:
 
 session:
   auto_save: true               # セッション状態の自動保存
-  save_path: ".sightjack/sessions"
+  save_path: ".siren/sessions"
 ```
 
 ---
@@ -710,7 +710,7 @@ sightjack/
 │       ├── scribe_detect.md.tmpl    # 設計判断検知用（Go template）
 │       └── scribe_adr.md.tmpl       # ADR生成用（Go template）
 ├── sightjack.yaml
-├── .sightjack/
+├── .siren/
 │   └── state.json
 ├── go.mod
 ├── go.sum

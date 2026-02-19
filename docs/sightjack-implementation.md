@@ -275,7 +275,7 @@ func DetectClusters(issues []Issue) []IssueCluster {
 
 ```json
 {
-  "version": 1,
+  "version": "0.0.10",
   "project": "my-project",
   "session_id": "sj-2026-02-15-001",
   "claude_sessions": {
@@ -529,7 +529,7 @@ sightjack/
 │       ├── architect.md.tmpl        # Architect Agent用（Go template）
 │       └── scribe.md.tmpl           # Scribe Agent用（Go template）
 ├── sightjack.yaml
-├── .sightjack/
+├── .siren/
 │   └── state.json                   # 薄い状態ファイル（1つだけ）
 ├── go.mod
 ├── go.sum

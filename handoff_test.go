@@ -10,7 +10,7 @@ var _ Handoff = (*handoffChecker)(nil)
 
 type handoffChecker struct{}
 
-func (p *handoffChecker) HandoffReady(_ context.Context, _ []string) error   { return nil }
+func (p *handoffChecker) HandoffReady(_ context.Context, _ []string) error        { return nil }
 func (p *handoffChecker) ReportIssue(_ context.Context, _ string, _ string) error { return nil }
 
 func TestHandoff_InterfaceCompiles(t *testing.T) {

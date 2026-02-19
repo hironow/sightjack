@@ -1,6 +1,6 @@
 # Sightjack
 
-**An interactive session that sends AI agents to sightjack your Linear issues — seeing their blind spots, ordering their dependencies, and architecturing them until every issue is ready for autonomous execution.**
+**An interactive session that sends AI agents to sightjack your Linear issues — seeing their blind spots, ordering their dependencies, and architecting them until every issue is ready for autonomous execution.**
 
 Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to bring issue completeness from ~30% to ~85%.
 
@@ -70,8 +70,8 @@ Controls how aggressively the AI enforces DoD completeness. Like SIREN's difficu
 
 ```
 fog       -> DoD gaps shown as warnings only (prototype/spike)
-normal    -> Missing must-have DoD triggers sub-issue proposals
-strict    -> All DoD required, dependencies enforced as blocked
+alert     -> Missing must-have DoD triggers sub-issue proposals
+lockdown  -> All DoD required, dependencies enforced as blocked
 ```
 
 - Configurable per-project and per-label override
@@ -196,7 +196,7 @@ sightjack session --verbose
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--config` | `-c` | `sightjack.yaml` | Config file path |
-| `--lang` | `-l` | `en` | Prompt language (`en` / `ja`) |
+| `--lang` | `-l` | | Language override (`en` / `ja`) |
 | `--verbose` | `-v` | `false` | Verbose logging |
 | `--dry-run` | | `false` | Generate prompts without executing Claude |
 | `--version` | | | Show version and exit |
@@ -223,7 +223,7 @@ scribe:
   enabled: true          # ADR generation via Scribe agent
 
 strictness:
-  default: "normal"      # Default strictness (fog/normal/strict)
+  default: "fog"         # Default strictness (fog/alert/lockdown)
 
 retry:
   max_attempts: 3        # Retry on Claude failures
