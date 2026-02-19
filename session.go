@@ -501,8 +501,9 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		LastScanned:  ts,
 		Completeness: scanResult.Completeness,
 		Waves:        BuildWaveStates(waves),
-		ADRCount:     adrCount,
-		ShibitoCount: len(scanResult.ShibitoWarnings),
+		ADRCount:        adrCount,
+		ShibitoCount:    len(scanResult.ShibitoWarnings),
+		StrictnessLevel: string(cfg.Strictness.Default),
 	}
 	for _, c := range scanResult.Clusters {
 		state.Clusters = append(state.Clusters, ClusterState{

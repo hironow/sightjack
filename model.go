@@ -84,6 +84,7 @@ type SessionState struct {
 	Waves        []WaveState    `json:"waves,omitempty"`
 	ADRCount       int    `json:"adr_count,omitempty"`
 	ShibitoCount   int    `json:"shibito_count,omitempty"`
+	StrictnessLevel string `json:"strictness_level,omitempty"`
 	ScanResultPath string `json:"scan_result_path,omitempty"`
 }
 

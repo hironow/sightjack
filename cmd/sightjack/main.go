@@ -277,11 +277,12 @@ func runScan(ctx context.Context, cfg *sightjack.Config, dryRun bool) {
 
 	// Save state
 	state := &sightjack.SessionState{
-		Version:      sightjack.StateFormatVersion,
-		SessionID:    sessionID,
-		Project:      cfg.Linear.Project,
-		LastScanned:  time.Now(),
-		Completeness: result.Completeness,
+		Version:         sightjack.StateFormatVersion,
+		SessionID:       sessionID,
+		Project:         cfg.Linear.Project,
+		LastScanned:     time.Now(),
+		Completeness:    result.Completeness,
+		StrictnessLevel: string(cfg.Strictness.Default),
 	}
 	for _, c := range result.Clusters {
 		state.Clusters = append(state.Clusters, sightjack.ClusterState{
@@ -331,7 +332,11 @@ func runShow() {
 	waves := sightjack.RestoreWaves(state.Waves)
 	lastScanned := state.LastScanned
 
-	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, &lastScanned, "fog", state.ShibitoCount)
+	strictness := state.StrictnessLevel
+	if strictness == "" {
+		strictness = "fog" // backward compat: older state files lack this field
+	}
+	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, &lastScanned, strictness, state.ShibitoCount)
 	fmt.Println()
 	fmt.Print(nav)
 	sightjack.LogInfo("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))

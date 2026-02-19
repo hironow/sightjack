@@ -1096,6 +1096,40 @@ func TestBuildSessionState_ShibitoCountZero(t *testing.T) {
 	}
 }
 
+func TestBuildSessionState_StrictnessLevel(t *testing.T) {
+	// given: config with alert strictness
+	scanResult := &ScanResult{Completeness: 0.50}
+	cfg := &Config{
+		Linear:     LinearConfig{Project: "P"},
+		Strictness: StrictnessConfig{Default: StrictnessAlert},
+	}
+
+	// when
+	state := BuildSessionState(cfg, "s1", scanResult, nil, 0, nil)
+
+	// then: state should capture the configured strictness level
+	if state.StrictnessLevel != "alert" {
+		t.Errorf("expected StrictnessLevel 'alert', got %q", state.StrictnessLevel)
+	}
+}
+
+func TestBuildSessionState_StrictnessLevelDefault(t *testing.T) {
+	// given: config with default (fog) strictness
+	scanResult := &ScanResult{Completeness: 0.50}
+	cfg := &Config{
+		Linear:     LinearConfig{Project: "P"},
+		Strictness: StrictnessConfig{Default: StrictnessFog},
+	}
+
+	// when
+	state := BuildSessionState(cfg, "s1", scanResult, nil, 0, nil)
+
+	// then
+	if state.StrictnessLevel != "fog" {
+		t.Errorf("expected StrictnessLevel 'fog', got %q", state.StrictnessLevel)
+	}
+}
+
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
 	originalActions := []WaveAction{
