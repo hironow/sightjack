@@ -5,10 +5,10 @@ import (
 	"sort"
 )
 
-// PaintressHandoff defines the integration contract for the Paintress agent (v1.0).
+// Handoff defines the integration contract for downstream execution agents (v1.0).
 // Implementations receive ready issue IDs and execute them via Claude Code agents.
-type PaintressHandoff interface {
-	// HandoffReady delivers a batch of ready issue IDs to the Paintress agent
+type Handoff interface {
+	// HandoffReady delivers a batch of ready issue IDs to a downstream agent
 	// for autonomous execution. Returns an error if the handoff fails.
 	HandoffReady(ctx context.Context, issueIDs []string) error
 
@@ -17,7 +17,7 @@ type PaintressHandoff interface {
 	ReportIssue(ctx context.Context, issueID string, finding string) error
 }
 
-// HandoffResult tracks the outcome of a Paintress handoff for a single issue.
+// HandoffResult tracks the outcome of a handoff for a single issue.
 type HandoffResult struct {
 	IssueID string // Linear issue identifier
 	Status  string // "success", "failed", "skipped"

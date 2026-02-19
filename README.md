@@ -248,7 +248,7 @@ lang: "en"               # Language (en/ja)
 +-- scanner.go               Scanner Agent (classify + deep-scan)
 +-- architect.go             Architect Agent (design discussion)
 +-- scribe.go                Scribe Agent (ADR generation)
-+-- paintress.go             Handoff interface for downstream tools
++-- handoff.go               Handoff interface for downstream tools
 +-- session.go               Session lifecycle (run, resume, rescan)
 +-- wave.go                  Wave model + unlock evaluation
 +-- wave_generator.go        Wave generation + nextgen (dynamic evolution)

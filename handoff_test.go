@@ -5,17 +5,17 @@ import (
 	"testing"
 )
 
-// Compile-time check: PaintressHandoff interface exists and has expected methods.
-var _ PaintressHandoff = (*paintressHandoffChecker)(nil)
+// Compile-time check: Handoff interface exists and has expected methods.
+var _ Handoff = (*handoffChecker)(nil)
 
-type paintressHandoffChecker struct{}
+type handoffChecker struct{}
 
-func (p *paintressHandoffChecker) HandoffReady(_ context.Context, _ []string) error   { return nil }
-func (p *paintressHandoffChecker) ReportIssue(_ context.Context, _ string, _ string) error { return nil }
+func (p *handoffChecker) HandoffReady(_ context.Context, _ []string) error   { return nil }
+func (p *handoffChecker) ReportIssue(_ context.Context, _ string, _ string) error { return nil }
 
-func TestPaintressHandoff_InterfaceCompiles(t *testing.T) {
-	// given: a type that implements PaintressHandoff
-	var h PaintressHandoff = &paintressHandoffChecker{}
+func TestHandoff_InterfaceCompiles(t *testing.T) {
+	// given: a type that implements Handoff
+	var h Handoff = &handoffChecker{}
 
 	// when / then: calling methods should not panic
 	if err := h.HandoffReady(context.Background(), []string{"ENG-101"}); err != nil {
