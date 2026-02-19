@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ParseArchitectResult reads and parses an architect response JSON file.
@@ -60,6 +63,14 @@ func clearArchitectOutput(scanDir string, wave Wave) {
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
 func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string, strictness string) (*ArchitectResponse, error) {
+	ctx, discussSpan := tracer.Start(ctx, "architect.discuss",
+		trace.WithAttributes(
+			attribute.String("wave.cluster_name", wave.ClusterName),
+			attribute.String("wave.id", wave.ID),
+		),
+	)
+	defer discussSpan.End()
+
 	clearArchitectOutput(scanDir, wave)
 	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
 

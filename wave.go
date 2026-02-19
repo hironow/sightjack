@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ParseWaveGenerateResult reads and parses a wave_{name}.json output file.
@@ -91,6 +94,15 @@ func waveApplyFileName(wave Wave) string {
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
 func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, strictness string) (*WaveApplyResult, error) {
+	ctx, applySpan := tracer.Start(ctx, "wave.apply",
+		trace.WithAttributes(
+			attribute.String("wave.id", wave.ID),
+			attribute.String("wave.cluster_name", wave.ClusterName),
+			attribute.Int("wave.action_count", len(wave.Actions)),
+		),
+	)
+	defer applySpan.End()
+
 	applyFile := filepath.Join(scanDir, waveApplyFileName(wave))
 
 	actionsJSON, err := json.Marshal(wave.Actions)

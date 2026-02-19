@@ -84,6 +84,10 @@ func main() {
 
 	sightjack.SetVerbose(verbose)
 
+	// Initialize OpenTelemetry tracer (noop when OTEL_EXPORTER_OTLP_ENDPOINT is unset).
+	shutdownTracer := sightjack.InitTracer("sightjack", version)
+	defer shutdownTracer(context.Background())
+
 	switch subcmd {
 	case "scan":
 		cfg := loadConfigOrExit(configPath)
@@ -92,7 +96,9 @@ func main() {
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
+		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runScan(ctx, cfg, baseDir, dryRun)
+		sightjack.EndRootSpan(ctx)
 	case "session":
 		cfg := loadConfigOrExit(configPath)
 		if lang != "" {
@@ -100,6 +106,7 @@ func main() {
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
+		ctx = sightjack.StartRootSpan(ctx, subcmd)
 
 		// Check for existing state (resume detection)
 		if !dryRun {
@@ -148,12 +155,14 @@ func main() {
 							sightjack.LogError("Resume failed: %v", err)
 							os.Exit(1)
 						}
+						sightjack.EndRootSpan(ctx)
 						return
 					case sightjack.ResumeChoiceRescan:
 						if err := sightjack.RunRescanSession(ctx, cfg, baseDir, existingState, os.Stdin); err != nil {
 							sightjack.LogError("Re-scan resume failed: %v", err)
 							os.Exit(1)
 						}
+						sightjack.EndRootSpan(ctx)
 						return
 					case sightjack.ResumeChoiceNew:
 						goto freshSession
@@ -173,17 +182,24 @@ func main() {
 			sightjack.LogError("Session failed: %v", err)
 			os.Exit(1)
 		}
+		sightjack.EndRootSpan(ctx)
 	case "show":
+		ctx := sightjack.StartRootSpan(context.Background(), subcmd)
 		runShow(baseDir)
+		sightjack.EndRootSpan(ctx)
 	case "init":
+		ctx := sightjack.StartRootSpan(context.Background(), subcmd)
 		if err := runInit(baseDir, os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 			os.Exit(1)
 		}
+		sightjack.EndRootSpan(ctx)
 	case "doctor":
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
+		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runDoctor(ctx, configPath)
+		sightjack.EndRootSpan(ctx)
 	}
 }
 

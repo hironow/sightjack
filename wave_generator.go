@@ -7,6 +7,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // maxWavesPerCluster is the cap on total waves per cluster.
@@ -78,6 +81,13 @@ func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cl
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
 func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string) ([]Wave, error) {
+	ctx, nextgenSpan := tracer.Start(ctx, "wave.nextgen",
+		trace.WithAttributes(
+			attribute.String("wave.cluster_name", completedWave.ClusterName),
+		),
+	)
+	defer nextgenSpan.End()
+
 	clearNextgenOutput(scanDir, completedWave)
 	outputFile := filepath.Join(scanDir, nextgenFileName(completedWave))
 

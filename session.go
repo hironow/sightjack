@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // StateFormatVersion is the version string written into SessionState files.
@@ -125,6 +128,13 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time) error {
 
+	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
+		trace.WithAttributes(
+			attribute.String("sightjack.session_id", sessionID),
+		),
+	)
+	defer loopSpan.End()
+
 	// --- Interactive Loop ---
 	shibitoShown := false
 	// sessionRejected tracks user-rejected actions per wave (keyed by WaveKey).
@@ -155,6 +165,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		// Prompt wave selection
 		selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
 		if err == ErrQuit {
+			loopSpan.AddEvent("session.paused")
 			LogInfo("Session paused. State saved.")
 			break
 		}
@@ -198,9 +209,21 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			switch choice {
 			case ApprovalApprove:
 				delete(sessionRejected, WaveKey(selected))
+				loopSpan.AddEvent("wave.approved",
+					trace.WithAttributes(
+						attribute.String("wave.id", selected.ID),
+						attribute.String("wave.cluster_name", selected.ClusterName),
+					),
+				)
 				applyWave = true
 			case ApprovalReject:
 				delete(sessionRejected, WaveKey(selected))
+				loopSpan.AddEvent("wave.rejected",
+					trace.WithAttributes(
+						attribute.String("wave.id", selected.ID),
+						attribute.String("wave.cluster_name", selected.ClusterName),
+					),
+				)
 				LogInfo("Wave rejected.")
 			case ApprovalDiscuss:
 				topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
@@ -279,10 +302,25 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		oldAvailable := len(AvailableWaves(waves, completed))
 
 		if !IsWaveApplyComplete(applyResult) {
+			loopSpan.AddEvent("wave.partial_failure",
+				trace.WithAttributes(
+					attribute.String("wave.id", selected.ID),
+					attribute.String("wave.cluster_name", selected.ClusterName),
+					attribute.Int("wave.error_count", len(applyResult.Errors)),
+				),
+			)
 			LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
 			DisplayRippleEffects(os.Stdout, applyResult.Ripples)
 			continue
 		}
+
+		loopSpan.AddEvent("wave.completed",
+			trace.WithAttributes(
+				attribute.String("wave.id", selected.ID),
+				attribute.String("wave.cluster_name", selected.ClusterName),
+				attribute.Int("wave.action_count", len(selected.Actions)),
+			),
+		)
 
 		// Mark wave completed using composite key (ClusterName:ID)
 		completed[WaveKey(selected)] = true
@@ -326,6 +364,11 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		if clusterForNextgen.Name == "" {
 			LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
 		} else if !NeedsMoreWaves(clusterForNextgen, waves) {
+			loopSpan.AddEvent("nextgen.skipped",
+				trace.WithAttributes(
+					attribute.String("wave.cluster_name", selected.ClusterName),
+				),
+			)
 			LogDebug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
 		} else {
 			completedWavesForCluster := completedWavesInCluster(waves, selected.ClusterName)

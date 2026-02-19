@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -54,6 +56,11 @@ func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWar
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
 func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool) (*ScanResult, error) {
+	ctx, scanSpan := tracer.Start(ctx, "scan",
+		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
+	)
+	defer scanSpan.End()
+
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return nil, err
@@ -61,6 +68,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 	// --- Pass 1: Classify ---
 	LogScan("Pass 1: Classifying issues...")
+	classifyCtx, classifySpan := tracer.Start(ctx, "classify")
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
 	classifyPrompt, err := RenderClassifyPrompt(cfg.Lang, ClassifyPromptData{
@@ -77,20 +85,24 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	}
 
 	if dryRun {
+		classifySpan.End()
 		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify")
 	}
 
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
 	if cfg.Labels.Enabled {
-		if _, err := RunClaudeOnce(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
+		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, os.Stdout); err != nil {
+			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
-		if _, err := RunClaude(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
+		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, os.Stdout); err != nil {
+			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	}
+	classifySpan.End()
 
 	classify, err := ParseClassifyResult(classifyOutput)
 	if err != nil {
@@ -98,7 +110,13 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	}
 	LogOK("Found %d clusters with %d total issues", len(classify.Clusters), classify.TotalIssues)
 
+	scanSpan.SetAttributes(
+		attribute.Int("scan.cluster_count", len(classify.Clusters)),
+		attribute.Int("scan.total_issues", classify.TotalIssues),
+	)
+
 	// --- Pass 2: Deep scan per cluster (parallel) ---
+	deepscanCtx, deepscanSpan := tracer.Start(ctx, "deepscan")
 	LogScan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
 	// Build scan cluster list from classify results. The index parameter in
@@ -110,6 +128,11 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	}
 
 	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+		ctx, clusterSpan := tracer.Start(ctx, "deepscan.cluster",
+			trace.WithAttributes(attribute.String("cluster.name", cluster.Name)),
+		)
+		defer clusterSpan.End()
+
 		cc := classify.Clusters[index]
 		chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
 		var chunkResults []ClusterScanResult
@@ -144,7 +167,8 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		return merged, nil
 	}
 
-	clusters, scanWarnings := RunParallelDeepScan(ctx, cfg, scanDir, scanClusters, deepScanFn)
+	clusters, scanWarnings := RunParallelDeepScan(deepscanCtx, cfg, scanDir, scanClusters, deepScanFn)
+	deepscanSpan.End()
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -158,6 +182,11 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 // RunWaveGenerate executes Pass 3: generate waves for each cluster in parallel.
 func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool) ([]Wave, error) {
+	ctx, waveGenSpan := tracer.Start(ctx, "wave.generate",
+		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
+	)
+	defer waveGenSpan.End()
+
 	LogScan("Pass 3: Generating waves for %d clusters...", len(clusters))
 
 	waveResults := make([]WaveGenerateResult, len(clusters))
