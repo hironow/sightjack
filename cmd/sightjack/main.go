@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -15,7 +16,7 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
-var version = "0.8.0-dev"
+var version = "0.9.0-dev"
 
 func main() {
 	// Extract subcommand before flag parsing so flags after the subcommand are honored.
@@ -90,6 +91,29 @@ func main() {
 		// Check for existing state (resume detection)
 		if !dryRun {
 			existingState, stateErr := sightjack.ReadState(baseDir)
+			if stateErr != nil {
+				// Try recovery from cached scan results.
+				// Session directories are named "session-{unixmilli}-{pid}", so
+				// lexicographic order matches creation time. Iterate in descending
+				// order and use the first directory with recoverable data, so a
+				// crashed/corrupt newest session doesn't block recovery from older ones.
+				scansDir := filepath.Join(baseDir, ".siren", "scans")
+				entries, dirErr := os.ReadDir(scansDir)
+				if dirErr == nil && len(entries) > 0 {
+					for i := len(entries) - 1; i >= 0; i-- {
+						entry := entries[i]
+						if !entry.IsDir() {
+							continue
+						}
+						recovered, recErr := sightjack.TryRecoverState(baseDir, entry.Name())
+						if recErr == nil {
+							existingState = recovered
+							stateErr = nil
+							break
+						}
+					}
+				}
+			}
 			if stateErr == nil {
 				scanner := bufio.NewScanner(os.Stdin)
 				for {

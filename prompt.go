@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"strings"
 	"text/template"
 )
 
@@ -17,6 +18,8 @@ type ClassifyPromptData struct {
 	CycleFilter     string
 	OutputPath      string
 	StrictnessLevel string
+	LabelsEnabled   bool
+	LabelPrefix     string
 }
 
 // DeepScanPromptData holds template data for the deep scan prompt.
@@ -33,6 +36,7 @@ type WaveGeneratePromptData struct {
 	Completeness    string
 	Issues          string
 	Observations    string
+	DoDSection      string
 	OutputPath      string
 	StrictnessLevel string
 }
@@ -45,6 +49,14 @@ type WaveApplyPromptData struct {
 	Actions         string
 	OutputPath      string
 	StrictnessLevel string
+	LabelsEnabled   bool
+	LabelPrefix     string
+}
+
+// ReadyLabelPromptData holds template data for the ready label prompt.
+type ReadyLabelPromptData struct {
+	ReadyLabel    string
+	ReadyIssueIDs string
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.
@@ -78,8 +90,56 @@ type NextGenPromptData struct {
 	CompletedWaves  string
 	ExistingADRs    []ExistingADR
 	RejectedActions string
+	DoDSection      string
 	OutputPath      string
 	StrictnessLevel string
+}
+
+// MatchDoDTemplate finds a DoD template matching the cluster name.
+// Matching uses case-insensitive prefix match. When multiple keys match,
+// the longest matching prefix wins. Equal-length ties are broken by
+// lexicographic comparison of lowercased keys for deterministic behavior.
+func MatchDoDTemplate(templates map[string]DoDTemplate, clusterName string) (bool, string) {
+	lower := strings.ToLower(clusterName)
+	bestKey := ""
+	bestKeyLower := ""
+	for key := range templates {
+		keyLower := strings.ToLower(key)
+		if !strings.HasPrefix(lower, keyLower) {
+			continue
+		}
+		if bestKey == "" || len(keyLower) > len(bestKeyLower) ||
+			(len(keyLower) == len(bestKeyLower) &&
+				(keyLower < bestKeyLower || (keyLower == bestKeyLower && key < bestKey))) {
+			bestKey = key
+			bestKeyLower = keyLower
+		}
+	}
+	if bestKey == "" {
+		return false, ""
+	}
+	return true, bestKey
+}
+
+// FormatDoDSection formats a DoD template into a text section for prompt injection.
+func FormatDoDSection(tmpl DoDTemplate) string {
+	if len(tmpl.Must) == 0 && len(tmpl.Should) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	if len(tmpl.Must) > 0 {
+		b.WriteString("Must:\n")
+		for _, item := range tmpl.Must {
+			b.WriteString("- " + item + "\n")
+		}
+	}
+	if len(tmpl.Should) > 0 {
+		b.WriteString("Should:\n")
+		for _, item := range tmpl.Should {
+			b.WriteString("- " + item + "\n")
+		}
+	}
+	return b.String()
 }
 
 func renderTemplate(name string, data any) (string, error) {
@@ -127,6 +187,12 @@ func RenderScribeADRPrompt(lang string, data ScribeADRPromptData) (string, error
 // RenderArchitectDiscussPrompt renders the architect discussion prompt for the given language.
 func RenderArchitectDiscussPrompt(lang string, data ArchitectDiscussPromptData) (string, error) {
 	name := fmt.Sprintf("prompts/templates/architect_discuss_%s.md.tmpl", lang)
+	return renderTemplate(name, data)
+}
+
+// RenderReadyLabelPrompt renders the ready label prompt for the given language.
+func RenderReadyLabelPrompt(lang string, data ReadyLabelPromptData) (string, error) {
+	name := fmt.Sprintf("prompts/templates/ready_label_%s.md.tmpl", lang)
 	return renderTemplate(name, data)
 }
 

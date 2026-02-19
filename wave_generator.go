@@ -93,6 +93,13 @@ func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		rejectedStr = string(rejectedJSON)
 	}
 
+	var dodSection string
+	if cfg.DoDTemplates != nil {
+		if matched, key := MatchDoDTemplate(cfg.DoDTemplates, completedWave.ClusterName); matched {
+			dodSection = FormatDoDSection(cfg.DoDTemplates[key])
+		}
+	}
+
 	return RenderNextGenPrompt(cfg.Lang, NextGenPromptData{
 		ClusterName:     completedWave.ClusterName,
 		Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
@@ -100,6 +107,7 @@ func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		CompletedWaves:  string(completedJSON),
 		ExistingADRs:    existingADRs,
 		RejectedActions: rejectedStr,
+		DoDSection:      dodSection,
 		OutputPath:      outputFile,
 		StrictnessLevel: string(cfg.Strictness.Default),
 	})

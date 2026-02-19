@@ -1,7 +1,11 @@
 package sightjack
 
 import (
+	"context"
+	"io"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -94,5 +98,102 @@ func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	}
 	if string(dataB) != "prompt B" {
 		t.Errorf("expected 'prompt B', got %q", string(dataB))
+	}
+}
+
+func TestRunClaudeOnceNoRetry(t *testing.T) {
+	callCount := 0
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		return exec.Command("false") // exits non-zero
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
+	}
+
+	// when
+	_, err := RunClaudeOnce(context.Background(), cfg, "test", io.Discard)
+
+	// then: should fail immediately without retrying
+	if err == nil {
+		t.Fatal("expected error from RunClaudeOnce")
+	}
+	if callCount != 1 {
+		t.Errorf("RunClaudeOnce should not retry; expected 1 call, got %d", callCount)
+	}
+}
+
+func TestRunClaudeRetriesOnFailure(t *testing.T) {
+	callCount := 0
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		if callCount < 3 {
+			return exec.Command("false") // exits non-zero
+		}
+		return exec.Command("echo", "success")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
+	}
+	output, err := RunClaude(context.Background(), cfg, "test", io.Discard)
+	if err != nil {
+		t.Fatalf("expected success after retries, got: %v", err)
+	}
+	if !strings.Contains(output, "success") {
+		t.Errorf("expected 'success' in output, got %q", output)
+	}
+	if callCount != 3 {
+		t.Errorf("expected 3 calls, got %d", callCount)
+	}
+}
+
+func TestRunClaudeNoRetryOnCancel(t *testing.T) {
+	callCount := 0
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		return exec.Command("false")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already cancelled
+
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
+	}
+	_, err := RunClaude(ctx, cfg, "test", io.Discard)
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+	if callCount > 1 {
+		t.Errorf("expected no retry on cancellation, got %d calls", callCount)
+	}
+}
+
+func TestRunClaudeExhaustsRetries(t *testing.T) {
+	callCount := 0
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		return exec.Command("false")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
+	}
+	_, err := RunClaude(context.Background(), cfg, "test", io.Discard)
+	if err == nil {
+		t.Fatal("expected error after exhausting retries")
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount)
 	}
 }

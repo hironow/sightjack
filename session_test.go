@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -991,8 +992,8 @@ func TestBuildSessionState(t *testing.T) {
 	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, nil)
 
 	// then
-	if state.Version != "0.8" {
-		t.Errorf("expected version 0.8, got %s", state.Version)
+	if state.Version != "0.9" {
+		t.Errorf("expected version 0.9, got %s", state.Version)
 	}
 	if state.SessionID != "test-123" {
 		t.Errorf("expected test-123, got %s", state.SessionID)
@@ -1335,18 +1336,37 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 }
 
 func TestCanResume_ValidState(t *testing.T) {
-	// given: state with valid ScanResultPath pointing to existing file
+	// given: state with valid ScanResultPath and non-empty Waves
 	dir := t.TempDir()
 	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
 	os.MkdirAll(scanDir, 0755)
 	path := filepath.Join(scanDir, "scan_result.json")
 	os.WriteFile(path, []byte(`{}`), 0644)
 
-	state := &SessionState{ScanResultPath: path}
+	state := &SessionState{
+		ScanResultPath: path,
+		Waves:          []WaveState{{ID: "w1", ClusterName: "auth", Status: "pending"}},
+	}
 
 	// when / then
 	if !CanResume(state) {
-		t.Error("expected CanResume true for valid state")
+		t.Error("expected CanResume true for valid state with waves")
+	}
+}
+
+func TestCanResume_EmptyWaves(t *testing.T) {
+	// given: state with valid ScanResultPath but no waves (recovered state)
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, ".siren", "scans", "s1")
+	os.MkdirAll(scanDir, 0755)
+	path := filepath.Join(scanDir, "scan_result.json")
+	os.WriteFile(path, []byte(`{}`), 0644)
+
+	state := &SessionState{ScanResultPath: path, Waves: nil}
+
+	// when / then
+	if CanResume(state) {
+		t.Error("expected CanResume false when waves are empty")
 	}
 }
 
@@ -1360,6 +1380,163 @@ func TestCanResume_EmptyPath(t *testing.T) {
 	}
 }
 
+func TestPartialApplyDelta(t *testing.T) {
+	tests := []struct {
+		name      string
+		applied   int
+		total     int
+		before    float64
+		after     float64
+		wantAfter float64
+	}{
+		{"full success", 5, 5, 0.3, 0.6, 0.6},
+		{"partial 3/5", 3, 5, 0.3, 0.6, 0.48},
+		{"zero applied", 0, 5, 0.3, 0.6, 0.3},
+		{"zero total (legacy)", 0, 0, 0.3, 0.6, 0.6},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given
+			result := &WaveApplyResult{Applied: tt.applied, TotalCount: tt.total}
+			delta := WaveDelta{Before: tt.before, After: tt.after}
+
+			// when
+			got := PartialApplyDelta(result, delta)
+
+			// then
+			if fmt.Sprintf("%.4f", got) != fmt.Sprintf("%.4f", tt.wantAfter) {
+				t.Errorf("PartialApplyDelta: got %.4f, want %.4f", got, tt.wantAfter)
+			}
+		})
+	}
+}
+
+func TestCheckCompletenessConsistency(t *testing.T) {
+	tests := []struct {
+		name     string
+		overall  float64
+		clusters []ClusterScanResult
+		wantWarn bool
+	}{
+		{"consistent", 0.5, []ClusterScanResult{
+			{Name: "a", Completeness: 0.4},
+			{Name: "b", Completeness: 0.6},
+		}, false},
+		{"inconsistent", 0.9, []ClusterScanResult{
+			{Name: "a", Completeness: 0.4},
+			{Name: "b", Completeness: 0.6},
+		}, true},
+		{"empty clusters", 0.0, nil, false},
+		{"within tolerance", 0.54, []ClusterScanResult{
+			{Name: "a", Completeness: 0.5},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CheckCompletenessConsistency(tt.overall, tt.clusters)
+			if got != tt.wantWarn {
+				t.Errorf("CheckCompletenessConsistency: got %v, want %v", got, tt.wantWarn)
+			}
+		})
+	}
+}
+
+func TestRecoverStateFromScan(t *testing.T) {
+	// given
+	scanResult := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "auth", Completeness: 0.4, Issues: []IssueDetail{{ID: "A-1"}}},
+			{Name: "infra", Completeness: 0.6, Issues: []IssueDetail{{ID: "I-1"}, {ID: "I-2"}}},
+		},
+		Completeness: 0.5,
+	}
+	waves := []Wave{
+		{ID: "w1", ClusterName: "auth", Status: "completed"},
+		{ID: "w2", ClusterName: "auth", Status: "available"},
+	}
+
+	dir := t.TempDir()
+	adrDir := filepath.Join(dir, "docs", "adr")
+	os.MkdirAll(adrDir, 0755)
+	os.WriteFile(filepath.Join(adrDir, "0001-test.md"), []byte("adr"), 0644)
+	os.WriteFile(filepath.Join(adrDir, "0002-test2.md"), []byte("adr2"), 0644)
+
+	// when
+	state := RecoverStateFromScan(scanResult, waves, adrDir)
+
+	// then
+	if state.Completeness != 0.5 {
+		t.Errorf("Completeness: expected 0.5, got %f", state.Completeness)
+	}
+	if len(state.Clusters) != 2 {
+		t.Errorf("Clusters: expected 2, got %d", len(state.Clusters))
+	}
+	if state.Clusters[0].Name != "auth" {
+		t.Errorf("Clusters[0].Name: expected auth, got %s", state.Clusters[0].Name)
+	}
+	if state.Clusters[0].IssueCount != 1 {
+		t.Errorf("Clusters[0].IssueCount: expected 1, got %d", state.Clusters[0].IssueCount)
+	}
+	if state.Clusters[1].IssueCount != 2 {
+		t.Errorf("Clusters[1].IssueCount: expected 2, got %d", state.Clusters[1].IssueCount)
+	}
+	if state.ADRCount != 2 {
+		t.Errorf("ADRCount: expected 2, got %d", state.ADRCount)
+	}
+	if len(state.Waves) != 2 {
+		t.Errorf("Waves: expected 2, got %d", len(state.Waves))
+	}
+	if state.Version != "0.9" {
+		t.Errorf("Version: expected 0.9, got %s", state.Version)
+	}
+	if state.ShibitoCount != 0 {
+		t.Errorf("ShibitoCount: expected 0, got %d", state.ShibitoCount)
+	}
+}
+
+func TestRecoverStateFromScanEmpty(t *testing.T) {
+	// given
+	scanResult := &ScanResult{}
+
+	// when
+	state := RecoverStateFromScan(scanResult, nil, "/nonexistent")
+
+	// then
+	if state.Completeness != 0 {
+		t.Errorf("Completeness: expected 0, got %f", state.Completeness)
+	}
+	if len(state.Clusters) != 0 {
+		t.Errorf("Clusters: expected 0, got %d", len(state.Clusters))
+	}
+	if len(state.Waves) != 0 {
+		t.Errorf("Waves: expected 0, got %d", len(state.Waves))
+	}
+	if state.ADRCount != 0 {
+		t.Errorf("ADRCount: expected 0, got %d", state.ADRCount)
+	}
+}
+
+func TestRecoverStateFromScan_ShibitoWarnings(t *testing.T) {
+	// given: scan result with shibito warnings
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "auth", Completeness: 0.3, Issues: []IssueDetail{{ID: "A-1"}}}},
+		Completeness: 0.3,
+		ShibitoWarnings: []ShibitoWarning{
+			{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-201", Description: "Login pattern", RiskLevel: "high"},
+			{ClosedIssueID: "ENG-30", CurrentIssueID: "ENG-180", Description: "Caching", RiskLevel: "medium"},
+			{ClosedIssueID: "ENG-10", CurrentIssueID: "ENG-100", Description: "Auth flow", RiskLevel: "low"},
+		},
+	}
+
+	// when
+	state := RecoverStateFromScan(scanResult, nil, "/nonexistent")
+
+	// then
+	if state.ShibitoCount != 3 {
+		t.Errorf("ShibitoCount: expected 3, got %d", state.ShibitoCount)
+	}
+}
+
 func TestCanResume_MissingFile(t *testing.T) {
 	// given: state with ScanResultPath pointing to deleted file
 	state := &SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
@@ -1367,5 +1544,59 @@ func TestCanResume_MissingFile(t *testing.T) {
 	// when / then
 	if CanResume(state) {
 		t.Error("expected CanResume false for missing file")
+	}
+}
+
+func TestTryRecoverState(t *testing.T) {
+	dir := t.TempDir()
+
+	// given: a cached scan result without a state.json
+	sessionID := "test-session"
+	scanDir, err := EnsureScanDir(dir, sessionID)
+	if err != nil {
+		t.Fatalf("EnsureScanDir: %v", err)
+	}
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "auth", Completeness: 0.5}},
+		Completeness: 0.5,
+	}
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("WriteScanResult: %v", err)
+	}
+
+	// when
+	recovered, recErr := TryRecoverState(dir, sessionID)
+
+	// then
+	if recErr != nil {
+		t.Fatalf("TryRecoverState: %v", recErr)
+	}
+	if recovered == nil {
+		t.Fatal("expected recovered state, got nil")
+	}
+	if recovered.Completeness != 0.5 {
+		t.Errorf("Completeness: expected 0.5, got %f", recovered.Completeness)
+	}
+	if recovered.SessionID != sessionID {
+		t.Errorf("SessionID: expected %s, got %s", sessionID, recovered.SessionID)
+	}
+	if recovered.ScanResultPath != scanResultPath {
+		t.Errorf("ScanResultPath: expected %s, got %s", scanResultPath, recovered.ScanResultPath)
+	}
+}
+
+func TestTryRecoverStateNoFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// when
+	recovered, err := TryRecoverState(dir, "nonexistent")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nonexistent session")
+	}
+	if recovered != nil {
+		t.Error("expected nil state")
 	}
 }

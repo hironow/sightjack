@@ -45,6 +45,14 @@ The user rejected these actions in a previous wave. Do NOT re-propose the same a
 - `update_description`: Update an Issue description
 - `create`: Create a new sub-issue
 
+{{if .DoDSection}}
+## Definition of Done Guidelines
+
+The following DoD standards apply to this cluster:
+
+{{.DoDSection}}
+Ensure proposed wave actions align with these standards.
+{{end}}
 ## Output
 Write the following JSON to **{{.OutputPath}}**:
 

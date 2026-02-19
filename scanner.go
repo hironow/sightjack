@@ -40,8 +40,8 @@ func ParseClusterScanResult(path string) (*ClusterScanResult, error) {
 
 // MergeScanResults combines per-cluster deep scan results into a single ScanResult.
 // shibitoWarnings are propagated from the Pass 1 classify result.
-func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWarning) ScanResult {
-	result := ScanResult{Clusters: clusters, ShibitoWarnings: shibitoWarnings}
+func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWarning, scanWarnings []string) ScanResult {
+	result := ScanResult{Clusters: clusters, ShibitoWarnings: shibitoWarnings, ScanWarnings: scanWarnings}
 	result.CalculateCompleteness()
 
 	for _, c := range clusters {
@@ -69,6 +69,8 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		CycleFilter:     cfg.Linear.Cycle,
 		OutputPath:      classifyOutput,
 		StrictnessLevel: string(cfg.Strictness.Default),
+		LabelsEnabled:   cfg.Labels.Enabled,
+		LabelPrefix:     cfg.Labels.Prefix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render classify prompt: %w", err)
@@ -78,8 +80,16 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify")
 	}
 
-	if _, err := RunClaude(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
-		return nil, fmt.Errorf("classify scan: %w", err)
+	// Use RunClaudeOnce when labels are enabled because classify applies
+	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
+	if cfg.Labels.Enabled {
+		if _, err := RunClaudeOnce(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
+			return nil, fmt.Errorf("classify scan: %w", err)
+		}
+	} else {
+		if _, err := RunClaude(ctx, cfg, classifyPrompt, os.Stdout); err != nil {
+			return nil, fmt.Errorf("classify scan: %w", err)
+		}
 	}
 
 	classify, err := ParseClassifyResult(classifyOutput)
@@ -91,51 +101,57 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// --- Pass 2: Deep scan per cluster (parallel) ---
 	LogScan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
-	clusters := make([]ClusterScanResult, len(classify.Clusters))
-
-	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(cfg.Scan.MaxConcurrency)
-
+	// Build scan cluster list from classify results. The index parameter in
+	// DeepScanFunc maps directly to classify.Clusters, so duplicate cluster
+	// names are handled safely without a name-keyed map.
+	scanClusters := make([]ClusterScanResult, len(classify.Clusters))
 	for i, cc := range classify.Clusters {
-		g.Go(func() error {
-			chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
-			var chunkResults []ClusterScanResult
+		scanClusters[i] = ClusterScanResult{Name: cc.Name}
+	}
 
-			for j, chunk := range chunks {
-				chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", i, sanitizeName(cc.Name), j))
-				prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
-					ClusterName:     cc.Name,
-					IssueIDs:        strings.Join(chunk, ", "),
-					OutputPath:      chunkFile,
-					StrictnessLevel: string(cfg.Strictness.Default),
-				})
-				if renderErr != nil {
-					return fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
-				}
+	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+		cc := classify.Clusters[index]
+		chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
+		var chunkResults []ClusterScanResult
 
-				LogScan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-				if _, runErr := RunClaude(gCtx, cfg, prompt, io.Discard); runErr != nil {
-					return fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
-				}
-
-				result, parseErr := ParseClusterScanResult(chunkFile)
-				if parseErr != nil {
-					return fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
-				}
-				chunkResults = append(chunkResults, *result)
+		for j, chunk := range chunks {
+			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, sanitizeName(cc.Name), j))
+			prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
+				ClusterName:     cc.Name,
+				IssueIDs:        strings.Join(chunk, ", "),
+				OutputPath:      chunkFile,
+				StrictnessLevel: string(cfg.Strictness.Default),
+			})
+			if renderErr != nil {
+				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
 			}
 
-			clusters[i] = mergeClusterChunks(cc.Name, chunkResults)
-			LogOK("Cluster %s: %.0f%% complete", cc.Name, clusters[i].Completeness*100)
-			return nil
-		})
+			LogScan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
+			if _, runErr := RunClaude(ctx, cfg, prompt, io.Discard); runErr != nil {
+				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
+			}
+
+			result, parseErr := ParseClusterScanResult(chunkFile)
+			if parseErr != nil {
+				return ClusterScanResult{}, fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
+			}
+			chunkResults = append(chunkResults, *result)
+		}
+
+		merged := mergeClusterChunks(cc.Name, chunkResults)
+		LogOK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
+		return merged, nil
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
+	clusters, scanWarnings := RunParallelDeepScan(ctx, cfg, scanDir, scanClusters, deepScanFn)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if len(clusters) == 0 && len(scanWarnings) > 0 {
+		return nil, fmt.Errorf("all clusters failed during deep scan: %v", scanWarnings)
 	}
 
-	merged := MergeScanResults(clusters, classify.ShibitoWarnings)
+	merged := MergeScanResults(clusters, classify.ShibitoWarnings, scanWarnings)
 	return &merged, nil
 }
 
@@ -157,11 +173,19 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				return fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
 			}
 
+			var dodSection string
+			if cfg.DoDTemplates != nil {
+				if matched, key := MatchDoDTemplate(cfg.DoDTemplates, cluster.Name); matched {
+					dodSection = FormatDoDSection(cfg.DoDTemplates[key])
+				}
+			}
+
 			prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
 				ClusterName:     cluster.Name,
 				Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
 				Issues:          string(issuesJSON),
 				Observations:    strings.Join(cluster.Observations, "\n"),
+				DoDSection:      dodSection,
 				OutputPath:      waveFile,
 				StrictnessLevel: string(cfg.Strictness.Default),
 			})
@@ -194,6 +218,88 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 	}
 
 	return MergeWaveResults(waveResults), nil
+}
+
+// DeepScanFunc is the function signature for scanning a single cluster.
+// The index parameter identifies the cluster's position in the original slice,
+// enabling safe lookup even when duplicate cluster names exist.
+type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error)
+
+// RunParallelDeepScan executes deep scan across clusters using goroutines with
+// semaphore-based concurrency control. Failed clusters get LogWarn and are skipped;
+// remaining clusters continue. Returns successful results and warning messages.
+func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
+	clusters []ClusterScanResult, scanFn DeepScanFunc) ([]ClusterScanResult, []string) {
+
+	maxConcurrency := cfg.Scan.MaxConcurrency
+	if maxConcurrency < 1 {
+		maxConcurrency = 1
+	}
+
+	type scanResult struct {
+		index   int
+		cluster ClusterScanResult
+		err     error
+	}
+
+	sem := make(chan struct{}, maxConcurrency)
+	results := make(chan scanResult, len(clusters))
+
+	// NOTE: i and cluster are safe to capture in the goroutine closure.
+	// Go 1.22+ scopes loop variables per iteration (go.mod requires go 1.25.0).
+	launched := 0
+	for i, cluster := range clusters {
+		if ctx.Err() != nil {
+			break
+		}
+		// Use select to respect cancellation while waiting for semaphore.
+		acquired := false
+		select {
+		case <-ctx.Done():
+		case sem <- struct{}{}:
+			acquired = true
+		}
+		if !acquired || ctx.Err() != nil {
+			if acquired {
+				<-sem // release the slot we just took
+			}
+			break
+		}
+		launched++
+		go func() {
+			defer func() { <-sem }()
+			result, err := scanFn(ctx, cfg, scanDir, i, cluster)
+			results <- scanResult{index: i, cluster: result, err: err}
+		}()
+	}
+
+	// Collect results indexed by original position to preserve deterministic ordering.
+	type indexedResult struct {
+		cluster ClusterScanResult
+		err     error
+	}
+	ordered := make([]*indexedResult, len(clusters))
+	var warnings []string
+	// NOTE: "for range integer" is valid Go 1.22+ syntax (go.mod requires go 1.25.0).
+	for range launched {
+		r := <-results
+		ordered[r.index] = &indexedResult{cluster: r.cluster, err: r.err}
+		if r.err != nil {
+			msg := fmt.Sprintf("Cluster %q scan failed: %v", clusters[r.index].Name, r.err)
+			LogWarn("%s", msg)
+			warnings = append(warnings, msg)
+		}
+	}
+
+	// Build successful slice in original cluster order.
+	var successful []ClusterScanResult
+	for _, ir := range ordered {
+		if ir != nil && ir.err == nil {
+			successful = append(successful, ir.cluster)
+		}
+	}
+
+	return successful, warnings
 }
 
 // chunkSlice splits items into sub-slices of at most size elements.

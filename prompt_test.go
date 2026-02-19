@@ -633,3 +633,294 @@ func TestRenderNextGenPrompt_NoRejectedActions(t *testing.T) {
 		t.Errorf("Rejected section should be omitted when empty")
 	}
 }
+
+func TestMatchDoDTemplate(t *testing.T) {
+	templates := map[string]DoDTemplate{
+		"auth":  {Must: []string{"auth must"}, Should: []string{"auth should"}},
+		"infra": {Must: []string{"infra must"}},
+	}
+	tests := []struct {
+		clusterName string
+		wantMatch   bool
+		wantKey     string
+	}{
+		{"Auth", true, "auth"},
+		{"auth-service", true, "auth"},
+		{"Authentication", true, "auth"},
+		{"INFRA", true, "infra"},
+		{"frontend", false, ""},
+	}
+	for _, tt := range tests {
+		matched, key := MatchDoDTemplate(templates, tt.clusterName)
+		if matched != tt.wantMatch {
+			t.Errorf("MatchDoDTemplate(%q): matched=%v, want %v", tt.clusterName, matched, tt.wantMatch)
+		}
+		if key != tt.wantKey {
+			t.Errorf("MatchDoDTemplate(%q): key=%q, want %q", tt.clusterName, key, tt.wantKey)
+		}
+	}
+}
+
+func TestMatchDoDTemplate_CaseTieBreaker(t *testing.T) {
+	// given: keys that differ only by case -> same length after lowering
+	templates := map[string]DoDTemplate{
+		"Auth": {Must: []string{"upper"}},
+		"auth": {Must: []string{"lower"}},
+	}
+
+	// when: both match "authentication" with equal length prefix
+	matched, key := MatchDoDTemplate(templates, "authentication")
+
+	// then: "Auth" < "auth" in ASCII, so "Auth" wins the original-key tie-breaker
+	if !matched {
+		t.Fatal("expected a match")
+	}
+	if key != "Auth" {
+		t.Errorf("expected deterministic winner 'Auth', got %q", key)
+	}
+
+	// Verify determinism across multiple calls (map iteration order varies)
+	for i := 0; i < 50; i++ {
+		_, k := MatchDoDTemplate(templates, "authentication")
+		if k != key {
+			t.Fatalf("non-deterministic on iteration %d: got %q, want %q", i, k, key)
+		}
+	}
+}
+
+func TestMatchDoDTemplate_LongestPrefixWins(t *testing.T) {
+	// given: "a" and "auth" both match "authentication"
+	templates := map[string]DoDTemplate{
+		"a":    {Must: []string{"short"}},
+		"auth": {Must: []string{"long"}},
+	}
+
+	// when
+	matched, key := MatchDoDTemplate(templates, "authentication")
+
+	// then: longest prefix wins
+	if !matched {
+		t.Fatal("expected a match")
+	}
+	if key != "auth" {
+		t.Errorf("expected longest prefix 'auth', got %q", key)
+	}
+}
+
+func TestFormatDoDSection(t *testing.T) {
+	tmpl := DoDTemplate{
+		Must:   []string{"Unit tests", "Error handling"},
+		Should: []string{"Integration tests"},
+	}
+	section := FormatDoDSection(tmpl)
+	if !strings.Contains(section, "Unit tests") {
+		t.Error("expected Must items in section")
+	}
+	if !strings.Contains(section, "Integration tests") {
+		t.Error("expected Should items in section")
+	}
+}
+
+func TestFormatDoDSectionEmpty(t *testing.T) {
+	section := FormatDoDSection(DoDTemplate{})
+	if section != "" {
+		t.Errorf("expected empty section for empty template, got %q", section)
+	}
+}
+
+func TestRenderWaveGeneratePromptWithDoD(t *testing.T) {
+	// given
+	data := WaveGeneratePromptData{
+		ClusterName:     "auth",
+		Completeness:    "50",
+		Issues:          "[]",
+		Observations:    "none",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		DoDSection:      "Must:\n- Unit tests\nShould:\n- Integration tests\n",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveGeneratePrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
+		}
+		if !strings.Contains(result, "Unit tests") {
+			t.Errorf("lang=%s: expected DoD section in output", lang)
+		}
+	}
+}
+
+func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
+	// given
+	data := WaveGeneratePromptData{
+		ClusterName:     "auth",
+		Completeness:    "50",
+		Issues:          "[]",
+		Observations:    "none",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		DoDSection:      "",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveGeneratePrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
+		}
+		if strings.Contains(result, "Definition of Done") || strings.Contains(result, "完成基準") {
+			t.Errorf("lang=%s: DoD section should not appear when empty", lang)
+		}
+	}
+}
+
+func TestRenderClassifyPromptWithLabels(t *testing.T) {
+	data := ClassifyPromptData{
+		TeamFilter:      "test",
+		ProjectFilter:   "test",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   true,
+		LabelPrefix:     "sightjack",
+	}
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderClassifyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if !strings.Contains(result, "sightjack:analyzed") {
+			t.Errorf("lang=%s: expected label instruction in output", lang)
+		}
+	}
+}
+
+func TestRenderClassifyPromptWithoutLabels(t *testing.T) {
+	data := ClassifyPromptData{
+		TeamFilter:      "test",
+		ProjectFilter:   "test",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   false,
+	}
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderClassifyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if strings.Contains(result, "analyzed") {
+			t.Errorf("lang=%s: label instruction should not appear when disabled", lang)
+		}
+	}
+}
+
+func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
+	data := WaveApplyPromptData{
+		WaveID:          "w1",
+		ClusterName:     "auth",
+		Title:           "Wave 1",
+		Actions:         "[]",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   true,
+		LabelPrefix:     "sightjack",
+	}
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if !strings.Contains(result, "sightjack:wave-done") {
+			t.Errorf("lang=%s: expected label instruction in output", lang)
+		}
+	}
+}
+
+func TestRenderWaveApplyPromptNoReadySection(t *testing.T) {
+	// given: wave_apply should NEVER contain ready-label instructions
+	// (ready labels are applied in a separate step after apply success)
+	data := WaveApplyPromptData{
+		WaveID:          "w1",
+		ClusterName:     "auth",
+		Title:           "Wave 1",
+		Actions:         "[]",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		LabelsEnabled:   true,
+		LabelPrefix:     "sightjack",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderWaveApplyPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if strings.Contains(result, "ready") {
+			t.Errorf("lang=%s: wave_apply must not contain ready-label section", lang)
+		}
+	}
+}
+
+func TestRenderReadyLabelPrompt(t *testing.T) {
+	// given
+	data := ReadyLabelPromptData{
+		ReadyLabel:    "sightjack:ready",
+		ReadyIssueIDs: "AUTH-1, AUTH-2",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderReadyLabelPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("lang=%s: %v", lang, err)
+		}
+		if !strings.Contains(result, "sightjack:ready") {
+			t.Errorf("lang=%s: expected ready label in output", lang)
+		}
+		if !strings.Contains(result, "AUTH-1") {
+			t.Errorf("lang=%s: expected issue IDs in output", lang)
+		}
+	}
+}
+
+func TestRenderReadyLabelPrompt_UnsupportedLang(t *testing.T) {
+	// given
+	data := ReadyLabelPromptData{
+		ReadyLabel:    "sightjack:ready",
+		ReadyIssueIDs: "AUTH-1",
+	}
+
+	// when
+	_, err := RenderReadyLabelPrompt("fr", data)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for unsupported language")
+	}
+}
+
+func TestRenderNextGenPromptWithDoD(t *testing.T) {
+	// given
+	data := NextGenPromptData{
+		ClusterName:     "auth",
+		Completeness:    "70",
+		Issues:          "[]",
+		CompletedWaves:  "[]",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+		DoDSection:      "Must:\n- Terraform reviewed\n",
+	}
+
+	// when / then
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderNextGenPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
+		}
+		if !strings.Contains(result, "Terraform reviewed") {
+			t.Errorf("lang=%s: expected DoD section in output", lang)
+		}
+	}
+}

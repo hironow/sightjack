@@ -211,7 +211,11 @@ func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, state *Ses
 	completePct := int(state.Completeness * 100)
 	fmt.Fprintf(w, "\n  Previous session found (%d%% complete, %d ADRs)\n", completePct, state.ADRCount)
 	fmt.Fprintf(w, "  Last scan: %s\n\n", state.LastScanned.Format("2006-01-02 15:04"))
-	fmt.Fprintln(w, "  [r] Resume session")
+	if CanResume(state) {
+		fmt.Fprintln(w, "  [r] Resume session")
+	} else {
+		fmt.Fprintln(w, "  [r] Resume session (unavailable — rescan required)")
+	}
 	fmt.Fprintln(w, "  [n] Start new session")
 	fmt.Fprintln(w, "  [s] Re-scan Linear and resume")
 	fmt.Fprint(w, "\n  Choice: ")

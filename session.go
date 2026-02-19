@@ -40,7 +40,6 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	if err != nil {
 		return fmt.Errorf("scan: %w", err)
 	}
-
 	// In dry-run mode, RunScan writes classify prompt but returns nil ScanResult.
 	// Continue to Pass 3 with sample cluster data so wave-generation prompts are also generated.
 	if dryRun {
@@ -81,6 +80,10 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 		LogOK("Dry-run complete. Check .siren/scans/ for generated prompts.")
 		return nil
+	}
+
+	for _, w := range scanResult.ScanWarnings {
+		LogWarn("Partial scan: %s", w)
 	}
 
 	// Capture scan timestamp once so it stays stable across wave completions
@@ -124,6 +127,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	// nextgen call triggered by that specific wave's completion, not accumulated
 	// across the entire cluster.
 	sessionRejected := make(map[string][]WaveAction)
+	labeledReady := make(map[string]bool) // tracks issues already labeled ready
 	for {
 		waves = EvaluateUnlocks(waves, completed)
 		available := AvailableWaves(waves, completed)
@@ -285,7 +289,8 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		// Update cluster completeness from delta, then recalculate overall
 		for i, c := range scanResult.Clusters {
 			if c.Name == selected.ClusterName {
-				scanResult.Clusters[i].Completeness = selected.Delta.After
+				adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
+				scanResult.Clusters[i].Completeness = adjustedAfter
 				// Note: per-issue completeness is NOT updated here because
 				// action types vary (add_dod vs add_dependency) and we lack
 				// accurate per-issue deltas. The nextgen prompt already
@@ -328,6 +333,28 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			}
 		}
 
+		// Apply ready labels after nextgen so the final wave list is used.
+		// Only label newly ready issues to avoid redundant API calls.
+		if cfg.Labels.Enabled {
+			readyIDs := ReadyIssueIDs(waves)
+			var newlyReady []string
+			for _, id := range readyIDs {
+				if !labeledReady[id] {
+					newlyReady = append(newlyReady, id)
+				}
+			}
+			if len(newlyReady) > 0 {
+				readyIssueStr := strings.Join(newlyReady, ", ")
+				if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
+					LogWarn("Ready label failed: %v", err)
+				} else {
+					for _, id := range newlyReady {
+						labeledReady[id] = true
+					}
+				}
+			}
+		}
+
 		// Save state after each wave completion (crash resilience)
 		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 			LogWarn("Failed to update cached scan result: %v", err)
@@ -337,6 +364,12 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 		if err := WriteState(baseDir, midState); err != nil {
 			LogWarn("Failed to save mid-session state: %v", err)
 		}
+	}
+
+	// Final consistency check
+	if CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
+		LogWarn("Completeness mismatch detected. Recalculating...")
+		scanResult.CalculateCompleteness()
 	}
 
 	// Save state + updated scan result
@@ -359,6 +392,9 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 // state files) or the file no longer exists on disk.
 func CanResume(state *SessionState) bool {
 	if state.ScanResultPath == "" {
+		return false
+	}
+	if len(state.Waves) == 0 {
 		return false
 	}
 	_, err := os.Stat(state.ScanResultPath)
@@ -416,6 +452,9 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if err != nil {
 		return fmt.Errorf("re-scan: %w", err)
 	}
+	for _, w := range scanResult.ScanWarnings {
+		LogWarn("Partial scan: %s", w)
+	}
 	scanTime := time.Now()
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
@@ -449,7 +488,7 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		ts = *lastScanned
 	}
 	state := &SessionState{
-		Version:      "0.8",
+		Version:      "0.9",
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  ts,
@@ -466,6 +505,19 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		})
 	}
 	return state
+}
+
+// PartialApplyDelta computes the adjusted delta for a partially applied wave.
+// When TotalCount is 0 (legacy result), the original delta.After is returned.
+func PartialApplyDelta(result *WaveApplyResult, delta WaveDelta) float64 {
+	if result.TotalCount == 0 || result.Applied >= result.TotalCount {
+		return delta.After
+	}
+	if result.Applied == 0 {
+		return delta.Before
+	}
+	successRate := float64(result.Applied) / float64(result.TotalCount)
+	return delta.Before + (delta.After-delta.Before)*successRate
 }
 
 // IsWaveApplyComplete returns true when the apply result has no errors,
@@ -584,6 +636,73 @@ func BuildWaveStates(waves []Wave) []WaveState {
 		}
 	}
 	return states
+}
+
+// CheckCompletenessConsistency verifies that the average of cluster completeness
+// values matches the overall completeness within a tolerance. Returns true if a
+// mismatch beyond the tolerance (5 percentage points) is detected.
+func CheckCompletenessConsistency(overall float64, clusters []ClusterScanResult) bool {
+	if len(clusters) == 0 {
+		return false
+	}
+	var sum float64
+	for _, c := range clusters {
+		sum += c.Completeness
+	}
+	avg := sum / float64(len(clusters))
+	diff := overall - avg
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff > 0.05
+}
+
+// RecoverStateFromScan reconstructs a SessionState from a cached ScanResult
+// and wave list. Used when state.json is missing or corrupted but scan_result.json exists.
+// Unrecoverable fields (SessionID, Project) are set to zero values.
+// LastScanned is set to time.Now() as an approximation.
+func RecoverStateFromScan(scanResult *ScanResult, waves []Wave, adrDir string) *SessionState {
+	state := &SessionState{
+		Version:      "0.9",
+		Completeness: scanResult.Completeness,
+		LastScanned:  time.Now(),
+		ADRCount:     CountADRFiles(adrDir),
+		ShibitoCount: len(scanResult.ShibitoWarnings),
+	}
+	for _, c := range scanResult.Clusters {
+		state.Clusters = append(state.Clusters, ClusterState{
+			Name:         c.Name,
+			Completeness: c.Completeness,
+			IssueCount:   len(c.Issues),
+		})
+	}
+	if len(waves) > 0 {
+		state.Waves = BuildWaveStates(waves)
+	}
+	return state
+}
+
+// TryRecoverState attempts to recover basic session state from cached scan result files.
+// Recovery chain: Try scan_result.json in scan dir -> recover clusters and completeness.
+// Note: Waves are not recovered, so the returned state will have an empty Waves slice.
+// This means CanResume will return false, directing the user to a rescan flow rather
+// than a direct resume. Returns error if no recoverable data found.
+func TryRecoverState(baseDir string, sessionID string) (*SessionState, error) {
+	scanDir := ScanDir(baseDir, sessionID)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+
+	scanResult, err := LoadScanResult(scanResultPath)
+	if err != nil {
+		return nil, fmt.Errorf("no recoverable scan data: %w", err)
+	}
+
+	LogWarn("State file missing. Recovered from cached scan result.")
+
+	adrDir := ADRDir(baseDir)
+	state := RecoverStateFromScan(scanResult, nil, adrDir)
+	state.SessionID = sessionID
+	state.ScanResultPath = scanResultPath
+	return state, nil
 }
 
 // completedWavesInCluster returns all completed waves for the given cluster.

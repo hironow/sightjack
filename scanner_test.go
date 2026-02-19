@@ -1,8 +1,11 @@
 package sightjack
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 )
 
@@ -314,7 +317,7 @@ func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
 	}
 
 	// when
-	result := MergeScanResults(clusters, warnings)
+	result := MergeScanResults(clusters, warnings, nil)
 
 	// then
 	if len(result.ShibitoWarnings) != 1 {
@@ -333,7 +336,7 @@ func TestMergeScanResults(t *testing.T) {
 	}
 
 	// when
-	result := MergeScanResults(clusters, nil)
+	result := MergeScanResults(clusters, nil, nil)
 
 	// then
 	if result.TotalIssues != 10 {
@@ -344,5 +347,271 @@ func TestMergeScanResults(t *testing.T) {
 	}
 	if len(result.Clusters) != 2 {
 		t.Errorf("expected 2 clusters, got %d", len(result.Clusters))
+	}
+}
+
+func TestMergeScanResults_WithScanWarnings(t *testing.T) {
+	// given: partial scan success — some clusters failed
+	clusters := []ClusterScanResult{
+		{Name: "Auth", Completeness: 0.5, Issues: make([]IssueDetail, 3)},
+	}
+	scanWarnings := []string{`Cluster "Infra" scan failed: timeout`}
+
+	// when
+	result := MergeScanResults(clusters, nil, scanWarnings)
+
+	// then
+	if len(result.ScanWarnings) != 1 {
+		t.Fatalf("expected 1 scan warning, got %d", len(result.ScanWarnings))
+	}
+	if result.ScanWarnings[0] != scanWarnings[0] {
+		t.Errorf("expected %q, got %q", scanWarnings[0], result.ScanWarnings[0])
+	}
+}
+
+func TestRunParallelDeepScan(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{
+		{Name: "auth", Issues: []IssueDetail{{ID: "A-1"}}},
+		{Name: "infra", Issues: []IssueDetail{{ID: "I-1"}}},
+		{Name: "frontend", Issues: []IssueDetail{{ID: "F-1"}}},
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 2
+
+	// when
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			return ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
+		})
+
+	// then
+	if len(results) != 3 {
+		t.Errorf("expected 3 results, got %d", len(results))
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d", len(warnings))
+	}
+}
+
+func TestRunParallelDeepScanWithFailure(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{
+		{Name: "auth"},
+		{Name: "infra"},
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	var callCount atomic.Int32
+
+	// when
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			callCount.Add(1)
+			if cluster.Name == "auth" {
+				return ClusterScanResult{}, fmt.Errorf("auth scan failed")
+			}
+			return ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
+		})
+
+	// then
+	if len(results) != 1 {
+		t.Errorf("expected 1 successful result, got %d", len(results))
+	}
+	if len(results) > 0 && results[0].Name != "infra" {
+		t.Errorf("expected 'infra', got %q", results[0].Name)
+	}
+	if len(warnings) != 1 {
+		t.Errorf("expected 1 warning, got %d", len(warnings))
+	}
+	if callCount.Load() != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount.Load())
+	}
+}
+
+func TestRunParallelDeepScanSingleCluster(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{{Name: "only"}}
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+
+	// when
+	results, _ := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+		})
+
+	// then
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
+	// given: classify result with cluster names and issue IDs (simulates Pass 1 output)
+	classifyClusters := []ClusterClassification{
+		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
+		{Name: "Infra", IssueIDs: []string{"I-1"}},
+	}
+
+	scanClusters := make([]ClusterScanResult, len(classifyClusters))
+	for i, cc := range classifyClusters {
+		scanClusters[i] = ClusterScanResult{Name: cc.Name}
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 2
+
+	// when: use index-based lookup (same pattern as wired in RunScan)
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			cc := classifyClusters[index]
+			return ClusterScanResult{
+				Name:         cc.Name,
+				Completeness: 0.5,
+				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
+			}, nil
+		})
+
+	// then
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d: %v", len(warnings), warnings)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	nameSet := make(map[string]bool)
+	for _, r := range results {
+		nameSet[r.Name] = true
+	}
+	if !nameSet["Auth"] {
+		t.Error("expected Auth cluster in results")
+	}
+	if !nameSet["Infra"] {
+		t.Error("expected Infra cluster in results")
+	}
+}
+
+func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
+	// given: classifier returns duplicate cluster names with different issue IDs
+	classifyClusters := []ClusterClassification{
+		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
+		{Name: "Auth", IssueIDs: []string{"A-3"}},
+	}
+
+	scanClusters := make([]ClusterScanResult, len(classifyClusters))
+	for i, cc := range classifyClusters {
+		scanClusters[i] = ClusterScanResult{Name: cc.Name}
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+
+	// when: index-based lookup ensures each duplicate gets its own issue IDs
+	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			cc := classifyClusters[index]
+			return ClusterScanResult{
+				Name:         cc.Name,
+				Completeness: float64(len(cc.IssueIDs)) * 0.25,
+				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
+			}, nil
+		})
+
+	// then: both clusters scanned with correct issue counts (order is non-deterministic)
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d", len(warnings))
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	// Collect completeness values (order may vary)
+	completenessSet := make(map[float64]int)
+	issueCountSet := make(map[int]int)
+	for _, r := range results {
+		completenessSet[r.Completeness]++
+		issueCountSet[len(r.Issues)]++
+	}
+	// One Auth has 2 issues (completeness 0.5), the other has 1 issue (completeness 0.25)
+	if completenessSet[0.5] != 1 {
+		t.Errorf("expected one result with completeness 0.5, got %d", completenessSet[0.5])
+	}
+	if completenessSet[0.25] != 1 {
+		t.Errorf("expected one result with completeness 0.25, got %d", completenessSet[0.25])
+	}
+	if issueCountSet[2] != 1 {
+		t.Errorf("expected one result with 2 issues, got %d", issueCountSet[2])
+	}
+	if issueCountSet[1] != 1 {
+		t.Errorf("expected one result with 1 issue, got %d", issueCountSet[1])
+	}
+}
+
+func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
+	// given: 5 clusters but context is already cancelled
+	clusters := make([]ClusterScanResult, 5)
+	for i := range clusters {
+		clusters[i] = ClusterScanResult{Name: fmt.Sprintf("c%d", i)}
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 1
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	var callCount atomic.Int32
+
+	// when
+	results, _ := RunParallelDeepScan(ctx, &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			callCount.Add(1)
+			return ClusterScanResult{Name: cluster.Name}, nil
+		})
+
+	// then: no goroutines should have been launched
+	if callCount.Load() != 0 {
+		t.Errorf("expected 0 calls with cancelled context, got %d", callCount.Load())
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
+	// given: concurrency=1, cancel while second cluster waits for semaphore
+	clusters := []ClusterScanResult{
+		{Name: "slow"},
+		{Name: "should-not-run"},
+	}
+
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Scan.MaxConcurrency = 1
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var callCount atomic.Int32
+
+	// when: first scan runs, cancels ctx during execution; second should not start
+	results, _ := RunParallelDeepScan(ctx, &cfg, dir, clusters,
+		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			callCount.Add(1)
+			if index == 0 {
+				cancel() // cancel while second cluster waits for semaphore
+			}
+			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+		})
+
+	// then: only the first cluster should have been scanned
+	if callCount.Load() != 1 {
+		t.Errorf("expected 1 call (only first cluster), got %d", callCount.Load())
+	}
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
 	}
 }

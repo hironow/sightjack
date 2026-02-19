@@ -323,6 +323,185 @@ strictness:
 	}
 }
 
+func TestDoDTemplatesInDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.DoDTemplates != nil {
+		t.Fatalf("expected nil DoDTemplates in default config, got %v", cfg.DoDTemplates)
+	}
+}
+
+func TestLoadConfigWithDoDTemplates(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+dod_templates:
+  auth:
+    must:
+      - "Unit tests for all public functions"
+      - "Error handling for all API calls"
+    should:
+      - "Integration test coverage"
+  infra:
+    must:
+      - "Terraform plan reviewed"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if len(cfg.DoDTemplates) != 2 {
+		t.Fatalf("expected 2 DoD templates, got %d", len(cfg.DoDTemplates))
+	}
+	auth := cfg.DoDTemplates["auth"]
+	if len(auth.Must) != 2 {
+		t.Errorf("auth.Must: expected 2, got %d", len(auth.Must))
+	}
+	if len(auth.Should) != 1 {
+		t.Errorf("auth.Should: expected 1, got %d", len(auth.Should))
+	}
+	infra := cfg.DoDTemplates["infra"]
+	if len(infra.Must) != 1 {
+		t.Errorf("infra.Must: expected 1, got %d", len(infra.Must))
+	}
+}
+
+func TestRetryConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Retry.MaxAttempts != 3 {
+		t.Errorf("expected MaxAttempts=3, got %d", cfg.Retry.MaxAttempts)
+	}
+	if cfg.Retry.BaseDelaySec != 2 {
+		t.Errorf("expected BaseDelaySec=2, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
+func TestLoadConfigWithRetry(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+retry:
+  max_attempts: 5
+  base_delay_sec: 1
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Retry.MaxAttempts != 5 {
+		t.Errorf("MaxAttempts: expected 5, got %d", cfg.Retry.MaxAttempts)
+	}
+	if cfg.Retry.BaseDelaySec != 1 {
+		t.Errorf("BaseDelaySec: expected 1, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
+func TestLoadConfigRetryValidation(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+retry:
+  max_attempts: 0
+  base_delay_sec: -1
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Retry.MaxAttempts != 3 {
+		t.Errorf("expected corrected MaxAttempts=3, got %d", cfg.Retry.MaxAttempts)
+	}
+	if cfg.Retry.BaseDelaySec != 2 {
+		t.Errorf("expected corrected BaseDelaySec=2, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
+func TestLabelsConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.Labels.Enabled {
+		t.Error("expected Labels.Enabled=true by default")
+	}
+	if cfg.Labels.Prefix != "sightjack" {
+		t.Errorf("expected Prefix='sightjack', got %q", cfg.Labels.Prefix)
+	}
+	if cfg.Labels.ReadyLabel != "sightjack:ready" {
+		t.Errorf("expected ReadyLabel='sightjack:ready', got %q", cfg.Labels.ReadyLabel)
+	}
+}
+
+func TestLoadConfigWithLabels(t *testing.T) {
+	content := `
+linear:
+  team: test
+  project: test
+labels:
+  enabled: false
+  prefix: "myprefix"
+  ready_label: "myprefix:done"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Labels.Enabled {
+		t.Error("expected Labels.Enabled=false")
+	}
+	if cfg.Labels.Prefix != "myprefix" {
+		t.Errorf("Prefix: expected 'myprefix', got %q", cfg.Labels.Prefix)
+	}
+	if cfg.Labels.ReadyLabel != "myprefix:done" {
+		t.Errorf("ReadyLabel: expected 'myprefix:done', got %q", cfg.Labels.ReadyLabel)
+	}
+}
+
+func TestLoadConfigLabelsEnabled_EmptyValues_FallsBackToDefaults(t *testing.T) {
+	// given: labels enabled with explicitly empty prefix and ready_label
+	content := `
+linear:
+  team: test
+  project: test
+labels:
+  enabled: true
+  prefix: ""
+  ready_label: ""
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(content), 0644)
+
+	// when
+	cfg, err := LoadConfig(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Labels.Prefix != "sightjack" {
+		t.Errorf("expected default prefix 'sightjack', got %q", cfg.Labels.Prefix)
+	}
+	if cfg.Labels.ReadyLabel != "sightjack:ready" {
+		t.Errorf("expected default ready label 'sightjack:ready', got %q", cfg.Labels.ReadyLabel)
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	// given: config without scribe section
 	dir := t.TempDir()

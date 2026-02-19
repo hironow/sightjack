@@ -513,6 +513,22 @@ func TestApprovalSelective_IsDistinctValue(t *testing.T) {
 	}
 }
 
+func TestWaveApplyResultTotalCount(t *testing.T) {
+	// given
+	data := `{"wave_id":"w1","applied":3,"total_count":5,"errors":["e1"]}`
+
+	// when
+	var result WaveApplyResult
+	if err := json.Unmarshal([]byte(data), &result); err != nil {
+		t.Fatal(err)
+	}
+
+	// then
+	if result.TotalCount != 5 {
+		t.Errorf("TotalCount: expected 5, got %d", result.TotalCount)
+	}
+}
+
 func TestScribeResponse_ZeroValues(t *testing.T) {
 	// given: all zero-value fields
 	data := `{"adr_id":"","title":"","content":"","reasoning":""}`

@@ -40,4 +40,7 @@ Write the following JSON to **{{.OutputPath}}**:
 }
 ```
 
+{{if .LabelsEnabled}}
+After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using Linear MCP.
+{{end}}
 Important: Write output directly to the file path above. Do not write to stdout.

@@ -12,14 +12,36 @@ type StrictnessConfig struct {
 	Default StrictnessLevel `yaml:"default"`
 }
 
+// DoDTemplate holds must/should Definition of Done items for a category.
+type DoDTemplate struct {
+	Must   []string `yaml:"must"`
+	Should []string `yaml:"should"`
+}
+
+// RetryConfig holds exponential backoff retry settings for Claude subprocess calls.
+type RetryConfig struct {
+	MaxAttempts  int `yaml:"max_attempts"`
+	BaseDelaySec int `yaml:"base_delay_sec"`
+}
+
+// LabelsConfig holds Linear label assignment settings.
+type LabelsConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	Prefix     string `yaml:"prefix"`
+	ReadyLabel string `yaml:"ready_label"`
+}
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
-	Linear     LinearConfig    `yaml:"linear"`
-	Scan       ScanConfig      `yaml:"scan"`
-	Claude     ClaudeConfig    `yaml:"claude"`
-	Scribe     ScribeConfig    `yaml:"scribe"`
-	Strictness StrictnessConfig `yaml:"strictness"`
-	Lang       string          `yaml:"lang"`
+	Linear       LinearConfig           `yaml:"linear"`
+	Scan         ScanConfig             `yaml:"scan"`
+	Claude       ClaudeConfig           `yaml:"claude"`
+	Scribe       ScribeConfig           `yaml:"scribe"`
+	Strictness   StrictnessConfig       `yaml:"strictness"`
+	Retry        RetryConfig            `yaml:"retry"`
+	Labels       LabelsConfig           `yaml:"labels"`
+	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates"`
+	Lang         string                 `yaml:"lang"`
 }
 
 // ScribeConfig holds Scribe Agent settings.
@@ -65,6 +87,15 @@ func DefaultConfig() Config {
 		Strictness: StrictnessConfig{
 			Default: StrictnessFog,
 		},
+		Retry: RetryConfig{
+			MaxAttempts:  3,
+			BaseDelaySec: 2,
+		},
+		Labels: LabelsConfig{
+			Enabled:    true,
+			Prefix:     "sightjack",
+			ReadyLabel: "sightjack:ready",
+		},
 		Lang: "ja",
 	}
 }
@@ -93,6 +124,21 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if !cfg.Strictness.Default.Valid() {
 		cfg.Strictness.Default = StrictnessFog
+	}
+	if cfg.Retry.MaxAttempts < 1 {
+		cfg.Retry.MaxAttempts = 3
+	}
+	if cfg.Retry.BaseDelaySec < 1 {
+		cfg.Retry.BaseDelaySec = 2
+	}
+	if cfg.Labels.Enabled {
+		defCfg := DefaultConfig()
+		if cfg.Labels.Prefix == "" {
+			cfg.Labels.Prefix = defCfg.Labels.Prefix
+		}
+		if cfg.Labels.ReadyLabel == "" {
+			cfg.Labels.ReadyLabel = defCfg.Labels.ReadyLabel
+		}
 	}
 
 	return &cfg, nil

@@ -29,6 +29,14 @@
 - `add_label`: Issueにラベルを付与
 - `update_description`: Issueの説明を更新
 
+{{if .DoDSection}}
+## 完成基準（DoD）ガイドライン
+
+このクラスタには以下のDoD基準が適用されます:
+
+{{.DoDSection}}
+提案するWaveアクションがこれらの基準に沿っていることを確認してください。
+{{end}}
 ## 出力
 以下の JSON を **{{.OutputPath}}** に書き込んでください:
 

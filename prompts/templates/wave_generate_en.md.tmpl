@@ -29,6 +29,14 @@ Adjust your analysis depth based on the current strictness level:
 - `add_label`: Add a label to an Issue
 - `update_description`: Update an Issue description
 
+{{if .DoDSection}}
+## Definition of Done Guidelines
+
+The following DoD standards apply to this cluster:
+
+{{.DoDSection}}
+Ensure proposed wave actions align with these standards.
+{{end}}
 ## Output
 Write the following JSON to **{{.OutputPath}}**:
 

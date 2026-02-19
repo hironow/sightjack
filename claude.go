@@ -29,14 +29,20 @@ func BuildClaudeArgs(cfg *Config, prompt string) []string {
 	return args
 }
 
-// RunClaude executes the Claude CLI as a subprocess, streaming its output to
-// w in real time and returning the full output when complete.
-// Pass os.Stdout for interactive single-process usage, or io.Discard for
-// parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
-	timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+// RunClaudeOnce executes the Claude CLI as a subprocess once without retry.
+// Use this for prompts that perform non-idempotent mutations (e.g. applying
+// labels or updating descriptions via Linear MCP) where retrying after a
+// partial success could duplicate side effects.
+func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+	// Apply per-call timeout only when the caller has not already set a deadline.
+	// RunClaude wraps the entire retry loop in a single timeout, so individual
+	// attempts inherit the remaining budget without resetting it.
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	args := BuildClaudeArgs(cfg, prompt)
 	cmd := newCmd(ctx, cfg.Claude.Command, args...)
@@ -81,6 +87,54 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 	}
 
 	return output.String(), nil
+}
+
+// RunClaude executes the Claude CLI as a subprocess with exponential backoff
+// retry. It streams output to w in real time and returns the full output when
+// complete.
+// Pass os.Stdout for interactive single-process usage, or io.Discard for
+// parallel invocations where interleaved output would be unreadable.
+func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+	maxAttempts := cfg.Retry.MaxAttempts
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+	baseDelay := time.Duration(cfg.Retry.BaseDelaySec) * time.Second
+
+	// Wrap the entire retry loop in a single timeout so total wall time
+	// is bounded by TimeoutSec regardless of MaxAttempts.
+	timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		if attempt > 1 {
+			shift := attempt - 2
+			if shift > 30 {
+				shift = 30 // cap to prevent overflow of time.Duration
+			}
+			delay := baseDelay * time.Duration(1<<shift) // exponential: base*2^0, base*2^1, base*2^2...
+			LogInfo("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		output, err := RunClaudeOnce(ctx, cfg, prompt, w)
+		if err == nil {
+			return output, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			return output, err
+		}
+	}
+	return "", fmt.Errorf("claude failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
