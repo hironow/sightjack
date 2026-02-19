@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+// StateFormatVersion is the version string written into SessionState files.
+// Centralised so that all code paths (scan, session, recovery) produce
+// consistent state files.
+const StateFormatVersion = "0.0.10"
+
 // CalcNewlyUnlocked computes how many waves were newly unlocked after completing a wave.
 // oldAvailable is the available count before the wave was completed (includes the completing wave).
 // newAvailable is the available count after completion and unlock evaluation.
@@ -488,7 +493,7 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 		ts = *lastScanned
 	}
 	state := &SessionState{
-		Version:      "0.9",
+		Version:      StateFormatVersion,
 		SessionID:    sessionID,
 		Project:      cfg.Linear.Project,
 		LastScanned:  ts,
@@ -663,7 +668,7 @@ func CheckCompletenessConsistency(overall float64, clusters []ClusterScanResult)
 // LastScanned is set to time.Now() as an approximation.
 func RecoverStateFromScan(scanResult *ScanResult, waves []Wave, adrDir string) *SessionState {
 	state := &SessionState{
-		Version:      "0.9",
+		Version:      StateFormatVersion,
 		Completeness: scanResult.Completeness,
 		LastScanned:  time.Now(),
 		ADRCount:     CountADRFiles(adrDir),

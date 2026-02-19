@@ -1,6 +1,43 @@
 package sightjack
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
+
+// Compile-time check: Handoff interface exists and has expected methods.
+var _ Handoff = (*handoffChecker)(nil)
+
+type handoffChecker struct{}
+
+func (p *handoffChecker) HandoffReady(_ context.Context, _ []string) error        { return nil }
+func (p *handoffChecker) ReportIssue(_ context.Context, _ string, _ string) error { return nil }
+
+func TestHandoff_InterfaceCompiles(t *testing.T) {
+	// given: a type that implements Handoff
+	var h Handoff = &handoffChecker{}
+
+	// when / then: calling methods should not panic
+	if err := h.HandoffReady(context.Background(), []string{"ENG-101"}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := h.ReportIssue(context.Background(), "ENG-101", "finding"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestHandoffResult_ZeroValue(t *testing.T) {
+	// given: zero-value HandoffResult
+	var result HandoffResult
+
+	// then: fields should have zero values
+	if result.IssueID != "" {
+		t.Errorf("expected empty IssueID, got %s", result.IssueID)
+	}
+	if result.Status != "" {
+		t.Errorf("expected empty Status, got %s", result.Status)
+	}
+}
 
 func TestReadyIssueIDs(t *testing.T) {
 	waves := []Wave{

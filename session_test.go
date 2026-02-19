@@ -992,8 +992,8 @@ func TestBuildSessionState(t *testing.T) {
 	state := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, nil)
 
 	// then
-	if state.Version != "0.9" {
-		t.Errorf("expected version 0.9, got %s", state.Version)
+	if state.Version != StateFormatVersion {
+		t.Errorf("expected version %s, got %s", StateFormatVersion, state.Version)
 	}
 	if state.SessionID != "test-123" {
 		t.Errorf("expected test-123, got %s", state.SessionID)
@@ -1486,8 +1486,8 @@ func TestRecoverStateFromScan(t *testing.T) {
 	if len(state.Waves) != 2 {
 		t.Errorf("Waves: expected 2, got %d", len(state.Waves))
 	}
-	if state.Version != "0.9" {
-		t.Errorf("Version: expected 0.9, got %s", state.Version)
+	if state.Version != StateFormatVersion {
+		t.Errorf("Version: expected %s, got %s", StateFormatVersion, state.Version)
 	}
 	if state.ShibitoCount != 0 {
 		t.Errorf("ShibitoCount: expected 0, got %d", state.ShibitoCount)
@@ -1583,6 +1583,96 @@ func TestTryRecoverState(t *testing.T) {
 	}
 	if recovered.ScanResultPath != scanResultPath {
 		t.Errorf("ScanResultPath: expected %s, got %s", scanResultPath, recovered.ScanResultPath)
+	}
+}
+
+func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
+	// given: saved state where auth-w1 is completed and auth-w2 is locked (depends on auth-w1)
+	// After restore + EvaluateUnlocks, auth-w2 should become available
+	baseDir := t.TempDir()
+
+	scanDir := ScanDir(baseDir, "resume-unlock")
+	os.MkdirAll(scanDir, 0755)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.40, Issues: []IssueDetail{{ID: "E1", Identifier: "E1", Title: "t"}}}},
+		TotalIssues:  1,
+		Completeness: 0.40,
+	}
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("write scan result: %v", err)
+	}
+
+	state := &SessionState{
+		Version:        StateFormatVersion,
+		SessionID:      "resume-unlock",
+		Project:        "Test",
+		ScanResultPath: scanResultPath,
+		Completeness:   0.40,
+		Clusters:       []ClusterState{{Name: "Auth", Completeness: 0.40, IssueCount: 1}},
+		Waves: []WaveState{
+			{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed",
+				ActionCount: 1, Actions: []WaveAction{{Type: "add_dod", IssueID: "E1", Description: "d"}},
+				Delta: WaveDelta{Before: 0.20, After: 0.40}},
+			{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "locked",
+				Prerequisites: []string{"Auth:auth-w1"},
+				ActionCount:   1, Actions: []WaveAction{{Type: "add_dod", IssueID: "E1", Description: "d2"}},
+				Delta: WaveDelta{Before: 0.40, After: 0.65}},
+		},
+	}
+
+	// when: restore waves and evaluate unlocks
+	_, waves, completed, _, err := ResumeSession(baseDir, state)
+	if err != nil {
+		t.Fatalf("ResumeSession: %v", err)
+	}
+	waves = EvaluateUnlocks(waves, completed)
+
+	// then: auth-w2 should be unlocked since auth-w1 is completed
+	var w2Status string
+	for _, w := range waves {
+		if w.ID == "auth-w2" {
+			w2Status = w.Status
+		}
+	}
+	if w2Status != "available" {
+		t.Errorf("expected auth-w2 available after unlock evaluation, got %s", w2Status)
+	}
+}
+
+func TestMergeCompletedStatus_AllCompleted(t *testing.T) {
+	// given: all old waves were completed; rescan generates new waves for the same clusters
+	oldCompleted := map[string]bool{
+		"Auth:auth-w1": true,
+		"Auth:auth-w2": true,
+		"API:api-w1":   true,
+	}
+	// Rescan produces new waves — some match old keys, some are new
+	newWaves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps v2", Status: "available"},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD v2", Status: "locked"},
+		{ID: "auth-w3", ClusterName: "Auth", Title: "New", Status: "locked"},
+		{ID: "api-w1", ClusterName: "API", Title: "Endpoints v2", Status: "available"},
+	}
+
+	// when
+	merged := MergeCompletedStatus(oldCompleted, newWaves)
+
+	// then: auth-w1, auth-w2, api-w1 should be completed (carried over)
+	completedCount := 0
+	for _, w := range merged {
+		if w.Status == "completed" {
+			completedCount++
+		}
+	}
+	if completedCount != 3 {
+		t.Errorf("expected 3 completed waves after merge, got %d", completedCount)
+	}
+	// auth-w3 should remain locked (not in old completed)
+	for _, w := range merged {
+		if w.ID == "auth-w3" && w.Status != "locked" {
+			t.Errorf("expected auth-w3 locked, got %s", w.Status)
+		}
 	}
 }
 

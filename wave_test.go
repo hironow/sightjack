@@ -238,6 +238,52 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 	}
 }
 
+func TestAvailableWaves_AllCompleted(t *testing.T) {
+	// given: all waves are completed
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
+		{ID: "auth-w2", ClusterName: "Auth", Status: "completed"},
+		{ID: "api-w1", ClusterName: "API", Status: "completed"},
+	}
+	completed := map[string]bool{
+		"Auth:auth-w1": true,
+		"Auth:auth-w2": true,
+		"API:api-w1":   true,
+	}
+
+	// when
+	available := AvailableWaves(waves, completed)
+
+	// then: no waves should be available — session is done
+	if len(available) != 0 {
+		t.Errorf("expected 0 available waves when all completed, got %d", len(available))
+	}
+}
+
+func TestEvaluateUnlocks_AllCompleted(t *testing.T) {
+	// given: all waves already completed, nothing left to unlock
+	waves := []Wave{
+		{ID: "a-w1", ClusterName: "A", Status: "completed"},
+		{ID: "a-w2", ClusterName: "A", Status: "completed", Prerequisites: []string{"A:a-w1"}},
+		{ID: "b-w1", ClusterName: "B", Status: "completed", Prerequisites: []string{"A:a-w1"}},
+	}
+	completed := map[string]bool{
+		"A:a-w1": true,
+		"A:a-w2": true,
+		"B:b-w1": true,
+	}
+
+	// when
+	updated := EvaluateUnlocks(waves, completed)
+
+	// then: all remain completed, no status changes
+	for _, w := range updated {
+		if w.Status != "completed" {
+			t.Errorf("expected %s to remain completed, got %s", WaveKey(w), w.Status)
+		}
+	}
+}
+
 func TestEvaluateUnlocks(t *testing.T) {
 	// given
 	waves := []Wave{
