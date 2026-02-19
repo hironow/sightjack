@@ -647,10 +647,8 @@ execution:
 strictness:
   default: fog
   overrides:
-    - label: "release-candidate"
-      level: lockdown
-    - label: "spike"
-      level: fog
+    release-candidate: lockdown
+    spike: fog
 
 adr:
   storage: "linear_document"     # linear_document | local_markdown | both
