@@ -759,7 +759,15 @@ func TryRecoverState(baseDir string, sessionID string) (*SessionState, error) {
 
 	scanResult, err := LoadScanResult(scanResultPath)
 	if err != nil {
-		return nil, fmt.Errorf("no recoverable scan data: %w", err)
+		// Fallback: check legacy .siren/scans/ path for pre-rename sessions.
+		legacyDir := filepath.Join(baseDir, stateDir, "scans", sessionID)
+		legacyPath := filepath.Join(legacyDir, "scan_result.json")
+		scanResult, err = LoadScanResult(legacyPath)
+		if err != nil {
+			return nil, fmt.Errorf("no recoverable scan data: %w", err)
+		}
+		scanDir = legacyDir
+		scanResultPath = legacyPath
 	}
 
 	LogWarn("State file missing. Recovered from cached scan result.")

@@ -1620,6 +1620,40 @@ func TestTryRecoverState(t *testing.T) {
 	}
 }
 
+func TestTryRecoverState_LegacyScansDir(t *testing.T) {
+	// given: scan result under legacy .siren/scans/ path (pre-rename)
+	dir := t.TempDir()
+	sessionID := "legacy-session"
+	legacyScanDir := filepath.Join(dir, ".siren", "scans", sessionID)
+	os.MkdirAll(legacyScanDir, 0755)
+
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "api", Completeness: 0.6}},
+		Completeness: 0.6,
+	}
+	legacyPath := filepath.Join(legacyScanDir, "scan_result.json")
+	if err := WriteScanResult(legacyPath, scanResult); err != nil {
+		t.Fatalf("WriteScanResult: %v", err)
+	}
+
+	// when: TryRecoverState should find it despite ScanDir() pointing to .run/
+	recovered, err := TryRecoverState(dir, sessionID)
+
+	// then
+	if err != nil {
+		t.Fatalf("TryRecoverState failed for legacy path: %v", err)
+	}
+	if recovered == nil {
+		t.Fatal("expected recovered state, got nil")
+	}
+	if recovered.Completeness != 0.6 {
+		t.Errorf("Completeness: expected 0.6, got %f", recovered.Completeness)
+	}
+	if recovered.ScanResultPath != legacyPath {
+		t.Errorf("ScanResultPath: expected %q, got %q", legacyPath, recovered.ScanResultPath)
+	}
+}
+
 func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
 	// given: saved state where auth-w1 is completed and auth-w2 is locked (depends on auth-w1)
 	// After restore + EvaluateUnlocks, auth-w2 should become available
