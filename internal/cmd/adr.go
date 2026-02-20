@@ -15,7 +15,17 @@ func newADRCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "adr [path]",
 		Short: "Generate ADR Markdown from stdin DiscussResult",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Generate an Architecture Decision Record from a DiscussResult on stdin.
+
+Reads a DiscussResult JSON (from 'discuss') and renders it as
+Markdown in the standard ADR format with auto-numbered filename.
+Output is written to stdout for redirection to docs/adr/.`,
+		Example: `  # Full pipeline: discuss → adr → file
+  sightjack discuss | sightjack adr > docs/adr/0042-my-decision.md
+
+  # Generate ADR from a saved discussion
+  cat discussion.json | sightjack adr`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

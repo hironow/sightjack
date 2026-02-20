@@ -16,7 +16,20 @@ func newShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show [path]",
 		Short: "Display last scan results",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Display scan results or wave plans.
+
+When stdin is a pipe, auto-detects ScanResult or WavePlan JSON
+and renders the appropriate navigator view. When run without pipe,
+reads from .siren/state.json and displays the matrix navigator.`,
+		Example: `  # Show from saved state
+  sightjack show
+
+  # Pipe a scan result
+  sightjack scan --json | sightjack show
+
+  # Pipe a wave plan
+  sightjack scan --json | sightjack waves | sightjack show`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

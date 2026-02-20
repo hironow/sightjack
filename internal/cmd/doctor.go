@@ -13,7 +13,17 @@ func newDoctorCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor [path]",
 		Short: "Check environment and tool availability",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Check environment health and tool availability.
+
+Verifies that the sightjack config is valid, required tools
+(claude, git) are installed, and the Linear MCP connection
+is working. Reports pass/fail/skip for each check.`,
+		Example: `  # Run environment check
+  sightjack doctor
+
+  # Check a specific project directory
+  sightjack doctor /path/to/project`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

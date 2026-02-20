@@ -16,7 +16,17 @@ func newSelectCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "select",
 		Short: "Interactively pick a wave from stdin WavePlan",
-		Args:  cobra.NoArgs,
+		Long: `Interactively pick a wave from a WavePlan JSON on stdin.
+
+Presents available waves and prompts for selection via /dev/tty.
+Outputs the selected wave as JSON with remaining sibling context
+for downstream commands (apply, discuss).`,
+		Example: `  # Select a wave and apply it
+  sightjack scan --json | sightjack waves | sightjack select | sightjack apply
+
+  # Select a wave and start a discussion
+  sightjack scan --json | sightjack waves | sightjack select | sightjack discuss`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			data, err := io.ReadAll(os.Stdin)
 			if err != nil {

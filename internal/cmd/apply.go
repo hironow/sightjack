@@ -16,7 +16,17 @@ func newApplyCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "apply [path]",
 		Short: "Apply a wave to Linear from stdin Wave JSON",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Apply a wave to Linear issues from stdin Wave JSON.
+
+Reads a Wave JSON (from 'select') and executes the wave plan against
+the Linear API. Outputs an ApplyResult JSON with updated completeness,
+suitable for piping into 'nextgen' for follow-up wave generation.`,
+		Example: `  # Apply a selected wave and generate follow-ups
+  sightjack select | sightjack apply | sightjack nextgen
+
+  # Apply with dry-run
+  sightjack select | sightjack apply --dry-run`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

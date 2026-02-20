@@ -18,7 +18,20 @@ func newArchivePruneCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive-prune [path]",
 		Short: "Prune expired d-mails from archive",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Prune expired d-mails from the archive directory.
+
+Lists archived d-mail files older than the retention threshold.
+By default, runs in dry-run mode showing what would be deleted.
+Pass --execute to actually remove the files.`,
+		Example: `  # Dry-run: list expired files (default 30 days)
+  sightjack archive-prune
+
+  # Delete expired files
+  sightjack archive-prune --execute
+
+  # Custom retention period
+  sightjack archive-prune --days 7 --execute`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

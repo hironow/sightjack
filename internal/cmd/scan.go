@@ -17,7 +17,20 @@ func newScanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan [path]",
 		Short: "Classify and deep-scan Linear issues",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Classify and deep-scan Linear issues in the configured project.
+
+Connects to the Linear API, fetches issues, and produces a ScanResult
+with cluster classification, completeness scores, and shibito warnings.
+Use --json to output structured JSON for piping into downstream commands.`,
+		Example: `  # Interactive scan with navigator display
+  sightjack scan
+
+  # Pipe workflow: scan → waves → show
+  sightjack scan --json | sightjack waves | sightjack show
+
+  # Scan a specific project directory
+  sightjack scan /path/to/project`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

@@ -16,7 +16,17 @@ func newWavesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "waves [path]",
 		Short: "Generate waves from stdin ScanResult JSON",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Generate wave plans from a ScanResult JSON on stdin.
+
+Reads a ScanResult (from 'scan --json') and produces a WavePlan
+containing prioritized waves for each cluster. Output is JSON suitable
+for piping into 'select' or 'show'.`,
+		Example: `  # Full pipe workflow
+  sightjack scan --json | sightjack waves | sightjack show
+
+  # Generate waves and save to file
+  sightjack scan --json | sightjack waves > plan.json`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

@@ -198,3 +198,24 @@ func TestPersistentHooks_SpanContext(t *testing.T) {
 		t.Fatal("expected span to be set in command context by PersistentPreRunE")
 	}
 }
+
+func TestAllCommands_HaveLongAndExample(t *testing.T) {
+	// given
+	rootCmd := NewRootCommand()
+
+	// when/then: every subcommand must have Long and Example set
+	for _, sub := range rootCmd.Commands() {
+		// Skip built-in commands (help, completion)
+		if sub.Name() == "help" || sub.Name() == "completion" {
+			continue
+		}
+		t.Run(sub.Name(), func(t *testing.T) {
+			if sub.Long == "" {
+				t.Errorf("command %q is missing Long description", sub.Name())
+			}
+			if sub.Example == "" {
+				t.Errorf("command %q is missing Example", sub.Name())
+			}
+		})
+	}
+}

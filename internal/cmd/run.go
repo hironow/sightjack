@@ -16,7 +16,20 @@ func newRunCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "run [path]",
 		Short: "Interactive wave approval and apply loop",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Run an interactive session with wave approval and apply loop.
+
+Combines scan → waves → select → apply → nextgen in a single
+interactive session. Supports resume from a previous session
+if state is found in .siren/state.json.`,
+		Example: `  # Start a new interactive session
+  sightjack run
+
+  # Resume a previous session (auto-detected)
+  sightjack run
+
+  # Dry-run mode (generate prompts without executing)
+  sightjack run --dry-run`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {

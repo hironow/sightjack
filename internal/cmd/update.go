@@ -13,7 +13,17 @@ func newUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Self-update sightjack to the latest release",
-		Args:  cobra.NoArgs,
+		Long: `Self-update sightjack to the latest GitHub release.
+
+Downloads the latest release, verifies the checksum, and replaces
+the current binary. Use --check to only check for updates without
+installing.`,
+		Example: `  # Check for updates
+  sightjack update --check
+
+  # Update to the latest version
+  sightjack update`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			updater, err := selfupdate.NewUpdater(selfupdate.Config{
 				Validator: &selfupdate.ChecksumValidator{UniqueFilename: "checksums.txt"},

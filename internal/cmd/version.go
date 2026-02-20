@@ -14,7 +14,16 @@ func newVersionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version, commit, and build information",
-		Args:  cobra.NoArgs,
+		Long: `Print version, commit hash, build date, and Go version.
+
+By default outputs a human-readable single line. Use --json
+for structured output suitable for scripts and CI.`,
+		Example: `  # Print version info
+  sightjack version
+
+  # JSON output for scripts
+  sightjack version --json`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			info := map[string]string{
 				"version": version,
