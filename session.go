@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -777,6 +778,41 @@ func TryRecoverState(baseDir string, sessionID string) (*SessionState, error) {
 	state.SessionID = sessionID
 	state.ScanResultPath = scanResultPath
 	return state, nil
+}
+
+// RecoverLatestState scans both .siren/.run/ and legacy .siren/scans/ for
+// session directories and attempts recovery from the most recent one.
+// Session directories are named "session-{unixmilli}-{pid}", so lexicographic
+// descending order matches creation time. Returns error if no recoverable data.
+func RecoverLatestState(baseDir string) (*SessionState, error) {
+	// Collect session directory names from both current and legacy paths.
+	var sessionIDs []string
+	seen := map[string]bool{}
+	for _, parent := range []string{
+		filepath.Join(baseDir, stateDir, ".run"),
+		filepath.Join(baseDir, stateDir, "scans"),
+	} {
+		entries, err := os.ReadDir(parent)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() && !seen[e.Name()] {
+				sessionIDs = append(sessionIDs, e.Name())
+				seen[e.Name()] = true
+			}
+		}
+	}
+	// Sort descending so newest session is tried first.
+	sort.Sort(sort.Reverse(sort.StringSlice(sessionIDs)))
+
+	for _, id := range sessionIDs {
+		state, err := TryRecoverState(baseDir, id)
+		if err == nil {
+			return state, nil
+		}
+	}
+	return nil, fmt.Errorf("no recoverable session data in %s", filepath.Join(baseDir, stateDir))
 }
 
 // completedWavesInCluster returns all completed waves for the given cluster.

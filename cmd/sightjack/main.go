@@ -109,26 +109,11 @@ func main() {
 		if !dryRun {
 			existingState, stateErr := sightjack.ReadState(baseDir)
 			if stateErr != nil {
-				// Try recovery from cached scan results.
-				// Session directories are named "session-{unixmilli}-{pid}", so
-				// lexicographic order matches creation time. Iterate in descending
-				// order and use the first directory with recoverable data, so a
-				// crashed/corrupt newest session doesn't block recovery from older ones.
-				scansDir := filepath.Join(baseDir, ".siren", ".run")
-				entries, dirErr := os.ReadDir(scansDir)
-				if dirErr == nil && len(entries) > 0 {
-					for i := len(entries) - 1; i >= 0; i-- {
-						entry := entries[i]
-						if !entry.IsDir() {
-							continue
-						}
-						recovered, recErr := sightjack.TryRecoverState(baseDir, entry.Name())
-						if recErr == nil {
-							existingState = recovered
-							stateErr = nil
-							break
-						}
-					}
+				// Try recovery from cached scan results (checks both .run/ and legacy scans/).
+				recovered, recErr := sightjack.RecoverLatestState(baseDir)
+				if recErr == nil {
+					existingState = recovered
+					stateErr = nil
 				}
 			}
 			if stateErr == nil {

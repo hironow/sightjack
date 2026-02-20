@@ -1795,6 +1795,83 @@ func TestResumeScanDir_CurrentPathFormat(t *testing.T) {
 	}
 }
 
+func TestRecoverLatestState_FromLegacyScansDir(t *testing.T) {
+	// given: scan result only in legacy .siren/scans/ (no .run/ exists)
+	dir := t.TempDir()
+	sessionID := "session-1000-1"
+	legacyDir := filepath.Join(dir, ".siren", "scans", sessionID)
+	os.MkdirAll(legacyDir, 0755)
+	scanResult := &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "auth", Completeness: 0.5}},
+		Completeness: 0.5,
+	}
+	WriteScanResult(filepath.Join(legacyDir, "scan_result.json"), scanResult)
+
+	// when
+	recovered, err := RecoverLatestState(dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("RecoverLatestState failed: %v", err)
+	}
+	if recovered == nil {
+		t.Fatal("expected recovered state, got nil")
+	}
+	if recovered.SessionID != sessionID {
+		t.Errorf("SessionID: expected %q, got %q", sessionID, recovered.SessionID)
+	}
+}
+
+func TestRecoverLatestState_PrefersNewest(t *testing.T) {
+	// given: sessions in both .run/ and legacy scans/
+	dir := t.TempDir()
+
+	// Older session in legacy scans/
+	oldID := "session-1000-1"
+	oldDir := filepath.Join(dir, ".siren", "scans", oldID)
+	os.MkdirAll(oldDir, 0755)
+	WriteScanResult(filepath.Join(oldDir, "scan_result.json"), &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "old", Completeness: 0.3}},
+		Completeness: 0.3,
+	})
+
+	// Newer session in .run/
+	newID := "session-2000-1"
+	newDir := filepath.Join(dir, ".siren", ".run", newID)
+	os.MkdirAll(newDir, 0755)
+	WriteScanResult(filepath.Join(newDir, "scan_result.json"), &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "new", Completeness: 0.7}},
+		Completeness: 0.7,
+	})
+
+	// when
+	recovered, err := RecoverLatestState(dir)
+
+	// then: should pick the newest (session-2000-1)
+	if err != nil {
+		t.Fatalf("RecoverLatestState failed: %v", err)
+	}
+	if recovered.SessionID != newID {
+		t.Errorf("SessionID: expected %q, got %q", newID, recovered.SessionID)
+	}
+}
+
+func TestRecoverLatestState_NoSessions(t *testing.T) {
+	// given: empty .siren/ with no session dirs
+	dir := t.TempDir()
+
+	// when
+	recovered, err := RecoverLatestState(dir)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for no sessions")
+	}
+	if recovered != nil {
+		t.Error("expected nil state")
+	}
+}
+
 func TestTryRecoverStateNoFiles(t *testing.T) {
 	dir := t.TempDir()
 
