@@ -5,7 +5,7 @@
 Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to bring issue completeness from ~30% to ~85%.
 
 ```bash
-sightjack session
+sightjack run
 ```
 
 This single command makes Sightjack repeat the following cycle:
@@ -168,19 +168,19 @@ sightjack init
 sightjack doctor
 
 # Run — .siren/ is created automatically
-sightjack session
+sightjack run
 ```
 
 Sightjack creates `.siren/` and all state/run files automatically at runtime.
 
 ## Subcommands
 
-### Interactive (monolithic session)
+### Interactive
 
 | Command | Description |
 |---------|-------------|
 | `sightjack scan` | Classify and deep-scan Linear issues (default) |
-| `sightjack session` | Interactive wave approval and apply session |
+| `sightjack run` | Interactive wave approval and apply loop |
 | `sightjack show` | Display last scan results (or pipe JSON from stdin) |
 | `sightjack init` | Initialize `.siren/config.yaml` interactively |
 | `sightjack doctor` | Check environment and tool availability |
@@ -208,31 +208,31 @@ Flags and subcommand can be placed in any order:
 ```bash
 sightjack scan --dry-run         # flags after subcommand
 sightjack --dry-run scan         # flags before subcommand
-sightjack --lang=ja session      # --flag=value form
+sightjack --lang=ja run          # --flag=value form
 ```
 
 ```bash
-# Scan only (classify + deep-scan, no interactive session)
+# Scan only (classify + deep-scan, no interactive loop)
 sightjack scan
 
-# Full interactive session (scan + wave approval + apply)
-sightjack session
+# Full interactive loop (scan + wave approval + apply)
+sightjack run
 
 # Display last scan results
 sightjack show
 
 # Dry run (generate prompts without executing Claude)
 sightjack scan --dry-run
-sightjack session --dry-run
+sightjack run --dry-run
 
 # Japanese prompts
-sightjack session --lang ja
+sightjack run --lang ja
 
 # Custom config path
-sightjack session --config .siren/config.yaml
+sightjack run --config .siren/config.yaml
 
 # Verbose logging
-sightjack session --verbose
+sightjack run --verbose
 
 # Scan a different repository
 sightjack scan /path/to/repo
@@ -324,7 +324,7 @@ Sightjack instruments key operations (scan, wave generation, architect discussio
 just jaeger
 
 # Run with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack session
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack run
 
 # View traces at http://localhost:16686
 
