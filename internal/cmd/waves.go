@@ -26,9 +26,6 @@ func newWavesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			data, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
@@ -48,7 +45,7 @@ func newWavesCmd() *cobra.Command {
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
 
-			waves, err := sightjack.RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, dryRun)
+			waves, err := sightjack.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun)
 			if err != nil {
 				return fmt.Errorf("wave generation failed: %w", err)
 			}

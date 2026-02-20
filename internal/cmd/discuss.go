@@ -28,9 +28,6 @@ func newDiscussCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			data, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
@@ -80,7 +77,7 @@ func newDiscussCmd() *cobra.Command {
 				return nil
 			}
 
-			resp, err := sightjack.RunArchitectDiscuss(ctx, cfg, scanDir, wave, topic, strictness)
+			resp, err := sightjack.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness)
 			if err != nil {
 				return fmt.Errorf("discussion failed: %w", err)
 			}

@@ -36,6 +36,12 @@ func NewRootCommand() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			sightjack.SetVerbose(verbose)
 			shutdownTracer = sightjack.InitTracer("sightjack", version)
+			spanCtx := sightjack.StartRootSpan(cmd.Context(), cmd.Name())
+			cmd.SetContext(spanCtx)
+			return nil
+		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			sightjack.EndRootSpan(cmd.Context())
 			return nil
 		},
 		SilenceUsage:  true,
@@ -108,14 +114,4 @@ func resolveConfigPath(cmd *cobra.Command, baseDir string) string {
 		return filepath.Join(baseDir, cfgPath)
 	}
 	return cfgPath
-}
-
-// startSpan starts a root OTel span for the given command name.
-func startSpan(cmd *cobra.Command) context.Context {
-	return sightjack.StartRootSpan(cmd.Context(), cmd.Name())
-}
-
-// endSpan ends the root OTel span.
-func endSpan(ctx context.Context) {
-	sightjack.EndRootSpan(ctx)
 }

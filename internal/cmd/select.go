@@ -18,9 +18,6 @@ func newSelectCmd() *cobra.Command {
 		Short: "Interactively pick a wave from stdin WavePlan",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			data, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
@@ -52,7 +49,7 @@ func newSelectCmd() *cobra.Command {
 				return fmt.Errorf("no available waves (all locked or completed)")
 			}
 
-			selected, err := sightjack.PromptWaveSelection(ctx, os.Stderr, scanner, available)
+			selected, err := sightjack.PromptWaveSelection(cmd.Context(), os.Stderr, scanner, available)
 			if err != nil {
 				if err == sightjack.ErrQuit || err == sightjack.ErrGoBack {
 					return nil

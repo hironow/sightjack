@@ -26,9 +26,6 @@ func newRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			// Check for existing state (resume detection)
 			if !dryRun {
 				existingState, stateErr := sightjack.ReadState(baseDir)
@@ -42,7 +39,7 @@ func newRunCmd() *cobra.Command {
 				if stateErr == nil {
 					scanner := bufio.NewScanner(os.Stdin)
 					for {
-						choice, promptErr := sightjack.PromptResume(ctx, os.Stdout, scanner, existingState)
+						choice, promptErr := sightjack.PromptResume(cmd.Context(), os.Stdout, scanner, existingState)
 						if promptErr == sightjack.ErrQuit {
 							return nil
 						}
@@ -56,9 +53,9 @@ func newRunCmd() *cobra.Command {
 								sightjack.LogWarn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}
-							return sightjack.RunResumeSession(ctx, cfg, baseDir, existingState, os.Stdin)
+							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, os.Stdin)
 						case sightjack.ResumeChoiceRescan:
-							return sightjack.RunRescanSession(ctx, cfg, baseDir, existingState, os.Stdin)
+							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, os.Stdin)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -72,7 +69,7 @@ func newRunCmd() *cobra.Command {
 			if !dryRun {
 				sessionInput = os.Stdin
 			}
-			return sightjack.RunSession(ctx, cfg, baseDir, sessionID, dryRun, sessionInput)
+			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput)
 		},
 	}
 }

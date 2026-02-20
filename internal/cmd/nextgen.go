@@ -26,9 +26,6 @@ func newNextgenCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			data, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
@@ -130,7 +127,7 @@ func newNextgenCmd() *cobra.Command {
 				return nil
 			}
 
-			newWaves, err := sightjack.GenerateNextWaves(ctx, cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil)
+			newWaves, err := sightjack.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil)
 			if err != nil {
 				return fmt.Errorf("nextgen failed: %w", err)
 			}

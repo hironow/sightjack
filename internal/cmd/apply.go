@@ -26,9 +26,6 @@ func newApplyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			data, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
@@ -61,7 +58,7 @@ func newApplyCmd() *cobra.Command {
 				return nil
 			}
 
-			internal, err := sightjack.RunWaveApply(ctx, cfg, scanDir, wave, strictness)
+			internal, err := sightjack.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness)
 			if err != nil {
 				return fmt.Errorf("apply failed: %w", err)
 			}

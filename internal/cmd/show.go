@@ -22,9 +22,6 @@ func newShowCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-			_ = ctx // show doesn't use ctx for API calls
 			if stdinIsPipe() {
 				return runShowFromStdin()
 			}

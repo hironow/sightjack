@@ -19,15 +19,12 @@ func newDoctorCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			resolved := resolveConfigPath(cmd, baseDir)
 
 			fmt.Println("sightjack doctor — environment health check")
 			fmt.Println()
 
-			results := sightjack.RunDoctor(ctx, resolved, baseDir)
+			results := sightjack.RunDoctor(cmd.Context(), resolved, baseDir)
 
 			var fails, skips int
 			for _, r := range results {

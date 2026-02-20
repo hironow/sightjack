@@ -27,15 +27,12 @@ func newScanCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
 
 			sightjack.LogInfo("Starting sightjack scan...")
 			sightjack.LogInfo("Team: %s | Project: %s | Lang: %s", cfg.Linear.Team, cfg.Linear.Project, cfg.Lang)
 
-			result, err := sightjack.RunScan(ctx, cfg, baseDir, sessionID, dryRun)
+			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}

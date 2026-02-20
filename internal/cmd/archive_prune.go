@@ -24,9 +24,6 @@ func newArchivePruneCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
-			ctx := startSpan(cmd)
-			defer endSpan(ctx)
-
 			files, err := sightjack.ListExpiredArchive(baseDir, days)
 			if err != nil {
 				return fmt.Errorf("failed to list archive: %w", err)
