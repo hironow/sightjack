@@ -283,7 +283,7 @@ scan:
 
 claude:
   command: "claude"      # Claude CLI command
-  model: ""              # Model override (optional)
+  model: "opus"          # Model override (default: "opus")
   timeout_sec: 300       # Per-invocation timeout
 
 scribe:
@@ -301,8 +301,8 @@ retry:
 
 labels:
   enabled: true          # Auto-label ready issues in Linear
-  prefix: "sj:"          # Label prefix (default: "sj:")
-  ready_label: "ready"   # Ready-for-execution label name
+  prefix: "sightjack"    # Label prefix (default: "sightjack")
+  ready_label: "sightjack:ready"  # Ready-for-execution label name
 
 dod_templates:           # Custom DoD templates by issue type
   api_endpoint:
@@ -379,6 +379,7 @@ just jaeger-down    # Stop Jaeger
 +-- logger.go                Colored logging to stderr (LogOK, LogWarn, LogError, LogInfo)
 +-- init.go                  Config scaffolding (sightjack init)
 +-- doctor.go                Environment health check (sightjack doctor)
++-- dmail.go                 D-Mail protocol (inbox/outbox/archive, fsnotify monitor)
 +-- telemetry.go             OpenTelemetry tracing (OTLP export, noop fallback)
 +-- *_test.go                Tests
 +-- justfile                 Task runner
@@ -394,6 +395,9 @@ just jaeger-down    # Stop Jaeger
     +-- architect_discuss_{en,ja}.md.tmpl
     +-- scribe_adr_{en,ja}.md.tmpl
     +-- ready_label_{en,ja}.md.tmpl
+    +-- skills/
+        +-- dmail-readable/SKILL.md
+        +-- dmail-sendable/SKILL.md
 ```
 
 ## Prerequisites
