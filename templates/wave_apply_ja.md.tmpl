@@ -23,7 +23,14 @@
 4. `update_description`: IssueのDescriptionを更新する
 
 適用後、他のクラスタへの波及効果（ripples）があれば記録してください。
+{{if .DoDSection}}
+## 完成基準（DoD）ガイドライン
 
+このクラスタには以下のDoD基準が適用されます:
+
+{{.DoDSection}}
+適用するアクションがこれらの基準に沿っていることを確認してください。
+{{end}}
 ## 出力
 以下の JSON を **{{.OutputPath}}** に書き込んでください:
 

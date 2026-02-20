@@ -3,13 +3,16 @@ package sightjack
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 // StrictnessConfig holds DoD strictness level settings.
+// Overrides are keyed by cluster name or Linear issue label (case-insensitive).
 type StrictnessConfig struct {
-	Default StrictnessLevel `yaml:"default"`
+	Default   StrictnessLevel            `yaml:"default"`
+	Overrides map[string]StrictnessLevel `yaml:"overrides"`
 }
 
 // DoDTemplate holds must/should Definition of Done items for a category.
@@ -69,6 +72,48 @@ type ClaudeConfig struct {
 	TimeoutSec int    `yaml:"timeout_sec"`
 }
 
+// strictnessRank returns a numeric rank for ordering: higher = stricter.
+func strictnessRank(level StrictnessLevel) int {
+	switch level {
+	case StrictnessFog:
+		return 0
+	case StrictnessAlert:
+		return 1
+	case StrictnessLockdown:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// ResolveStrictness determines the effective strictness level for a set of keys.
+// Keys typically include the cluster name followed by Linear issue labels.
+// Matching is case-insensitive. When multiple keys match, the strictest override
+// wins (lockdown > alert > fog), even if less strict than the default.
+// Returns the default level only when no overrides match.
+func ResolveStrictness(cfg StrictnessConfig, labels []string) StrictnessLevel {
+	if len(cfg.Overrides) == 0 || len(labels) == 0 {
+		return cfg.Default
+	}
+	matched := false
+	var best StrictnessLevel
+	for _, label := range labels {
+		lower := strings.ToLower(label)
+		for key, level := range cfg.Overrides {
+			if strings.ToLower(key) == lower {
+				if !matched || strictnessRank(level) > strictnessRank(best) {
+					best = level
+					matched = true
+				}
+			}
+		}
+	}
+	if !matched {
+		return cfg.Default
+	}
+	return best
+}
+
 // DefaultConfig returns a Config populated with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
@@ -100,6 +145,16 @@ func DefaultConfig() Config {
 	}
 }
 
+// ValidLang returns true if lang is a supported language code.
+// Only "ja" and "en" are valid (used as template suffixes).
+func ValidLang(lang string) bool {
+	switch lang {
+	case "ja", "en":
+		return true
+	}
+	return false
+}
+
 // LoadConfig reads a YAML config file and returns a Config with defaults
 // applied for any fields not specified in the file.
 func LoadConfig(path string) (*Config, error) {
@@ -124,6 +179,11 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if !cfg.Strictness.Default.Valid() {
 		cfg.Strictness.Default = StrictnessFog
+	}
+	for label, level := range cfg.Strictness.Overrides {
+		if !level.Valid() {
+			return nil, fmt.Errorf("invalid strictness override for %q: %q", label, level)
+		}
 	}
 	if cfg.Retry.MaxAttempts < 1 {
 		cfg.Retry.MaxAttempts = 3

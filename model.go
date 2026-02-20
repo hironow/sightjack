@@ -18,6 +18,7 @@ type ClassifyResult struct {
 type ClusterClassification struct {
 	Name     string   `json:"name"`
 	IssueIDs []string `json:"issue_ids"`
+	Labels   []string `json:"labels,omitempty"`
 }
 
 // ClusterScanResult is the output of Pass 2 (per-cluster deep scan).
@@ -27,6 +28,17 @@ type ClusterScanResult struct {
 	Completeness float64       `json:"completeness"`
 	Issues       []IssueDetail `json:"issues"`
 	Observations []string      `json:"observations"`
+	Labels       []string      `json:"labels,omitempty"`
+	IssueCount   int           `json:"-"` // computed; used when Issues is nil (e.g. show command)
+}
+
+// NumIssues returns the number of issues. It prefers len(Issues) when
+// the slice is populated and falls back to the IssueCount field.
+func (c ClusterScanResult) NumIssues() int {
+	if len(c.Issues) > 0 {
+		return len(c.Issues)
+	}
+	return c.IssueCount
 }
 
 // IssueDetail holds the deep scan analysis of a single issue.
@@ -57,6 +69,21 @@ type ScanResult struct {
 	ScanWarnings    []string         `json:"scan_warnings,omitempty"`
 }
 
+// ClusterLabels returns the labels for a named cluster, or nil if not found.
+func (r *ScanResult) ClusterLabels(clusterName string) []string {
+	for _, c := range r.Clusters {
+		if c.Name == clusterName {
+			return c.Labels
+		}
+	}
+	return nil
+}
+
+// StrictnessKeys returns the lookup keys for ResolveStrictness: cluster name + labels.
+func (r *ScanResult) StrictnessKeys(clusterName string) []string {
+	return append([]string{clusterName}, r.ClusterLabels(clusterName)...)
+}
+
 // CalculateCompleteness computes overall completeness as the average of cluster completeness values,
 // and tallies total issues across all clusters.
 func (r *ScanResult) CalculateCompleteness() {
@@ -75,16 +102,17 @@ func (r *ScanResult) CalculateCompleteness() {
 
 // SessionState is the thin state file persisted to .siren/state.json.
 type SessionState struct {
-	Version      string         `json:"version"`
-	SessionID    string         `json:"session_id"`
-	Project      string         `json:"project"`
-	LastScanned  time.Time      `json:"last_scanned"`
-	Completeness float64        `json:"completeness"`
-	Clusters     []ClusterState `json:"clusters"`
-	Waves        []WaveState    `json:"waves,omitempty"`
-	ADRCount       int    `json:"adr_count,omitempty"`
-	ShibitoCount   int    `json:"shibito_count,omitempty"`
-	ScanResultPath string `json:"scan_result_path,omitempty"`
+	Version         string         `json:"version"`
+	SessionID       string         `json:"session_id"`
+	Project         string         `json:"project"`
+	LastScanned     time.Time      `json:"last_scanned"`
+	Completeness    float64        `json:"completeness"`
+	Clusters        []ClusterState `json:"clusters"`
+	Waves           []WaveState    `json:"waves,omitempty"`
+	ADRCount        int            `json:"adr_count,omitempty"`
+	ShibitoCount    int            `json:"shibito_count,omitempty"`
+	StrictnessLevel string         `json:"strictness_level,omitempty"`
+	ScanResultPath  string         `json:"scan_result_path,omitempty"`
 }
 
 // ClusterState is the per-cluster state within SessionState.

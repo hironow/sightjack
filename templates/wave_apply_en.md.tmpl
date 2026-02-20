@@ -23,7 +23,14 @@ For each action:
 4. `update_description`: Update the Issue description
 
 After applying, record any ripple effects on other clusters.
+{{if .DoDSection}}
+## Definition of Done (DoD) Guidelines
 
+The following DoD criteria apply to this cluster:
+
+{{.DoDSection}}
+Ensure applied actions align with these criteria.
+{{end}}
 ## Output
 Write the following JSON to **{{.OutputPath}}**:
 

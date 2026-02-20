@@ -463,6 +463,26 @@ func TestRenderMatrixNavigator_ShibitoZero_Hidden(t *testing.T) {
 	}
 }
 
+func TestRenderMatrixNavigator_IssueCountWithoutSlice(t *testing.T) {
+	// given: cluster with IssueCount but no Issues slice (show command path)
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.50, IssueCount: 7},
+		},
+		TotalIssues:  7,
+		Completeness: 0.50,
+	}
+	waves := []Wave{{ID: "w1", ClusterName: "Auth", Title: "T", Status: "available"}}
+
+	// when
+	nav := RenderMatrixNavigator(result, "P", waves, 0, nil, "fog", 0)
+
+	// then: should display "(7)" for the issue count
+	if !strings.Contains(nav, "(7)") {
+		t.Errorf("expected '(7)' in output for IssueCount=7, got:\n%s", nav)
+	}
+}
+
 func TestRenderMatrixNavigator_GridBorders(t *testing.T) {
 	result := &ScanResult{
 		Clusters: []ClusterScanResult{

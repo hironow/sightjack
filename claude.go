@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var newCmd = defaultNewCmd
@@ -18,22 +21,19 @@ func defaultNewCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
 }
 
-// BuildClaudeArgs constructs the argument list for the Claude CLI based on
-// the given configuration and prompt text.
-func BuildClaudeArgs(cfg *Config, prompt string) []string {
-	args := []string{"--print"}
-	if cfg.Claude.Model != "" {
-		args = append(args, "--model", cfg.Claude.Model)
-	}
-	args = append(args, "-p", prompt)
-	return args
-}
-
 // RunClaudeOnce executes the Claude CLI as a subprocess once without retry.
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
 func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+	ctx, span := tracer.Start(ctx, "claude.invoke",
+		trace.WithAttributes(
+			attribute.String("claude.model", cfg.Claude.Model),
+			attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec),
+		),
+	)
+	defer span.End()
+
 	// Apply per-call timeout only when the caller has not already set a deadline.
 	// RunClaude wraps the entire retry loop in a single timeout, so individual
 	// attempts inherit the remaining budget without resetting it.
@@ -44,7 +44,11 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer)
 		defer cancel()
 	}
 
-	args := BuildClaudeArgs(cfg, prompt)
+	var args []string
+	if cfg.Claude.Model != "" {
+		args = append(args, "--model", cfg.Claude.Model)
+	}
+	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, cfg.Claude.Command, args...)
 
 	stdout, err := cmd.StdoutPipe()
@@ -83,6 +87,11 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer)
 	<-done
 
 	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			span.AddEvent("claude.timeout",
+				trace.WithAttributes(attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec)),
+			)
+		}
 		return output.String(), fmt.Errorf("claude exit: %w", err)
 	}
 
@@ -133,6 +142,14 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 		if ctx.Err() != nil {
 			return output, err
 		}
+		// Record retry event on the current span (if any).
+		span := trace.SpanFromContext(ctx)
+		span.AddEvent("claude.retry",
+			trace.WithAttributes(
+				attribute.Int("claude.attempt", attempt),
+				attribute.String("claude.error", err.Error()),
+			),
+		)
 	}
 	return "", fmt.Errorf("claude failed after %d attempts: %w", maxAttempts, lastErr)
 }

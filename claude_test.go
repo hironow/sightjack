@@ -9,42 +9,60 @@ import (
 	"testing"
 )
 
-func TestBuildClaudeArgs(t *testing.T) {
-	cfg := &Config{
-		Claude: ClaudeConfig{
-			Command: "claude",
-			Model:   "opus",
-		},
+func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
+	// given: config with model set
+	var capturedArgs []string
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = args
+		return exec.Command("echo", "ok")
 	}
-	prompt := "Analyze these issues"
+	defer func() { newCmd = defaultNewCmd }()
 
-	args := BuildClaudeArgs(cfg, prompt)
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	}
 
-	expected := []string{"--print", "--model", "opus", "-p", "Analyze these issues"}
-	if len(args) != len(expected) {
-		t.Fatalf("expected %d args, got %d: %v", len(expected), len(args), args)
+	// when
+	RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard)
+
+	// then
+	expected := []string{"--model", "opus", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
+	if len(capturedArgs) != len(expected) {
+		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
 	}
 	for i, e := range expected {
-		if args[i] != e {
-			t.Errorf("arg[%d]: expected %q, got %q", i, e, args[i])
+		if capturedArgs[i] != e {
+			t.Errorf("arg[%d]: expected %q, got %q", i, e, capturedArgs[i])
 		}
 	}
 }
 
-func TestBuildClaudeArgs_NoModel(t *testing.T) {
-	cfg := &Config{
-		Claude: ClaudeConfig{
-			Command: "claude",
-			Model:   "",
-		},
+func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
+	// given: config without model
+	var capturedArgs []string
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = args
+		return exec.Command("echo", "ok")
 	}
-	prompt := "test prompt"
+	defer func() { newCmd = defaultNewCmd }()
 
-	args := BuildClaudeArgs(cfg, prompt)
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", Model: "", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	}
 
-	for _, a := range args {
-		if a == "--model" {
-			t.Error("--model should not be present when model is empty")
+	// when
+	RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard)
+
+	// then
+	expected := []string{"--dangerously-skip-permissions", "--print", "-p", "test prompt"}
+	if len(capturedArgs) != len(expected) {
+		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
+	}
+	for i, e := range expected {
+		if capturedArgs[i] != e {
+			t.Errorf("arg[%d]: expected %q, got %q", i, e, capturedArgs[i])
 		}
 	}
 }

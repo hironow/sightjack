@@ -7,7 +7,43 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
+
+// maxWavesPerCluster is the cap on total waves per cluster.
+// Beyond this count, nextgen is skipped to prevent infinite wave growth.
+const maxWavesPerCluster = 8
+
+// NeedsMoreWaves returns true when post-completion wave generation should run
+// for the given cluster. It returns false (skip nextgen) when any of:
+//   - cluster completeness >= 0.95 (effectively done)
+//   - available (non-completed) waves still remain for the cluster
+//   - total wave count for the cluster >= maxWavesPerCluster
+func NeedsMoreWaves(cluster ClusterScanResult, waves []Wave) bool {
+	if cluster.Completeness >= 0.95 {
+		return false
+	}
+	var clusterTotal int
+	hasAvailable := false
+	for _, w := range waves {
+		if w.ClusterName != cluster.Name {
+			continue
+		}
+		clusterTotal++
+		if w.Status == "available" || w.Status == "locked" {
+			hasAvailable = true
+		}
+	}
+	if hasAvailable {
+		return false
+	}
+	if clusterTotal >= maxWavesPerCluster {
+		return false
+	}
+	return true
+}
 
 // nextgenFileName returns the output filename for a nextgen wave generation run.
 func nextgenFileName(wave Wave) string {
@@ -34,8 +70,8 @@ func ParseNextGenResult(path string) (*NextGenResult, error) {
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt to a file instead of executing Claude.
-func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction) error {
-	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions)
+func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string) error {
+	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness)
 	if err != nil {
 		return err
 	}
@@ -44,11 +80,18 @@ func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cl
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction) ([]Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string) ([]Wave, error) {
+	ctx, nextgenSpan := tracer.Start(ctx, "wave.nextgen",
+		trace.WithAttributes(
+			attribute.String("wave.cluster_name", completedWave.ClusterName),
+		),
+	)
+	defer nextgenSpan.End()
+
 	clearNextgenOutput(scanDir, completedWave)
 	outputFile := filepath.Join(scanDir, nextgenFileName(completedWave))
 
-	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions)
+	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +114,7 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 }
 
 // buildNextGenPrompt constructs the prompt for post-completion wave generation.
-func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction) (string, error) {
+func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string) (string, error) {
 	outputFile := filepath.Join(scanDir, nextgenFileName(completedWave))
 
 	issuesJSON, err := json.Marshal(cluster.Issues)
@@ -93,12 +136,7 @@ func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		rejectedStr = string(rejectedJSON)
 	}
 
-	var dodSection string
-	if cfg.DoDTemplates != nil {
-		if matched, key := MatchDoDTemplate(cfg.DoDTemplates, completedWave.ClusterName); matched {
-			dodSection = FormatDoDSection(cfg.DoDTemplates[key])
-		}
-	}
+	dodSection := ResolveDoDSection(cfg.DoDTemplates, completedWave.ClusterName)
 
 	return RenderNextGenPrompt(cfg.Lang, NextGenPromptData{
 		ClusterName:     completedWave.ClusterName,
@@ -109,6 +147,6 @@ func buildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		RejectedActions: rejectedStr,
 		DoDSection:      dodSection,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: strictness,
 	})
 }

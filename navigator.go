@@ -115,7 +115,7 @@ func RenderMatrixNavigator(result *ScanResult, projectName string, waves []Wave,
 	for _, cluster := range result.Clusters {
 		pct := int(cluster.Completeness * 100)
 		name := truncate(cluster.Name, matrixClusterCol-2)
-		issueCount := len(cluster.Issues)
+		issueCount := cluster.NumIssues()
 		label := fmt.Sprintf("%s (%d)", name, issueCount)
 		if displayWidth(label) > matrixClusterCol-2 {
 			label = truncate(label, matrixClusterCol-2)

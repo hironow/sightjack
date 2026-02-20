@@ -104,3 +104,83 @@ func TestLogLine_WithColor(t *testing.T) {
 		t.Errorf("expected color reset in output")
 	}
 }
+
+func TestLogError_WritesToStderr(t *testing.T) {
+	// given: swap logStderr to capture LogError output
+	var errBuf bytes.Buffer
+	origStderr := logStderr
+	logStderr = &errBuf
+	defer func() { logStderr = origStderr }()
+
+	// when: call LogError (not logLineTo directly)
+	LogError("something failed: %s", "timeout")
+
+	// then: output should appear on the stderr writer
+	line := errBuf.String()
+	if !strings.Contains(line, " ERR") {
+		t.Errorf("expected ERR prefix on stderr, got: %s", line)
+	}
+	if !strings.Contains(line, "something failed: timeout") {
+		t.Errorf("expected error message on stderr, got: %s", line)
+	}
+}
+
+func TestLogWarn_WritesToStderr(t *testing.T) {
+	// given: swap logStderr to capture LogWarn output
+	var errBuf bytes.Buffer
+	origStderr := logStderr
+	logStderr = &errBuf
+	defer func() { logStderr = origStderr }()
+
+	// when: call LogWarn (not logLineTo directly)
+	LogWarn("low disk space")
+
+	// then: output should appear on the stderr writer
+	line := errBuf.String()
+	if !strings.Contains(line, "WARN") {
+		t.Errorf("expected WARN prefix on stderr, got: %s", line)
+	}
+	if !strings.Contains(line, "low disk space") {
+		t.Errorf("expected warning message on stderr, got: %s", line)
+	}
+}
+
+func TestLogInfo_WritesToStdout(t *testing.T) {
+	// given: swap logStdout to capture LogInfo output
+	var outBuf bytes.Buffer
+	origStdout := logStdout
+	logStdout = &outBuf
+	defer func() { logStdout = origStdout }()
+
+	// when: call LogInfo (not logLineTo directly)
+	LogInfo("starting scan")
+
+	// then: output should appear on the stdout writer
+	line := outBuf.String()
+	if !strings.Contains(line, "INFO") {
+		t.Errorf("expected INFO prefix on stdout, got: %s", line)
+	}
+	if !strings.Contains(line, "starting scan") {
+		t.Errorf("expected info message on stdout, got: %s", line)
+	}
+}
+
+func TestLogError_DoesNotWriteToStdout(t *testing.T) {
+	// given: swap both writers
+	var outBuf, errBuf bytes.Buffer
+	origStdout, origStderr := logStdout, logStderr
+	logStdout = &outBuf
+	logStderr = &errBuf
+	defer func() { logStdout = origStdout; logStderr = origStderr }()
+
+	// when
+	LogError("fail")
+
+	// then: stdout should be empty, stderr should have the message
+	if outBuf.Len() != 0 {
+		t.Errorf("LogError should not write to stdout, got: %s", outBuf.String())
+	}
+	if errBuf.Len() == 0 {
+		t.Error("LogError should write to stderr, but stderr was empty")
+	}
+}

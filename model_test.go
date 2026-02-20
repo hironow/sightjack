@@ -529,6 +529,86 @@ func TestWaveApplyResultTotalCount(t *testing.T) {
 	}
 }
 
+func TestScanResult_StrictnessKeys(t *testing.T) {
+	// given: scan result with labeled clusters
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Labels: []string{"security", "backend"}},
+			{Name: "UI", Labels: []string{"frontend"}},
+		},
+	}
+
+	// when/then: keys include cluster name + labels
+	keys := result.StrictnessKeys("Auth")
+	if len(keys) != 3 {
+		t.Fatalf("expected 3 keys, got %d: %v", len(keys), keys)
+	}
+	if keys[0] != "Auth" || keys[1] != "security" || keys[2] != "backend" {
+		t.Errorf("unexpected keys: %v", keys)
+	}
+
+	// unknown cluster returns just the name
+	keys2 := result.StrictnessKeys("Unknown")
+	if len(keys2) != 1 || keys2[0] != "Unknown" {
+		t.Errorf("expected [Unknown], got %v", keys2)
+	}
+}
+
+func TestClusterScanResult_NumIssues_FromSlice(t *testing.T) {
+	// given: cluster with populated Issues slice
+	c := ClusterScanResult{
+		Name:   "Auth",
+		Issues: make([]IssueDetail, 5),
+	}
+
+	// when/then
+	if got := c.NumIssues(); got != 5 {
+		t.Errorf("NumIssues() = %d, want 5", got)
+	}
+}
+
+func TestClusterScanResult_NumIssues_FromIssueCount(t *testing.T) {
+	// given: cluster with IssueCount but no Issues slice (show command case)
+	c := ClusterScanResult{
+		Name:       "Auth",
+		IssueCount: 8,
+	}
+
+	// when/then
+	if got := c.NumIssues(); got != 8 {
+		t.Errorf("NumIssues() = %d, want 8", got)
+	}
+}
+
+func TestClusterScanResult_NumIssues_SliceTakesPrecedence(t *testing.T) {
+	// given: both Issues and IssueCount set — slice wins
+	c := ClusterScanResult{
+		Name:       "Auth",
+		Issues:     make([]IssueDetail, 3),
+		IssueCount: 10,
+	}
+
+	// when/then
+	if got := c.NumIssues(); got != 3 {
+		t.Errorf("NumIssues() = %d, want 3 (slice takes precedence)", got)
+	}
+}
+
+func TestScanResult_ClusterLabels_NilWhenNoLabels(t *testing.T) {
+	// given: cluster without labels
+	result := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth"},
+		},
+	}
+
+	// when/then
+	labels := result.ClusterLabels("Auth")
+	if labels != nil {
+		t.Errorf("expected nil labels, got %v", labels)
+	}
+}
+
 func TestScribeResponse_ZeroValues(t *testing.T) {
 	// given: all zero-value fields
 	data := `{"adr_id":"","title":"","content":"","reasoning":""}`

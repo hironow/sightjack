@@ -9,15 +9,30 @@ import (
 
 const stateDir = ".siren"
 const stateFile = "state.json"
+const configFile = "config.yaml"
 
 // StatePath returns the path to the state file within the given base directory.
 func StatePath(baseDir string) string {
 	return filepath.Join(baseDir, stateDir, stateFile)
 }
 
+// ConfigPath returns the path to the config file within .siren/.
+func ConfigPath(baseDir string) string {
+	return filepath.Join(baseDir, stateDir, configFile)
+}
+
+// WriteGitIgnore writes a .gitignore inside .siren/ that excludes ephemeral
+// files (state.json and .run/) from version control.
+// The write is idempotent — the file is always overwritten with the canonical content.
+func WriteGitIgnore(baseDir string) error {
+	content := "state.json\n.run/\n"
+	path := filepath.Join(baseDir, stateDir, ".gitignore")
+	return os.WriteFile(path, []byte(content), 0644)
+}
+
 // ScanDir returns the path to the scan directory for a given session.
 func ScanDir(baseDir, sessionID string) string {
-	return filepath.Join(baseDir, stateDir, "scans", sessionID)
+	return filepath.Join(baseDir, stateDir, ".run", sessionID)
 }
 
 // WriteState persists the session state as JSON to .siren/state.json.
@@ -54,11 +69,14 @@ func ReadState(baseDir string) (*SessionState, error) {
 }
 
 // EnsureScanDir creates the scan directory for a session and returns its path.
+// It also writes .siren/.gitignore as a best-effort side effect.
 func EnsureScanDir(baseDir, sessionID string) (string, error) {
 	dir := ScanDir(baseDir, sessionID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("create scan dir: %w", err)
 	}
+	// Best-effort: ensure .gitignore exists for first-run coverage.
+	_ = WriteGitIgnore(baseDir)
 	return dir, nil
 }
 

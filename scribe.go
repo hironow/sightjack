@@ -125,7 +125,7 @@ func clearScribeOutput(scanDir string, wave Wave) {
 }
 
 // RunScribeADRDryRun saves the scribe prompt to a file instead of executing Claude.
-func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string) error {
+func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string) error {
 	adrNum, err := NextADRNumber(adrDir)
 	if err != nil {
 		return fmt.Errorf("next adr number: %w", err)
@@ -151,7 +151,7 @@ func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *A
 		Reasoning:       architectResp.Reasoning,
 		ADRNumber:       adrID,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: strictness,
 		ExistingADRs:    existingADRs,
 	})
 	if err != nil {
@@ -188,7 +188,7 @@ func ParseScribeResult(path string) (*ScribeResponse, error) {
 }
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
-func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string) (*ScribeResponse, error) {
+func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string) (*ScribeResponse, error) {
 	clearScribeOutput(scanDir, wave)
 
 	adrNum, err := NextADRNumber(adrDir)
@@ -216,7 +216,7 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		Reasoning:       architectResp.Reasoning,
 		ADRNumber:       adrID,
 		OutputPath:      outputFile,
-		StrictnessLevel: string(cfg.Strictness.Default),
+		StrictnessLevel: strictness,
 		ExistingADRs:    existingADRs,
 	})
 	if err != nil {
