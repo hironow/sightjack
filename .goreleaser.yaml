@@ -47,7 +47,7 @@ signs:
 brews:
   - repository:
       owner: hironow
-      name: homebrew-tools
+      name: homebrew-tap
     directory: Formula
     homepage: https://github.com/hironow/sightjack
     description: SIREN-inspired issue architecture tool for Linear
