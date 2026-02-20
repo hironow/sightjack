@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
@@ -255,10 +256,10 @@ func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 }
 
 // DrainInboxFeedback reads all currently buffered feedback from the monitor channel
-// and displays them to the CLI. Returns the number of feedback messages displayed.
-func DrainInboxFeedback(ch <-chan *DMail) int {
+// and displays them to the CLI. Returns the drained feedback messages for downstream use.
+func DrainInboxFeedback(ch <-chan *DMail) []*DMail {
 	if ch == nil {
-		return 0
+		return nil
 	}
 	var feedback []*DMail
 loop:
@@ -274,7 +275,7 @@ loop:
 		}
 	}
 	if len(feedback) == 0 {
-		return 0
+		return nil
 	}
 	LogInfo("Received %d feedback d-mail(s):", len(feedback))
 	for _, fb := range feedback {
@@ -285,26 +286,79 @@ loop:
 			LogInfo("[%s] %s", fb.Name, fb.Description)
 		}
 	}
-	return len(feedback)
+	return feedback
 }
 
-// LogInboxFeedbackAsync starts a background goroutine that displays
-// feedback d-mails as they arrive on the monitor channel.
-// Safe to call with a nil channel (no-op).
-func LogInboxFeedbackAsync(ch <-chan *DMail) {
-	if ch == nil {
-		return
+// FormatFeedbackForPrompt formats feedback d-mails as a Markdown section
+// suitable for injection into wave generation prompts. HIGH severity items
+// are emphasized with a ### [HIGH] header. Returns "" for nil or empty input.
+func FormatFeedbackForPrompt(feedback []*DMail) string {
+	if len(feedback) == 0 {
+		return ""
 	}
-	go func() {
-		for mail := range ch {
-			switch mail.Severity {
-			case "high":
-				LogWarn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
-			default:
-				LogInfo("[D-Mail] [%s] %s", mail.Name, mail.Description)
-			}
+	var b strings.Builder
+	for _, fb := range feedback {
+		if fb.Severity == "high" {
+			fmt.Fprintf(&b, "### [HIGH] %s\n", fb.Name)
+		} else {
+			fmt.Fprintf(&b, "### %s\n", fb.Name)
 		}
-	}()
+		fmt.Fprintf(&b, "%s\n", fb.Description)
+		if fb.Body != "" {
+			fmt.Fprintf(&b, "\n%s\n", fb.Body)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// feedbackCollector accumulates feedback d-mails from both the initial
+// drain and late-arriving items on the monitor channel. It replaces
+// LogInboxFeedbackAsync by both displaying AND storing late arrivals,
+// so they can be included in nextgen prompts.
+type feedbackCollector struct {
+	mu    sync.Mutex
+	items []*DMail
+}
+
+// CollectFeedback creates a feedbackCollector seeded with initial feedback
+// and starts a background goroutine to accumulate late-arriving items
+// from the channel. Safe to call with nil initial and/or nil channel.
+func CollectFeedback(initial []*DMail, ch <-chan *DMail) *feedbackCollector {
+	c := &feedbackCollector{}
+	if len(initial) > 0 {
+		c.items = make([]*DMail, len(initial))
+		copy(c.items, initial)
+	}
+	if ch != nil {
+		go func() {
+			for mail := range ch {
+				c.mu.Lock()
+				c.items = append(c.items, mail)
+				c.mu.Unlock()
+				switch mail.Severity {
+				case "high":
+					LogWarn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
+				default:
+					LogInfo("[D-Mail] [%s] %s", mail.Name, mail.Description)
+				}
+			}
+		}()
+	}
+	return c
+}
+
+// All returns a copy of all accumulated feedback (initial + late arrivals).
+// Non-destructive: repeated calls return the same data plus any new arrivals.
+func (c *feedbackCollector) All() []*DMail {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.items) == 0 {
+		return nil
+	}
+	cp := make([]*DMail, len(c.items))
+	copy(cp, c.items)
+	return cp
 }
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.

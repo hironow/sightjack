@@ -671,22 +671,36 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	count := DrainInboxFeedback(ch)
-	if count != 1 {
-		t.Errorf("expected 1 drained, got %d", count)
+	feedback := DrainInboxFeedback(ch)
+	if len(feedback) != 1 {
+		t.Errorf("expected 1 drained, got %d", len(feedback))
+	}
+	if feedback[0].Name != "feedback-drain-001" {
+		t.Errorf("name: got %s, want feedback-drain-001", feedback[0].Name)
 	}
 }
 
 func TestDrainInboxFeedback_NilChannel(t *testing.T) {
-	count := DrainInboxFeedback(nil)
-	if count != 0 {
-		t.Errorf("expected 0 for nil channel, got %d", count)
+	feedback := DrainInboxFeedback(nil)
+	if feedback != nil {
+		t.Errorf("expected nil for nil channel, got %d items", len(feedback))
 	}
 }
 
-func TestLogInboxFeedbackAsync_ConsumesLateArrivals(t *testing.T) {
+func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
+
+	// Pre-place feedback in inbox (initial)
+	initialFb := &DMail{
+		Name:        "fb-init-001",
+		Kind:        DMailFeedback,
+		Description: "Initial feedback",
+		Severity:    "high",
+		Body:        "Initial body.",
+	}
+	data, _ := MarshalDMail(initialFb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), initialFb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -696,37 +710,849 @@ func TestLogInboxFeedbackAsync_ConsumesLateArrivals(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// Drain initial (empty)
-	DrainInboxFeedback(ch)
+	// Drain initial feedback
+	initial := DrainInboxFeedback(ch)
 
-	// Start background consumer
-	LogInboxFeedbackAsync(ch)
+	// Start collector with initial feedback
+	collector := CollectFeedback(initial, ch)
+
+	// All() should return initial feedback
+	all := collector.All()
+	if len(all) != 1 {
+		t.Fatalf("expected 1 initial item, got %d", len(all))
+	}
+	if all[0].Name != "fb-init-001" {
+		t.Errorf("expected fb-init-001, got %q", all[0].Name)
+	}
 
 	// Wait for watcher to be ready
 	time.Sleep(50 * time.Millisecond)
 
-	// Write feedback AFTER drain
-	fb := &DMail{
-		Name:        "feedback-late-001",
+	// Write late-arriving feedback
+	lateFb := &DMail{
+		Name:        "fb-late-001",
 		Kind:        DMailFeedback,
 		Description: "Late feedback",
 		Severity:    "high",
-		Body:        "# Late\n",
+		Body:        "Late body.",
 	}
-	data, _ := MarshalDMail(fb)
-	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	lateData, _ := MarshalDMail(lateFb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), lateFb.Filename()), lateData, 0644)
 
-	// Wait for background processing
+	// Wait for fsnotify + background goroutine
 	time.Sleep(500 * time.Millisecond)
 
-	// Verify: file should be archived (consumed by background goroutine)
-	archivePath := filepath.Join(MailDir(dir, "archive"), fb.Filename())
+	// All() should now return both initial AND late feedback
+	all = collector.All()
+	if len(all) != 2 {
+		t.Fatalf("expected 2 items (initial + late), got %d", len(all))
+	}
+
+	// Verify late feedback was archived
+	archivePath := filepath.Join(MailDir(dir, "archive"), lateFb.Filename())
 	if _, err := os.Stat(archivePath); err != nil {
-		t.Errorf("late feedback not archived (background consumer didn't process): %v", err)
+		t.Errorf("late feedback not archived: %v", err)
 	}
 }
 
-func TestLogInboxFeedbackAsync_NilChannel(t *testing.T) {
-	// Should not panic
-	LogInboxFeedbackAsync(nil)
+func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
+	// given: collector with items
+	initial := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "Item 1"},
+		{Name: "fb-002", Kind: DMailFeedback, Description: "Item 2"},
+	}
+	collector := CollectFeedback(initial, nil)
+
+	// when: call All() multiple times
+	first := collector.All()
+	second := collector.All()
+
+	// then: same data each time (non-destructive)
+	if len(first) != 2 {
+		t.Fatalf("first All(): expected 2, got %d", len(first))
+	}
+	if len(second) != 2 {
+		t.Fatalf("second All(): expected 2, got %d", len(second))
+	}
+}
+
+func TestFeedbackCollector_NilChannel(t *testing.T) {
+	// given: nil channel
+	collector := CollectFeedback(nil, nil)
+
+	// then: All() returns nil
+	if all := collector.All(); all != nil {
+		t.Errorf("expected nil for nil initial + nil channel, got %d items", len(all))
+	}
+}
+
+func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
+	// given: nil initial but channel that will receive items
+	ch := make(chan *DMail, 1)
+	collector := CollectFeedback(nil, ch)
+
+	// when: send one item
+	ch <- &DMail{Name: "fb-late", Kind: DMailFeedback, Description: "Late only"}
+	close(ch)
+
+	// Wait for goroutine
+	time.Sleep(50 * time.Millisecond)
+
+	// then: All() returns the late item
+	all := collector.All()
+	if len(all) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(all))
+	}
+	if all[0].Name != "fb-late" {
+		t.Errorf("expected fb-late, got %q", all[0].Name)
+	}
+}
+
+func TestFormatFeedbackForPrompt_Empty(t *testing.T) {
+	got := FormatFeedbackForPrompt(nil)
+	if got != "" {
+		t.Errorf("expected empty string for nil, got %q", got)
+	}
+	got = FormatFeedbackForPrompt([]*DMail{})
+	if got != "" {
+		t.Errorf("expected empty string for empty slice, got %q", got)
+	}
+}
+
+func TestFormatFeedbackForPrompt_Single(t *testing.T) {
+	feedback := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "Architecture drift", Severity: "high", Body: "Auth module drift detected."},
+	}
+	got := FormatFeedbackForPrompt(feedback)
+	if !strings.Contains(got, "### [HIGH]") {
+		t.Error("expected HIGH severity header")
+	}
+	if !strings.Contains(got, "fb-001") {
+		t.Error("expected feedback name")
+	}
+	if !strings.Contains(got, "Architecture drift") {
+		t.Error("expected description")
+	}
+	if !strings.Contains(got, "Auth module drift detected.") {
+		t.Error("expected body content")
+	}
+}
+
+func TestFormatFeedbackForPrompt_Multiple(t *testing.T) {
+	feedback := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "High severity item", Severity: "high", Body: "Details here."},
+		{Name: "fb-002", Kind: DMailFeedback, Description: "Normal item", Severity: "", Body: "Normal details."},
+	}
+	got := FormatFeedbackForPrompt(feedback)
+	if !strings.Contains(got, "### [HIGH]") {
+		t.Error("expected HIGH header for first item")
+	}
+	if !strings.Contains(got, "### fb-002") {
+		t.Error("expected normal header for second item")
+	}
+	if !strings.Contains(got, "Normal details.") {
+		t.Error("expected second body")
+	}
+}
+
+func TestFormatFeedbackForPrompt_NoBody(t *testing.T) {
+	feedback := []*DMail{
+		{Name: "fb-003", Kind: DMailFeedback, Description: "No body feedback", Severity: "high"},
+	}
+	got := FormatFeedbackForPrompt(feedback)
+	if !strings.Contains(got, "No body feedback") {
+		t.Error("expected description even without body")
+	}
+}
+
+// --- Receiving test group ---
+
+func TestReceiveDMail_MalformedContent(t *testing.T) {
+	// given: a file in inbox that is not valid d-mail format
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	inboxPath := filepath.Join(MailDir(dir, "inbox"), "bad.md")
+	os.WriteFile(inboxPath, []byte("not a d-mail"), 0644)
+
+	// when
+	_, err := ReceiveDMail(dir, "bad.md")
+
+	// then: parse error, not a file-not-found error
+	if err == nil {
+		t.Fatal("expected error for malformed content")
+	}
+	if !strings.Contains(err.Error(), "parse") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+	// inbox file should still exist (parse failed before move)
+	if _, statErr := os.Stat(inboxPath); os.IsNotExist(statErr) {
+		t.Error("inbox file should remain after parse failure")
+	}
+}
+
+func TestReceiveDMail_PreservesAllFields(t *testing.T) {
+	// given: a d-mail with all fields populated
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	original := &DMail{
+		Name:        "feedback-full",
+		Kind:        DMailFeedback,
+		Description: "Full field test",
+		Issues:      []string{"MY-100", "MY-101"},
+		Severity:    "high",
+		Metadata:    map[string]string{"source": "phonewave", "version": "1.0"},
+		Body:        "# Full\n\nAll fields present.\n",
+	}
+	data, _ := MarshalDMail(original)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), original.Filename()), data, 0644)
+
+	// when
+	received, err := ReceiveDMail(dir, original.Filename())
+
+	// then: all fields preserved
+	if err != nil {
+		t.Fatalf("receive: %v", err)
+	}
+	if received.Name != "feedback-full" {
+		t.Errorf("name: got %q", received.Name)
+	}
+	if received.Kind != DMailFeedback {
+		t.Errorf("kind: got %q", received.Kind)
+	}
+	if received.Description != "Full field test" {
+		t.Errorf("description: got %q", received.Description)
+	}
+	if len(received.Issues) != 2 || received.Issues[0] != "MY-100" || received.Issues[1] != "MY-101" {
+		t.Errorf("issues: got %v", received.Issues)
+	}
+	if received.Severity != "high" {
+		t.Errorf("severity: got %q", received.Severity)
+	}
+	if received.Metadata["source"] != "phonewave" || received.Metadata["version"] != "1.0" {
+		t.Errorf("metadata: got %v", received.Metadata)
+	}
+	if received.Body != original.Body {
+		t.Errorf("body: got %q, want %q", received.Body, original.Body)
+	}
+}
+
+func TestMonitorInbox_MultipleFeedbackInitialDrain(t *testing.T) {
+	// given: 3 feedback files in inbox before monitor starts
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	for _, name := range []string{"feedback-a", "feedback-b", "feedback-c"} {
+		fb := &DMail{
+			Name:        name,
+			Kind:        DMailFeedback,
+			Description: name + " desc",
+		}
+		data, _ := MarshalDMail(fb)
+		os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// when
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// then: all 3 drained
+	feedback := DrainInboxFeedback(ch)
+	if len(feedback) != 3 {
+		t.Errorf("expected 3 feedback, got %d", len(feedback))
+	}
+	// all archived
+	archiveFiles, _ := ListDMail(dir, "archive")
+	if len(archiveFiles) != 3 {
+		t.Errorf("expected 3 archived files, got %d", len(archiveFiles))
+	}
+	// inbox empty
+	inboxFiles, _ := ListDMail(dir, "inbox")
+	if len(inboxFiles) != 0 {
+		t.Errorf("expected empty inbox, got %d files", len(inboxFiles))
+	}
+}
+
+func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
+	// given: mixed feedback + specification + report in inbox
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	mails := []*DMail{
+		{Name: "feedback-mix-1", Kind: DMailFeedback, Description: "feedback 1"},
+		{Name: "spec-mix-1", Kind: DMailSpecification, Description: "spec 1"},
+		{Name: "feedback-mix-2", Kind: DMailFeedback, Description: "feedback 2"},
+		{Name: "report-mix-1", Kind: DMailReport, Description: "report 1"},
+	}
+	for _, m := range mails {
+		data, _ := MarshalDMail(m)
+		os.WriteFile(filepath.Join(MailDir(dir, "inbox"), m.Filename()), data, 0644)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// when
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// then: only 2 feedback come through channel
+	feedback := DrainInboxFeedback(ch)
+	if len(feedback) != 2 {
+		t.Fatalf("expected 2 feedback, got %d", len(feedback))
+	}
+	names := make(map[string]bool)
+	for _, fb := range feedback {
+		names[fb.Name] = true
+	}
+	if !names["feedback-mix-1"] || !names["feedback-mix-2"] {
+		t.Errorf("expected both feedback names, got %v", names)
+	}
+	// all 4 should be archived (spec and report are received but not channeled)
+	archiveFiles, _ := ListDMail(dir, "archive")
+	if len(archiveFiles) != 4 {
+		t.Errorf("expected 4 archived files, got %d", len(archiveFiles))
+	}
+}
+
+func TestDrainInboxFeedback_MultipleFeedback(t *testing.T) {
+	// given: buffered channel with 3 items
+	ch := make(chan *DMail, 3)
+	ch <- &DMail{Name: "fb-1", Kind: DMailFeedback, Description: "first", Severity: "high"}
+	ch <- &DMail{Name: "fb-2", Kind: DMailFeedback, Description: "second"}
+	ch <- &DMail{Name: "fb-3", Kind: DMailFeedback, Description: "third", Severity: "high"}
+
+	// when
+	feedback := DrainInboxFeedback(ch)
+
+	// then
+	if len(feedback) != 3 {
+		t.Fatalf("expected 3, got %d", len(feedback))
+	}
+	if feedback[0].Name != "fb-1" || feedback[1].Name != "fb-2" || feedback[2].Name != "fb-3" {
+		t.Errorf("order: got %s, %s, %s", feedback[0].Name, feedback[1].Name, feedback[2].Name)
+	}
+}
+
+func TestDrainInboxFeedback_ClosedChannel(t *testing.T) {
+	// given: a closed channel with 1 buffered item
+	ch := make(chan *DMail, 1)
+	ch <- &DMail{Name: "fb-closed", Kind: DMailFeedback, Description: "before close"}
+	close(ch)
+
+	// when
+	feedback := DrainInboxFeedback(ch)
+
+	// then: should drain the buffered item
+	if len(feedback) != 1 {
+		t.Fatalf("expected 1, got %d", len(feedback))
+	}
+	if feedback[0].Name != "fb-closed" {
+		t.Errorf("name: got %q", feedback[0].Name)
+	}
+}
+
+func TestDrainInboxFeedback_EmptyChannel(t *testing.T) {
+	// given: an empty buffered channel (not nil, not closed)
+	ch := make(chan *DMail, 5)
+
+	// when
+	feedback := DrainInboxFeedback(ch)
+
+	// then: returns nil (no feedback)
+	if feedback != nil {
+		t.Errorf("expected nil for empty channel, got %d items", len(feedback))
+	}
+}
+
+// --- Parse edge cases ---
+
+func TestParseDMail_FrontmatterOnly_NoBody(t *testing.T) {
+	// given: valid frontmatter with no body content
+	mail := &DMail{
+		Name:        "no-body-mail",
+		Kind:        DMailFeedback,
+		Description: "No body content",
+	}
+	data, err := MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	// when
+	parsed, err := ParseDMail(data)
+
+	// then
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if parsed.Name != "no-body-mail" {
+		t.Errorf("name: got %q", parsed.Name)
+	}
+	if parsed.Body != "" {
+		t.Errorf("body: got %q, want empty", parsed.Body)
+	}
+}
+
+func TestParseDMail_MissingClosingDelimiter(t *testing.T) {
+	// given: opening --- but no closing ---
+	data := []byte("---\nname: test\nkind: feedback\n")
+
+	// when
+	_, err := ParseDMail(data)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for missing closing delimiter")
+	}
+	if !strings.Contains(err.Error(), "closing frontmatter") {
+		t.Errorf("error should mention closing delimiter: %v", err)
+	}
+}
+
+func TestMarshalDMail_NoBody(t *testing.T) {
+	// given: d-mail with empty body
+	mail := &DMail{
+		Name:        "no-body",
+		Kind:        DMailReport,
+		Description: "Report without body",
+	}
+
+	// when
+	data, err := MarshalDMail(mail)
+
+	// then
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	content := string(data)
+	// should end with closing --- and newline, no extra blank line
+	if !strings.HasSuffix(content, "---\n") {
+		t.Errorf("expected to end with ---\\n, got suffix: %q", content[len(content)-20:])
+	}
+}
+
+// --- Sending test group ---
+
+func TestComposeDMail_NilMail(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// when
+	err := ComposeDMail(dir, nil)
+
+	// then
+	if err == nil {
+		t.Error("expected error for nil mail")
+	}
+}
+
+func TestComposeReport_WithErrors(t *testing.T) {
+	// given: apply result with errors
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "api",
+		Title:       "API hardening",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-60", Description: "Rate limiting"},
+			{Type: "add_dependency", IssueID: "MY-61", Description: "Auth dependency"},
+		},
+	}
+	result := &WaveApplyResult{
+		WaveID:  "w1",
+		Applied: 1,
+		Errors:  []string{"Failed to update MY-61: permission denied"},
+	}
+
+	// when
+	err := ComposeReport(dir, wave, result)
+
+	// then
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "report-api-w1.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if !strings.Contains(mail.Body, "## Errors") {
+		t.Error("body should contain Errors section")
+	}
+	if !strings.Contains(mail.Body, "permission denied") {
+		t.Error("body should contain error message")
+	}
+}
+
+func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
+	// given: apply result with both errors and ripples
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w3",
+		ClusterName: "infra",
+		Title:       "Infra setup",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-70", Description: "Docker setup"},
+		},
+	}
+	result := &WaveApplyResult{
+		WaveID:  "w3",
+		Applied: 1,
+		Errors:  []string{"Partial failure on sub-issue creation"},
+		Ripples: []Ripple{
+			{ClusterName: "api", Description: "API now requires Docker"},
+			{ClusterName: "frontend", Description: "Frontend builds affected"},
+		},
+	}
+
+	// when
+	err := ComposeReport(dir, wave, result)
+
+	// then
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "report-infra-w3.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if !strings.Contains(mail.Body, "## Errors") {
+		t.Error("body should contain Errors section")
+	}
+	if !strings.Contains(mail.Body, "## Ripple Effects") {
+		t.Error("body should contain Ripple Effects section")
+	}
+	if !strings.Contains(mail.Body, "API now requires Docker") {
+		t.Error("body should contain ripple description")
+	}
+}
+
+func TestComposeSpecification_WaveWithDescription(t *testing.T) {
+	// given: wave with non-empty description
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "db",
+		Title:       "Database Migrations",
+		Description: "Critical migration wave for schema changes.",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-80", Description: "Migration script"},
+		},
+	}
+
+	// when
+	err := ComposeSpecification(dir, wave)
+
+	// then
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "spec-db-w1.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if !strings.Contains(mail.Body, "Critical migration wave") {
+		t.Error("body should contain wave description")
+	}
+	if !strings.Contains(mail.Body, "# Database Migrations") {
+		t.Error("body should contain wave title as heading")
+	}
+}
+
+func TestComposeSpecification_EmptyActions(t *testing.T) {
+	// given: wave with no actions (edge case)
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "misc",
+		Title:       "Empty wave",
+		Actions:     []WaveAction{},
+	}
+
+	// when
+	err := ComposeSpecification(dir, wave)
+
+	// then: should succeed (empty actions section)
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "spec-misc-w1.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if !strings.Contains(mail.Body, "## Actions") {
+		t.Error("body should still have Actions heading")
+	}
+}
+
+func TestComposeSpecification_IssueDedup(t *testing.T) {
+	// given: wave with duplicate issue IDs across actions
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "auth",
+		Title:       "Auth DoD",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-42", Description: "First DoD"},
+			{Type: "add_dependency", IssueID: "MY-42", Description: "Dependency"},
+			{Type: "add_dod", IssueID: "MY-43", Description: "Second DoD"},
+		},
+	}
+
+	// when
+	err := ComposeSpecification(dir, wave)
+
+	// then: issues list should be deduplicated
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "spec-auth-w1.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if len(mail.Issues) != 2 {
+		t.Errorf("expected 2 unique issues, got %d: %v", len(mail.Issues), mail.Issues)
+	}
+}
+
+func TestComposeReport_IssuesSorted(t *testing.T) {
+	// given: wave with unsorted issue IDs
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "sort",
+		Title:       "Sort test",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-99", Description: "Last"},
+			{Type: "add_dod", IssueID: "MY-10", Description: "First"},
+			{Type: "add_dod", IssueID: "MY-50", Description: "Middle"},
+		},
+	}
+	result := &WaveApplyResult{WaveID: "w1", Applied: 3}
+
+	// when
+	err := ComposeReport(dir, wave, result)
+
+	// then: issues are sorted
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "report-sort-w1.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if len(mail.Issues) != 3 {
+		t.Fatalf("expected 3 issues, got %d", len(mail.Issues))
+	}
+	if mail.Issues[0] != "MY-10" || mail.Issues[1] != "MY-50" || mail.Issues[2] != "MY-99" {
+		t.Errorf("issues not sorted: %v", mail.Issues)
+	}
+}
+
+// --- Helper function tests ---
+
+func TestWaveIssueIDs_Dedup(t *testing.T) {
+	// given: actions with duplicate issue IDs
+	wave := Wave{
+		Actions: []WaveAction{
+			{IssueID: "MY-1"},
+			{IssueID: "MY-2"},
+			{IssueID: "MY-1"},
+			{IssueID: "MY-3"},
+			{IssueID: "MY-2"},
+		},
+	}
+
+	// when
+	ids := waveIssueIDs(wave)
+
+	// then
+	if len(ids) != 3 {
+		t.Fatalf("expected 3 unique IDs, got %d: %v", len(ids), ids)
+	}
+}
+
+func TestWaveIssueIDs_Empty(t *testing.T) {
+	// given: wave with no actions
+	wave := Wave{Actions: []WaveAction{}}
+
+	// when
+	ids := waveIssueIDs(wave)
+
+	// then
+	if len(ids) != 0 {
+		t.Errorf("expected 0 IDs, got %d", len(ids))
+	}
+}
+
+func TestWaveIssueIDs_SkipsEmptyID(t *testing.T) {
+	// given: actions where some have empty issue IDs
+	wave := Wave{
+		Actions: []WaveAction{
+			{IssueID: "MY-1"},
+			{IssueID: ""},
+			{IssueID: "MY-2"},
+		},
+	}
+
+	// when
+	ids := waveIssueIDs(wave)
+
+	// then: empty IDs are excluded
+	if len(ids) != 2 {
+		t.Errorf("expected 2 IDs (empty excluded), got %d: %v", len(ids), ids)
+	}
+}
+
+func TestWaveIssueIDs_Sorted(t *testing.T) {
+	// given: unsorted issue IDs
+	wave := Wave{
+		Actions: []WaveAction{
+			{IssueID: "MY-99"},
+			{IssueID: "MY-10"},
+			{IssueID: "MY-50"},
+		},
+	}
+
+	// when
+	ids := waveIssueIDs(wave)
+
+	// then: sorted
+	if ids[0] != "MY-10" || ids[1] != "MY-50" || ids[2] != "MY-99" {
+		t.Errorf("not sorted: %v", ids)
+	}
+}
+
+func TestSpecificationBody_Format(t *testing.T) {
+	// given
+	wave := Wave{
+		Title:       "Auth Wave",
+		Description: "Setting up authentication.",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-1", Description: "Add unit tests"},
+			{Type: "add_dependency", IssueID: "MY-2", Description: "Depends on auth"},
+		},
+	}
+
+	// when
+	body := specificationBody(wave)
+
+	// then
+	if !strings.HasPrefix(body, "# Auth Wave\n") {
+		t.Error("body should start with title heading")
+	}
+	if !strings.Contains(body, "Setting up authentication.") {
+		t.Error("body should contain description")
+	}
+	if !strings.Contains(body, "## Actions") {
+		t.Error("body should contain Actions heading")
+	}
+	if !strings.Contains(body, "- [add_dod] MY-1: Add unit tests") {
+		t.Error("body should contain formatted action")
+	}
+	if !strings.Contains(body, "- [add_dependency] MY-2: Depends on auth") {
+		t.Error("body should contain second action")
+	}
+}
+
+func TestSpecificationBody_NoDescription(t *testing.T) {
+	// given: wave without description
+	wave := Wave{
+		Title: "Minimal Wave",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-1", Description: "DoD item"},
+		},
+	}
+
+	// when
+	body := specificationBody(wave)
+
+	// then: no double blank line between title and Actions
+	if strings.Contains(body, "# Minimal Wave\n\n\n") {
+		t.Error("should not have extra blank line when description is empty")
+	}
+	if !strings.Contains(body, "## Actions") {
+		t.Error("body should contain Actions heading")
+	}
+}
+
+func TestReportBody_Format(t *testing.T) {
+	// given
+	wave := Wave{Title: "Deploy Wave"}
+	result := &WaveApplyResult{
+		Applied: 3,
+		Errors:  []string{"timeout on MY-5"},
+		Ripples: []Ripple{
+			{ClusterName: "api", Description: "API needs rebuild"},
+		},
+	}
+
+	// when
+	body := reportBody(wave, result)
+
+	// then
+	if !strings.HasPrefix(body, "# Wave Completed: Deploy Wave\n") {
+		t.Error("body should start with completion heading")
+	}
+	if !strings.Contains(body, "Applied 3 action(s).") {
+		t.Error("body should contain applied count")
+	}
+	if !strings.Contains(body, "## Errors") {
+		t.Error("body should contain Errors section")
+	}
+	if !strings.Contains(body, "timeout on MY-5") {
+		t.Error("body should contain error detail")
+	}
+	if !strings.Contains(body, "## Ripple Effects") {
+		t.Error("body should contain Ripple Effects section")
+	}
+	if !strings.Contains(body, "[api] API needs rebuild") {
+		t.Error("body should contain ripple detail")
+	}
+}
+
+func TestReportBody_NoErrorsNoRipples(t *testing.T) {
+	// given: clean apply
+	wave := Wave{Title: "Clean Wave"}
+	result := &WaveApplyResult{Applied: 2}
+
+	// when
+	body := reportBody(wave, result)
+
+	// then: no Errors or Ripple sections
+	if strings.Contains(body, "## Errors") {
+		t.Error("should not have Errors section when no errors")
+	}
+	if strings.Contains(body, "## Ripple Effects") {
+		t.Error("should not have Ripple section when no ripples")
+	}
+}
+
+func TestDMailName_EmptyWaveKey(t *testing.T) {
+	got := DMailName("spec", "")
+	if got != "spec-" {
+		t.Errorf("got %q, want %q", got, "spec-")
+	}
+}
+
+func TestDMailName_MultipleColons(t *testing.T) {
+	got := DMailName("report", "ns:cluster:w1")
+	if got != "report-ns-cluster-w1" {
+		t.Errorf("got %q, want %q", got, "report-ns-cluster-w1")
+	}
+}
+
+func TestDMailName_TrailingSpecialChars(t *testing.T) {
+	// given: wave key ending with special characters
+	got := DMailName("spec", "auth:w1!!!")
+
+	// then: trailing underscores should be trimmed
+	if strings.HasSuffix(got, "_") {
+		t.Errorf("trailing underscores not trimmed: %q", got)
+	}
 }

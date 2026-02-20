@@ -91,6 +91,7 @@ type NextGenPromptData struct {
 	CompletedWaves  string
 	ExistingADRs    []ExistingADR
 	RejectedActions string
+	FeedbackSection string
 	DoDSection      string
 	OutputPath      string
 	StrictnessLevel string

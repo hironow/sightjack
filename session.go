@@ -45,7 +45,10 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
-	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	// Start inbox monitor (fsnotify-based) for feedback d-mails.
+	// CollectFeedback accumulates initial + late-arriving feedback so
+	// all feedback is available for nextgen prompt injection.
+	var fbCollector *feedbackCollector
 	if !dryRun {
 		monitorCtx, monitorCancel := context.WithCancel(ctx)
 		defer monitorCancel()
@@ -53,8 +56,8 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		if monitorErr != nil {
 			LogWarn("D-Mail monitor failed: %v", monitorErr)
 		}
-		DrainInboxFeedback(inboxCh)
-		LogInboxFeedbackAsync(inboxCh)
+		initial := DrainInboxFeedback(inboxCh)
+		fbCollector = CollectFeedback(initial, inboxCh)
 	}
 
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -102,7 +105,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		// Also generate nextgen prompt for dry-run
 		sampleCompletedWaves := []Wave{sampleWave}
 		sampleCluster := ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
-		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default)); err != nil {
+		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil); err != nil {
 			return fmt.Errorf("nextgen dry-run: %w", err)
 		}
 		LogOK("Dry-run complete. Check .siren/.run/ for generated prompts.")
@@ -136,7 +139,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector)
 }
 
 // selectPhaseResult describes the outcome of the wave selection phase.
@@ -327,7 +330,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 	waves *[]Wave, completed map[string]bool,
 	scanResult *ScanResult, sessionRejected map[string][]WaveAction,
 	labeledReady map[string]bool, adrCount int,
-	scanTimestamp time.Time, loopSpan trace.Span) {
+	scanTimestamp time.Time, fbCollector *feedbackCollector, loopSpan trace.Span) {
 
 	// --- Pass 4: Wave Apply ---
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness)
@@ -420,7 +423,11 @@ func applyPhase(ctx context.Context, cfg *Config,
 			LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
 		}
 		rejectedForWave := sessionRejected[WaveKey(selected)]
-		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness)
+		var feedback []*DMail
+		if fbCollector != nil {
+			feedback = fbCollector.All()
+		}
+		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback)
 		if nextgenErr != nil {
 			LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
 		} else if len(newWaves) > 0 {
@@ -468,7 +475,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
 func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
-	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time) error {
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *feedbackCollector) error {
 
 	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
@@ -514,7 +521,7 @@ outerLoop:
 		applyPhase(ctx, cfg, scanDir, scanResultPath, baseDir, sessionID, adrDir,
 			selected, resolvedStrictness,
 			&waves, completed, scanResult, sessionRejected,
-			labeledReady, adrCount, scanTimestamp, loopSpan)
+			labeledReady, adrCount, scanTimestamp, fbCollector, loopSpan)
 	}
 
 	// Final consistency check
@@ -591,15 +598,16 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
-	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	// Start inbox monitor (fsnotify-based) for feedback d-mails.
+	// CollectFeedback accumulates initial + late-arriving feedback.
 	monitorCtx, monitorCancel := context.WithCancel(ctx)
 	defer monitorCancel()
 	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
 	if monitorErr != nil {
 		LogWarn("D-Mail monitor failed: %v", monitorErr)
 	}
-	DrainInboxFeedback(inboxCh)
-	LogInboxFeedbackAsync(inboxCh)
+	initial := DrainInboxFeedback(inboxCh)
+	fbCollector := CollectFeedback(initial, inboxCh)
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
@@ -614,7 +622,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	LogOK("Resumed session: %d waves, %d completed", len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector)
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
@@ -628,15 +636,16 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
-	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	// Start inbox monitor (fsnotify-based) for feedback d-mails.
+	// CollectFeedback accumulates initial + late-arriving feedback.
 	monitorCtx, monitorCancel := context.WithCancel(ctx)
 	defer monitorCancel()
 	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
 	if monitorErr != nil {
 		LogWarn("D-Mail monitor failed: %v", monitorErr)
 	}
-	DrainInboxFeedback(inboxCh)
-	LogInboxFeedbackAsync(inboxCh)
+	initial := DrainInboxFeedback(inboxCh)
+	fbCollector := CollectFeedback(initial, inboxCh)
 
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -671,7 +680,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		len(scanResult.Clusters), len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector)
 }
 
 // BuildSessionState creates a SessionState from current session data.

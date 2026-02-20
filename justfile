@@ -93,6 +93,20 @@ jaeger:
 jaeger-down:
     docker compose -f docker/compose.yaml down
 
+# Prune archived d-mails older than N days (default: 30)
+archive-prune days="30":
+    @echo "Files to prune in .siren/archive/ (older than {{days}} days):"
+    @find .siren/archive -name "*.md" -mtime +{{days}} -print || echo "(none)"
+    @read -p "Delete these files? [y/N] " confirm && [ "$$confirm" = "y" ] && \
+        find .siren/archive -name "*.md" -mtime +{{days}} -delete && \
+        echo "Pruned." || echo "Cancelled."
+
+# Dry-run: show what would be pruned (no deletion)
+archive-prune-dry days="30":
+    @echo "Dry-run: files older than {{days}} days in .siren/archive/:"
+    @find .siren/archive -name "*.md" -mtime +{{days}} -print || echo "(none)"
+    @echo "(dry-run — no files deleted)"
+
 # Clean build artifacts
 clean:
     rm -f sightjack coverage.out

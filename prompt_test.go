@@ -975,3 +975,56 @@ func TestRenderNextGenPromptWithDoD(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderNextGenPrompt_WithFeedback(t *testing.T) {
+	// given
+	data := NextGenPromptData{
+		ClusterName:     "Auth",
+		Completeness:    "60",
+		Issues:          `[]`,
+		CompletedWaves:  `[]`,
+		FeedbackSection: "### [HIGH] fb-001\nArchitecture drift detected\n",
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when / then: both languages should render feedback
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderNextGenPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
+		}
+		if !strings.Contains(result, "fb-001") {
+			t.Errorf("lang=%s: expected feedback name in output", lang)
+		}
+		if !strings.Contains(result, "Architecture drift detected") {
+			t.Errorf("lang=%s: expected feedback content in output", lang)
+		}
+		if !strings.Contains(result, "[HIGH]") {
+			t.Errorf("lang=%s: expected HIGH severity marker", lang)
+		}
+	}
+}
+
+func TestRenderNextGenPrompt_NoFeedback(t *testing.T) {
+	// given: no feedback
+	data := NextGenPromptData{
+		ClusterName:     "DB",
+		Completeness:    "40",
+		Issues:          `[]`,
+		CompletedWaves:  `[]`,
+		OutputPath:      "/tmp/out.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	for _, lang := range []string{"en", "ja"} {
+		result, err := RenderNextGenPrompt(lang, data)
+		if err != nil {
+			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
+		}
+		if strings.Contains(result, "Received Feedback") || strings.Contains(result, "受信フィードバック") {
+			t.Errorf("lang=%s: feedback section should be omitted when empty", lang)
+		}
+	}
+}
