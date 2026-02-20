@@ -275,6 +275,40 @@ func specificationBody(wave Wave) string {
 	return b.String()
 }
 
+// reportBody formats wave apply results as Markdown body for a report d-mail.
+func reportBody(wave Wave, result *WaveApplyResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Wave Completed: %s\n\n", wave.Title)
+	fmt.Fprintf(&b, "Applied %d action(s).\n\n", result.Applied)
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(&b, "## Errors\n\n")
+		for _, e := range result.Errors {
+			fmt.Fprintf(&b, "- %s\n", e)
+		}
+		b.WriteString("\n")
+	}
+	if len(result.Ripples) > 0 {
+		fmt.Fprintf(&b, "## Ripple Effects\n\n")
+		for _, r := range result.Ripples {
+			fmt.Fprintf(&b, "- [%s] %s\n", r.ClusterName, r.Description)
+		}
+	}
+	return b.String()
+}
+
+// ComposeReport creates and sends a report d-mail for a completed wave.
+func ComposeReport(baseDir string, wave Wave, result *WaveApplyResult) error {
+	key := WaveKey(wave)
+	mail := &DMail{
+		Name:        DMailName("report", key),
+		Kind:        DMailReport,
+		Description: fmt.Sprintf("Wave %s completed", key),
+		Issues:      waveIssueIDs(wave),
+		Body:        reportBody(wave, result),
+	}
+	return ComposeDMail(baseDir, mail)
+}
+
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
 func ComposeSpecification(baseDir string, wave Wave) error {
 	key := WaveKey(wave)

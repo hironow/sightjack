@@ -446,6 +446,89 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	}
 }
 
+func TestComposeReport_CreatesFiles(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "auth",
+		Title:       "Add DoD to auth issues",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket"},
+		},
+	}
+	applyResult := &WaveApplyResult{
+		WaveID:  "w1",
+		Applied: 1,
+		Ripples: []Ripple{
+			{ClusterName: "api", Description: "Rate limiting affects API cluster"},
+		},
+	}
+
+	err := ComposeReport(dir, wave, applyResult)
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+
+	// outbox file exists and is parseable
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "report-auth-w1.md")
+	data, readErr := os.ReadFile(outboxPath)
+	if readErr != nil {
+		t.Fatalf("outbox file missing: %v", readErr)
+	}
+
+	mail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse: %v", parseErr)
+	}
+	if mail.Kind != DMailReport {
+		t.Errorf("kind: got %s, want report", mail.Kind)
+	}
+	if mail.Name != "report-auth-w1" {
+		t.Errorf("name: got %s", mail.Name)
+	}
+	if !strings.Contains(mail.Body, "Rate limiting affects API cluster") {
+		t.Error("body should contain ripple description")
+	}
+
+	// archive file also exists
+	archivePath := filepath.Join(MailDir(dir, "archive"), "report-auth-w1.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
+
+func TestComposeReport_NoRipples(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	wave := Wave{
+		ID:          "w2",
+		ClusterName: "db",
+		Title:       "Database migrations",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-50", Description: "Schema migration"},
+		},
+	}
+	applyResult := &WaveApplyResult{
+		WaveID:  "w2",
+		Applied: 1,
+	}
+
+	err := ComposeReport(dir, wave, applyResult)
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "report-db-w2.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if mail.Body == "" {
+		t.Error("body should not be empty even without ripples")
+	}
+}
+
 func TestWatchInbox_StopsOnCancel(t *testing.T) {
 	dir := t.TempDir()
 	if err := EnsureMailDirs(dir); err != nil {

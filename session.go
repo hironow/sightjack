@@ -358,6 +358,11 @@ func applyPhase(ctx context.Context, cfg *Config,
 		}
 	}
 
+	// Compose report d-mail for the completed wave
+	if err := ComposeReport(baseDir, selected, applyResult); err != nil {
+		LogWarn("D-Mail report failed (non-fatal): %v", err)
+	}
+
 	// Update cluster completeness from delta, then recalculate overall
 	for i, c := range scanResult.Clusters {
 		if c.Name == selected.ClusterName {
