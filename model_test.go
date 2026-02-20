@@ -825,6 +825,71 @@ func TestWavePlan_JSONRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDetectPipeType_ScanResultWithClusters(t *testing.T) {
+	// given: valid ScanResult JSON with clusters
+	data := []byte(`{"clusters":[{"name":"Auth","completeness":0.5,"issues":[],"observations":[]}],"total_issues":1,"completeness":0.5,"observations":[]}`)
+
+	// when
+	got := DetectPipeType(data)
+
+	// then
+	if got != PipeTypeScanResult {
+		t.Errorf("expected PipeTypeScanResult, got %d", got)
+	}
+}
+
+func TestDetectPipeType_ScanResultWithEmptyClusters(t *testing.T) {
+	// given: valid ScanResult JSON with zero clusters (the bug scenario)
+	data := []byte(`{"clusters":[],"total_issues":0,"completeness":0.0,"observations":[]}`)
+
+	// when
+	got := DetectPipeType(data)
+
+	// then
+	if got != PipeTypeScanResult {
+		t.Errorf("expected PipeTypeScanResult for empty clusters, got %d", got)
+	}
+}
+
+func TestDetectPipeType_WavePlan(t *testing.T) {
+	// given: valid WavePlan JSON
+	data := []byte(`{"waves":[{"id":"w1","cluster_name":"Auth","title":"T","description":"D","actions":[],"prerequisites":[],"delta":{"before":0.2,"after":0.5},"status":"available"}]}`)
+
+	// when
+	got := DetectPipeType(data)
+
+	// then
+	if got != PipeTypeWavePlan {
+		t.Errorf("expected PipeTypeWavePlan, got %d", got)
+	}
+}
+
+func TestDetectPipeType_InvalidJSON(t *testing.T) {
+	// given: invalid JSON
+	data := []byte(`{bad json`)
+
+	// when
+	got := DetectPipeType(data)
+
+	// then
+	if got != PipeTypeUnknown {
+		t.Errorf("expected PipeTypeUnknown for invalid JSON, got %d", got)
+	}
+}
+
+func TestDetectPipeType_NoDiscriminatingKeys(t *testing.T) {
+	// given: valid JSON but no discriminating keys
+	data := []byte(`{"some_field":"value"}`)
+
+	// when
+	got := DetectPipeType(data)
+
+	// then
+	if got != PipeTypeUnknown {
+		t.Errorf("expected PipeTypeUnknown when no discriminating keys, got %d", got)
+	}
+}
+
 func TestWavePlan_ScanResultOmittedWhenNil(t *testing.T) {
 	plan := WavePlan{Waves: []Wave{{ID: "w1", ClusterName: "X", Title: "T"}}}
 	data, err := json.Marshal(plan)

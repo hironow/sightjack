@@ -1,6 +1,7 @@
 package sightjack
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -264,6 +265,32 @@ type ArchitectResponse struct {
 }
 
 // --- Wire format types (pipe interface) ---
+
+// PipeType represents the type of JSON wire data in the pipe interface.
+type PipeType int
+
+const (
+	PipeTypeUnknown    PipeType = iota
+	PipeTypeScanResult          // JSON with top-level "clusters" key
+	PipeTypeWavePlan            // JSON with top-level "waves" key
+)
+
+// DetectPipeType identifies the wire type of JSON data by checking
+// for the presence of discriminating top-level keys.
+// "clusters" → ScanResult, "waves" → WavePlan.
+func DetectPipeType(data []byte) PipeType {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return PipeTypeUnknown
+	}
+	if _, ok := raw["clusters"]; ok {
+		return PipeTypeScanResult
+	}
+	if _, ok := raw["waves"]; ok {
+		return PipeTypeWavePlan
+	}
+	return PipeTypeUnknown
+}
 
 // WavePlan is the output of `waves` subcommand.
 // Contains generated waves and optionally the scan result for context.

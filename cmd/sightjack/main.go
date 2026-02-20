@@ -878,21 +878,27 @@ func runShowFromStdin() {
 		os.Exit(1)
 	}
 
-	// Discriminate JSON type by attempting ScanResult first (has "clusters"),
-	// then WavePlan (has "waves"). The len() checks act as discriminators:
-	// Go's json.Unmarshal ignores unknown fields, so a WavePlan JSON could
-	// unmarshal into ScanResult with zero Clusters — the len check prevents
-	// this false positive.
-	var scanResult sightjack.ScanResult
-	if err := json.Unmarshal(data, &scanResult); err == nil && len(scanResult.Clusters) > 0 {
+	// Discriminate JSON type by checking for top-level key presence.
+	// "clusters" → ScanResult, "waves" → WavePlan.
+	// Uses DetectPipeType to avoid false positives from Go's json.Unmarshal
+	// ignoring unknown fields (e.g. WavePlan JSON unmarshalling into ScanResult).
+	switch sightjack.DetectPipeType(data) {
+	case sightjack.PipeTypeScanResult:
+		var scanResult sightjack.ScanResult
+		if err := json.Unmarshal(data, &scanResult); err != nil {
+			sightjack.LogError("Parse ScanResult: %v", err)
+			os.Exit(1)
+		}
 		nav := sightjack.RenderNavigator(&scanResult, "")
 		fmt.Println()
 		fmt.Print(nav)
-		return
-	}
 
-	var plan sightjack.WavePlan
-	if err := json.Unmarshal(data, &plan); err == nil && len(plan.Waves) > 0 {
+	case sightjack.PipeTypeWavePlan:
+		var plan sightjack.WavePlan
+		if err := json.Unmarshal(data, &plan); err != nil {
+			sightjack.LogError("Parse WavePlan: %v", err)
+			os.Exit(1)
+		}
 		var result *sightjack.ScanResult
 		if plan.ScanResult != nil {
 			result = plan.ScanResult
@@ -902,11 +908,11 @@ func runShowFromStdin() {
 		nav := sightjack.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
 		fmt.Println()
 		fmt.Print(nav)
-		return
-	}
 
-	sightjack.LogError("Could not parse stdin: expected ScanResult (with clusters) or WavePlan (with waves), got neither.")
-	os.Exit(1)
+	default:
+		sightjack.LogError("Could not parse stdin: expected ScanResult (with \"clusters\" key) or WavePlan (with \"waves\" key).")
+		os.Exit(1)
+	}
 }
 
 func runShowFromState(baseDir string) {
