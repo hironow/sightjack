@@ -293,12 +293,15 @@ type WaveModification struct {
 // Reports per-action outcomes and downstream effects.
 // CompletedWave carries the wave context so downstream pipe commands
 // (e.g. nextgen) can operate without reading .siren/state.json.
+// RemainingWaves carries sibling waves from the original plan so that
+// nextgen can accurately determine whether follow-up generation is needed.
 type ApplyResult struct {
 	WaveID          string         `json:"wave_id"`
 	AppliedActions  []ActionResult `json:"applied_actions"`
 	RippleEffects   []Ripple       `json:"ripple_effects,omitempty"`
 	NewCompleteness float64        `json:"new_completeness"`
 	CompletedWave   *Wave          `json:"completed_wave,omitempty"`
+	RemainingWaves  []Wave         `json:"remaining_waves,omitempty"`
 }
 
 // ActionResult reports the outcome of a single wave action application.

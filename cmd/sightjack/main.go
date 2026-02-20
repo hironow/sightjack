@@ -474,7 +474,9 @@ func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryR
 		} else {
 			cluster = sightjack.ClusterScanResult{Name: completedWave.ClusterName}
 		}
-		allWaves = []sightjack.Wave{completedWave}
+		// Include remaining sibling waves so NeedsMoreWaves can accurately
+		// detect whether available/locked waves still exist in the plan.
+		allWaves = append([]sightjack.Wave{completedWave}, applyResult.RemainingWaves...)
 	} else {
 		// Fallback: read state (interactive session workflow).
 		state, stateErr := sightjack.ReadState(baseDir)
@@ -665,11 +667,17 @@ func runApply(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun
 		os.Exit(1)
 	}
 
-	var wave sightjack.Wave
-	if err := json.Unmarshal(data, &wave); err != nil {
+	// Read Wave + optional remaining_waves context from select output.
+	type applyInput struct {
+		sightjack.Wave
+		RemainingWaves []sightjack.Wave `json:"remaining_waves,omitempty"`
+	}
+	var input applyInput
+	if err := json.Unmarshal(data, &input); err != nil {
 		sightjack.LogError("Invalid Wave JSON: %v", err)
 		os.Exit(1)
 	}
+	wave := input.Wave
 
 	sessionID := fmt.Sprintf("apply-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir := sightjack.ScanDir(baseDir, sessionID)
@@ -692,6 +700,7 @@ func runApply(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun
 	}
 
 	result := sightjack.ToApplyResult(wave, internal)
+	result.RemainingWaves = input.RemainingWaves
 	out, jsonErr := json.MarshalIndent(result, "", "  ")
 	if jsonErr != nil {
 		sightjack.LogError("JSON marshal failed: %v", jsonErr)
@@ -758,7 +767,23 @@ func runSelect(ctx context.Context) {
 		}
 	}
 
-	out, jsonErr := json.MarshalIndent(selected, "", "  ")
+	// Build remaining waves (all plan waves except the selected one)
+	// so downstream apply → nextgen can accurately check NeedsMoreWaves.
+	var remaining []sightjack.Wave
+	selectedKey := sightjack.WaveKey(selected)
+	for _, w := range plan.Waves {
+		if sightjack.WaveKey(w) != selectedKey {
+			remaining = append(remaining, w)
+		}
+	}
+
+	// Output selected wave with remaining sibling context.
+	type selectOutput struct {
+		sightjack.Wave
+		RemainingWaves []sightjack.Wave `json:"remaining_waves,omitempty"`
+	}
+	output := selectOutput{Wave: selected, RemainingWaves: remaining}
+	out, jsonErr := json.MarshalIndent(output, "", "  ")
 	if jsonErr != nil {
 		sightjack.LogError("JSON marshal failed: %v", jsonErr)
 		os.Exit(1)

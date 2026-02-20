@@ -1315,6 +1315,52 @@ func TestToApplyResult_EmbedCompletedWave(t *testing.T) {
 	}
 }
 
+func TestApplyResult_RemainingWaves_RoundTrip(t *testing.T) {
+	// given: ApplyResult with remaining waves
+	result := ApplyResult{
+		WaveID:          "w1",
+		AppliedActions:  []ActionResult{{Type: "add_dependency", IssueID: "ENG-101", Success: true}},
+		NewCompleteness: 0.50,
+		CompletedWave: &Wave{
+			ID: "w1", ClusterName: "Auth", Status: "completed",
+			Actions: []WaveAction{{Type: "add_dependency", IssueID: "ENG-101"}},
+			Delta:   WaveDelta{Before: 0.30, After: 0.50},
+		},
+		RemainingWaves: []Wave{
+			{ID: "w2", ClusterName: "Auth", Status: "available", Title: "Token lifecycle"},
+			{ID: "w3", ClusterName: "Auth", Status: "locked", Title: "Audit logging"},
+		},
+	}
+
+	// when: marshal + unmarshal
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ApplyResult
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then: remaining waves survive round-trip
+	if len(decoded.RemainingWaves) != 2 {
+		t.Fatalf("RemainingWaves: got %d, want 2", len(decoded.RemainingWaves))
+	}
+	if decoded.RemainingWaves[0].ID != "w2" {
+		t.Errorf("RemainingWaves[0].ID: got %q, want w2", decoded.RemainingWaves[0].ID)
+	}
+	if decoded.RemainingWaves[1].Status != "locked" {
+		t.Errorf("RemainingWaves[1].Status: got %q, want locked", decoded.RemainingWaves[1].Status)
+	}
+
+	// Verify NeedsMoreWaves sees the full picture.
+	allWaves := append([]Wave{*decoded.CompletedWave}, decoded.RemainingWaves...)
+	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.50}
+	if NeedsMoreWaves(cluster, allWaves) {
+		t.Error("NeedsMoreWaves should return false when available waves remain")
+	}
+}
+
 // --- Schema example file round-trip tests ---
 
 func TestSchemaExamples_RoundTrip(t *testing.T) {

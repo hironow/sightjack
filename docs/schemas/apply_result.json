@@ -42,5 +42,24 @@
     "prerequisites": [],
     "delta": { "before": 0.30, "after": 0.50 },
     "status": "completed"
-  }
+  },
+  "remaining_waves": [
+    {
+      "id": "auth-w2",
+      "cluster_name": "Auth",
+      "title": "Token Lifecycle",
+      "description": "Implement token refresh and expiry",
+      "actions": [
+        {
+          "type": "add_dod",
+          "issue_id": "ENG-103",
+          "description": "Add token refresh DoD",
+          "detail": ""
+        }
+      ],
+      "prerequisites": ["Auth:auth-w1"],
+      "delta": { "before": 0.50, "after": 0.70 },
+      "status": "available"
+    }
+  ]
 }
