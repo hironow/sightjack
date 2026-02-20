@@ -122,6 +122,66 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
 }
 
+// selectPhaseResult describes the outcome of the wave selection phase.
+type selectPhaseResult int
+
+const (
+	selectChosen selectPhaseResult = iota
+	selectQuit
+	selectRetry
+)
+
+// selectPhase handles the wave selection UI: navigator display, shibito warnings,
+// wave selection prompt, go-back handling, and quit handling.
+// Returns the selected wave, a result code, and the updated shibitoShown flag.
+func selectPhase(ctx context.Context, scanner *bufio.Scanner,
+	scanResult *ScanResult, cfg *Config, available []Wave, waves []Wave, completed map[string]bool,
+	adrCount int, resumedAt *time.Time, shibitoShown bool,
+	loopSpan trace.Span) (Wave, selectPhaseResult, bool) {
+
+	// Display Link Navigator
+	nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
+	fmt.Println()
+	fmt.Print(nav)
+
+	// Display shibito warnings once (static data, does not change during session)
+	if !shibitoShown {
+		DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
+		shibitoShown = true
+	}
+
+	// Prompt wave selection
+	selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
+	if err == ErrQuit {
+		loopSpan.AddEvent("session.paused")
+		LogInfo("Session paused. State saved.")
+		return Wave{}, selectQuit, shibitoShown
+	}
+	if err == ErrGoBack {
+		completedList := CompletedWaves(waves)
+		if len(completedList) == 0 {
+			LogInfo("No completed waves to revisit.")
+			return Wave{}, selectRetry, shibitoShown
+		}
+		revisit, backErr := PromptCompletedWaveSelection(ctx, os.Stdout, scanner, completedList)
+		if backErr == ErrQuit {
+			LogInfo("Session paused. State saved.")
+			return Wave{}, selectQuit, shibitoShown
+		}
+		if backErr != nil {
+			return Wave{}, selectRetry, shibitoShown
+		}
+		DisplayCompletedWaveActions(os.Stdout, revisit)
+		return Wave{}, selectRetry, shibitoShown
+	}
+	if err != nil {
+		LogWarn("Invalid selection: %v", err)
+		return Wave{}, selectRetry, shibitoShown
+	}
+
+	return selected, selectChosen, shibitoShown
+}
+
 // runInteractiveLoop runs the wave selection/approval/apply loop shared by
 // RunSession, RunResumeSession, and RunRescanSession.
 // resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
@@ -145,6 +205,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	// across the entire cluster.
 	sessionRejected := make(map[string][]WaveAction)
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
+outerLoop:
 	for {
 		waves = EvaluateUnlocks(waves, completed)
 		available := AvailableWaves(waves, completed)
@@ -153,43 +214,13 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			break
 		}
 
-		// Display Link Navigator
-		nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
-		fmt.Println()
-		fmt.Print(nav)
-
-		// Display shibito warnings once (static data, does not change during session)
-		if !shibitoShown {
-			DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
-			shibitoShown = true
-		}
-
-		// Prompt wave selection
-		selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
-		if err == ErrQuit {
-			loopSpan.AddEvent("session.paused")
-			LogInfo("Session paused. State saved.")
-			break
-		}
-		if err == ErrGoBack {
-			completedList := CompletedWaves(waves)
-			if len(completedList) == 0 {
-				LogInfo("No completed waves to revisit.")
-				continue
-			}
-			revisit, backErr := PromptCompletedWaveSelection(ctx, os.Stdout, scanner, completedList)
-			if backErr == ErrQuit {
-				LogInfo("Session paused. State saved.")
-				break
-			}
-			if backErr != nil {
-				continue
-			}
-			DisplayCompletedWaveActions(os.Stdout, revisit)
-			continue
-		}
-		if err != nil {
-			LogWarn("Invalid selection: %v", err)
+		var selected Wave
+		var result selectPhaseResult
+		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, completed, adrCount, resumedAt, shibitoShown, loopSpan)
+		switch result {
+		case selectQuit:
+			break outerLoop
+		case selectRetry:
 			continue
 		}
 
