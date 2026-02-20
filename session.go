@@ -182,6 +182,116 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	return selected, selectChosen, shibitoShown
 }
 
+// approvalPhaseResult describes the outcome of the wave approval phase.
+type approvalPhaseResult int
+
+const (
+	approvalApproved approvalPhaseResult = iota
+	approvalRejected
+)
+
+// approvalPhase handles the wave approval/reject/discuss/selective loop.
+// Returns the (possibly modified) wave and whether it was approved.
+func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
+	cfg *Config, scanDir string, selected Wave, resolvedStrictness string,
+	waves []Wave, completed map[string]bool,
+	sessionRejected map[string][]WaveAction, adrDir string, adrCount *int,
+	loopSpan trace.Span) (Wave, approvalPhaseResult) {
+
+	for {
+		choice, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
+		if err == ErrQuit {
+			return selected, approvalRejected
+		}
+		if err != nil {
+			LogWarn("Invalid input: %v", err)
+			continue
+		}
+
+		switch choice {
+		case ApprovalApprove:
+			delete(sessionRejected, WaveKey(selected))
+			loopSpan.AddEvent("wave.approved",
+				trace.WithAttributes(
+					attribute.String("wave.id", selected.ID),
+					attribute.String("wave.cluster_name", selected.ClusterName),
+				),
+			)
+			return selected, approvalApproved
+		case ApprovalReject:
+			delete(sessionRejected, WaveKey(selected))
+			loopSpan.AddEvent("wave.rejected",
+				trace.WithAttributes(
+					attribute.String("wave.id", selected.ID),
+					attribute.String("wave.cluster_name", selected.ClusterName),
+				),
+			)
+			LogInfo("Wave rejected.")
+			return selected, approvalRejected
+		case ApprovalDiscuss:
+			topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
+			if topicErr == ErrQuit {
+				continue
+			}
+			if topicErr != nil {
+				LogWarn("Invalid topic: %v", topicErr)
+				continue
+			}
+			result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness)
+			if discussErr != nil {
+				LogError("Architect discussion failed: %v", discussErr)
+				continue
+			}
+			DisplayArchitectResponse(os.Stdout, result)
+			if result.ModifiedWave != nil {
+				selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+				PropagateWaveUpdate(waves, selected)
+				// Trigger Scribe to generate ADR for the modification
+				// (runs even for locked waves — the decision itself is worth recording)
+				if cfg.Scribe.Enabled {
+					scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness)
+					if scribeErr != nil {
+						LogWarn("Scribe failed (non-fatal): %v", scribeErr)
+					} else {
+						DisplayScribeResponse(os.Stdout, scribeResp)
+						DisplayADRConflicts(os.Stdout, scribeResp.Conflicts)
+						*adrCount++
+					}
+				}
+				if selected.Status == "locked" {
+					LogWarn("Architect added unmet prerequisites — wave is now locked.")
+					return selected, approvalRejected
+				}
+			}
+			continue // back to approval prompt with (possibly modified) wave
+		case ApprovalSelective:
+			approved, rejected, selErr := PromptSelectiveApproval(ctx, os.Stdout, scanner, selected)
+			if selErr == ErrQuit {
+				return selected, approvalRejected
+			}
+			if selErr != nil {
+				LogWarn("Selective approval error: %v", selErr)
+				continue
+			}
+			if len(approved) == 0 {
+				LogInfo("No actions selected. Wave skipped.")
+				return selected, approvalRejected
+			}
+			selected.Actions = approved
+			// Recompute delta proportionally when actions were rejected
+			totalActions := len(approved) + len(rejected)
+			if totalActions > 0 && len(rejected) > 0 {
+				fraction := float64(len(approved)) / float64(totalActions)
+				selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
+			}
+			PropagateWaveUpdate(waves, selected)
+			sessionRejected[WaveKey(selected)] = rejected
+			return selected, approvalApproved
+		}
+		return selected, approvalRejected
+	}
+}
+
 // runInteractiveLoop runs the wave selection/approval/apply loop shared by
 // RunSession, RunResumeSession, and RunRescanSession.
 // resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
@@ -224,103 +334,10 @@ outerLoop:
 			continue
 		}
 
-		// Resolve strictness using cluster name + labels from scan result
 		resolvedStrictness := string(ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-		// Prompt wave approval (with discuss loop)
-		var applyWave bool
-		for {
-			choice, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
-			if err == ErrQuit {
-				break
-			}
-			if err != nil {
-				LogWarn("Invalid input: %v", err)
-				continue
-			}
-
-			switch choice {
-			case ApprovalApprove:
-				delete(sessionRejected, WaveKey(selected))
-				loopSpan.AddEvent("wave.approved",
-					trace.WithAttributes(
-						attribute.String("wave.id", selected.ID),
-						attribute.String("wave.cluster_name", selected.ClusterName),
-					),
-				)
-				applyWave = true
-			case ApprovalReject:
-				delete(sessionRejected, WaveKey(selected))
-				loopSpan.AddEvent("wave.rejected",
-					trace.WithAttributes(
-						attribute.String("wave.id", selected.ID),
-						attribute.String("wave.cluster_name", selected.ClusterName),
-					),
-				)
-				LogInfo("Wave rejected.")
-			case ApprovalDiscuss:
-				topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
-				if topicErr == ErrQuit {
-					continue
-				}
-				if topicErr != nil {
-					LogWarn("Invalid topic: %v", topicErr)
-					continue
-				}
-				result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness)
-				if discussErr != nil {
-					LogError("Architect discussion failed: %v", discussErr)
-					continue
-				}
-				DisplayArchitectResponse(os.Stdout, result)
-				if result.ModifiedWave != nil {
-					selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
-					PropagateWaveUpdate(waves, selected)
-					// Trigger Scribe to generate ADR for the modification
-					// (runs even for locked waves — the decision itself is worth recording)
-					if cfg.Scribe.Enabled {
-						scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness)
-						if scribeErr != nil {
-							LogWarn("Scribe failed (non-fatal): %v", scribeErr)
-						} else {
-							DisplayScribeResponse(os.Stdout, scribeResp)
-							DisplayADRConflicts(os.Stdout, scribeResp.Conflicts)
-							adrCount++
-						}
-					}
-					if selected.Status == "locked" {
-						LogWarn("Architect added unmet prerequisites — wave is now locked.")
-						break
-					}
-				}
-				continue // back to approval prompt with (possibly modified) wave
-			case ApprovalSelective:
-				approved, rejected, selErr := PromptSelectiveApproval(ctx, os.Stdout, scanner, selected)
-				if selErr == ErrQuit {
-					break
-				}
-				if selErr != nil {
-					LogWarn("Selective approval error: %v", selErr)
-					continue
-				}
-				if len(approved) == 0 {
-					LogInfo("No actions selected. Wave skipped.")
-					break
-				}
-				selected.Actions = approved
-				// Recompute delta proportionally when actions were rejected
-				totalActions := len(approved) + len(rejected)
-				if totalActions > 0 && len(rejected) > 0 {
-					fraction := float64(len(approved)) / float64(totalActions)
-					selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
-				}
-				PropagateWaveUpdate(waves, selected)
-				sessionRejected[WaveKey(selected)] = rejected
-				applyWave = true
-			}
-			break
-		}
-		if !applyWave {
+		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, loopSpan)
+		if approvalResult != approvalApproved {
 			continue
 		}
 
