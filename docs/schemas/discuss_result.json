@@ -1,0 +1,14 @@
+{
+  "wave_id": "auth-w1",
+  "analysis": "The JWT approach has trade-offs in complexity vs security",
+  "reasoning": "Session-based auth is simpler for this use case and avoids token management issues",
+  "decision": "Use session-based auth with Redis store",
+  "modifications": [
+    {
+      "action_index": 0,
+      "change": "Updated dependency to include Redis session store"
+    }
+  ],
+  "adr_worthy": true,
+  "adr_title": "Session-based auth over JWT"
+}

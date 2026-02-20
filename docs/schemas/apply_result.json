@@ -1,0 +1,23 @@
+{
+  "wave_id": "auth-w1",
+  "applied_actions": [
+    {
+      "type": "add_dependency",
+      "issue_id": "ENG-101",
+      "success": true
+    },
+    {
+      "type": "add_dod",
+      "issue_id": "ENG-102",
+      "success": false,
+      "error": "permission denied: not a project member"
+    }
+  ],
+  "ripple_effects": [
+    {
+      "cluster_name": "API",
+      "description": "W2 prerequisites updated"
+    }
+  ],
+  "new_completeness": 0.50
+}

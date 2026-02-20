@@ -1,0 +1,66 @@
+{
+  "waves": [
+    {
+      "id": "auth-w1",
+      "cluster_name": "Auth",
+      "title": "Dependency Ordering",
+      "description": "Order dependencies first",
+      "actions": [
+        {
+          "type": "add_dependency",
+          "issue_id": "ENG-101",
+          "description": "Auth before token",
+          "detail": "ENG-101 -> ENG-102"
+        }
+      ],
+      "prerequisites": [],
+      "delta": {
+        "before": 0.25,
+        "after": 0.50
+      },
+      "status": "available"
+    },
+    {
+      "id": "auth-w2",
+      "cluster_name": "Auth",
+      "title": "Security Hardening",
+      "description": "Add MFA and token rotation",
+      "actions": [
+        {
+          "type": "add_dod",
+          "issue_id": "ENG-102",
+          "description": "Add security checklist",
+          "detail": "MFA integration test required"
+        }
+      ],
+      "prerequisites": ["Auth:auth-w1"],
+      "delta": {
+        "before": 0.50,
+        "after": 0.75
+      },
+      "status": "locked"
+    }
+  ],
+  "scan_result": {
+    "clusters": [
+      {
+        "name": "Auth",
+        "completeness": 0.25,
+        "issues": [
+          {
+            "id": "abc-123",
+            "identifier": "ENG-101",
+            "title": "Implement login",
+            "completeness": 0.30,
+            "gaps": ["DoD missing"]
+          }
+        ],
+        "observations": ["Missing MFA"],
+        "labels": ["security"]
+      }
+    ],
+    "total_issues": 5,
+    "completeness": 0.25,
+    "observations": []
+  }
+}

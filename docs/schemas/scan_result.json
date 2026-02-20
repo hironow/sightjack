@@ -1,0 +1,31 @@
+{
+  "clusters": [
+    {
+      "name": "Auth",
+      "completeness": 0.25,
+      "issues": [
+        {
+          "id": "abc-123",
+          "identifier": "ENG-101",
+          "title": "Implement login",
+          "completeness": 0.30,
+          "gaps": ["DoD missing", "No dependency specified"]
+        }
+      ],
+      "observations": ["Missing MFA"],
+      "labels": ["security"]
+    }
+  ],
+  "total_issues": 12,
+  "completeness": 0.35,
+  "observations": ["Global observation"],
+  "shibito_warnings": [
+    {
+      "closed_issue_id": "ENG-045",
+      "current_issue_id": "ENG-102",
+      "description": "Token management circular dependency re-emerging",
+      "risk_level": "high"
+    }
+  ],
+  "scan_warnings": ["Cluster X has no issues"]
+}
