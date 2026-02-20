@@ -181,3 +181,50 @@ func TestEnsureMailDirs_Idempotent(t *testing.T) {
 		t.Fatalf("second: %v", err)
 	}
 }
+
+func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
+	dir := t.TempDir()
+	if err := EnsureMailDirs(dir); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+	mail := &DMail{
+		Name:        "spec-my-42",
+		Kind:        DMailSpecification,
+		Description: "Ready for impl",
+		Body:        "# DoD\n- item 1\n",
+	}
+	if err := ComposeDMail(dir, mail); err != nil {
+		t.Fatalf("compose: %v", err)
+	}
+
+	// outbox file exists
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "spec-my-42.md")
+	if _, err := os.Stat(outboxPath); err != nil {
+		t.Errorf("outbox file missing: %v", err)
+	}
+
+	// archive file exists
+	archivePath := filepath.Join(MailDir(dir, "archive"), "spec-my-42.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+
+	// content is parseable
+	data, _ := os.ReadFile(outboxPath)
+	parsed, err := ParseDMail(data)
+	if err != nil {
+		t.Fatalf("parse outbox: %v", err)
+	}
+	if parsed.Name != "spec-my-42" {
+		t.Errorf("name: got %s", parsed.Name)
+	}
+}
+
+func TestComposeDMail_ValidationError(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	mail := &DMail{Name: "", Kind: DMailSpecification, Description: "bad"}
+	if err := ComposeDMail(dir, mail); err == nil {
+		t.Error("expected validation error for empty name")
+	}
+}

@@ -98,6 +98,25 @@ func ParseDMail(data []byte) (*DMail, error) {
 	return &mail, nil
 }
 
+// ComposeDMail writes a d-mail to both outbox/ and archive/.
+func ComposeDMail(baseDir string, mail *DMail) error {
+	if err := ValidateDMail(mail); err != nil {
+		return err
+	}
+	data, err := MarshalDMail(mail)
+	if err != nil {
+		return err
+	}
+	filename := mail.Filename()
+	for _, sub := range []string{outboxDir, archiveDir} {
+		path := filepath.Join(MailDir(baseDir, sub), filename)
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			return fmt.Errorf("dmail compose to %s: %w", sub, err)
+		}
+	}
+	return nil
+}
+
 // ValidateDMail checks required fields and kind validity.
 func ValidateDMail(mail *DMail) error {
 	if mail == nil {
