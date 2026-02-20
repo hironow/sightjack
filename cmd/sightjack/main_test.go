@@ -25,7 +25,7 @@ func TestUsageOutput_ContainsSubcommands(t *testing.T) {
 
 	// then: output contains all subcommands
 	output := buf.String()
-	for _, cmd := range []string{"scan", "waves", "select", "discuss", "apply", "adr", "nextgen", "run", "show", "init", "doctor"} {
+	for _, cmd := range []string{"scan", "waves", "select", "discuss", "apply", "adr", "nextgen", "run", "show", "init", "doctor", "archive-prune"} {
 		if !strings.Contains(output, cmd) {
 			t.Errorf("expected usage output to contain %q, got:\n%s", cmd, output)
 		}
@@ -285,6 +285,30 @@ func TestExtractSubcommand(t *testing.T) {
 			args:      []string{"--verbose", "select"},
 			wantCmd:   "select",
 			wantFlags: []string{"--verbose"},
+		},
+		// --- archive-prune subcommand cases ---
+		{
+			name:    "archive-prune subcommand",
+			args:    []string{"archive-prune"},
+			wantCmd: "archive-prune",
+		},
+		{
+			name:      "archive-prune with execute flag",
+			args:      []string{"archive-prune", "--execute"},
+			wantCmd:   "archive-prune",
+			wantFlags: []string{"--execute"},
+		},
+		{
+			name:      "archive-prune with days flag",
+			args:      []string{"archive-prune", "--days", "90"},
+			wantCmd:   "archive-prune",
+			wantFlags: []string{"--days", "90"},
+		},
+		{
+			name:     "archive-prune with path",
+			args:     []string{"archive-prune", "/tmp/repo"},
+			wantCmd:  "archive-prune",
+			wantPath: "/tmp/repo",
 		},
 	}
 

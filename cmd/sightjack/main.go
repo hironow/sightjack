@@ -37,6 +37,8 @@ func main() {
 		dryRun     bool
 		showVer    bool
 		jsonOutput bool
+		execute    bool
+		days       int
 	)
 
 	fs := flag.NewFlagSet("sightjack", flag.ExitOnError)
@@ -51,6 +53,8 @@ func main() {
 	fs.BoolVar(&jsonOutput, "json", false, "Output scan result as JSON")
 	fs.BoolVar(&jsonOutput, "j", false, "Output scan result as JSON (shorthand)")
 	fs.BoolVar(&showVer, "version", false, "Show version")
+	fs.BoolVar(&execute, "execute", false, "Execute archive pruning (default: dry-run)")
+	fs.IntVar(&days, "days", 30, "Retention days for archive-prune")
 	fs.Parse(flagArgs)
 
 	if showVer {
@@ -59,7 +63,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|run|init|doctor] [flags] [path]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|run|init|doctor|archive-prune] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -237,6 +241,8 @@ func main() {
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runDoctor(ctx, configPath, baseDir)
 		sightjack.EndRootSpan(ctx)
+	case "archive-prune":
+		runArchivePrune(baseDir, days, execute)
 	}
 }
 
@@ -258,7 +264,8 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "  run       Interactive wave approval and apply loop\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
 		fmt.Fprintf(out, "  init      Create .siren/config.yaml interactively\n")
-		fmt.Fprintf(out, "  doctor    Check environment and tool availability\n\n")
+		fmt.Fprintf(out, "  doctor    Check environment and tool availability\n")
+		fmt.Fprintf(out, "  archive-prune  Prune expired d-mails from archive\n\n")
 		fmt.Fprintf(out, "Flags:\n")
 		fs.PrintDefaults()
 	}
@@ -295,11 +302,12 @@ func configExplicitlySet(fs *flag.FlagSet) bool {
 // At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "adr": true, "nextgen": true, "show": true, "run": true, "init": true, "doctor": true}
+	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "adr": true, "nextgen": true, "show": true, "run": true, "init": true, "doctor": true, "archive-prune": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
 		"-lang": true, "--lang": true, "-l": true,
+		"-days": true, "--days": true,
 	}
 	// Boolean flags that may optionally consume "true"/"false" as next token.
 	boolFlags := map[string]bool{
@@ -307,6 +315,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		"-dry-run": true, "--dry-run": true,
 		"-version": true, "--version": true,
 		"-json": true, "--json": true, "-j": true,
+		"-execute": true, "--execute": true,
 	}
 
 	var subcmd string
@@ -345,7 +354,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|run|init|doctor] [flags] [path]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|run|init|doctor|archive-prune] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
@@ -853,6 +862,36 @@ func runWaves(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun
 		os.Exit(1)
 	}
 	fmt.Println(string(out))
+}
+
+func runArchivePrune(baseDir string, days int, execute bool) {
+	files, err := sightjack.ListExpiredArchive(baseDir, days)
+	if err != nil {
+		sightjack.LogError("Failed to list archive: %v", err)
+		os.Exit(1)
+	}
+
+	if len(files) == 0 {
+		fmt.Fprintf(os.Stderr, "No expired files in archive (threshold: %d days).\n", days)
+		return
+	}
+
+	for _, f := range files {
+		fmt.Println(f)
+	}
+	fmt.Fprintf(os.Stderr, "\n%d file(s) older than %d days.\n", len(files), days)
+
+	if !execute {
+		fmt.Fprintln(os.Stderr, "(dry-run — pass --execute to delete)")
+		return
+	}
+
+	deleted, err := sightjack.PruneArchive(baseDir, days)
+	if err != nil {
+		sightjack.LogError("Prune failed: %v", err)
+		os.Exit(1)
+	}
+	fmt.Fprintf(os.Stderr, "Pruned %d file(s).\n", len(deleted))
 }
 
 func stdinIsPipe() bool {
