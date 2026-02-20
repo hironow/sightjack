@@ -166,14 +166,28 @@ func TestExtractSubcommand(t *testing.T) {
 			wantPath: "/tmp/repo",
 		},
 		{
-			name:    "mistyped command rejected",
-			args:    []string{"scna"},
-			wantErr: true,
+			name:     "mistyped command treated as path",
+			args:     []string{"scna"},
+			wantCmd:  "scan",
+			wantPath: "scna",
 		},
 		{
-			name:    "unknown command rejected",
-			args:    []string{"deploy"},
-			wantErr: true,
+			name:     "unknown command treated as path",
+			args:     []string{"deploy"},
+			wantCmd:  "scan",
+			wantPath: "deploy",
+		},
+		{
+			name:     "bare relative path defaults to scan",
+			args:     []string{"repo"},
+			wantCmd:  "scan",
+			wantPath: "repo",
+		},
+		{
+			name:     "bare relative path with subcommand",
+			args:     []string{"scan", "repo"},
+			wantCmd:  "scan",
+			wantPath: "repo",
 		},
 	}
 

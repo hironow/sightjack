@@ -288,14 +288,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 			subcmd = arg
 			continue
 		}
-		// Non-flag, non-command positional.
-		// Accept as path only if it looks like a filesystem path (starts with / . ~)
-		// or a subcommand has already been identified. Otherwise reject as
-		// unknown command to catch typos like "scna" instead of "scan".
-		looksLikePath := strings.HasPrefix(arg, "/") || strings.HasPrefix(arg, ".") || strings.HasPrefix(arg, "~")
-		if !looksLikePath && subcmd == "" {
-			return "", "", nil, fmt.Errorf("unknown command: %s\nUsage: sightjack [scan|show|session|init|doctor] [flags] [path]", arg)
-		}
+		// Non-flag, non-command positional — treat as path argument.
 		if path != "" {
 			return "", "", nil, fmt.Errorf("unexpected argument: %s\nOnly one path argument is allowed.", arg)
 		}
