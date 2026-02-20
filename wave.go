@@ -85,6 +85,38 @@ func AvailableWaves(waves []Wave, completed map[string]bool) []Wave {
 	return available
 }
 
+// ToApplyResult converts the internal WaveApplyResult to the pipe wire format ApplyResult.
+// It builds per-action results from the wave's actions and the internal result's error list.
+func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
+	actions := make([]ActionResult, 0, len(wave.Actions))
+
+	// Build per-action results: first N actions succeed (N = Applied),
+	// remaining get error messages from the Errors list.
+	for i, a := range wave.Actions {
+		ar := ActionResult{
+			Type:    a.Type,
+			IssueID: a.IssueID,
+			Success: i < internal.Applied,
+		}
+		if !ar.Success {
+			errIdx := i - internal.Applied
+			if errIdx >= 0 && errIdx < len(internal.Errors) {
+				ar.Error = internal.Errors[errIdx]
+			} else {
+				ar.Error = "unknown error"
+			}
+		}
+		actions = append(actions, ar)
+	}
+
+	return ApplyResult{
+		WaveID:          internal.WaveID,
+		AppliedActions:  actions,
+		RippleEffects:   internal.Ripples,
+		NewCompleteness: wave.Delta.After,
+	}
+}
+
 // waveApplyFileName returns the output filename for a wave apply result.
 // Includes cluster name to avoid collisions when wave IDs are duplicated across clusters.
 func waveApplyFileName(wave Wave) string {

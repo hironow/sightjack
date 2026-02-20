@@ -1028,6 +1028,101 @@ func TestApplyResult_RippleEffectsOmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestToApplyResult_AllSuccess(t *testing.T) {
+	// given
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101"},
+			{Type: "add_dod", IssueID: "ENG-102"},
+		},
+		Delta: WaveDelta{Before: 0.30, After: 0.50},
+	}
+	internal := &WaveApplyResult{
+		WaveID:  "w1",
+		Applied: 2,
+		Errors:  nil,
+		Ripples: []Ripple{{ClusterName: "API", Description: "W2 unlocked"}},
+	}
+
+	// when
+	result := ToApplyResult(wave, internal)
+
+	// then
+	if result.WaveID != "w1" {
+		t.Errorf("wave_id: got %q", result.WaveID)
+	}
+	if len(result.AppliedActions) != 2 {
+		t.Fatalf("applied_actions: got %d, want 2", len(result.AppliedActions))
+	}
+	for _, a := range result.AppliedActions {
+		if !a.Success {
+			t.Errorf("expected success=true for %s", a.IssueID)
+		}
+	}
+	if len(result.RippleEffects) != 1 {
+		t.Fatalf("ripple_effects: got %d, want 1", len(result.RippleEffects))
+	}
+	if result.NewCompleteness != 0.50 {
+		t.Errorf("new_completeness: got %f, want 0.50", result.NewCompleteness)
+	}
+}
+
+func TestToApplyResult_WithErrors(t *testing.T) {
+	// given
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101"},
+			{Type: "add_dod", IssueID: "ENG-102"},
+		},
+		Delta: WaveDelta{Before: 0.30, After: 0.50},
+	}
+	internal := &WaveApplyResult{
+		WaveID:  "w1",
+		Applied: 1,
+		Errors:  []string{"permission denied on ENG-102"},
+		Ripples: nil,
+	}
+
+	// when
+	result := ToApplyResult(wave, internal)
+
+	// then
+	if len(result.AppliedActions) != 2 {
+		t.Fatalf("applied_actions: got %d, want 2", len(result.AppliedActions))
+	}
+	// First action should succeed, second should fail
+	if !result.AppliedActions[0].Success {
+		t.Error("expected first action success=true")
+	}
+	if result.AppliedActions[1].Success {
+		t.Error("expected second action success=false")
+	}
+	if result.AppliedActions[1].Error == "" {
+		t.Error("expected error message on failed action")
+	}
+}
+
+func TestToApplyResult_NoActions(t *testing.T) {
+	// given
+	wave := Wave{ID: "w1", ClusterName: "Auth", Delta: WaveDelta{After: 0.40}}
+	internal := &WaveApplyResult{WaveID: "w1", Applied: 0}
+
+	// when
+	result := ToApplyResult(wave, internal)
+
+	// then
+	if result.AppliedActions == nil {
+		t.Error("expected non-nil applied_actions (empty slice)")
+	}
+	if len(result.AppliedActions) != 0 {
+		t.Errorf("applied_actions: got %d, want 0", len(result.AppliedActions))
+	}
+}
+
 // --- Schema example file round-trip tests ---
 
 func TestSchemaExamples_RoundTrip(t *testing.T) {
