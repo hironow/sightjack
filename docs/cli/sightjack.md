@@ -7,6 +7,11 @@ SIREN-inspired issue architecture tool for Linear
 sightjack — SIREN-inspired issue architecture tool for Linear
 
 Classify, wave-plan, discuss, and apply changes to Linear issues.
+Running without a subcommand defaults to 'scan'.
+
+```
+sightjack [flags]
+```
 
 ### Options
 

@@ -199,6 +199,29 @@ func TestPersistentHooks_SpanContext(t *testing.T) {
 	}
 }
 
+func TestCobraRouting_DefaultToScan(t *testing.T) {
+	// given: run sightjack with no subcommand — should dispatch to scan
+	// scan will fail (no config), but the error should come from scan, not "no command"
+	dir := t.TempDir()
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then: should fail with config error (scan ran), not help/nil
+	if err == nil {
+		t.Fatal("expected error from default scan (no config), but got nil")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "config") {
+		t.Errorf("expected config-related error from scan dispatch, got: %v", err)
+	}
+}
+
 func TestAllCommands_HaveLongAndExample(t *testing.T) {
 	// given
 	rootCmd := NewRootCommand()

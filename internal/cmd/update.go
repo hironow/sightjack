@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/creativeprojects/go-selfupdate"
 	"github.com/spf13/cobra"
 )
@@ -38,6 +39,13 @@ installing.`,
 			}
 			if !found {
 				fmt.Fprintln(cmd.OutOrStdout(), "No release found.")
+				return nil
+			}
+
+			// Guard: version may be "dev" for local builds (non-semver).
+			// LessOrEqual calls semver.MustParse internally, which panics on invalid input.
+			if _, err := semver.NewVersion(version); err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", version, latest.Version())
 				return nil
 			}
 

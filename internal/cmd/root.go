@@ -38,7 +38,17 @@ func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "sightjack",
 		Short: "SIREN-inspired issue architecture tool for Linear",
-		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.",
+		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.",
+		// Default to scan when no subcommand is given (preserves pre-cobra behavior).
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			scanCmd, _, err := cmd.Find([]string{"scan"})
+			if err != nil {
+				return err
+			}
+			scanCmd.SetContext(cmd.Context())
+			return scanCmd.RunE(scanCmd, args)
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			sightjack.SetVerbose(verbose)
 			shutdownTracer = sightjack.InitTracer("sightjack", version)
