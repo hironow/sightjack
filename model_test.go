@@ -1103,6 +1103,78 @@ func TestToDiscussResult_NilModifiedWave(t *testing.T) {
 	}
 }
 
+func TestToDiscussResult_WithAddedActions(t *testing.T) {
+	// given: modified wave has more actions than original
+	wave := Wave{
+		ID: "w1", ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
+		},
+	}
+	modified := Wave{
+		ID: "w1", ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
+			{Type: "add_dod", IssueID: "ENG-103", Description: "new action added by architect"},
+		},
+	}
+	resp := &ArchitectResponse{
+		Analysis:     "Additional action needed",
+		Reasoning:    "Discovered missing DoD",
+		ModifiedWave: &modified,
+	}
+
+	// when
+	result := ToDiscussResult(wave, resp, "expand scope")
+
+	// then: added action should be reported as a modification
+	if len(result.Modifications) != 1 {
+		t.Fatalf("modifications: got %d, want 1 (added action)", len(result.Modifications))
+	}
+	if result.Modifications[0].ActionIndex != 1 {
+		t.Errorf("action_index: got %d, want 1", result.Modifications[0].ActionIndex)
+	}
+	if result.Modifications[0].Change == "" {
+		t.Error("expected non-empty change description for added action")
+	}
+}
+
+func TestToDiscussResult_WithRemovedActions(t *testing.T) {
+	// given: modified wave has fewer actions than original
+	wave := Wave{
+		ID: "w1", ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "keep this"},
+			{Type: "add_dod", IssueID: "ENG-102", Description: "remove this"},
+		},
+	}
+	modified := Wave{
+		ID: "w1", ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "keep this"},
+		},
+	}
+	resp := &ArchitectResponse{
+		Analysis:     "Simplified",
+		Reasoning:    "Action not needed",
+		ModifiedWave: &modified,
+	}
+
+	// when
+	result := ToDiscussResult(wave, resp, "simplify")
+
+	// then: removed action should be reported
+	if len(result.Modifications) != 1 {
+		t.Fatalf("modifications: got %d, want 1 (removed action)", len(result.Modifications))
+	}
+	if result.Modifications[0].ActionIndex != 1 {
+		t.Errorf("action_index: got %d, want 1", result.Modifications[0].ActionIndex)
+	}
+	if result.Modifications[0].Change == "" {
+		t.Error("expected non-empty change description for removed action")
+	}
+}
+
 func TestToApplyResult_AllSuccess(t *testing.T) {
 	// given
 	wave := Wave{
