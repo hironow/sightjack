@@ -59,7 +59,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|apply|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -109,6 +109,16 @@ func main() {
 		defer cancel()
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runWaves(ctx, cfg, baseDir, dryRun)
+		sightjack.EndRootSpan(ctx)
+	case "discuss":
+		cfg := loadConfigOrExit(configPath)
+		if lang != "" {
+			cfg.Lang = lang
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		ctx = sightjack.StartRootSpan(ctx, subcmd)
+		runDiscuss(ctx, cfg, baseDir, dryRun)
 		sightjack.EndRootSpan(ctx)
 	case "apply":
 		cfg := loadConfigOrExit(configPath)
@@ -227,6 +237,7 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "  scan      Classify and deep-scan Linear issues (default)\n")
 		fmt.Fprintf(out, "  waves     Generate waves from stdin ScanResult JSON\n")
 		fmt.Fprintf(out, "  select    Interactively pick a wave from stdin WavePlan\n")
+		fmt.Fprintf(out, "  discuss   Architect discussion from stdin Wave JSON\n")
 		fmt.Fprintf(out, "  apply     Apply a wave to Linear from stdin Wave JSON\n")
 		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
@@ -268,7 +279,7 @@ func configExplicitlySet(fs *flag.FlagSet) bool {
 // At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "apply": true, "show": true, "session": true, "init": true, "doctor": true}
+	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "show": true, "session": true, "init": true, "doctor": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
@@ -318,7 +329,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|apply|show|session|init|doctor] [flags] [path]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|show|session|init|doctor] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
@@ -405,6 +416,78 @@ func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun 
 	}
 
 	sightjack.LogOK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
+}
+
+func runDiscuss(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool) {
+	// Read Wave JSON from stdin.
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		sightjack.LogError("Failed to read stdin: %v", err)
+		os.Exit(1)
+	}
+	if len(data) == 0 {
+		sightjack.LogError("No input on stdin. Pipe a wave: sightjack select | sightjack discuss")
+		os.Exit(1)
+	}
+
+	var wave sightjack.Wave
+	if err := json.Unmarshal(data, &wave); err != nil {
+		sightjack.LogError("Invalid Wave JSON: %v", err)
+		os.Exit(1)
+	}
+
+	// Open /dev/tty for interactive input (stdin is consumed by pipe).
+	tty, err := os.Open("/dev/tty")
+	if err != nil {
+		sightjack.LogError("Cannot open /dev/tty: %v (not a terminal?)", err)
+		os.Exit(1)
+	}
+	defer tty.Close()
+
+	scanner := bufio.NewScanner(tty)
+
+	// Prompt for discussion topic on stderr.
+	fmt.Fprintf(os.Stderr, "\nDiscuss wave: %s - %s\n", wave.ClusterName, wave.Title)
+	fmt.Fprint(os.Stderr, "Topic (or Enter to discuss the wave as-is): ")
+	var topic string
+	if scanner.Scan() {
+		topic = strings.TrimSpace(scanner.Text())
+	}
+	if topic == "" {
+		topic = fmt.Sprintf("Review wave %s: %s", wave.ID, wave.Title)
+	}
+
+	sessionID := fmt.Sprintf("discuss-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	if err := os.MkdirAll(scanDir, 0755); err != nil {
+		sightjack.LogError("Failed to create scan dir: %v", err)
+		os.Exit(1)
+	}
+
+	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+
+	if dryRun {
+		if err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, topic, strictness); err != nil {
+			sightjack.LogError("Dry-run failed: %v", err)
+			os.Exit(1)
+		}
+		sightjack.LogOK("Dry-run complete. Check %s for generated prompt.", scanDir)
+		return
+	}
+
+	resp, err := sightjack.RunArchitectDiscuss(ctx, cfg, scanDir, wave, topic, strictness)
+	if err != nil {
+		sightjack.LogError("Discussion failed: %v", err)
+		os.Exit(1)
+	}
+
+	result := sightjack.ToDiscussResult(wave, resp, topic)
+	out, jsonErr := json.MarshalIndent(result, "", "  ")
+	if jsonErr != nil {
+		sightjack.LogError("JSON marshal failed: %v", jsonErr)
+		os.Exit(1)
+	}
+	fmt.Println(string(out))
 }
 
 func runApply(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool) {

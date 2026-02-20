@@ -1028,6 +1028,81 @@ func TestApplyResult_RippleEffectsOmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestToDiscussResult_Basic(t *testing.T) {
+	// given
+	wave := Wave{ID: "w1", ClusterName: "Auth", Title: "Setup JWT"}
+	resp := &ArchitectResponse{
+		Analysis:  "JWT has trade-offs in complexity",
+		Reasoning: "Session-based auth is simpler",
+	}
+	topic := "auth approach"
+
+	// when
+	result := ToDiscussResult(wave, resp, topic)
+
+	// then
+	if result.WaveID != "w1" {
+		t.Errorf("wave_id: got %q", result.WaveID)
+	}
+	if result.Analysis != resp.Analysis {
+		t.Errorf("analysis: got %q", result.Analysis)
+	}
+	if result.Reasoning != resp.Reasoning {
+		t.Errorf("reasoning: got %q", result.Reasoning)
+	}
+	if result.Decision != topic {
+		t.Errorf("decision: got %q, want %q", result.Decision, topic)
+	}
+}
+
+func TestToDiscussResult_WithModifiedWave(t *testing.T) {
+	// given
+	wave := Wave{
+		ID: "w1", ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
+			{Type: "add_dod", IssueID: "ENG-102", Description: "unchanged"},
+		},
+	}
+	modified := Wave{
+		ID: "w1", ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101", Description: "updated with Redis"},
+			{Type: "add_dod", IssueID: "ENG-102", Description: "unchanged"},
+		},
+	}
+	resp := &ArchitectResponse{
+		Analysis:     "Redis needed",
+		Reasoning:    "For session store",
+		ModifiedWave: &modified,
+	}
+
+	// when
+	result := ToDiscussResult(wave, resp, "session store")
+
+	// then
+	if len(result.Modifications) != 1 {
+		t.Fatalf("modifications: got %d, want 1", len(result.Modifications))
+	}
+	if result.Modifications[0].ActionIndex != 0 {
+		t.Errorf("action_index: got %d, want 0", result.Modifications[0].ActionIndex)
+	}
+}
+
+func TestToDiscussResult_NilModifiedWave(t *testing.T) {
+	// given
+	wave := Wave{ID: "w1", ClusterName: "Auth"}
+	resp := &ArchitectResponse{Analysis: "ok", Reasoning: "no changes needed"}
+
+	// when
+	result := ToDiscussResult(wave, resp, "review")
+
+	// then
+	if len(result.Modifications) != 0 {
+		t.Errorf("modifications: got %d, want 0", len(result.Modifications))
+	}
+}
+
 func TestToApplyResult_AllSuccess(t *testing.T) {
 	// given
 	wave := Wave{

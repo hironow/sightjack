@@ -11,6 +11,33 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// ToDiscussResult converts an ArchitectResponse to the pipe wire format DiscussResult.
+// It compares original and modified wave actions to build the modifications list.
+func ToDiscussResult(wave Wave, resp *ArchitectResponse, topic string) DiscussResult {
+	var mods []WaveModification
+	if resp.ModifiedWave != nil {
+		for i, orig := range wave.Actions {
+			if i < len(resp.ModifiedWave.Actions) {
+				mod := resp.ModifiedWave.Actions[i]
+				if orig.Description != mod.Description || orig.Detail != mod.Detail || orig.Type != mod.Type || orig.IssueID != mod.IssueID {
+					mods = append(mods, WaveModification{
+						ActionIndex: i,
+						Change:      fmt.Sprintf("%s → %s", orig.Description, mod.Description),
+					})
+				}
+			}
+		}
+	}
+
+	return DiscussResult{
+		WaveID:        wave.ID,
+		Analysis:      resp.Analysis,
+		Reasoning:     resp.Reasoning,
+		Decision:      topic,
+		Modifications: mods,
+	}
+}
+
 // ParseArchitectResult reads and parses an architect response JSON file.
 func ParseArchitectResult(path string) (*ArchitectResponse, error) {
 	data, err := os.ReadFile(path)
