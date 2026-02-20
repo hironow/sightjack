@@ -118,6 +118,8 @@ func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
 		completeness = wave.Delta.Before + (wave.Delta.After-wave.Delta.Before)*ratio
 	}
 
+	wave.Status = "completed"
+
 	return ApplyResult{
 		WaveID:          internal.WaveID,
 		AppliedActions:  actions,

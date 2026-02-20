@@ -1236,6 +1236,11 @@ func TestToApplyResult_EmbedCompletedWave(t *testing.T) {
 	if result.CompletedWave.ClusterContext == nil {
 		t.Error("expected CompletedWave.ClusterContext to be preserved")
 	}
+	// P2 follow-up: Status must be "completed" so NeedsMoreWaves and
+	// CompletedWavesForCluster treat it correctly in the pipe workflow.
+	if result.CompletedWave.Status != "completed" {
+		t.Errorf("CompletedWave.Status: got %q, want \"completed\"", result.CompletedWave.Status)
+	}
 }
 
 // --- Schema example file round-trip tests ---
