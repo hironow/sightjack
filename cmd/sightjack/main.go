@@ -460,43 +460,56 @@ func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryR
 		return
 	}
 
-	// Read state to reconstruct context for wave generation.
-	state, stateErr := sightjack.ReadState(baseDir)
-	if stateErr != nil {
-		sightjack.LogError("Cannot read state for nextgen context: %v\nRun 'sightjack scan' first.", stateErr)
-		os.Exit(1)
-	}
-
-	// Find the cluster matching the completed wave.
-	var cluster sightjack.ClusterScanResult
-	clusterFound := false
-	waves := sightjack.RestoreWaves(state.Waves)
+	// Resolve wave and cluster context — prefer embedded CompletedWave (pipe),
+	// fall back to .siren/state.json (interactive session).
 	var completedWave sightjack.Wave
-	for _, w := range waves {
-		if sightjack.WaveKey(w) == state.Project+":"+applyResult.WaveID || w.ID == applyResult.WaveID {
-			completedWave = w
-			for _, cs := range state.Clusters {
-				if cs.Name == w.ClusterName {
-					cluster = sightjack.ClusterScanResult{
-						Name:         cs.Name,
-						Completeness: cs.Completeness,
-						IssueCount:   cs.IssueCount,
+	var cluster sightjack.ClusterScanResult
+	var allWaves []sightjack.Wave
+
+	if applyResult.CompletedWave != nil {
+		// Pipe workflow: context carried in the ApplyResult itself.
+		completedWave = *applyResult.CompletedWave
+		if completedWave.ClusterContext != nil {
+			cluster = *completedWave.ClusterContext
+		} else {
+			cluster = sightjack.ClusterScanResult{Name: completedWave.ClusterName}
+		}
+		allWaves = []sightjack.Wave{completedWave}
+	} else {
+		// Fallback: read state (interactive session workflow).
+		state, stateErr := sightjack.ReadState(baseDir)
+		if stateErr != nil {
+			sightjack.LogError("Cannot resolve wave context: no CompletedWave in ApplyResult and no state file.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first.")
+			os.Exit(1)
+		}
+
+		allWaves = sightjack.RestoreWaves(state.Waves)
+		found := false
+		for _, w := range allWaves {
+			if sightjack.WaveKey(w) == state.Project+":"+applyResult.WaveID || w.ID == applyResult.WaveID {
+				completedWave = w
+				for _, cs := range state.Clusters {
+					if cs.Name == w.ClusterName {
+						cluster = sightjack.ClusterScanResult{
+							Name:         cs.Name,
+							Completeness: cs.Completeness,
+							IssueCount:   cs.IssueCount,
+						}
+						found = true
+						break
 					}
-					clusterFound = true
-					break
 				}
+				break
 			}
-			break
+		}
+		if !found {
+			sightjack.LogError("Could not find cluster context for wave %q in state.", applyResult.WaveID)
+			os.Exit(1)
 		}
 	}
 
-	if !clusterFound {
-		sightjack.LogError("Could not find cluster context for wave %q in state.", applyResult.WaveID)
-		os.Exit(1)
-	}
-
 	// Check if more waves are needed.
-	if !sightjack.NeedsMoreWaves(cluster, waves) {
+	if !sightjack.NeedsMoreWaves(cluster, allWaves) {
 		sightjack.LogOK("No more waves needed for %s.", cluster.Name)
 		emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
 		fmt.Println(string(emptyPlan))
@@ -512,7 +525,7 @@ func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryR
 
 	adrDir := sightjack.ADRDir(baseDir)
 	existingADRs, _ := sightjack.ReadExistingADRs(adrDir)
-	completedWaves := sightjack.CompletedWavesForCluster(waves, cluster.Name)
+	completedWaves := sightjack.CompletedWavesForCluster(allWaves, cluster.Name)
 	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 	if dryRun {

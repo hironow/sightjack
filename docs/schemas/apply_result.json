@@ -19,5 +19,28 @@
       "description": "W2 prerequisites updated"
     }
   ],
-  "new_completeness": 0.50
+  "new_completeness": 0.40,
+  "completed_wave": {
+    "id": "auth-w1",
+    "cluster_name": "Auth",
+    "title": "Dependency Ordering",
+    "description": "Order dependencies for auth issues",
+    "actions": [
+      {
+        "type": "add_dependency",
+        "issue_id": "ENG-101",
+        "description": "Add dep ENG-101 → ENG-102",
+        "detail": ""
+      },
+      {
+        "type": "add_dod",
+        "issue_id": "ENG-102",
+        "description": "Add token lifecycle DoD",
+        "detail": ""
+      }
+    ],
+    "prerequisites": [],
+    "delta": { "before": 0.30, "after": 0.50 },
+    "status": "completed"
+  }
 }

@@ -1179,6 +1179,11 @@ func TestToApplyResult_WithErrors(t *testing.T) {
 	if result.AppliedActions[1].Error == "" {
 		t.Error("expected error message on failed action")
 	}
+	// P2: partial apply should interpolate completeness, not use Delta.After
+	// 1 of 2 succeeded → Before + (After - Before) * 0.5 = 0.30 + 0.10 = 0.40
+	if result.NewCompleteness != 0.40 {
+		t.Errorf("new_completeness: got %f, want 0.40 (interpolated for partial apply)", result.NewCompleteness)
+	}
 }
 
 func TestToApplyResult_NoActions(t *testing.T) {
@@ -1195,6 +1200,41 @@ func TestToApplyResult_NoActions(t *testing.T) {
 	}
 	if len(result.AppliedActions) != 0 {
 		t.Errorf("applied_actions: got %d, want 0", len(result.AppliedActions))
+	}
+}
+
+func TestToApplyResult_EmbedCompletedWave(t *testing.T) {
+	// given: wave with cluster context
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "Auth",
+		Title:       "Dependency Ordering",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101"},
+		},
+		Delta: WaveDelta{Before: 0.30, After: 0.50},
+		ClusterContext: &ClusterScanResult{
+			Name:         "Auth",
+			Completeness: 0.30,
+		},
+	}
+	internal := &WaveApplyResult{WaveID: "w1", Applied: 1}
+
+	// when
+	result := ToApplyResult(wave, internal)
+
+	// then: completed wave should be embedded
+	if result.CompletedWave == nil {
+		t.Fatal("expected CompletedWave to be embedded in ApplyResult")
+	}
+	if result.CompletedWave.ID != "w1" {
+		t.Errorf("CompletedWave.ID: got %q, want w1", result.CompletedWave.ID)
+	}
+	if result.CompletedWave.ClusterName != "Auth" {
+		t.Errorf("CompletedWave.ClusterName: got %q, want Auth", result.CompletedWave.ClusterName)
+	}
+	if result.CompletedWave.ClusterContext == nil {
+		t.Error("expected CompletedWave.ClusterContext to be preserved")
 	}
 }
 

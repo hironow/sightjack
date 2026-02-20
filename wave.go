@@ -109,11 +109,21 @@ func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
 		actions = append(actions, ar)
 	}
 
+	// Interpolate completeness based on the ratio of successfully applied actions.
+	// All success → Delta.After, all failure → Delta.Before, partial → linear interpolation.
+	completeness := wave.Delta.After
+	total := len(wave.Actions)
+	if total > 0 && internal.Applied < total {
+		ratio := float64(internal.Applied) / float64(total)
+		completeness = wave.Delta.Before + (wave.Delta.After-wave.Delta.Before)*ratio
+	}
+
 	return ApplyResult{
 		WaveID:          internal.WaveID,
 		AppliedActions:  actions,
 		RippleEffects:   internal.Ripples,
-		NewCompleteness: wave.Delta.After,
+		NewCompleteness: completeness,
+		CompletedWave:   &wave,
 	}
 }
 
