@@ -72,6 +72,57 @@ func TestRenderInitConfig_DefaultStrictness(t *testing.T) {
 	}
 }
 
+func TestInstallSkills_CreatesFiles(t *testing.T) {
+	// given: empty temp dir as base
+	baseDir := t.TempDir()
+
+	// when
+	err := InstallSkills(baseDir)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("InstallSkills: %v", err)
+	}
+
+	// then: dmail-sendable SKILL.md exists with expected content
+	sendable, err := os.ReadFile(filepath.Join(baseDir, ".siren", "skills", "dmail-sendable", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read dmail-sendable: %v", err)
+	}
+	if !strings.Contains(string(sendable), "name: dmail-sendable") {
+		t.Errorf("dmail-sendable missing expected content, got:\n%s", sendable)
+	}
+
+	// then: dmail-readable SKILL.md exists with expected content
+	readable, err := os.ReadFile(filepath.Join(baseDir, ".siren", "skills", "dmail-readable", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read dmail-readable: %v", err)
+	}
+	if !strings.Contains(string(readable), "name: dmail-readable") {
+		t.Errorf("dmail-readable missing expected content, got:\n%s", readable)
+	}
+}
+
+func TestInstallSkills_Idempotent(t *testing.T) {
+	// given: install once
+	baseDir := t.TempDir()
+	if err := InstallSkills(baseDir); err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+
+	// when: install again
+	err := InstallSkills(baseDir)
+
+	// then: no error, files still correct
+	if err != nil {
+		t.Fatalf("second install: %v", err)
+	}
+	sendable, _ := os.ReadFile(filepath.Join(baseDir, ".siren", "skills", "dmail-sendable", "SKILL.md"))
+	if !strings.Contains(string(sendable), "name: dmail-sendable") {
+		t.Errorf("content corrupted after second install")
+	}
+}
+
 func TestRenderInitConfig_DefaultsApplied(t *testing.T) {
 	// given: rendered config with minimal values
 	output := RenderInitConfig("Team", "Project", "ja", "fog")
