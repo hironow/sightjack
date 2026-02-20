@@ -36,7 +36,10 @@ func InstallSkills(baseDir string) error {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(srcPrefix, path)
+		rel, relErr := filepath.Rel(srcPrefix, path)
+		if relErr != nil {
+			return fmt.Errorf("relative path for %s: %w", path, relErr)
+		}
 		dest := filepath.Join(destRoot, rel)
 
 		if d.IsDir() {
