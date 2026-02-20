@@ -223,3 +223,67 @@ func ReceiveDMail(baseDir, filename string) (*DMail, error) {
 	}
 	return mail, nil
 }
+
+// DMailName generates a sanitized d-mail name from a prefix and wave key.
+// Example: DMailName("spec", "auth:w1") → "spec-auth-w1"
+func DMailName(prefix, waveKey string) string {
+	var b strings.Builder
+	b.WriteString(prefix)
+	b.WriteRune('-')
+	for _, r := range strings.ToLower(waveKey) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+			b.WriteRune(r)
+		case r == ':':
+			b.WriteRune('-')
+		case r == ' ':
+			b.WriteRune('_')
+		default:
+			b.WriteRune('_')
+		}
+	}
+	return strings.TrimRight(b.String(), "_")
+}
+
+// waveIssueIDs extracts unique, sorted issue IDs from wave actions.
+func waveIssueIDs(wave Wave) []string {
+	seen := make(map[string]bool)
+	for _, a := range wave.Actions {
+		if a.IssueID != "" {
+			seen[a.IssueID] = true
+		}
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// specificationBody formats wave actions as Markdown body for a specification d-mail.
+func specificationBody(wave Wave) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", wave.Title)
+	if wave.Description != "" {
+		fmt.Fprintf(&b, "%s\n\n", wave.Description)
+	}
+	fmt.Fprintf(&b, "## Actions\n\n")
+	for _, a := range wave.Actions {
+		fmt.Fprintf(&b, "- [%s] %s: %s\n", a.Type, a.IssueID, a.Description)
+	}
+	return b.String()
+}
+
+// ComposeSpecification creates and sends a specification d-mail for an approved wave.
+func ComposeSpecification(baseDir string, wave Wave) error {
+	key := WaveKey(wave)
+	mail := &DMail{
+		Name:        DMailName("spec", key),
+		Kind:        DMailSpecification,
+		Description: wave.Title,
+		Issues:      waveIssueIDs(wave),
+		Body:        specificationBody(wave),
+	}
+	return ComposeDMail(baseDir, mail)
+}

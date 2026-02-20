@@ -375,6 +375,77 @@ func TestWatchInbox_IgnoresNonMD(t *testing.T) {
 	}
 }
 
+func TestDMailName_SanitizesWaveKey(t *testing.T) {
+	got := DMailName("spec", "auth:w1")
+	if got != "spec-auth-w1" {
+		t.Errorf("got %s, want spec-auth-w1", got)
+	}
+}
+
+func TestDMailName_HandlesSpecialChars(t *testing.T) {
+	got := DMailName("report", "My Cluster:wave-2")
+	if got != "report-my_cluster-wave-2" {
+		t.Errorf("got %s, want report-my_cluster-wave-2", got)
+	}
+}
+
+func TestComposeSpecification_CreatesFiles(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "auth",
+		Title:       "Add DoD to auth issues",
+		Description: "First wave for auth cluster",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket rate limiting"},
+			{Type: "add_dependency", IssueID: "MY-42", Description: "Depends on auth middleware"},
+			{Type: "add_dod", IssueID: "MY-43", Description: "Session management"},
+		},
+	}
+
+	err := ComposeSpecification(dir, wave)
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+
+	// outbox file exists
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "spec-auth-w1.md")
+	data, readErr := os.ReadFile(outboxPath)
+	if readErr != nil {
+		t.Fatalf("outbox file missing: %v", readErr)
+	}
+
+	// parse and verify
+	mail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse: %v", parseErr)
+	}
+	if mail.Kind != DMailSpecification {
+		t.Errorf("kind: got %s, want specification", mail.Kind)
+	}
+	if mail.Name != "spec-auth-w1" {
+		t.Errorf("name: got %s", mail.Name)
+	}
+	// issues should be unique and sorted
+	if len(mail.Issues) != 2 {
+		t.Errorf("issues count: got %d, want 2 (MY-42, MY-43)", len(mail.Issues))
+	}
+	if mail.Body == "" {
+		t.Error("body should not be empty")
+	}
+	if !strings.Contains(mail.Body, "Token bucket rate limiting") {
+		t.Error("body should contain action descriptions")
+	}
+
+	// archive file also exists
+	archivePath := filepath.Join(MailDir(dir, "archive"), "spec-auth-w1.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
+
 func TestWatchInbox_StopsOnCancel(t *testing.T) {
 	dir := t.TempDir()
 	if err := EnsureMailDirs(dir); err != nil {

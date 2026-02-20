@@ -224,6 +224,9 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 					attribute.String("wave.cluster_name", selected.ClusterName),
 				),
 			)
+			if err := ComposeSpecification(baseDir, selected); err != nil {
+				LogWarn("D-Mail specification failed (non-fatal): %v", err)
+			}
 			return selected, approvalApproved
 		case ApprovalReject:
 			delete(sessionRejected, WaveKey(selected))
@@ -293,6 +296,9 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			}
 			PropagateWaveUpdate(waves, selected)
 			sessionRejected[WaveKey(selected)] = rejected
+			if err := ComposeSpecification(baseDir, selected); err != nil {
+				LogWarn("D-Mail specification failed (non-fatal): %v", err)
+			}
 			return selected, approvalApproved
 		}
 		return selected, approvalRejected
