@@ -1,6 +1,12 @@
 package sightjack
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
 
 // DMail represents a d-mail message: YAML frontmatter + Markdown body.
 type DMail struct {
@@ -25,6 +31,48 @@ const (
 // Filename returns the canonical filename: "<name>.md".
 func (d *DMail) Filename() string {
 	return d.Name + ".md"
+}
+
+const frontmatterDelim = "---"
+
+// MarshalDMail serializes a DMail to YAML frontmatter + Markdown body.
+func MarshalDMail(mail *DMail) ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteString(frontmatterDelim + "\n")
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(mail); err != nil {
+		return nil, fmt.Errorf("dmail marshal frontmatter: %w", err)
+	}
+	enc.Close()
+	buf.WriteString(frontmatterDelim + "\n")
+	if mail.Body != "" {
+		buf.WriteString("\n")
+		buf.WriteString(mail.Body)
+	}
+	return buf.Bytes(), nil
+}
+
+// ParseDMail parses YAML frontmatter + Markdown body from bytes.
+func ParseDMail(data []byte) (*DMail, error) {
+	content := string(data)
+	if !strings.HasPrefix(content, frontmatterDelim+"\n") {
+		return nil, fmt.Errorf("dmail: missing frontmatter delimiter")
+	}
+	rest := content[len(frontmatterDelim)+1:]
+	idx := strings.Index(rest, "\n"+frontmatterDelim+"\n")
+	if idx < 0 {
+		return nil, fmt.Errorf("dmail: missing closing frontmatter delimiter")
+	}
+	yamlPart := rest[:idx]
+	bodyPart := rest[idx+len("\n"+frontmatterDelim+"\n"):]
+
+	var mail DMail
+	if err := yaml.Unmarshal([]byte(yamlPart), &mail); err != nil {
+		return nil, fmt.Errorf("dmail parse frontmatter: %w", err)
+	}
+	mail.Body = strings.TrimPrefix(bodyPart, "\n")
+	return &mail, nil
 }
 
 // ValidateDMail checks required fields and kind validity.
