@@ -486,26 +486,39 @@ func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryR
 		}
 
 		allWaves = sightjack.RestoreWaves(state.Waves)
-		found := false
+
+		// Find the completed wave by ID. Collect all candidates to detect
+		// ambiguity when the same wave ID appears in multiple clusters.
+		var candidates []sightjack.Wave
 		for _, w := range allWaves {
-			if sightjack.WaveKey(w) == state.Project+":"+applyResult.WaveID || w.ID == applyResult.WaveID {
-				completedWave = w
-				for _, cs := range state.Clusters {
-					if cs.Name == w.ClusterName {
-						cluster = sightjack.ClusterScanResult{
-							Name:         cs.Name,
-							Completeness: cs.Completeness,
-							IssueCount:   cs.IssueCount,
-						}
-						found = true
-						break
-					}
+			if w.ID == applyResult.WaveID {
+				candidates = append(candidates, w)
+			}
+		}
+		if len(candidates) == 0 {
+			sightjack.LogError("Could not find wave %q in state.", applyResult.WaveID)
+			os.Exit(1)
+		}
+		if len(candidates) > 1 {
+			sightjack.LogError("Ambiguous wave ID %q matches %d clusters. Use pipe workflow (apply | nextgen) for unambiguous resolution.", applyResult.WaveID, len(candidates))
+			os.Exit(1)
+		}
+		completedWave = candidates[0]
+
+		found := false
+		for _, cs := range state.Clusters {
+			if cs.Name == completedWave.ClusterName {
+				cluster = sightjack.ClusterScanResult{
+					Name:         cs.Name,
+					Completeness: cs.Completeness,
+					IssueCount:   cs.IssueCount,
 				}
+				found = true
 				break
 			}
 		}
 		if !found {
-			sightjack.LogError("Could not find cluster context for wave %q in state.", applyResult.WaveID)
+			sightjack.LogError("Could not find cluster %q for wave %q in state.", completedWave.ClusterName, applyResult.WaveID)
 			os.Exit(1)
 		}
 	}
@@ -862,7 +875,11 @@ func runShowFromStdin() {
 		os.Exit(1)
 	}
 
-	// Try ScanResult first, then WavePlan.
+	// Discriminate JSON type by attempting ScanResult first (has "clusters"),
+	// then WavePlan (has "waves"). The len() checks act as discriminators:
+	// Go's json.Unmarshal ignores unknown fields, so a WavePlan JSON could
+	// unmarshal into ScanResult with zero Clusters — the len check prevents
+	// this false positive.
 	var scanResult sightjack.ScanResult
 	if err := json.Unmarshal(data, &scanResult); err == nil && len(scanResult.Clusters) > 0 {
 		nav := sightjack.RenderNavigator(&scanResult, "")
@@ -885,7 +902,7 @@ func runShowFromStdin() {
 		return
 	}
 
-	sightjack.LogError("Could not parse stdin as ScanResult or WavePlan.")
+	sightjack.LogError("Could not parse stdin: expected ScanResult (with clusters) or WavePlan (with waves), got neither.")
 	os.Exit(1)
 }
 
