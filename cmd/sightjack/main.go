@@ -474,6 +474,9 @@ func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryR
 		} else {
 			cluster = sightjack.ClusterScanResult{Name: completedWave.ClusterName}
 		}
+		// Update cluster completeness to post-apply value so NeedsMoreWaves
+		// and the nextgen prompt use current data, not stale pre-apply context.
+		cluster.Completeness = applyResult.NewCompleteness
 		// Include remaining sibling waves so NeedsMoreWaves can accurately
 		// detect whether available/locked waves still exist in the plan.
 		allWaves = append([]sightjack.Wave{completedWave}, applyResult.RemainingWaves...)
