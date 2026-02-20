@@ -69,7 +69,6 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// --- Pass 1: Classify ---
 	LogScan("Pass 1: Classifying issues...")
 	classifyCtx, classifySpan := tracer.Start(ctx, "classify")
-	defer classifySpan.End()
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
 	classifyPrompt, err := RenderClassifyPrompt(cfg.Lang, ClassifyPromptData{
@@ -82,10 +81,12 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		LabelPrefix:     cfg.Labels.Prefix,
 	})
 	if err != nil {
+		classifySpan.End()
 		return nil, fmt.Errorf("render classify prompt: %w", err)
 	}
 
 	if dryRun {
+		classifySpan.End()
 		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify")
 	}
 
@@ -93,19 +94,23 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
 	if cfg.Labels.Enabled {
 		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, os.Stdout); err != nil {
+			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
 		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, os.Stdout); err != nil {
+			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	}
 
 	classify, err := ParseClassifyResult(classifyOutput)
 	if err != nil {
+		classifySpan.End()
 		return nil, err
 	}
 	LogOK("Found %d clusters with %d total issues", len(classify.Clusters), classify.TotalIssues)
+	classifySpan.End()
 
 	scanSpan.SetAttributes(
 		attribute.Int("scan.cluster_count", len(classify.Clusters)),
