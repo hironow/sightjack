@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,9 @@ import (
 // the given number of days. Only .md files are considered.
 // Returns an empty slice (not error) when the archive directory does not exist.
 func ListExpiredArchive(baseDir string, days int) ([]string, error) {
+	if days < 0 {
+		return nil, fmt.Errorf("days must be non-negative, got %d", days)
+	}
 	dir := MailDir(baseDir, archiveDir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {

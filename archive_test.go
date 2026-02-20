@@ -167,6 +167,35 @@ func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 	}
 }
 
+func TestListExpiredArchive_NegativeDaysReturnsError(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+
+	// when
+	_, err := ListExpiredArchive(baseDir, -1)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for negative days")
+	}
+	if err.Error() != "days must be non-negative, got -1" {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestPruneArchive_NegativeDaysReturnsError(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+
+	// when
+	_, err := PruneArchive(baseDir, -1)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for negative days")
+	}
+}
+
 func TestPruneArchive_NoDirReturnsEmpty(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
