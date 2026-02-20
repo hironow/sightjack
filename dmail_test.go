@@ -529,6 +529,142 @@ func TestComposeReport_NoRipples(t *testing.T) {
 	}
 }
 
+func TestProcessInbox_ReceivesFeedback(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// Place a feedback d-mail in inbox
+	fb := &DMail{
+		Name:        "feedback-d-001",
+		Kind:        DMailFeedback,
+		Description: "Architecture drift detected",
+		Severity:    "high",
+		Body:        "# Feedback\n\nDrift in auth module.\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+
+	// Process inbox
+	received, err := ProcessInbox(dir)
+	if err != nil {
+		t.Fatalf("ProcessInbox: %v", err)
+	}
+	if len(received) != 1 {
+		t.Fatalf("expected 1 feedback, got %d", len(received))
+	}
+	if received[0].Name != "feedback-d-001" {
+		t.Errorf("name: got %s", received[0].Name)
+	}
+	if received[0].Severity != "high" {
+		t.Errorf("severity: got %s", received[0].Severity)
+	}
+
+	// inbox should be empty
+	files, _ := ListDMail(dir, "inbox")
+	if len(files) != 0 {
+		t.Errorf("inbox not empty after processing: %d files", len(files))
+	}
+
+	// archive should have the file
+	archivePath := filepath.Join(MailDir(dir, "archive"), fb.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
+
+func TestProcessInbox_SkipsNonFeedback(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// Place a specification d-mail in inbox (wrong kind for sightjack consumer)
+	spec := &DMail{
+		Name:        "spec-my-42",
+		Kind:        DMailSpecification,
+		Description: "Spec for MY-42",
+		Body:        "# Spec\n",
+	}
+	data, _ := MarshalDMail(spec)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), spec.Filename()), data, 0644)
+
+	received, err := ProcessInbox(dir)
+	if err != nil {
+		t.Fatalf("ProcessInbox: %v", err)
+	}
+	// Non-feedback should be received but filtered out from return
+	if len(received) != 0 {
+		t.Errorf("expected 0 feedback, got %d", len(received))
+	}
+}
+
+func TestProcessInbox_DedupSkipsAlreadyArchived(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// Place feedback in both inbox and archive (already processed)
+	fb := &DMail{
+		Name:        "feedback-d-002",
+		Kind:        DMailFeedback,
+		Description: "Duplicate feedback",
+		Body:        "# Already processed\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(MailDir(dir, "archive"), fb.Filename()), data, 0644)
+
+	received, err := ProcessInbox(dir)
+	if err != nil {
+		t.Fatalf("ProcessInbox: %v", err)
+	}
+	// Should be skipped (dedup)
+	if len(received) != 0 {
+		t.Errorf("expected 0 (dedup), got %d", len(received))
+	}
+
+	// inbox file should be removed (cleanup)
+	files, _ := ListDMail(dir, "inbox")
+	if len(files) != 0 {
+		t.Errorf("inbox should be cleaned up after dedup: %d files", len(files))
+	}
+}
+
+func TestDisplayInboxFeedback_NoError(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// Place feedback in inbox
+	fb := &DMail{
+		Name:        "feedback-d-010",
+		Kind:        DMailFeedback,
+		Description: "Test feedback",
+		Severity:    "high",
+		Body:        "# Test\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+
+	// Should not panic or error
+	DisplayInboxFeedback(dir)
+
+	// inbox should be empty after processing
+	files, _ := ListDMail(dir, "inbox")
+	if len(files) != 0 {
+		t.Errorf("inbox not empty: %d files", len(files))
+	}
+}
+
+func TestProcessInbox_EmptyInbox(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	received, err := ProcessInbox(dir)
+	if err != nil {
+		t.Fatalf("ProcessInbox: %v", err)
+	}
+	if len(received) != 0 {
+		t.Errorf("expected 0, got %d", len(received))
+	}
+}
+
 func TestWatchInbox_StopsOnCancel(t *testing.T) {
 	dir := t.TempDir()
 	if err := EnsureMailDirs(dir); err != nil {

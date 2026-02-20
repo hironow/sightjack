@@ -203,6 +203,58 @@ func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
 	return ch, nil
 }
 
+// ProcessInbox scans inbox/ for d-mails, processes them (archive + remove from inbox),
+// and returns only feedback d-mails. Non-feedback mails are archived but not returned.
+// Already-archived files are skipped (consumer-side dedup per MY-271).
+func ProcessInbox(baseDir string) ([]*DMail, error) {
+	files, err := ListDMail(baseDir, inboxDir)
+	if err != nil {
+		return nil, err
+	}
+	var feedback []*DMail
+	for _, filename := range files {
+		// Consumer-side dedup: skip if already in archive
+		archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
+		if _, statErr := os.Stat(archivePath); statErr == nil {
+			// Already processed — just remove from inbox
+			os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename))
+			continue
+		}
+
+		mail, recvErr := ReceiveDMail(baseDir, filename)
+		if recvErr != nil {
+			LogWarn("Failed to receive d-mail %s: %v", filename, recvErr)
+			continue
+		}
+		if mail.Kind == DMailFeedback {
+			feedback = append(feedback, mail)
+		}
+	}
+	return feedback, nil
+}
+
+// DisplayInboxFeedback processes inbox d-mails and displays feedback to the CLI.
+// Non-fatal: errors are logged as warnings.
+func DisplayInboxFeedback(baseDir string) {
+	feedback, err := ProcessInbox(baseDir)
+	if err != nil {
+		LogWarn("D-Mail inbox scan failed: %v", err)
+		return
+	}
+	if len(feedback) == 0 {
+		return
+	}
+	LogInfo("Received %d feedback d-mail(s):", len(feedback))
+	for _, fb := range feedback {
+		switch fb.Severity {
+		case "high":
+			LogWarn("[%s] %s (severity: HIGH)", fb.Name, fb.Description)
+		default:
+			LogInfo("[%s] %s", fb.Name, fb.Description)
+		}
+	}
+}
+
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.
 func ReceiveDMail(baseDir, filename string) (*DMail, error) {
 	inboxPath := filepath.Join(MailDir(baseDir, inboxDir), filename)

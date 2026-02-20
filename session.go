@@ -45,6 +45,11 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
+	// Process incoming d-mails (one-shot scan)
+	if !dryRun {
+		DisplayInboxFeedback(baseDir)
+	}
+
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
@@ -579,6 +584,9 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
+	// Process incoming d-mails (one-shot scan)
+	DisplayInboxFeedback(baseDir)
+
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
 		return fmt.Errorf("resume: %w", err)
@@ -605,6 +613,9 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if err := EnsureMailDirs(baseDir); err != nil {
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
+
+	// Process incoming d-mails (one-shot scan)
+	DisplayInboxFeedback(baseDir)
 
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
