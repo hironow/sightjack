@@ -801,7 +801,57 @@ func runWaves(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun
 	fmt.Println(string(out))
 }
 
+func stdinIsPipe() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice == 0
+}
+
 func runShow(baseDir string) {
+	if stdinIsPipe() {
+		runShowFromStdin()
+		return
+	}
+	runShowFromState(baseDir)
+}
+
+func runShowFromStdin() {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		sightjack.LogError("Failed to read stdin: %v", err)
+		os.Exit(1)
+	}
+
+	// Try ScanResult first, then WavePlan.
+	var scanResult sightjack.ScanResult
+	if err := json.Unmarshal(data, &scanResult); err == nil && len(scanResult.Clusters) > 0 {
+		nav := sightjack.RenderNavigator(&scanResult, "")
+		fmt.Println()
+		fmt.Print(nav)
+		return
+	}
+
+	var plan sightjack.WavePlan
+	if err := json.Unmarshal(data, &plan); err == nil && len(plan.Waves) > 0 {
+		var result *sightjack.ScanResult
+		if plan.ScanResult != nil {
+			result = plan.ScanResult
+		} else {
+			result = &sightjack.ScanResult{}
+		}
+		nav := sightjack.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
+		fmt.Println()
+		fmt.Print(nav)
+		return
+	}
+
+	sightjack.LogError("Could not parse stdin as ScanResult or WavePlan.")
+	os.Exit(1)
+}
+
+func runShowFromState(baseDir string) {
 	state, err := sightjack.ReadState(baseDir)
 	if err != nil {
 		sightjack.LogError("No previous scan found: %v", err)
