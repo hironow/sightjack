@@ -687,9 +687,20 @@ func TestDrainInboxFeedback_NilChannel(t *testing.T) {
 	}
 }
 
-func TestLogInboxFeedbackAsync_ConsumesLateArrivals(t *testing.T) {
+func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
+
+	// Pre-place feedback in inbox (initial)
+	initialFb := &DMail{
+		Name:        "fb-init-001",
+		Kind:        DMailFeedback,
+		Description: "Initial feedback",
+		Severity:    "high",
+		Body:        "Initial body.",
+	}
+	data, _ := MarshalDMail(initialFb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), initialFb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -699,33 +710,101 @@ func TestLogInboxFeedbackAsync_ConsumesLateArrivals(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// Drain initial (empty)
-	DrainInboxFeedback(ch)
+	// Drain initial feedback
+	initial := DrainInboxFeedback(ch)
 
-	// Start background consumer
-	LogInboxFeedbackAsync(ch)
+	// Start collector with initial feedback
+	collector := CollectFeedback(initial, ch)
+
+	// All() should return initial feedback
+	all := collector.All()
+	if len(all) != 1 {
+		t.Fatalf("expected 1 initial item, got %d", len(all))
+	}
+	if all[0].Name != "fb-init-001" {
+		t.Errorf("expected fb-init-001, got %q", all[0].Name)
+	}
 
 	// Wait for watcher to be ready
 	time.Sleep(50 * time.Millisecond)
 
-	// Write feedback AFTER drain
-	fb := &DMail{
-		Name:        "feedback-late-001",
+	// Write late-arriving feedback
+	lateFb := &DMail{
+		Name:        "fb-late-001",
 		Kind:        DMailFeedback,
 		Description: "Late feedback",
 		Severity:    "high",
-		Body:        "# Late\n",
+		Body:        "Late body.",
 	}
-	data, _ := MarshalDMail(fb)
-	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	lateData, _ := MarshalDMail(lateFb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), lateFb.Filename()), lateData, 0644)
 
-	// Wait for background processing
+	// Wait for fsnotify + background goroutine
 	time.Sleep(500 * time.Millisecond)
 
-	// Verify: file should be archived (consumed by background goroutine)
-	archivePath := filepath.Join(MailDir(dir, "archive"), fb.Filename())
+	// All() should now return both initial AND late feedback
+	all = collector.All()
+	if len(all) != 2 {
+		t.Fatalf("expected 2 items (initial + late), got %d", len(all))
+	}
+
+	// Verify late feedback was archived
+	archivePath := filepath.Join(MailDir(dir, "archive"), lateFb.Filename())
 	if _, err := os.Stat(archivePath); err != nil {
-		t.Errorf("late feedback not archived (background consumer didn't process): %v", err)
+		t.Errorf("late feedback not archived: %v", err)
+	}
+}
+
+func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
+	// given: collector with items
+	initial := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "Item 1"},
+		{Name: "fb-002", Kind: DMailFeedback, Description: "Item 2"},
+	}
+	collector := CollectFeedback(initial, nil)
+
+	// when: call All() multiple times
+	first := collector.All()
+	second := collector.All()
+
+	// then: same data each time (non-destructive)
+	if len(first) != 2 {
+		t.Fatalf("first All(): expected 2, got %d", len(first))
+	}
+	if len(second) != 2 {
+		t.Fatalf("second All(): expected 2, got %d", len(second))
+	}
+}
+
+func TestFeedbackCollector_NilChannel(t *testing.T) {
+	// given: nil channel
+	collector := CollectFeedback(nil, nil)
+
+	// then: All() returns nil
+	if all := collector.All(); all != nil {
+		t.Errorf("expected nil for nil initial + nil channel, got %d items", len(all))
+	}
+}
+
+func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
+	// given: nil initial but channel that will receive items
+	ch := make(chan *DMail, 1)
+	collector := CollectFeedback(nil, ch)
+
+	// when: send one item
+	ch <- &DMail{Name: "fb-late", Kind: DMailFeedback, Description: "Late only"}
+	close(ch)
+
+	// Wait for goroutine
+	time.Sleep(50 * time.Millisecond)
+
+	// then: All() returns the late item
+	all := collector.All()
+	if len(all) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(all))
+	}
+	if all[0].Name != "fb-late" {
+		t.Errorf("expected fb-late, got %q", all[0].Name)
 	}
 }
 
@@ -784,11 +863,6 @@ func TestFormatFeedbackForPrompt_NoBody(t *testing.T) {
 	if !strings.Contains(got, "No body feedback") {
 		t.Error("expected description even without body")
 	}
-}
-
-func TestLogInboxFeedbackAsync_NilChannel(t *testing.T) {
-	// Should not panic
-	LogInboxFeedbackAsync(nil)
 }
 
 // --- Receiving test group ---

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
@@ -311,23 +312,53 @@ func FormatFeedbackForPrompt(feedback []*DMail) string {
 	return b.String()
 }
 
-// LogInboxFeedbackAsync starts a background goroutine that displays
-// feedback d-mails as they arrive on the monitor channel.
-// Safe to call with a nil channel (no-op).
-func LogInboxFeedbackAsync(ch <-chan *DMail) {
-	if ch == nil {
-		return
+// feedbackCollector accumulates feedback d-mails from both the initial
+// drain and late-arriving items on the monitor channel. It replaces
+// LogInboxFeedbackAsync by both displaying AND storing late arrivals,
+// so they can be included in nextgen prompts.
+type feedbackCollector struct {
+	mu    sync.Mutex
+	items []*DMail
+}
+
+// CollectFeedback creates a feedbackCollector seeded with initial feedback
+// and starts a background goroutine to accumulate late-arriving items
+// from the channel. Safe to call with nil initial and/or nil channel.
+func CollectFeedback(initial []*DMail, ch <-chan *DMail) *feedbackCollector {
+	c := &feedbackCollector{}
+	if len(initial) > 0 {
+		c.items = make([]*DMail, len(initial))
+		copy(c.items, initial)
 	}
-	go func() {
-		for mail := range ch {
-			switch mail.Severity {
-			case "high":
-				LogWarn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
-			default:
-				LogInfo("[D-Mail] [%s] %s", mail.Name, mail.Description)
+	if ch != nil {
+		go func() {
+			for mail := range ch {
+				c.mu.Lock()
+				c.items = append(c.items, mail)
+				c.mu.Unlock()
+				switch mail.Severity {
+				case "high":
+					LogWarn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
+				default:
+					LogInfo("[D-Mail] [%s] %s", mail.Name, mail.Description)
+				}
 			}
-		}
-	}()
+		}()
+	}
+	return c
+}
+
+// All returns a copy of all accumulated feedback (initial + late arrivals).
+// Non-destructive: repeated calls return the same data plus any new arrivals.
+func (c *feedbackCollector) All() []*DMail {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.items) == 0 {
+		return nil
+	}
+	cp := make([]*DMail, len(c.items))
+	copy(cp, c.items)
+	return cp
 }
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.

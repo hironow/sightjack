@@ -93,7 +93,8 @@ All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent p
      |                      | MonitorInbox() [fsnotify]    |
      |                      | receiveDMailIfNew()          |
      |                      | -> DrainInboxFeedback()      |
-     |                      | -> LogInboxFeedbackAsync()   |
+     |                      | -> CollectFeedback()         |
+     |                      |    (accumulates for nextgen) |
      |                      |                              |
      |                      | (wave approved)              |
      |                      |   ComposeSpecification()     |
