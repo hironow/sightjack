@@ -671,16 +671,19 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	count := DrainInboxFeedback(ch)
-	if count != 1 {
-		t.Errorf("expected 1 drained, got %d", count)
+	feedback := DrainInboxFeedback(ch)
+	if len(feedback) != 1 {
+		t.Errorf("expected 1 drained, got %d", len(feedback))
+	}
+	if feedback[0].Name != "feedback-drain-001" {
+		t.Errorf("name: got %s, want feedback-drain-001", feedback[0].Name)
 	}
 }
 
 func TestDrainInboxFeedback_NilChannel(t *testing.T) {
-	count := DrainInboxFeedback(nil)
-	if count != 0 {
-		t.Errorf("expected 0 for nil channel, got %d", count)
+	feedback := DrainInboxFeedback(nil)
+	if feedback != nil {
+		t.Errorf("expected nil for nil channel, got %d items", len(feedback))
 	}
 }
 
@@ -723,6 +726,63 @@ func TestLogInboxFeedbackAsync_ConsumesLateArrivals(t *testing.T) {
 	archivePath := filepath.Join(MailDir(dir, "archive"), fb.Filename())
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("late feedback not archived (background consumer didn't process): %v", err)
+	}
+}
+
+func TestFormatFeedbackForPrompt_Empty(t *testing.T) {
+	got := FormatFeedbackForPrompt(nil)
+	if got != "" {
+		t.Errorf("expected empty string for nil, got %q", got)
+	}
+	got = FormatFeedbackForPrompt([]*DMail{})
+	if got != "" {
+		t.Errorf("expected empty string for empty slice, got %q", got)
+	}
+}
+
+func TestFormatFeedbackForPrompt_Single(t *testing.T) {
+	feedback := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "Architecture drift", Severity: "high", Body: "Auth module drift detected."},
+	}
+	got := FormatFeedbackForPrompt(feedback)
+	if !strings.Contains(got, "### [HIGH]") {
+		t.Error("expected HIGH severity header")
+	}
+	if !strings.Contains(got, "fb-001") {
+		t.Error("expected feedback name")
+	}
+	if !strings.Contains(got, "Architecture drift") {
+		t.Error("expected description")
+	}
+	if !strings.Contains(got, "Auth module drift detected.") {
+		t.Error("expected body content")
+	}
+}
+
+func TestFormatFeedbackForPrompt_Multiple(t *testing.T) {
+	feedback := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "High severity item", Severity: "high", Body: "Details here."},
+		{Name: "fb-002", Kind: DMailFeedback, Description: "Normal item", Severity: "", Body: "Normal details."},
+	}
+	got := FormatFeedbackForPrompt(feedback)
+	if !strings.Contains(got, "### [HIGH]") {
+		t.Error("expected HIGH header for first item")
+	}
+	if !strings.Contains(got, "### fb-002") {
+		t.Error("expected normal header for second item")
+	}
+	if !strings.Contains(got, "Normal details.") {
+		t.Error("expected second body")
+	}
+}
+
+func TestFormatFeedbackForPrompt_NoBody(t *testing.T) {
+	feedback := []*DMail{
+		{Name: "fb-003", Kind: DMailFeedback, Description: "No body feedback", Severity: "high"},
+	}
+	got := FormatFeedbackForPrompt(feedback)
+	if !strings.Contains(got, "No body feedback") {
+		t.Error("expected description even without body")
 	}
 }
 

@@ -114,7 +114,7 @@ func TestBuildNextGenPrompt_WithDoDTemplates(t *testing.T) {
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog")
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
 
 	// then
 	if err != nil {
@@ -146,7 +146,7 @@ func TestBuildNextGenPrompt_WithRejectedActions(t *testing.T) {
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected, "fog")
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected, "fog", nil)
 
 	// then
 	if err != nil {
@@ -175,7 +175,7 @@ func TestBuildNextGenPrompt_NilOptionals(t *testing.T) {
 	}
 
 	// when: nil DoD, nil ADRs, nil rejected, nil completedWaves
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog")
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
 
 	// then: should not panic and should produce valid prompt
 	if err != nil {
@@ -207,7 +207,7 @@ func TestBuildNextGenPrompt_WithExistingADRs(t *testing.T) {
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil, "fog")
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil, "fog", nil)
 
 	// then
 	if err != nil {
@@ -218,6 +218,70 @@ func TestBuildNextGenPrompt_WithExistingADRs(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "JWT for auth tokens") {
 		t.Error("expected ADR content in prompt")
+	}
+}
+
+func TestBuildNextGenPrompt_WithFeedback(t *testing.T) {
+	// given: feedback d-mails
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := DefaultConfig()
+	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.65,
+		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+	}
+	feedback := []*DMail{
+		{Name: "fb-arch-001", Kind: DMailFeedback, Description: "Architecture drift in auth module", Severity: "high", Body: "Token rotation not aligned with JWT spec."},
+	}
+
+	// when
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", feedback)
+
+	// then
+	if err != nil {
+		t.Fatalf("buildNextGenPrompt: %v", err)
+	}
+	if !strings.Contains(prompt, "fb-arch-001") {
+		t.Error("expected feedback name in prompt")
+	}
+	if !strings.Contains(prompt, "Architecture drift in auth module") {
+		t.Error("expected feedback description in prompt")
+	}
+	if !strings.Contains(prompt, "[HIGH]") {
+		t.Error("expected HIGH severity marker in prompt")
+	}
+	if !strings.Contains(prompt, "Token rotation not aligned with JWT spec.") {
+		t.Error("expected feedback body in prompt")
+	}
+}
+
+func TestBuildNextGenPrompt_NilFeedback(t *testing.T) {
+	// given: no feedback
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := DefaultConfig()
+	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.5,
+		Issues:       []IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+	}
+
+	// when
+	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("buildNextGenPrompt: %v", err)
+	}
+	if strings.Contains(prompt, "受信フィードバック") || strings.Contains(prompt, "Received Feedback") {
+		t.Error("feedback section should be omitted when nil")
 	}
 }
 
@@ -340,7 +404,7 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 	}
 	completedWaves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
 
-	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog")
+	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil)
 	if err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}

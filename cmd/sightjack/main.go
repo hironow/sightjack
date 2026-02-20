@@ -547,7 +547,7 @@ func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryR
 	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 	if dryRun {
-		if err := sightjack.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness); err != nil {
+		if err := sightjack.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil); err != nil {
 			sightjack.LogError("Dry-run failed: %v", err)
 			os.Exit(1)
 		}
@@ -555,7 +555,7 @@ func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryR
 		return
 	}
 
-	newWaves, err := sightjack.GenerateNextWaves(ctx, cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness)
+	newWaves, err := sightjack.GenerateNextWaves(ctx, cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil)
 	if err != nil {
 		sightjack.LogError("Nextgen failed: %v", err)
 		os.Exit(1)

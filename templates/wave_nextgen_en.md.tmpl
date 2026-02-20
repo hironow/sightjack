@@ -29,6 +29,12 @@ A wave has just been completed in this cluster. Generate the NEXT wave(s) based 
 The user rejected these actions in a previous wave. Do NOT re-propose the same actions.
 {{.RejectedActions}}
 {{- end}}
+{{- if .FeedbackSection}}
+
+## Received Feedback
+The following feedback was received from collaborating agents. Incorporate these observations into your wave proposals where relevant.
+{{.FeedbackSection}}
+{{- end}}
 
 ## Generation Guidelines
 - Generate 0-2 new waves based on remaining gaps

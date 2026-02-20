@@ -255,10 +255,10 @@ func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 }
 
 // DrainInboxFeedback reads all currently buffered feedback from the monitor channel
-// and displays them to the CLI. Returns the number of feedback messages displayed.
-func DrainInboxFeedback(ch <-chan *DMail) int {
+// and displays them to the CLI. Returns the drained feedback messages for downstream use.
+func DrainInboxFeedback(ch <-chan *DMail) []*DMail {
 	if ch == nil {
-		return 0
+		return nil
 	}
 	var feedback []*DMail
 loop:
@@ -274,7 +274,7 @@ loop:
 		}
 	}
 	if len(feedback) == 0 {
-		return 0
+		return nil
 	}
 	LogInfo("Received %d feedback d-mail(s):", len(feedback))
 	for _, fb := range feedback {
@@ -285,7 +285,30 @@ loop:
 			LogInfo("[%s] %s", fb.Name, fb.Description)
 		}
 	}
-	return len(feedback)
+	return feedback
+}
+
+// FormatFeedbackForPrompt formats feedback d-mails as a Markdown section
+// suitable for injection into wave generation prompts. HIGH severity items
+// are emphasized with a ### [HIGH] header. Returns "" for nil or empty input.
+func FormatFeedbackForPrompt(feedback []*DMail) string {
+	if len(feedback) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, fb := range feedback {
+		if fb.Severity == "high" {
+			fmt.Fprintf(&b, "### [HIGH] %s\n", fb.Name)
+		} else {
+			fmt.Fprintf(&b, "### %s\n", fb.Name)
+		}
+		fmt.Fprintf(&b, "%s\n", fb.Description)
+		if fb.Body != "" {
+			fmt.Fprintf(&b, "\n%s\n", fb.Body)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 // LogInboxFeedbackAsync starts a background goroutine that displays
