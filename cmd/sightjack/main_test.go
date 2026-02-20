@@ -25,7 +25,7 @@ func TestUsageOutput_ContainsSubcommands(t *testing.T) {
 
 	// then: output contains all subcommands
 	output := buf.String()
-	for _, cmd := range []string{"scan", "session", "show", "init", "doctor"} {
+	for _, cmd := range []string{"scan", "waves", "session", "show", "init", "doctor"} {
 		if !strings.Contains(output, cmd) {
 			t.Errorf("expected usage output to contain %q, got:\n%s", cmd, output)
 		}
@@ -213,6 +213,24 @@ func TestExtractSubcommand(t *testing.T) {
 			args:      []string{"--json", "true", "scan"},
 			wantCmd:   "scan",
 			wantFlags: []string{"--json=true"},
+		},
+		// --- waves subcommand cases ---
+		{
+			name:    "waves subcommand",
+			args:    []string{"waves"},
+			wantCmd: "waves",
+		},
+		{
+			name:      "waves with verbose",
+			args:      []string{"--verbose", "waves"},
+			wantCmd:   "waves",
+			wantFlags: []string{"--verbose"},
+		},
+		{
+			name:      "waves with config",
+			args:      []string{"-c", "custom.yaml", "waves"},
+			wantCmd:   "waves",
+			wantFlags: []string{"-c", "custom.yaml"},
 		},
 	}
 

@@ -59,7 +59,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -99,6 +99,16 @@ func main() {
 		defer cancel()
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runScan(ctx, cfg, baseDir, dryRun, jsonOutput)
+		sightjack.EndRootSpan(ctx)
+	case "waves":
+		cfg := loadConfigOrExit(configPath)
+		if lang != "" {
+			cfg.Lang = lang
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		ctx = sightjack.StartRootSpan(ctx, subcmd)
+		runWaves(ctx, cfg, baseDir, dryRun)
 		sightjack.EndRootSpan(ctx)
 	case "session":
 		cfg := loadConfigOrExit(configPath)
@@ -199,6 +209,7 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "Usage: sightjack [command] [flags] [path]\n\n")
 		fmt.Fprintf(out, "Commands:\n")
 		fmt.Fprintf(out, "  scan      Classify and deep-scan Linear issues (default)\n")
+		fmt.Fprintf(out, "  waves     Generate waves from stdin ScanResult JSON\n")
 		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
 		fmt.Fprintf(out, "  init      Create .siren/config.yaml interactively\n")
@@ -239,7 +250,7 @@ func configExplicitlySet(fs *flag.FlagSet) bool {
 // At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "show": true, "session": true, "init": true, "doctor": true}
+	knownCmds := map[string]bool{"scan": true, "waves": true, "show": true, "session": true, "init": true, "doctor": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
@@ -289,7 +300,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|show|session|init|doctor] [flags] [path]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|show|session|init|doctor] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
@@ -376,6 +387,54 @@ func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun 
 	}
 
 	sightjack.LogOK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
+}
+
+func runWaves(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool) {
+	// Read ScanResult JSON from stdin.
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		sightjack.LogError("Failed to read stdin: %v", err)
+		os.Exit(1)
+	}
+	if len(data) == 0 {
+		sightjack.LogError("No input on stdin. Pipe scan result: sightjack scan --json | sightjack waves")
+		os.Exit(1)
+	}
+
+	var scanResult sightjack.ScanResult
+	if err := json.Unmarshal(data, &scanResult); err != nil {
+		sightjack.LogError("Invalid ScanResult JSON: %v", err)
+		os.Exit(1)
+	}
+
+	sessionID := fmt.Sprintf("waves-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	if err := os.MkdirAll(scanDir, 0755); err != nil {
+		sightjack.LogError("Failed to create scan dir: %v", err)
+		os.Exit(1)
+	}
+
+	waves, err := sightjack.RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, dryRun)
+	if err != nil {
+		sightjack.LogError("Wave generation failed: %v", err)
+		os.Exit(1)
+	}
+
+	if dryRun {
+		sightjack.LogOK("Dry-run complete. Check %s for generated prompts.", scanDir)
+		return
+	}
+
+	plan := sightjack.WavePlan{
+		Waves:      waves,
+		ScanResult: &scanResult,
+	}
+	out, jsonErr := json.MarshalIndent(plan, "", "  ")
+	if jsonErr != nil {
+		sightjack.LogError("JSON marshal failed: %v", jsonErr)
+		os.Exit(1)
+	}
+	fmt.Println(string(out))
 }
 
 func runShow(baseDir string) {
