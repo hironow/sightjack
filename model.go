@@ -60,13 +60,14 @@ type ShibitoWarning struct {
 }
 
 // ScanResult is the merged result of Pass 1 + Pass 2.
+// Wire format: output of `scan --json`.
 type ScanResult struct {
-	Clusters        []ClusterScanResult
-	TotalIssues     int
-	Completeness    float64
-	Observations    []string
-	ShibitoWarnings []ShibitoWarning `json:"shibito_warnings,omitempty"`
-	ScanWarnings    []string         `json:"scan_warnings,omitempty"`
+	Clusters        []ClusterScanResult `json:"clusters"`
+	TotalIssues     int                 `json:"total_issues"`
+	Completeness    float64             `json:"completeness"`
+	Observations    []string            `json:"observations"`
+	ShibitoWarnings []ShibitoWarning    `json:"shibito_warnings,omitempty"`
+	ScanWarnings    []string            `json:"scan_warnings,omitempty"`
 }
 
 // ClusterLabels returns the labels for a named cluster, or nil if not found.
@@ -136,15 +137,17 @@ type WaveState struct {
 }
 
 // Wave is a unit of work proposed by AI for a cluster.
+// Wire format: input to `discuss` and `apply` subcommands.
 type Wave struct {
-	ID            string       `json:"id"`
-	ClusterName   string       `json:"cluster_name"`
-	Title         string       `json:"title"`
-	Description   string       `json:"description"`
-	Actions       []WaveAction `json:"actions"`
-	Prerequisites []string     `json:"prerequisites"`
-	Delta         WaveDelta    `json:"delta"`
-	Status        string       `json:"status"`
+	ID             string             `json:"id"`
+	ClusterName    string             `json:"cluster_name"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	Actions        []WaveAction       `json:"actions"`
+	Prerequisites  []string           `json:"prerequisites"`
+	Delta          WaveDelta          `json:"delta"`
+	Status         string             `json:"status"`
+	ClusterContext *ClusterScanResult `json:"cluster_context,omitempty"`
 }
 
 // WaveAction is a single change proposed within a Wave.
@@ -257,4 +260,48 @@ type ArchitectResponse struct {
 	Analysis     string `json:"analysis"`
 	ModifiedWave *Wave  `json:"modified_wave"`
 	Reasoning    string `json:"reasoning"`
+}
+
+// --- Wire format types (pipe interface) ---
+
+// WavePlan is the output of `waves` subcommand.
+// Contains generated waves and optionally the scan result for context.
+type WavePlan struct {
+	Waves      []Wave      `json:"waves"`
+	ScanResult *ScanResult `json:"scan_result,omitempty"`
+}
+
+// DiscussResult is the output of `discuss` subcommand.
+// Captures the architect discussion outcome for a single wave.
+type DiscussResult struct {
+	WaveID        string             `json:"wave_id"`
+	Analysis      string             `json:"analysis"`
+	Reasoning     string             `json:"reasoning"`
+	Decision      string             `json:"decision"`
+	Modifications []WaveModification `json:"modifications,omitempty"`
+	ADRWorthy     bool               `json:"adr_worthy"`
+	ADRTitle      string             `json:"adr_title,omitempty"`
+}
+
+// WaveModification describes a change made to a wave action during discussion.
+type WaveModification struct {
+	ActionIndex int    `json:"action_index"`
+	Change      string `json:"change"`
+}
+
+// ApplyResult is the output of `apply` subcommand.
+// Reports per-action outcomes and downstream effects.
+type ApplyResult struct {
+	WaveID          string         `json:"wave_id"`
+	AppliedActions  []ActionResult `json:"applied_actions"`
+	RippleEffects   []Ripple       `json:"ripple_effects,omitempty"`
+	NewCompleteness float64        `json:"new_completeness"`
+}
+
+// ActionResult reports the outcome of a single wave action application.
+type ActionResult struct {
+	Type    string `json:"type"`
+	IssueID string `json:"issue_id"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
 }

@@ -413,17 +413,17 @@ func TestSessionState_ScanResultPath_OmittedWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestLoadScanResult_PreV06Format_BackwardCompat(t *testing.T) {
-	// given: JSON with Go-default field names (pre-v0.6 format, no JSON tags)
+func TestLoadScanResult_SnakeCaseFormat(t *testing.T) {
+	// given: JSON with snake_case field names (v0.0.12+ wire format)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "scan_result.json")
 	os.WriteFile(path, []byte(`{
-		"Clusters": [
-			{"Name": "Auth", "Completeness": 0.50, "Issues": [], "Observations": ["obs1"]}
+		"clusters": [
+			{"name": "Auth", "completeness": 0.50, "issues": [], "observations": ["obs1"]}
 		],
-		"TotalIssues": 5,
-		"Completeness": 0.50,
-		"Observations": ["global obs"]
+		"total_issues": 5,
+		"completeness": 0.50,
+		"observations": ["global obs"]
 	}`), 0644)
 
 	// when

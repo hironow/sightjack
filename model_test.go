@@ -394,6 +394,142 @@ func TestShibitoWarning_JSONRoundTrip(t *testing.T) {
 	}
 }
 
+func TestScanResult_MarshalJSON_SnakeCaseKeys(t *testing.T) {
+	// given
+	result := ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25},
+		},
+		TotalIssues:  5,
+		Completeness: 0.35,
+		Observations: []string{"test obs"},
+	}
+
+	// when
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	s := string(data)
+
+	// then: all keys must be snake_case
+	if !strings.Contains(s, `"clusters"`) {
+		t.Errorf("expected 'clusters' key (snake_case), got: %s", s)
+	}
+	if !strings.Contains(s, `"total_issues"`) {
+		t.Errorf("expected 'total_issues' key (snake_case), got: %s", s)
+	}
+	if !strings.Contains(s, `"completeness"`) {
+		t.Errorf("expected 'completeness' key (snake_case), got: %s", s)
+	}
+	if !strings.Contains(s, `"observations"`) {
+		t.Errorf("expected 'observations' key (snake_case), got: %s", s)
+	}
+}
+
+func TestScanResult_UnmarshalJSON_SnakeCaseKeys(t *testing.T) {
+	// given: snake_case JSON (wire format)
+	raw := `{
+		"clusters": [{"name": "Auth", "completeness": 0.25, "issues": [], "observations": []}],
+		"total_issues": 5,
+		"completeness": 0.35,
+		"observations": ["global obs"],
+		"shibito_warnings": [],
+		"scan_warnings": ["warn1"]
+	}`
+
+	// when
+	var result ScanResult
+	err := json.Unmarshal([]byte(raw), &result)
+
+	// then
+	if err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(result.Clusters) != 1 {
+		t.Fatalf("expected 1 cluster, got %d", len(result.Clusters))
+	}
+	if result.TotalIssues != 5 {
+		t.Errorf("expected 5 total_issues, got %d", result.TotalIssues)
+	}
+	if result.Completeness != 0.35 {
+		t.Errorf("expected 0.35, got %f", result.Completeness)
+	}
+	if len(result.Observations) != 1 || result.Observations[0] != "global obs" {
+		t.Errorf("unexpected observations: %v", result.Observations)
+	}
+	if len(result.ScanWarnings) != 1 {
+		t.Errorf("expected 1 scan_warning, got %d", len(result.ScanWarnings))
+	}
+}
+
+func TestScanResult_JSONRoundTrip(t *testing.T) {
+	// given
+	original := ScanResult{
+		Clusters: []ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25, Issues: []IssueDetail{
+				{ID: "abc", Identifier: "ENG-1", Title: "Login", Completeness: 0.3, Gaps: []string{"DoD"}},
+			}, Observations: []string{"obs1"}, Labels: []string{"security"}},
+		},
+		TotalIssues:     1,
+		Completeness:    0.25,
+		Observations:    []string{"global"},
+		ShibitoWarnings: []ShibitoWarning{{ClosedIssueID: "X", CurrentIssueID: "Y", Description: "reborn", RiskLevel: "high"}},
+		ScanWarnings:    []string{"warn"},
+	}
+
+	// when: marshal then unmarshal
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ScanResult
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if len(decoded.Clusters) != 1 {
+		t.Fatalf("clusters: got %d, want 1", len(decoded.Clusters))
+	}
+	if decoded.TotalIssues != 1 {
+		t.Errorf("total_issues: got %d, want 1", decoded.TotalIssues)
+	}
+	if decoded.Completeness != 0.25 {
+		t.Errorf("completeness: got %f, want 0.25", decoded.Completeness)
+	}
+	if len(decoded.Observations) != 1 {
+		t.Errorf("observations: got %d, want 1", len(decoded.Observations))
+	}
+	if len(decoded.ShibitoWarnings) != 1 {
+		t.Errorf("shibito_warnings: got %d, want 1", len(decoded.ShibitoWarnings))
+	}
+	if len(decoded.ScanWarnings) != 1 {
+		t.Errorf("scan_warnings: got %d, want 1", len(decoded.ScanWarnings))
+	}
+}
+
+func TestScanResult_UnmarshalJSON_ForwardCompatible(t *testing.T) {
+	// given: JSON with unknown fields (future schema additions)
+	raw := `{
+		"clusters": [],
+		"total_issues": 0,
+		"completeness": 0.0,
+		"observations": [],
+		"future_field": "should be ignored",
+		"another_future": 42
+	}`
+
+	// when
+	var result ScanResult
+	err := json.Unmarshal([]byte(raw), &result)
+
+	// then: should not error on unknown fields
+	if err != nil {
+		t.Fatalf("expected forward-compatible unmarshal, got error: %v", err)
+	}
+}
+
 func TestScanResult_ShibitoWarnings_OmittedWhenEmpty(t *testing.T) {
 	// given
 	result := ScanResult{Completeness: 0.5}
@@ -625,5 +761,267 @@ func TestScribeResponse_ZeroValues(t *testing.T) {
 	}
 	if resp.Title != "" {
 		t.Errorf("expected empty Title, got %s", resp.Title)
+	}
+}
+
+// --- Wire format types (pipe interface) ---
+
+func TestWavePlan_JSONRoundTrip(t *testing.T) {
+	// given
+	raw := `{
+		"waves": [
+			{
+				"id": "auth-w1",
+				"cluster_name": "Auth",
+				"title": "Dependency Ordering",
+				"description": "Order deps",
+				"actions": [{"type": "add_dependency", "issue_id": "ENG-101", "description": "dep", "detail": ""}],
+				"prerequisites": [],
+				"delta": {"before": 0.25, "after": 0.50},
+				"status": "available"
+			}
+		],
+		"scan_result": {
+			"clusters": [{"name": "Auth", "completeness": 0.25, "issues": [], "observations": []}],
+			"total_issues": 5,
+			"completeness": 0.25,
+			"observations": []
+		}
+	}`
+
+	// when
+	var plan WavePlan
+	if err := json.Unmarshal([]byte(raw), &plan); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if len(plan.Waves) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(plan.Waves))
+	}
+	if plan.Waves[0].ID != "auth-w1" {
+		t.Errorf("wave id: got %q, want %q", plan.Waves[0].ID, "auth-w1")
+	}
+	if plan.ScanResult == nil {
+		t.Fatal("expected non-nil scan_result")
+	}
+	if plan.ScanResult.TotalIssues != 5 {
+		t.Errorf("total_issues: got %d, want 5", plan.ScanResult.TotalIssues)
+	}
+
+	// round-trip
+	data, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded WavePlan
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("re-unmarshal: %v", err)
+	}
+	if len(decoded.Waves) != 1 || decoded.ScanResult.TotalIssues != 5 {
+		t.Errorf("round-trip mismatch")
+	}
+}
+
+func TestWavePlan_ScanResultOmittedWhenNil(t *testing.T) {
+	plan := WavePlan{Waves: []Wave{{ID: "w1", ClusterName: "X", Title: "T"}}}
+	data, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(data), "scan_result") {
+		t.Error("expected scan_result to be omitted when nil")
+	}
+}
+
+func TestWave_ClusterContext(t *testing.T) {
+	// given: wave with cluster_context (pipe input to discuss/apply)
+	raw := `{
+		"id": "auth-w1",
+		"cluster_name": "Auth",
+		"title": "Dep Ordering",
+		"description": "desc",
+		"actions": [],
+		"prerequisites": [],
+		"delta": {"before": 0.25, "after": 0.50},
+		"status": "available",
+		"cluster_context": {
+			"name": "Auth",
+			"completeness": 0.25,
+			"issues": [{"id": "abc", "identifier": "ENG-1", "title": "Login", "completeness": 0.3, "gaps": []}],
+			"observations": ["obs"]
+		}
+	}`
+
+	// when
+	var w Wave
+	if err := json.Unmarshal([]byte(raw), &w); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if w.ClusterContext == nil {
+		t.Fatal("expected non-nil cluster_context")
+	}
+	if w.ClusterContext.Name != "Auth" {
+		t.Errorf("context name: got %q, want %q", w.ClusterContext.Name, "Auth")
+	}
+	if len(w.ClusterContext.Issues) != 1 {
+		t.Errorf("context issues: got %d, want 1", len(w.ClusterContext.Issues))
+	}
+}
+
+func TestWave_ClusterContext_OmittedWhenNil(t *testing.T) {
+	w := Wave{ID: "w1", ClusterName: "X", Title: "T"}
+	data, err := json.Marshal(w)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(data), "cluster_context") {
+		t.Error("expected cluster_context to be omitted when nil")
+	}
+}
+
+func TestDiscussResult_JSONRoundTrip(t *testing.T) {
+	// given
+	raw := `{
+		"wave_id": "auth-w1",
+		"analysis": "JWT has trade-offs",
+		"reasoning": "Session-based is simpler",
+		"decision": "Use session-based auth",
+		"modifications": [
+			{"action_index": 0, "change": "Updated to include Redis"}
+		],
+		"adr_worthy": true,
+		"adr_title": "Session-based auth over JWT"
+	}`
+
+	// when
+	var dr DiscussResult
+	if err := json.Unmarshal([]byte(raw), &dr); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if dr.WaveID != "auth-w1" {
+		t.Errorf("wave_id: got %q", dr.WaveID)
+	}
+	if dr.Decision != "Use session-based auth" {
+		t.Errorf("decision: got %q", dr.Decision)
+	}
+	if !dr.ADRWorthy {
+		t.Error("expected adr_worthy=true")
+	}
+	if len(dr.Modifications) != 1 {
+		t.Fatalf("modifications: got %d, want 1", len(dr.Modifications))
+	}
+	if dr.Modifications[0].ActionIndex != 0 {
+		t.Errorf("action_index: got %d, want 0", dr.Modifications[0].ActionIndex)
+	}
+
+	// round-trip
+	data, err := json.Marshal(dr)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded DiscussResult
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("re-unmarshal: %v", err)
+	}
+	if decoded.ADRTitle != "Session-based auth over JWT" {
+		t.Errorf("round-trip adr_title: got %q", decoded.ADRTitle)
+	}
+}
+
+func TestDiscussResult_ModificationsOmittedWhenEmpty(t *testing.T) {
+	dr := DiscussResult{WaveID: "w1", Analysis: "ok", Decision: "noop"}
+	data, err := json.Marshal(dr)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(data), "modifications") {
+		t.Error("expected modifications to be omitted when empty")
+	}
+}
+
+func TestApplyResult_JSONRoundTrip(t *testing.T) {
+	// given
+	raw := `{
+		"wave_id": "auth-w1",
+		"applied_actions": [
+			{"type": "add_dependency", "issue_id": "ENG-101", "success": true}
+		],
+		"ripple_effects": [
+			{"cluster_name": "API", "description": "W2 unlocked"}
+		],
+		"new_completeness": 0.50
+	}`
+
+	// when
+	var ar ApplyResult
+	if err := json.Unmarshal([]byte(raw), &ar); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then
+	if ar.WaveID != "auth-w1" {
+		t.Errorf("wave_id: got %q", ar.WaveID)
+	}
+	if len(ar.AppliedActions) != 1 {
+		t.Fatalf("applied_actions: got %d, want 1", len(ar.AppliedActions))
+	}
+	if !ar.AppliedActions[0].Success {
+		t.Error("expected success=true")
+	}
+	if len(ar.RippleEffects) != 1 {
+		t.Fatalf("ripple_effects: got %d, want 1", len(ar.RippleEffects))
+	}
+	if ar.NewCompleteness != 0.50 {
+		t.Errorf("new_completeness: got %f, want 0.50", ar.NewCompleteness)
+	}
+
+	// round-trip
+	data, err := json.Marshal(ar)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ApplyResult
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("re-unmarshal: %v", err)
+	}
+	if decoded.NewCompleteness != 0.50 {
+		t.Errorf("round-trip completeness: got %f", decoded.NewCompleteness)
+	}
+}
+
+func TestApplyResult_ActionWithError(t *testing.T) {
+	raw := `{
+		"wave_id": "w1",
+		"applied_actions": [
+			{"type": "add_dod", "issue_id": "ENG-50", "success": false, "error": "permission denied"}
+		],
+		"new_completeness": 0.30
+	}`
+
+	var ar ApplyResult
+	if err := json.Unmarshal([]byte(raw), &ar); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if ar.AppliedActions[0].Success {
+		t.Error("expected success=false")
+	}
+	if ar.AppliedActions[0].Error != "permission denied" {
+		t.Errorf("error: got %q", ar.AppliedActions[0].Error)
+	}
+}
+
+func TestApplyResult_RippleEffectsOmittedWhenEmpty(t *testing.T) {
+	ar := ApplyResult{WaveID: "w1", NewCompleteness: 0.5}
+	data, err := json.Marshal(ar)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(data), "ripple_effects") {
+		t.Error("expected ripple_effects to be omitted when empty")
 	}
 }
