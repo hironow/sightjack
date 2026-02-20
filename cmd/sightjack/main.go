@@ -1042,6 +1042,11 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
 	}
 
+	// Create D-Mail directories (inbox/, outbox/, archive/)
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
+		fmt.Fprintf(w, "Warning: failed to create mail dirs: %v\n", err)
+	}
+
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Created .siren/config.yaml\n")
 	return nil

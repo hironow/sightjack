@@ -40,6 +40,11 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		return fmt.Errorf("input reader is required for interactive session")
 	}
 
+	// Ensure D-Mail directories exist before any mail operations
+	if err := EnsureMailDirs(baseDir); err != nil {
+		return fmt.Errorf("ensure mail dirs: %w", err)
+	}
+
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
@@ -557,6 +562,12 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
+
+	// Ensure D-Mail directories exist before any mail operations
+	if err := EnsureMailDirs(baseDir); err != nil {
+		return fmt.Errorf("ensure mail dirs: %w", err)
+	}
+
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
 		return fmt.Errorf("resume: %w", err)
@@ -578,6 +589,12 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
+
+	// Ensure D-Mail directories exist before any mail operations
+	if err := EnsureMailDirs(baseDir); err != nil {
+		return fmt.Errorf("ensure mail dirs: %w", err)
+	}
+
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {

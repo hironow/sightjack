@@ -644,3 +644,29 @@ func TestRunInit_InstallsSkills(t *testing.T) {
 		t.Errorf("unexpected dmail-readable content: %s", readable)
 	}
 }
+
+func TestRunInit_CreatesMailDirs(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	input := strings.NewReader("Team\nProject\n\n\n")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then: mail directories should be created
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+	for _, sub := range []string{"inbox", "outbox", "archive"} {
+		path := filepath.Join(dir, ".siren", sub)
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			t.Errorf("%s not created: %v", sub, statErr)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("%s is not a directory", sub)
+		}
+	}
+}
