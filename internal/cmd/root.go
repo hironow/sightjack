@@ -81,6 +81,7 @@ func NewRootCommand() *cobra.Command {
 		newNextgenCmd(),
 		newRunCmd(),
 		newVersionCmd(),
+		newUpdateCmd(),
 	)
 
 	return rootCmd
