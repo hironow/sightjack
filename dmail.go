@@ -157,22 +157,64 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 	return files, nil
 }
 
-// WatchInbox monitors the inbox/ directory for new .md files using fsnotify.
-// Returns a channel that receives filenames of newly created d-mails.
+// receiveDMailIfNew reads a d-mail from inbox, applies consumer-side dedup (MY-271),
+// archives it, and returns it only if it is a feedback d-mail.
+// Returns nil for already-archived, non-feedback, or unreadable files.
+func receiveDMailIfNew(baseDir, filename string) *DMail {
+	// Consumer-side dedup: skip if already in archive
+	archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
+	if _, err := os.Stat(archivePath); err == nil {
+		os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename))
+		return nil
+	}
+
+	mail, err := ReceiveDMail(baseDir, filename)
+	if err != nil {
+		LogWarn("Failed to receive d-mail %s: %v", filename, err)
+		return nil
+	}
+	if mail.Kind != DMailFeedback {
+		return nil
+	}
+	return mail
+}
+
+// MonitorInbox starts monitoring the inbox directory for feedback d-mails.
+// It first drains existing files (initial scan), then watches for new files via fsnotify.
+// Each d-mail is received (archived + removed from inbox). Only feedback d-mails
+// are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
-func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
+func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, fmt.Errorf("dmail watch: create watcher: %w", err)
+		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
 	}
 
 	inboxPath := MailDir(baseDir, inboxDir)
 	if err := watcher.Add(inboxPath); err != nil {
 		watcher.Close()
-		return nil, fmt.Errorf("dmail watch: add inbox: %w", err)
+		return nil, fmt.Errorf("dmail monitor: add inbox: %w", err)
 	}
 
-	ch := make(chan string)
+	// Phase 1: Initial drain (synchronous, before goroutine starts).
+	// watcher.Add is called first so files created during the drain
+	// are caught by fsnotify and deduplicated by receiveDMailIfNew.
+	var initial []*DMail
+	files, listErr := ListDMail(baseDir, inboxDir)
+	if listErr == nil {
+		for _, filename := range files {
+			if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
+				initial = append(initial, mail)
+			}
+		}
+	}
+
+	ch := make(chan *DMail, len(initial))
+	for _, mail := range initial {
+		ch <- mail
+	}
+
+	// Phase 2: Watch for new files (async).
 	go func() {
 		defer close(ch)
 		defer watcher.Close()
@@ -186,10 +228,12 @@ func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
 				}
 				if event.Has(fsnotify.Create) && strings.HasSuffix(event.Name, ".md") {
 					filename := filepath.Base(event.Name)
-					select {
-					case ch <- filename:
-					case <-ctx.Done():
-						return
+					if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
+						select {
+						case ch <- mail:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			case _, ok := <-watcher.Errors:
@@ -203,46 +247,27 @@ func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
 	return ch, nil
 }
 
-// ProcessInbox scans inbox/ for d-mails, processes them (archive + remove from inbox),
-// and returns only feedback d-mails. Non-feedback mails are archived but not returned.
-// Already-archived files are skipped (consumer-side dedup per MY-271).
-func ProcessInbox(baseDir string) ([]*DMail, error) {
-	files, err := ListDMail(baseDir, inboxDir)
-	if err != nil {
-		return nil, err
+// DrainInboxFeedback reads all currently buffered feedback from the monitor channel
+// and displays them to the CLI. Returns the number of feedback messages displayed.
+func DrainInboxFeedback(ch <-chan *DMail) int {
+	if ch == nil {
+		return 0
 	}
 	var feedback []*DMail
-	for _, filename := range files {
-		// Consumer-side dedup: skip if already in archive
-		archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
-		if _, statErr := os.Stat(archivePath); statErr == nil {
-			// Already processed — just remove from inbox
-			os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename))
-			continue
-		}
-
-		mail, recvErr := ReceiveDMail(baseDir, filename)
-		if recvErr != nil {
-			LogWarn("Failed to receive d-mail %s: %v", filename, recvErr)
-			continue
-		}
-		if mail.Kind == DMailFeedback {
+loop:
+	for {
+		select {
+		case mail, ok := <-ch:
+			if !ok {
+				break loop
+			}
 			feedback = append(feedback, mail)
+		default:
+			break loop
 		}
-	}
-	return feedback, nil
-}
-
-// DisplayInboxFeedback processes inbox d-mails and displays feedback to the CLI.
-// Non-fatal: errors are logged as warnings.
-func DisplayInboxFeedback(baseDir string) {
-	feedback, err := ProcessInbox(baseDir)
-	if err != nil {
-		LogWarn("D-Mail inbox scan failed: %v", err)
-		return
 	}
 	if len(feedback) == 0 {
-		return
+		return 0
 	}
 	LogInfo("Received %d feedback d-mail(s):", len(feedback))
 	for _, fb := range feedback {
@@ -253,6 +278,7 @@ func DisplayInboxFeedback(baseDir string) {
 			LogInfo("[%s] %s", fb.Name, fb.Description)
 		}
 	}
+	return len(feedback)
 }
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.

@@ -305,76 +305,6 @@ func TestReceiveDMail_FileNotFound(t *testing.T) {
 	}
 }
 
-func TestWatchInbox_DetectsNewFile(t *testing.T) {
-	dir := t.TempDir()
-	if err := EnsureMailDirs(dir); err != nil {
-		t.Fatalf("ensure: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ch, err := WatchInbox(ctx, dir)
-	if err != nil {
-		t.Fatalf("watch: %v", err)
-	}
-
-	// give watcher time to start
-	time.Sleep(50 * time.Millisecond)
-
-	// write a .md file to inbox
-	mail := &DMail{
-		Name:        "spec-test-1",
-		Kind:        DMailSpecification,
-		Description: "test",
-		Body:        "body\n",
-	}
-	data, _ := MarshalDMail(mail)
-	inboxPath := filepath.Join(MailDir(dir, "inbox"), mail.Filename())
-	if err := os.WriteFile(inboxPath, data, 0644); err != nil {
-		t.Fatalf("write inbox: %v", err)
-	}
-
-	// expect notification
-	select {
-	case filename := <-ch:
-		if filename != "spec-test-1.md" {
-			t.Errorf("got %s, want spec-test-1.md", filename)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for inbox notification")
-	}
-}
-
-func TestWatchInbox_IgnoresNonMD(t *testing.T) {
-	dir := t.TempDir()
-	if err := EnsureMailDirs(dir); err != nil {
-		t.Fatalf("ensure: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ch, err := WatchInbox(ctx, dir)
-	if err != nil {
-		t.Fatalf("watch: %v", err)
-	}
-
-	time.Sleep(50 * time.Millisecond)
-
-	// write a non-.md file
-	txtPath := filepath.Join(MailDir(dir, "inbox"), "notes.txt")
-	os.WriteFile(txtPath, []byte("not a dmail"), 0644)
-
-	// should NOT receive notification
-	select {
-	case filename := <-ch:
-		t.Errorf("unexpected notification for non-.md file: %s", filename)
-	case <-time.After(200 * time.Millisecond):
-		// expected: no notification
-	}
-}
-
 func TestDMailName_SanitizesWaveKey(t *testing.T) {
 	got := DMailName("spec", "auth:w1")
 	if got != "spec-auth-w1" {
@@ -529,40 +459,49 @@ func TestComposeReport_NoRipples(t *testing.T) {
 	}
 }
 
-func TestProcessInbox_ReceivesFeedback(t *testing.T) {
+func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
 
-	// Place a feedback d-mail in inbox
+	// Place feedback in inbox before starting monitor
 	fb := &DMail{
-		Name:        "feedback-d-001",
+		Name:        "feedback-mon-001",
 		Kind:        DMailFeedback,
-		Description: "Architecture drift detected",
+		Description: "Drift detected",
 		Severity:    "high",
-		Body:        "# Feedback\n\nDrift in auth module.\n",
+		Body:        "# Feedback\n",
 	}
 	data, _ := MarshalDMail(fb)
 	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 
-	// Process inbox
-	received, err := ProcessInbox(dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
 	if err != nil {
-		t.Fatalf("ProcessInbox: %v", err)
-	}
-	if len(received) != 1 {
-		t.Fatalf("expected 1 feedback, got %d", len(received))
-	}
-	if received[0].Name != "feedback-d-001" {
-		t.Errorf("name: got %s", received[0].Name)
-	}
-	if received[0].Severity != "high" {
-		t.Errorf("severity: got %s", received[0].Severity)
+		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// inbox should be empty
+	// Should receive the existing feedback immediately (buffered)
+	select {
+	case mail, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed unexpectedly")
+		}
+		if mail.Name != "feedback-mon-001" {
+			t.Errorf("name: got %s, want feedback-mon-001", mail.Name)
+		}
+		if mail.Severity != "high" {
+			t.Errorf("severity: got %s, want high", mail.Severity)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for initial feedback")
+	}
+
+	// inbox should be empty (archived)
 	files, _ := ListDMail(dir, "inbox")
 	if len(files) != 0 {
-		t.Errorf("inbox not empty after processing: %d files", len(files))
+		t.Errorf("inbox not empty: %d files", len(files))
 	}
 
 	// archive should have the file
@@ -572,115 +511,133 @@ func TestProcessInbox_ReceivesFeedback(t *testing.T) {
 	}
 }
 
-func TestProcessInbox_SkipsNonFeedback(t *testing.T) {
+func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
 
-	// Place a specification d-mail in inbox (wrong kind for sightjack consumer)
+	// Place a specification d-mail in inbox
 	spec := &DMail{
-		Name:        "spec-my-42",
+		Name:        "spec-mon-001",
 		Kind:        DMailSpecification,
-		Description: "Spec for MY-42",
+		Description: "Spec for issue",
 		Body:        "# Spec\n",
 	}
 	data, _ := MarshalDMail(spec)
 	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), spec.Filename()), data, 0644)
 
-	received, err := ProcessInbox(dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
 	if err != nil {
-		t.Fatalf("ProcessInbox: %v", err)
+		t.Fatalf("MonitorInbox: %v", err)
 	}
-	// Non-feedback should be received but filtered out from return
-	if len(received) != 0 {
-		t.Errorf("expected 0 feedback, got %d", len(received))
+
+	// Should NOT receive anything (spec is not feedback)
+	select {
+	case mail := <-ch:
+		t.Errorf("unexpected feedback: %s", mail.Name)
+	case <-time.After(200 * time.Millisecond):
+		// expected: no feedback
+	}
+
+	// But the spec should be archived (received, just not sent to channel)
+	archivePath := filepath.Join(MailDir(dir, "archive"), spec.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
 	}
 }
 
-func TestProcessInbox_DedupSkipsAlreadyArchived(t *testing.T) {
+func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
 
 	// Place feedback in both inbox and archive (already processed)
 	fb := &DMail{
-		Name:        "feedback-d-002",
+		Name:        "feedback-mon-dup",
 		Kind:        DMailFeedback,
-		Description: "Duplicate feedback",
-		Body:        "# Already processed\n",
+		Description: "Duplicate",
+		Body:        "# Dup\n",
 	}
 	data, _ := MarshalDMail(fb)
 	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 	os.WriteFile(filepath.Join(MailDir(dir, "archive"), fb.Filename()), data, 0644)
 
-	received, err := ProcessInbox(dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
 	if err != nil {
-		t.Fatalf("ProcessInbox: %v", err)
-	}
-	// Should be skipped (dedup)
-	if len(received) != 0 {
-		t.Errorf("expected 0 (dedup), got %d", len(received))
+		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// inbox file should be removed (cleanup)
+	// Should NOT receive anything (already archived = dedup)
+	select {
+	case mail := <-ch:
+		t.Errorf("unexpected feedback (should be deduped): %s", mail.Name)
+	case <-time.After(200 * time.Millisecond):
+		// expected: dedup skipped
+	}
+
+	// inbox should be cleaned up
 	files, _ := ListDMail(dir, "inbox")
 	if len(files) != 0 {
-		t.Errorf("inbox should be cleaned up after dedup: %d files", len(files))
+		t.Errorf("inbox should be empty after dedup cleanup: %d files", len(files))
 	}
 }
 
-func TestDisplayInboxFeedback_NoError(t *testing.T) {
+func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
 
-	// Place feedback in inbox
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// Wait for watcher to be ready
+	time.Sleep(50 * time.Millisecond)
+
+	// Write a new feedback d-mail to inbox
 	fb := &DMail{
-		Name:        "feedback-d-010",
+		Name:        "feedback-mon-new",
 		Kind:        DMailFeedback,
-		Description: "Test feedback",
+		Description: "New feedback via fsnotify",
 		Severity:    "high",
-		Body:        "# Test\n",
+		Body:        "# New\n",
 	}
 	data, _ := MarshalDMail(fb)
 	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 
-	// Should not panic or error
-	DisplayInboxFeedback(dir)
-
-	// inbox should be empty after processing
-	files, _ := ListDMail(dir, "inbox")
-	if len(files) != 0 {
-		t.Errorf("inbox not empty: %d files", len(files))
+	// Should receive via fsnotify
+	select {
+	case mail, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed unexpectedly")
+		}
+		if mail.Name != "feedback-mon-new" {
+			t.Errorf("name: got %s, want feedback-mon-new", mail.Name)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for fsnotify notification")
 	}
 }
 
-func TestProcessInbox_EmptyInbox(t *testing.T) {
+func TestMonitorInbox_StopsOnCancel(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
 
-	received, err := ProcessInbox(dir)
-	if err != nil {
-		t.Fatalf("ProcessInbox: %v", err)
-	}
-	if len(received) != 0 {
-		t.Errorf("expected 0, got %d", len(received))
-	}
-}
-
-func TestWatchInbox_StopsOnCancel(t *testing.T) {
-	dir := t.TempDir()
-	if err := EnsureMailDirs(dir); err != nil {
-		t.Fatalf("ensure: %v", err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-	ch, err := WatchInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir)
 	if err != nil {
-		t.Fatalf("watch: %v", err)
+		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// cancel context
 	cancel()
 
-	// channel should close
 	select {
 	case _, ok := <-ch:
 		if ok {
@@ -688,5 +645,41 @@ func TestWatchInbox_StopsOnCancel(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for channel close")
+	}
+}
+
+func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// Place feedback in inbox
+	fb := &DMail{
+		Name:        "feedback-drain-001",
+		Kind:        DMailFeedback,
+		Description: "Drain test",
+		Severity:    "high",
+		Body:        "# Drain\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	count := DrainInboxFeedback(ch)
+	if count != 1 {
+		t.Errorf("expected 1 drained, got %d", count)
+	}
+}
+
+func TestDrainInboxFeedback_NilChannel(t *testing.T) {
+	count := DrainInboxFeedback(nil)
+	if count != 0 {
+		t.Errorf("expected 0 for nil channel, got %d", count)
 	}
 }

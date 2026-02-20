@@ -45,9 +45,15 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
-	// Process incoming d-mails (one-shot scan)
+	// Start inbox monitor (fsnotify-based) for feedback d-mails
 	if !dryRun {
-		DisplayInboxFeedback(baseDir)
+		monitorCtx, monitorCancel := context.WithCancel(ctx)
+		defer monitorCancel()
+		inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
+		if monitorErr != nil {
+			LogWarn("D-Mail monitor failed: %v", monitorErr)
+		}
+		DrainInboxFeedback(inboxCh)
 	}
 
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -584,8 +590,14 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
-	// Process incoming d-mails (one-shot scan)
-	DisplayInboxFeedback(baseDir)
+	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	monitorCtx, monitorCancel := context.WithCancel(ctx)
+	defer monitorCancel()
+	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
+	if monitorErr != nil {
+		LogWarn("D-Mail monitor failed: %v", monitorErr)
+	}
+	DrainInboxFeedback(inboxCh)
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
@@ -614,8 +626,14 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
-	// Process incoming d-mails (one-shot scan)
-	DisplayInboxFeedback(baseDir)
+	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	monitorCtx, monitorCancel := context.WithCancel(ctx)
+	defer monitorCancel()
+	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
+	if monitorErr != nil {
+		LogWarn("D-Mail monitor failed: %v", monitorErr)
+	}
+	DrainInboxFeedback(inboxCh)
 
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
