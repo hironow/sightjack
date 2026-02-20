@@ -52,11 +52,16 @@ func ToDiscussResult(wave Wave, resp *ArchitectResponse, topic string) DiscussRe
 		}
 	}
 
+	decision := resp.Decision
+	if decision == "" {
+		decision = topic
+	}
+
 	return DiscussResult{
 		WaveID:        wave.ID,
 		Analysis:      resp.Analysis,
 		Reasoning:     resp.Reasoning,
-		Decision:      topic,
+		Decision:      decision,
 		Modifications: mods,
 	}
 }

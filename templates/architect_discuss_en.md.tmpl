@@ -23,15 +23,17 @@ Title: {{.WaveTitle}}
 ## Instructions
 1. Analyze the topic considering the full cluster context
 2. Provide your analysis as clear text
-3. If the discussion suggests changes to the wave, provide a modified wave
-4. If no changes are needed, set modified_wave to null
-5. Explain your reasoning
+3. State your decision as a concise, actionable statement
+4. If the discussion suggests changes to the wave, provide a modified wave
+5. If no changes are needed, set modified_wave to null
+6. Explain your reasoning
 
 ## Output
 Write the following JSON to **{{.OutputPath}}**:
 
 {
   "analysis": "Your analysis text here",
+  "decision": "Your decision as a concise, actionable statement",
   "modified_wave": null,
   "reasoning": "Why you suggest these changes (or no changes)"
 }

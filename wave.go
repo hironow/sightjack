@@ -123,7 +123,14 @@ func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
 		completeness = wave.Delta.After
 	}
 
-	wave.Status = "completed"
+	// Only mark "completed" on full success. Partial failures get "partial"
+	// so downstream logic (CompletedWavesForCluster, nextgen) does not treat
+	// failed actions as done.
+	if total == 0 || internal.Applied >= total {
+		wave.Status = "completed"
+	} else {
+		wave.Status = "partial"
+	}
 
 	return ApplyResult{
 		WaveID:          internal.WaveID,

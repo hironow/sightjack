@@ -260,6 +260,7 @@ type ArchitectResponse struct {
 	Analysis     string `json:"analysis"`
 	ModifiedWave *Wave  `json:"modified_wave"`
 	Reasoning    string `json:"reasoning"`
+	Decision     string `json:"decision,omitempty"`
 }
 
 // --- Wire format types (pipe interface) ---

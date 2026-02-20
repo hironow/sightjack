@@ -1175,6 +1175,68 @@ func TestToDiscussResult_WithRemovedActions(t *testing.T) {
 	}
 }
 
+func TestToDiscussResult_UsesArchitectDecision(t *testing.T) {
+	// given: architect provides an explicit decision
+	wave := Wave{ID: "w1", ClusterName: "Auth"}
+	resp := &ArchitectResponse{
+		Analysis:  "JWT is overkill here",
+		Reasoning: "Session cookies are simpler and sufficient",
+		Decision:  "Use session-based auth with httpOnly cookies",
+	}
+	topic := "Should we use JWT or sessions?"
+
+	// when
+	result := ToDiscussResult(wave, resp, topic)
+
+	// then: decision should come from architect, not topic
+	if result.Decision != "Use session-based auth with httpOnly cookies" {
+		t.Errorf("decision: got %q, want architect's decision", result.Decision)
+	}
+}
+
+func TestToDiscussResult_FallsBackToTopicWhenNoDecision(t *testing.T) {
+	// given: architect does not provide a decision (empty string)
+	wave := Wave{ID: "w1", ClusterName: "Auth"}
+	resp := &ArchitectResponse{
+		Analysis:  "No changes needed",
+		Reasoning: "Wave is fine as-is",
+	}
+	topic := "review wave"
+
+	// when
+	result := ToDiscussResult(wave, resp, topic)
+
+	// then: falls back to topic
+	if result.Decision != "review wave" {
+		t.Errorf("decision: got %q, want topic fallback", result.Decision)
+	}
+}
+
+func TestToApplyResult_PartialFailureStatus(t *testing.T) {
+	// given: wave with 2 actions, only 1 succeeds
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "Auth",
+		Actions: []WaveAction{
+			{Type: "add_dependency", IssueID: "ENG-101"},
+			{Type: "add_dod", IssueID: "ENG-102"},
+		},
+		Delta: WaveDelta{Before: 0.3, After: 0.5},
+	}
+	internal := &WaveApplyResult{WaveID: "w1", Applied: 1, Errors: []string{"denied"}}
+
+	// when
+	result := ToApplyResult(wave, internal)
+
+	// then: partial failure should NOT be marked "completed"
+	if result.CompletedWave.Status == "completed" {
+		t.Error("partial failure should not have status 'completed'")
+	}
+	if result.CompletedWave.Status != "partial" {
+		t.Errorf("expected status 'partial', got %q", result.CompletedWave.Status)
+	}
+}
+
 func TestToApplyResult_AllSuccess(t *testing.T) {
 	// given
 	wave := Wave{
