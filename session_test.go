@@ -1856,6 +1856,40 @@ func TestRecoverLatestState_PrefersNewest(t *testing.T) {
 	}
 }
 
+func TestRecoverLatestState_MixedPrefixes_PrefersNewerScan(t *testing.T) {
+	// given: older "session-" and newer "scan-" with higher timestamp
+	dir := t.TempDir()
+
+	// Older session
+	oldID := "session-1000-1"
+	oldDir := filepath.Join(dir, ".siren", ".run", oldID)
+	os.MkdirAll(oldDir, 0755)
+	WriteScanResult(filepath.Join(oldDir, "scan_result.json"), &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "old", Completeness: 0.3}},
+		Completeness: 0.3,
+	})
+
+	// Newer scan (higher timestamp, but "scan-" < "session-" lexicographically)
+	newID := "scan-2000-1"
+	newDir := filepath.Join(dir, ".siren", ".run", newID)
+	os.MkdirAll(newDir, 0755)
+	WriteScanResult(filepath.Join(newDir, "scan_result.json"), &ScanResult{
+		Clusters:     []ClusterScanResult{{Name: "new", Completeness: 0.7}},
+		Completeness: 0.7,
+	})
+
+	// when
+	recovered, err := RecoverLatestState(dir)
+
+	// then: should pick scan-2000-1 (newer timestamp) not session-1000-1
+	if err != nil {
+		t.Fatalf("RecoverLatestState failed: %v", err)
+	}
+	if recovered.SessionID != newID {
+		t.Errorf("SessionID: expected %q, got %q", newID, recovered.SessionID)
+	}
+}
+
 func TestRecoverLatestState_NoSessions(t *testing.T) {
 	// given: empty .siren/ with no session dirs
 	dir := t.TempDir()

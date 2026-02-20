@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -780,10 +781,22 @@ func TryRecoverState(baseDir string, sessionID string) (*SessionState, error) {
 	return state, nil
 }
 
+// sessionTimestamp extracts the Unix-milli timestamp from a session directory
+// name formatted as "{prefix}-{unixmilli}-{pid}". Returns 0 for unparseable names.
+func sessionTimestamp(name string) int64 {
+	parts := strings.SplitN(name, "-", 3)
+	if len(parts) < 2 {
+		return 0
+	}
+	ts, _ := strconv.ParseInt(parts[1], 10, 64)
+	return ts
+}
+
 // RecoverLatestState scans both .siren/.run/ and legacy .siren/scans/ for
 // session directories and attempts recovery from the most recent one.
-// Session directories are named "session-{unixmilli}-{pid}", so lexicographic
-// descending order matches creation time. Returns error if no recoverable data.
+// Session directories are named "{prefix}-{unixmilli}-{pid}" where prefix is
+// "session" or "scan". Sorted by timestamp descending so the newest is tried first.
+// Returns error if no recoverable data.
 func RecoverLatestState(baseDir string) (*SessionState, error) {
 	// Collect session directory names from both current and legacy paths.
 	var sessionIDs []string
@@ -803,8 +816,10 @@ func RecoverLatestState(baseDir string) (*SessionState, error) {
 			}
 		}
 	}
-	// Sort descending so newest session is tried first.
-	sort.Sort(sort.Reverse(sort.StringSlice(sessionIDs)))
+	// Sort by timestamp descending so newest session is tried first.
+	sort.Slice(sessionIDs, func(i, j int) bool {
+		return sessionTimestamp(sessionIDs[i]) > sessionTimestamp(sessionIDs[j])
+	})
 
 	for _, id := range sessionIDs {
 		state, err := TryRecoverState(baseDir, id)
