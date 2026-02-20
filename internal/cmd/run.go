@@ -1,0 +1,78 @@
+package cmd
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	sightjack "github.com/hironow/sightjack"
+)
+
+func newRunCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "run [path]",
+		Short: "Interactive wave approval and apply loop",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			baseDir, err := resolveBaseDir(args)
+			if err != nil {
+				return fmt.Errorf("invalid path: %w", err)
+			}
+			cfg, err := loadConfig(cmd, baseDir)
+			if err != nil {
+				return err
+			}
+			ctx := startSpan(cmd)
+			defer endSpan(ctx)
+
+			// Check for existing state (resume detection)
+			if !dryRun {
+				existingState, stateErr := sightjack.ReadState(baseDir)
+				if stateErr != nil {
+					recovered, recErr := sightjack.RecoverLatestState(baseDir)
+					if recErr == nil {
+						existingState = recovered
+						stateErr = nil
+					}
+				}
+				if stateErr == nil {
+					scanner := bufio.NewScanner(os.Stdin)
+					for {
+						choice, promptErr := sightjack.PromptResume(ctx, os.Stdout, scanner, existingState)
+						if promptErr == sightjack.ErrQuit {
+							return nil
+						}
+						if promptErr != nil {
+							sightjack.LogWarn("Invalid input: %v", promptErr)
+							continue
+						}
+						switch choice {
+						case sightjack.ResumeChoiceResume:
+							if !sightjack.CanResume(existingState) {
+								sightjack.LogWarn("Cached scan data missing — starting fresh session instead.")
+								goto freshSession
+							}
+							return sightjack.RunResumeSession(ctx, cfg, baseDir, existingState, os.Stdin)
+						case sightjack.ResumeChoiceRescan:
+							return sightjack.RunRescanSession(ctx, cfg, baseDir, existingState, os.Stdin)
+						case sightjack.ResumeChoiceNew:
+							goto freshSession
+						}
+					}
+				}
+			}
+		freshSession:
+
+			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
+			var sessionInput io.Reader
+			if !dryRun {
+				sessionInput = os.Stdin
+			}
+			return sightjack.RunSession(ctx, cfg, baseDir, sessionID, dryRun, sessionInput)
+		},
+	}
+}

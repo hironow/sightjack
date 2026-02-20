@@ -1,0 +1,73 @@
+package cmd
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	sightjack "github.com/hironow/sightjack"
+)
+
+func newWavesCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "waves [path]",
+		Short: "Generate waves from stdin ScanResult JSON",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			baseDir, err := resolveBaseDir(args)
+			if err != nil {
+				return fmt.Errorf("invalid path: %w", err)
+			}
+			cfg, err := loadConfig(cmd, baseDir)
+			if err != nil {
+				return err
+			}
+			ctx := startSpan(cmd)
+			defer endSpan(ctx)
+
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("failed to read stdin: %w", err)
+			}
+			if len(data) == 0 {
+				return fmt.Errorf("no input on stdin. Pipe scan result: sightjack scan --json | sightjack waves")
+			}
+
+			var scanResult sightjack.ScanResult
+			if err := json.Unmarshal(data, &scanResult); err != nil {
+				return fmt.Errorf("invalid ScanResult JSON: %w", err)
+			}
+
+			sessionID := fmt.Sprintf("waves-%d-%d", time.Now().UnixMilli(), os.Getpid())
+			scanDir := sightjack.ScanDir(baseDir, sessionID)
+			if err := os.MkdirAll(scanDir, 0755); err != nil {
+				return fmt.Errorf("failed to create scan dir: %w", err)
+			}
+
+			waves, err := sightjack.RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, dryRun)
+			if err != nil {
+				return fmt.Errorf("wave generation failed: %w", err)
+			}
+
+			if dryRun {
+				sightjack.LogOK("Dry-run complete. Check %s for generated prompts.", scanDir)
+				return nil
+			}
+
+			plan := sightjack.WavePlan{
+				Waves:      waves,
+				ScanResult: &scanResult,
+			}
+			out, jsonErr := json.MarshalIndent(plan, "", "  ")
+			if jsonErr != nil {
+				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
+			}
+			fmt.Println(string(out))
+			return nil
+		},
+	}
+}

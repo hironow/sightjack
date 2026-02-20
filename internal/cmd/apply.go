@@ -1,0 +1,79 @@
+package cmd
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	sightjack "github.com/hironow/sightjack"
+)
+
+func newApplyCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "apply [path]",
+		Short: "Apply a wave to Linear from stdin Wave JSON",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			baseDir, err := resolveBaseDir(args)
+			if err != nil {
+				return fmt.Errorf("invalid path: %w", err)
+			}
+			cfg, err := loadConfig(cmd, baseDir)
+			if err != nil {
+				return err
+			}
+			ctx := startSpan(cmd)
+			defer endSpan(ctx)
+
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("failed to read stdin: %w", err)
+			}
+			if len(data) == 0 {
+				return fmt.Errorf("no input on stdin. Pipe a wave: sightjack select | sightjack apply")
+			}
+
+			// Read Wave + optional remaining_waves context from select output.
+			type applyInput struct {
+				sightjack.Wave
+				RemainingWaves []sightjack.Wave `json:"remaining_waves,omitempty"`
+			}
+			var input applyInput
+			if err := json.Unmarshal(data, &input); err != nil {
+				return fmt.Errorf("invalid Wave JSON: %w", err)
+			}
+			wave := input.Wave
+
+			sessionID := fmt.Sprintf("apply-%d-%d", time.Now().UnixMilli(), os.Getpid())
+			scanDir := sightjack.ScanDir(baseDir, sessionID)
+			if err := os.MkdirAll(scanDir, 0755); err != nil {
+				return fmt.Errorf("failed to create scan dir: %w", err)
+			}
+
+			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+
+			if dryRun {
+				sightjack.LogOK("Dry-run: would apply wave %s (%s)", wave.ID, wave.ClusterName)
+				return nil
+			}
+
+			internal, err := sightjack.RunWaveApply(ctx, cfg, scanDir, wave, strictness)
+			if err != nil {
+				return fmt.Errorf("apply failed: %w", err)
+			}
+
+			result := sightjack.ToApplyResult(wave, internal)
+			result.RemainingWaves = input.RemainingWaves
+			out, jsonErr := json.MarshalIndent(result, "", "  ")
+			if jsonErr != nil {
+				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
+			}
+			fmt.Println(string(out))
+			return nil
+		},
+	}
+}
