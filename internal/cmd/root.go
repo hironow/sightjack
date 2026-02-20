@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -38,17 +39,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "sightjack",
 		Short: "SIREN-inspired issue architecture tool for Linear",
-		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.",
-		// Default to scan when no subcommand is given (preserves pre-cobra behavior).
-		Args: cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			scanCmd, _, err := cmd.Find([]string{"scan"})
-			if err != nil {
-				return err
-			}
-			scanCmd.SetContext(cmd.Context())
-			return scanCmd.RunE(scanCmd, args)
-		},
+		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse DefaultToScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			sightjack.SetVerbose(verbose)
 			shutdownTracer = sightjack.InitTracer("sightjack", version)
@@ -95,6 +86,49 @@ func NewRootCommand() *cobra.Command {
 	)
 
 	return rootCmd
+}
+
+// DefaultToScan preprocesses CLI args to inject "scan" when no subcommand
+// is detected. This preserves pre-cobra behavior where flags like --json
+// are forwarded to the scan command. Call before rootCmd.ExecuteContext.
+func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
+	if len(args) == 0 {
+		return []string{"scan"}
+	}
+
+	// Root-level flags that should not be redirected to scan.
+	for _, arg := range args {
+		if arg == "--version" || arg == "--help" || arg == "-h" {
+			return args
+		}
+	}
+
+	// Build set of known subcommand names.
+	known := make(map[string]bool)
+	for _, sub := range rootCmd.Commands() {
+		known[sub.Name()] = true
+		for _, alias := range sub.Aliases {
+			known[alias] = true
+		}
+	}
+
+	// If the first positional argument (non-flag) is a known subcommand,
+	// leave args unchanged. Otherwise prepend "scan".
+	for _, arg := range args {
+		if arg == "--" {
+			break
+		}
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if known[arg] {
+			return args
+		}
+		return append([]string{"scan"}, args...)
+	}
+
+	// All args are flags (e.g., "--json") → default to scan.
+	return append([]string{"scan"}, args...)
 }
 
 // resolveBaseDir returns the absolute path from the first arg or cwd.

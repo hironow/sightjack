@@ -200,12 +200,11 @@ func TestPersistentHooks_SpanContext(t *testing.T) {
 }
 
 func TestCobraRouting_DefaultToScan(t *testing.T) {
-	// given: run sightjack with no subcommand — should dispatch to scan
-	// scan will fail (no config), but the error should come from scan, not "no command"
+	// given: run sightjack with no subcommand — DefaultToScan prepends "scan"
 	dir := t.TempDir()
 
 	rootCmd := NewRootCommand()
-	rootCmd.SetArgs([]string{dir})
+	rootCmd.SetArgs(DefaultToScan(rootCmd, []string{dir}))
 	rootCmd.SetOut(&bytes.Buffer{})
 	rootCmd.SetErr(&bytes.Buffer{})
 
@@ -217,6 +216,31 @@ func TestCobraRouting_DefaultToScan(t *testing.T) {
 		t.Fatal("expected error from default scan (no config), but got nil")
 	}
 	errMsg := err.Error()
+	if !strings.Contains(errMsg, "config") {
+		t.Errorf("expected config-related error from scan dispatch, got: %v", err)
+	}
+}
+
+func TestCobraRouting_DefaultToScanWithFlag(t *testing.T) {
+	// given: run sightjack --json <dir> — scan-local flag must be forwarded
+	dir := t.TempDir()
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs(DefaultToScan(rootCmd, []string{"--json", dir}))
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then: should reach scan (fail with config error), NOT "unknown flag: --json"
+	if err == nil {
+		t.Fatal("expected error from default scan (no config), but got nil")
+	}
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "unknown flag") {
+		t.Errorf("scan flag --json should be accepted via DefaultToScan, got: %v", err)
+	}
 	if !strings.Contains(errMsg, "config") {
 		t.Errorf("expected config-related error from scan dispatch, got: %v", err)
 	}
