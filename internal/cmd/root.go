@@ -11,7 +11,13 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
-var version = "0.0.12"
+// version, commit, date are set by -ldflags at build time (GoReleaser).
+// Defaults to "dev" for local development (go run / go build without flags).
+var (
+	version = "dev"
+	commit  = "dev"
+	date    = "dev"
+)
 
 var (
 	cfgPath string
@@ -74,6 +80,7 @@ func NewRootCommand() *cobra.Command {
 		newApplyCmd(),
 		newNextgenCmd(),
 		newRunCmd(),
+		newVersionCmd(),
 	)
 
 	return rootCmd

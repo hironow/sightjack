@@ -30,10 +30,13 @@ lint-md:
 
 # Version from git tags
 VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
+COMMIT := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
+DATE := `date -u +%Y-%m-%dT%H:%M:%SZ`
+LDFLAGS := "-X github.com/hironow/sightjack/internal/cmd.version=" + VERSION + " -X github.com/hironow/sightjack/internal/cmd.commit=" + COMMIT + " -X github.com/hironow/sightjack/internal/cmd.date=" + DATE
 
 # Build the binary with version info
 build:
-    go build -ldflags "-X github.com/hironow/sightjack/internal/cmd.version={{VERSION}}" -o sightjack ./cmd/sightjack
+    go build -ldflags "{{LDFLAGS}}" -o sightjack ./cmd/sightjack
 
 # Build and install to /usr/local/bin
 install: build
