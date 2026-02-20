@@ -89,6 +89,26 @@ After each wave completion, the AI generates follow-up waves based on what was l
 
 ## Architecture
 
+### Pipe Architecture (v0.0.12+)
+
+```
+scan --json ──→ waves ──→ select ──→ discuss ──→ apply ──→ nextgen
+   |              |          |           |          |          |
+   v              v          v           v          v          v
+ScanResult    WavePlan     Wave    DiscussResult ApplyResult WavePlan
+                                       |
+                                       └──→ adr ──→ ADR Markdown
+```
+
+All data flows as JSON through Unix pipes. Each subcommand is a standalone filter:
+
+- **stdin**: JSON from previous command (or file)
+- **stdout**: JSON for next command (or file)
+- **stderr**: all log output
+- **/dev/tty**: interactive prompts (select, discuss)
+
+### Monolithic Architecture
+
 ```
 Sightjack (binary)
     |
@@ -155,14 +175,31 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime.
 
 ## Subcommands
 
+### Interactive (monolithic session)
+
 | Command | Description |
 |---------|-------------|
 | `sightjack scan` | Classify and deep-scan Linear issues (default) |
 | `sightjack session` | Interactive wave approval and apply session |
-| `sightjack show` | Display last scan results |
+| `sightjack show` | Display last scan results (or pipe JSON from stdin) |
 | `sightjack init` | Initialize `.siren/config.yaml` interactively |
 | `sightjack doctor` | Check environment and tool availability |
 | `sightjack --version` | Show version and exit |
+
+### Pipe-friendly (Unix pipeline)
+
+Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stderr. Interactive prompts use `/dev/tty`.
+
+| Command | stdin | stdout | Description |
+|---------|-------|--------|-------------|
+| `sightjack scan --json` | — | `ScanResult` | Scan and output structured JSON |
+| `sightjack waves` | `ScanResult` | `WavePlan` | Generate execution waves |
+| `sightjack select` | `WavePlan` | `Wave` | Interactive wave selection (tty) |
+| `sightjack discuss` | `Wave` | `DiscussResult` | Architect discussion (tty) |
+| `sightjack apply` | `Wave` | `ApplyResult` | Apply wave actions to Linear |
+| `sightjack adr` | `DiscussResult` | ADR Markdown | Generate ADR document |
+| `sightjack nextgen` | `ApplyResult` | `WavePlan` | Generate follow-up waves |
+| `sightjack show` | `ScanResult` or `WavePlan` | human-readable | Render piped JSON for display |
 
 ## Usage
 
@@ -201,6 +238,25 @@ sightjack session --verbose
 sightjack scan /path/to/repo
 ```
 
+### Unix pipeline
+
+```bash
+# Full pipeline: scan → select wave → discuss → apply
+sightjack scan --json | sightjack waves | sightjack select | sightjack apply
+
+# Generate ADR from discussion
+sightjack scan --json | sightjack waves | sightjack select | sightjack discuss | sightjack adr > docs/adr/0005-foo.md
+
+# Preview scan results
+sightjack scan --json | sightjack show
+
+# Save intermediate results
+sightjack scan --json | tee scan.json | sightjack waves | tee plan.json | sightjack select > wave.json
+
+# Generate follow-up waves after apply
+cat wave.json | sightjack apply | sightjack nextgen
+```
+
 ## Options
 
 | Flag | Short | Default | Description |
@@ -209,6 +265,7 @@ sightjack scan /path/to/repo
 | `--lang` | `-l` | config (`ja`) | Language override (`en` / `ja`) |
 | `--verbose` | `-v` | `false` | Verbose logging |
 | `--dry-run` | | `false` | Generate prompts without executing Claude |
+| `--json` | `-j` | `false` | Output structured JSON (scan subcommand) |
 | `--version` | | | Show version and exit |
 
 ## Configuration
@@ -303,30 +360,38 @@ just jaeger-down    # Stop Jaeger
 
 ```
 +-- cmd/sightjack/
-|   +-- main.go              CLI entry point + subcommand routing
+|   +-- main.go              CLI entry point + subcommand routing (pipe + monolithic)
 |   +-- main_test.go         CLI arg parsing tests
 +-- scanner.go               Scanner Agent (classify + deep-scan)
-+-- architect.go             Architect Agent (design discussion)
-+-- scribe.go                Scribe Agent (ADR generation)
++-- architect.go             Architect Agent (design discussion + ToDiscussResult)
++-- scribe.go                Scribe Agent (ADR generation + RenderADRFromDiscuss)
 +-- handoff.go               Handoff interface for downstream tools
 +-- session.go               Session lifecycle (run, resume, rescan)
-+-- wave.go                  Wave model + unlock evaluation
++-- wave.go                  Wave model + unlock evaluation + ToApplyResult
 +-- wave_generator.go        Wave generation + nextgen (dynamic evolution)
 +-- navigator.go             Matrix Navigator rendering
 +-- cli.go                   Interactive prompts (selection, approval, discuss)
-+-- claude.go                Claude Code subprocess runner
++-- claude.go                Claude Code subprocess runner (--dangerously-skip-permissions)
 +-- config.go                Config parser + defaults (.siren/config.yaml)
-+-- model.go                 Core types (Cluster, Issue, Wave, Action, etc.)
++-- model.go                 Core types + JSON wire format (ScanResult, WavePlan, Wave, etc.)
 +-- state.go                 State persistence + path helpers (.siren/)
 +-- prompt.go                Go template renderer for AI prompts
-+-- logger.go                Colored logging (LogOK, LogWarn, LogError, LogInfo)
++-- logger.go                Colored logging to stderr (LogOK, LogWarn, LogError, LogInfo)
 +-- init.go                  Config scaffolding (sightjack init)
 +-- doctor.go                Environment health check (sightjack doctor)
 +-- telemetry.go             OpenTelemetry tracing (OTLP export, noop fallback)
-+-- *_test.go                Tests (443+)
++-- *_test.go                Tests
 +-- justfile                 Task runner
 +-- docker/
 |   +-- compose.yaml         Jaeger all-in-one for trace viewing
+|   +-- jaeger-v2-config.yaml  Jaeger v2 OTLP configuration
++-- docs/
+|   +-- schemas/             JSON Schema for wire format types
+|       +-- scan_result.json
+|       +-- wave_plan.json
+|       +-- wave.json
+|       +-- discuss_result.json
+|       +-- apply_result.json
 +-- templates/
     +-- scanner_classify_{en,ja}.md.tmpl
     +-- scanner_deepscan_{en,ja}.md.tmpl

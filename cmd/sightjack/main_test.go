@@ -25,7 +25,7 @@ func TestUsageOutput_ContainsSubcommands(t *testing.T) {
 
 	// then: output contains all subcommands
 	output := buf.String()
-	for _, cmd := range []string{"scan", "session", "show", "init", "doctor"} {
+	for _, cmd := range []string{"scan", "waves", "select", "discuss", "apply", "adr", "nextgen", "session", "show", "init", "doctor"} {
 		if !strings.Contains(output, cmd) {
 			t.Errorf("expected usage output to contain %q, got:\n%s", cmd, output)
 		}
@@ -188,6 +188,103 @@ func TestExtractSubcommand(t *testing.T) {
 			args:     []string{"scan", "repo"},
 			wantCmd:  "scan",
 			wantPath: "repo",
+		},
+		// --- --json flag cases ---
+		{
+			name:      "json flag before scan",
+			args:      []string{"--json", "scan"},
+			wantCmd:   "scan",
+			wantFlags: []string{"--json"},
+		},
+		{
+			name:      "short json flag before scan",
+			args:      []string{"-j", "scan"},
+			wantCmd:   "scan",
+			wantFlags: []string{"-j"},
+		},
+		{
+			name:      "scan with json flag after",
+			args:      []string{"scan", "--json"},
+			wantCmd:   "scan",
+			wantFlags: []string{"--json"},
+		},
+		{
+			name:      "json true before scan",
+			args:      []string{"--json", "true", "scan"},
+			wantCmd:   "scan",
+			wantFlags: []string{"--json=true"},
+		},
+		// --- waves subcommand cases ---
+		{
+			name:    "waves subcommand",
+			args:    []string{"waves"},
+			wantCmd: "waves",
+		},
+		{
+			name:      "waves with verbose",
+			args:      []string{"--verbose", "waves"},
+			wantCmd:   "waves",
+			wantFlags: []string{"--verbose"},
+		},
+		{
+			name:      "waves with config",
+			args:      []string{"-c", "custom.yaml", "waves"},
+			wantCmd:   "waves",
+			wantFlags: []string{"-c", "custom.yaml"},
+		},
+		// --- nextgen subcommand cases ---
+		{
+			name:    "nextgen subcommand",
+			args:    []string{"nextgen"},
+			wantCmd: "nextgen",
+		},
+		{
+			name:      "nextgen with config",
+			args:      []string{"-c", "custom.yaml", "nextgen"},
+			wantCmd:   "nextgen",
+			wantFlags: []string{"-c", "custom.yaml"},
+		},
+		// --- adr subcommand cases ---
+		{
+			name:    "adr subcommand",
+			args:    []string{"adr"},
+			wantCmd: "adr",
+		},
+		// --- discuss subcommand cases ---
+		{
+			name:    "discuss subcommand",
+			args:    []string{"discuss"},
+			wantCmd: "discuss",
+		},
+		{
+			name:      "discuss with config",
+			args:      []string{"-c", "custom.yaml", "discuss"},
+			wantCmd:   "discuss",
+			wantFlags: []string{"-c", "custom.yaml"},
+		},
+		// --- apply subcommand cases ---
+		{
+			name:    "apply subcommand",
+			args:    []string{"apply"},
+			wantCmd: "apply",
+		},
+		{
+			name:      "apply with config",
+			args:      []string{"-c", "custom.yaml", "apply"},
+			wantCmd:   "apply",
+			wantFlags: []string{"-c", "custom.yaml"},
+		},
+		// --- select subcommand cases ---
+		{
+			name:    "select subcommand",
+			args:    []string{"select"},
+			wantCmd: "select",
+		},
+		{
+			name:      "select with verbose",
+			args:      []string{"--verbose", "select"},
+			wantCmd:   "select",
+			wantFlags: []string{"--verbose"},
 		},
 	}
 

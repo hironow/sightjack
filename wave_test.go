@@ -284,6 +284,25 @@ func TestEvaluateUnlocks_AllCompleted(t *testing.T) {
 	}
 }
 
+func TestToApplyResult_ZeroActions_ReturnsBeforeCompleteness(t *testing.T) {
+	// given: wave with no actions — nothing to accomplish
+	wave := Wave{
+		ID:          "empty-w1",
+		ClusterName: "Auth",
+		Delta:       WaveDelta{Before: 0.3, After: 0.5},
+		Actions:     nil,
+	}
+	internal := &WaveApplyResult{WaveID: "empty-w1", Applied: 0}
+
+	// when
+	result := ToApplyResult(wave, internal)
+
+	// then: no actions means nothing accomplished → completeness should be Before
+	if result.NewCompleteness != 0.3 {
+		t.Errorf("expected 0.3 (Delta.Before), got %f", result.NewCompleteness)
+	}
+}
+
 func TestEvaluateUnlocks(t *testing.T) {
 	// given
 	waves := []Wave{

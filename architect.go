@@ -11,6 +11,61 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// ToDiscussResult converts an ArchitectResponse to the pipe wire format DiscussResult.
+// It compares original and modified wave actions to build the modifications list,
+// detecting changed, added, and removed actions.
+func ToDiscussResult(wave Wave, resp *ArchitectResponse, topic string) DiscussResult {
+	var mods []WaveModification
+	if resp.ModifiedWave != nil {
+		origLen := len(wave.Actions)
+		modLen := len(resp.ModifiedWave.Actions)
+
+		// Compare actions that exist in both original and modified.
+		commonLen := min(origLen, modLen)
+		for i := 0; i < commonLen; i++ {
+			orig := wave.Actions[i]
+			mod := resp.ModifiedWave.Actions[i]
+			if orig.Description != mod.Description || orig.Detail != mod.Detail || orig.Type != mod.Type || orig.IssueID != mod.IssueID {
+				mods = append(mods, WaveModification{
+					ActionIndex: i,
+					Change:      fmt.Sprintf("%s → %s", orig.Description, mod.Description),
+				})
+			}
+		}
+
+		// Report added actions (modified has more than original).
+		for i := origLen; i < modLen; i++ {
+			mod := resp.ModifiedWave.Actions[i]
+			mods = append(mods, WaveModification{
+				ActionIndex: i,
+				Change:      fmt.Sprintf("added: %s", mod.Description),
+			})
+		}
+
+		// Report removed actions (original has more than modified).
+		for i := modLen; i < origLen; i++ {
+			orig := wave.Actions[i]
+			mods = append(mods, WaveModification{
+				ActionIndex: i,
+				Change:      fmt.Sprintf("removed: %s", orig.Description),
+			})
+		}
+	}
+
+	decision := resp.Decision
+	if decision == "" {
+		decision = topic
+	}
+
+	return DiscussResult{
+		WaveID:        wave.ID,
+		Analysis:      resp.Analysis,
+		Reasoning:     resp.Reasoning,
+		Decision:      decision,
+		Modifications: mods,
+	}
+}
+
 // ParseArchitectResult reads and parses an architect response JSON file.
 func ParseArchitectResult(path string) (*ArchitectResponse, error) {
 	data, err := os.ReadFile(path)

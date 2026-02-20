@@ -85,6 +85,62 @@ func AvailableWaves(waves []Wave, completed map[string]bool) []Wave {
 	return available
 }
 
+// ToApplyResult converts the internal WaveApplyResult to the pipe wire format ApplyResult.
+// It builds per-action results from the wave's actions and the internal result's error list.
+func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
+	actions := make([]ActionResult, 0, len(wave.Actions))
+
+	// Build per-action results: first N actions succeed (N = Applied),
+	// remaining get error messages from the Errors list.
+	for i, a := range wave.Actions {
+		ar := ActionResult{
+			Type:    a.Type,
+			IssueID: a.IssueID,
+			Success: i < internal.Applied,
+		}
+		if !ar.Success {
+			errIdx := i - internal.Applied
+			if errIdx >= 0 && errIdx < len(internal.Errors) {
+				ar.Error = internal.Errors[errIdx]
+			} else {
+				ar.Error = "unknown error"
+			}
+		}
+		actions = append(actions, ar)
+	}
+
+	// Interpolate completeness based on the ratio of successfully applied actions.
+	// All success → Delta.After, all failure → Delta.Before, partial → linear interpolation.
+	// Zero actions → Delta.Before (nothing accomplished).
+	total := len(wave.Actions)
+	var completeness float64
+	if total == 0 {
+		completeness = wave.Delta.Before
+	} else if internal.Applied < total {
+		ratio := float64(internal.Applied) / float64(total)
+		completeness = wave.Delta.Before + (wave.Delta.After-wave.Delta.Before)*ratio
+	} else {
+		completeness = wave.Delta.After
+	}
+
+	// Only mark "completed" on full success. Partial failures get "partial"
+	// so downstream logic (CompletedWavesForCluster, nextgen) does not treat
+	// failed actions as done.
+	if total == 0 || internal.Applied >= total {
+		wave.Status = "completed"
+	} else {
+		wave.Status = "partial"
+	}
+
+	return ApplyResult{
+		WaveID:          internal.WaveID,
+		AppliedActions:  actions,
+		RippleEffects:   internal.Ripples,
+		NewCompleteness: completeness,
+		CompletedWave:   &wave,
+	}
+}
+
 // waveApplyFileName returns the output filename for a wave apply result.
 // Includes cluster name to avoid collisions when wave IDs are duplicated across clusters.
 func waveApplyFileName(wave Wave) string {

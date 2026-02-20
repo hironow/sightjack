@@ -373,7 +373,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			)
 			LogDebug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
 		} else {
-			completedWavesForCluster := completedWavesInCluster(waves, selected.ClusterName)
+			completedWavesForCluster := CompletedWavesForCluster(waves, selected.ClusterName)
 			existingADRs, adrErr := ReadExistingADRs(adrDir)
 			if adrErr != nil {
 				LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
@@ -830,8 +830,8 @@ func RecoverLatestState(baseDir string) (*SessionState, error) {
 	return nil, fmt.Errorf("no recoverable session data in %s", filepath.Join(baseDir, stateDir))
 }
 
-// completedWavesInCluster returns all completed waves for the given cluster.
-func completedWavesInCluster(waves []Wave, clusterName string) []Wave {
+// CompletedWavesForCluster returns all completed waves for the given cluster.
+func CompletedWavesForCluster(waves []Wave, clusterName string) []Wave {
 	var result []Wave
 	for _, w := range waves {
 		if w.ClusterName == clusterName && w.Status == "completed" {

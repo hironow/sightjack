@@ -32,7 +32,7 @@ func NeedsMoreWaves(cluster ClusterScanResult, waves []Wave) bool {
 			continue
 		}
 		clusterTotal++
-		if w.Status == "available" || w.Status == "locked" {
+		if w.Status == "available" || w.Status == "locked" || w.Status == "partial" {
 			hasAvailable = true
 		}
 	}

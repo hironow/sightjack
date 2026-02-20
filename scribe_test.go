@@ -457,3 +457,72 @@ func TestNormalizeScribeResult_EmptyID(t *testing.T) {
 		t.Errorf("expected 0003, got %s", result.ADRID)
 	}
 }
+
+func TestRenderADRFromDiscuss_Basic(t *testing.T) {
+	// given
+	dr := DiscussResult{
+		WaveID:    "auth-w1",
+		Analysis:  "JWT has trade-offs",
+		Reasoning: "Session-based auth is simpler",
+		Decision:  "Use session-based auth",
+		ADRWorthy: true,
+		ADRTitle:  "Session over JWT",
+	}
+
+	// when
+	md := RenderADRFromDiscuss(dr, 42)
+
+	// then
+	if !strings.Contains(md, "# 0042.") {
+		t.Errorf("expected ADR number in title, got:\n%s", md)
+	}
+	if !strings.Contains(md, "Session over JWT") {
+		t.Errorf("expected ADR title, got:\n%s", md)
+	}
+	if !strings.Contains(md, "JWT has trade-offs") {
+		t.Errorf("expected analysis in context, got:\n%s", md)
+	}
+	if !strings.Contains(md, "Use session-based auth") {
+		t.Errorf("expected decision, got:\n%s", md)
+	}
+	if !strings.Contains(md, "Session-based auth is simpler") {
+		t.Errorf("expected reasoning, got:\n%s", md)
+	}
+}
+
+func TestRenderADRFromDiscuss_UsesWaveIDWhenNoTitle(t *testing.T) {
+	// given
+	dr := DiscussResult{
+		WaveID:   "auth-w1",
+		Analysis: "ok",
+		Decision: "proceed",
+	}
+
+	// when
+	md := RenderADRFromDiscuss(dr, 1)
+
+	// then
+	if !strings.Contains(md, "auth-w1") {
+		t.Errorf("expected wave ID as fallback title, got:\n%s", md)
+	}
+}
+
+func TestRenderADRFromDiscuss_WithModifications(t *testing.T) {
+	// given
+	dr := DiscussResult{
+		WaveID:   "w1",
+		Analysis: "changed approach",
+		Decision: "use Redis",
+		Modifications: []WaveModification{
+			{ActionIndex: 0, Change: "Added Redis dependency"},
+		},
+	}
+
+	// when
+	md := RenderADRFromDiscuss(dr, 5)
+
+	// then
+	if !strings.Contains(md, "Redis dependency") {
+		t.Errorf("expected modification in output, got:\n%s", md)
+	}
+}
