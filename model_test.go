@@ -2,8 +2,6 @@ package sightjack
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -1485,48 +1483,5 @@ func TestApplyResult_RemainingWaves_RoundTrip(t *testing.T) {
 	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.50}
 	if NeedsMoreWaves(cluster, allWaves) {
 		t.Error("NeedsMoreWaves should return false when available waves remain")
-	}
-}
-
-// --- Schema example file round-trip tests ---
-
-func TestSchemaExamples_RoundTrip(t *testing.T) {
-	schemasDir := filepath.Join("docs", "schemas")
-
-	tests := []struct {
-		file   string
-		target any
-	}{
-		{"scan_result.json", &ScanResult{}},
-		{"wave_plan.json", &WavePlan{}},
-		{"wave.json", &Wave{}},
-		{"discuss_result.json", &DiscussResult{}},
-		{"apply_result.json", &ApplyResult{}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.file, func(t *testing.T) {
-			path := filepath.Join(schemasDir, tt.file)
-			data, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatalf("read %s: %v", tt.file, err)
-			}
-
-			// unmarshal
-			if err := json.Unmarshal(data, tt.target); err != nil {
-				t.Fatalf("unmarshal %s: %v", tt.file, err)
-			}
-
-			// re-marshal
-			redata, err := json.Marshal(tt.target)
-			if err != nil {
-				t.Fatalf("re-marshal %s: %v", tt.file, err)
-			}
-
-			// re-unmarshal (round-trip)
-			if err := json.Unmarshal(redata, tt.target); err != nil {
-				t.Fatalf("round-trip unmarshal %s: %v", tt.file, err)
-			}
-		})
 	}
 }

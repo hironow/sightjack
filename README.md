@@ -385,13 +385,6 @@ just jaeger-down    # Stop Jaeger
 +-- docker/
 |   +-- compose.yaml         Jaeger all-in-one for trace viewing
 |   +-- jaeger-v2-config.yaml  Jaeger v2 OTLP configuration
-+-- docs/
-|   +-- schemas/             JSON Schema for wire format types
-|       +-- scan_result.json
-|       +-- wave_plan.json
-|       +-- wave.json
-|       +-- discuss_result.json
-|       +-- apply_result.json
 +-- templates/
     +-- scanner_classify_{en,ja}.md.tmpl
     +-- scanner_deepscan_{en,ja}.md.tmpl
