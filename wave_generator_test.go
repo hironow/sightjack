@@ -308,6 +308,22 @@ func TestNeedsMoreWaves_IgnoresOtherClusterWaves(t *testing.T) {
 	}
 }
 
+func TestNeedsMoreWaves_PartialWaveIsPending(t *testing.T) {
+	// given: only wave is "partial" (failed apply), no other available/locked
+	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.4}
+	waves := []Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Status: "partial"},
+	}
+
+	// when
+	result := NeedsMoreWaves(cluster, waves)
+
+	// then: partial wave = unfinished work, should NOT trigger nextgen
+	if result {
+		t.Error("expected false: partial wave should be treated as pending, not trigger nextgen")
+	}
+}
+
 func TestGenerateNextWavesDryRun(t *testing.T) {
 	dir := t.TempDir()
 	scanDir := filepath.Join(dir, "scans")
