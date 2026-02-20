@@ -71,15 +71,15 @@ func logLineTo(w io.Writer, prefix, color string, format string, args ...any) {
 	}
 }
 
-func LogInfo(format string, args ...any)  { logLineTo(logStdout, "INFO", colorCyan, format, args...) }
-func LogOK(format string, args ...any)    { logLineTo(logStdout, " OK ", colorGreen, format, args...) }
+func LogInfo(format string, args ...any)  { logLineTo(logStderr, "INFO", colorCyan, format, args...) }
+func LogOK(format string, args ...any)    { logLineTo(logStderr, " OK ", colorGreen, format, args...) }
 func LogWarn(format string, args ...any)  { logLineTo(logStderr, "WARN", colorYellow, format, args...) }
 func LogError(format string, args ...any) { logLineTo(logStderr, " ERR", colorRed, format, args...) }
-func LogScan(format string, args ...any)  { logLineTo(logStdout, "SCAN", colorBlue, format, args...) }
-func LogNav(format string, args ...any)   { logLineTo(logStdout, " NAV", colorPurple, format, args...) }
+func LogScan(format string, args ...any)  { logLineTo(logStderr, "SCAN", colorBlue, format, args...) }
+func LogNav(format string, args ...any)   { logLineTo(logStderr, " NAV", colorPurple, format, args...) }
 func LogDebug(format string, args ...any) {
 	if verboseMode {
-		logLineTo(logStdout, "DBUG", colorCyan, format, args...)
+		logLineTo(logStderr, "DBUG", colorCyan, format, args...)
 	}
 }
 

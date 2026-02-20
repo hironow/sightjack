@@ -145,27 +145,86 @@ func TestLogWarn_WritesToStderr(t *testing.T) {
 	}
 }
 
-func TestLogInfo_WritesToStdout(t *testing.T) {
-	// given: swap logStdout to capture LogInfo output
-	var outBuf bytes.Buffer
-	origStdout := logStdout
-	logStdout = &outBuf
-	defer func() { logStdout = origStdout }()
+func TestLogInfo_WritesToStderr(t *testing.T) {
+	// given: swap logStderr to capture LogInfo output
+	var errBuf bytes.Buffer
+	origStderr := logStderr
+	logStderr = &errBuf
+	defer func() { logStderr = origStderr }()
 
-	// when: call LogInfo (not logLineTo directly)
+	// when
 	LogInfo("starting scan")
 
-	// then: output should appear on the stdout writer
-	line := outBuf.String()
+	// then: output should appear on stderr
+	line := errBuf.String()
 	if !strings.Contains(line, "INFO") {
-		t.Errorf("expected INFO prefix on stdout, got: %s", line)
+		t.Errorf("expected INFO prefix on stderr, got: %s", line)
 	}
 	if !strings.Contains(line, "starting scan") {
-		t.Errorf("expected info message on stdout, got: %s", line)
+		t.Errorf("expected info message on stderr, got: %s", line)
 	}
 }
 
-func TestLogError_DoesNotWriteToStdout(t *testing.T) {
+func TestLogOK_WritesToStderr(t *testing.T) {
+	var errBuf bytes.Buffer
+	origStderr := logStderr
+	logStderr = &errBuf
+	defer func() { logStderr = origStderr }()
+
+	LogOK("done")
+
+	line := errBuf.String()
+	if !strings.Contains(line, " OK ") {
+		t.Errorf("expected OK prefix on stderr, got: %s", line)
+	}
+}
+
+func TestLogScan_WritesToStderr(t *testing.T) {
+	var errBuf bytes.Buffer
+	origStderr := logStderr
+	logStderr = &errBuf
+	defer func() { logStderr = origStderr }()
+
+	LogScan("classifying")
+
+	line := errBuf.String()
+	if !strings.Contains(line, "SCAN") {
+		t.Errorf("expected SCAN prefix on stderr, got: %s", line)
+	}
+}
+
+func TestLogNav_WritesToStderr(t *testing.T) {
+	var errBuf bytes.Buffer
+	origStderr := logStderr
+	logStderr = &errBuf
+	defer func() { logStderr = origStderr }()
+
+	LogNav("rendering")
+
+	line := errBuf.String()
+	if !strings.Contains(line, " NAV") {
+		t.Errorf("expected NAV prefix on stderr, got: %s", line)
+	}
+}
+
+func TestLogDebug_WritesToStderr(t *testing.T) {
+	SetVerbose(true)
+	defer SetVerbose(false)
+
+	var errBuf bytes.Buffer
+	origStderr := logStderr
+	logStderr = &errBuf
+	defer func() { logStderr = origStderr }()
+
+	LogDebug("trace info")
+
+	line := errBuf.String()
+	if !strings.Contains(line, "DBUG") {
+		t.Errorf("expected DBUG prefix on stderr, got: %s", line)
+	}
+}
+
+func TestAllLogs_NeverWriteToStdout(t *testing.T) {
 	// given: swap both writers
 	var outBuf, errBuf bytes.Buffer
 	origStdout, origStderr := logStdout, logStderr
@@ -173,14 +232,24 @@ func TestLogError_DoesNotWriteToStdout(t *testing.T) {
 	logStderr = &errBuf
 	defer func() { logStdout = origStdout; logStderr = origStderr }()
 
-	// when
-	LogError("fail")
+	SetVerbose(true)
+	defer SetVerbose(false)
 
-	// then: stdout should be empty, stderr should have the message
+	// when: call every log function
+	LogInfo("info")
+	LogOK("ok")
+	LogWarn("warn")
+	LogError("error")
+	LogScan("scan")
+	LogNav("nav")
+	LogDebug("debug")
+
+	// then: stdout must be completely empty
 	if outBuf.Len() != 0 {
-		t.Errorf("LogError should not write to stdout, got: %s", outBuf.String())
+		t.Errorf("no log function should write to stdout, got: %s", outBuf.String())
 	}
+	// stderr must have all messages
 	if errBuf.Len() == 0 {
-		t.Error("LogError should write to stderr, but stderr was empty")
+		t.Error("all log output should go to stderr")
 	}
 }
