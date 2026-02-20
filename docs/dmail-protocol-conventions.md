@@ -70,7 +70,7 @@ with identical filenames.
 ### 5. Retention Rules
 
 - **Default retention**: Indefinite (no automatic expiration)
-- **Manual pruning**: Available via `just archive-prune` (per-tool)
+- **Manual pruning**: Available via each tool's CLI subcommand (e.g. `sightjack archive-prune`)
 - **Retention criterion**: File modification time > N days (default: 30)
 - **Compression**: Not applied (individual .md files, git-tracked for diff visibility)
 - **Automatic pruning**: Not implemented (premature optimization)
@@ -86,17 +86,33 @@ with identical filenames.
 
 ### 7. Pruning Implementation
 
-Each tool implements its own `archive-prune` in its justfile (Candidate A).
+Each tool implements `archive-prune` as a CLI subcommand.
+
+Usage (sightjack example):
+
+```bash
+# Dry-run (default): list expired files
+sightjack archive-prune
+
+# With custom retention days
+sightjack archive-prune --days 90
+
+# Execute deletion
+sightjack archive-prune --execute
+
+# Execute with custom days
+sightjack archive-prune --days 90 --execute
+```
 
 Rationale:
 
 - Archive paths are tool-specific (`.siren/archive/`, `.expedition/archive/`, `.gate/archive/`)
-- No shared infrastructure needed
-- Tool-specific guards are easy to add (e.g. amadeus sequence number verification)
+- End users only have CLI binaries, not justfiles
+- Default dry-run ensures safety — `--execute` flag required for deletion
 
 Requirements:
 
-- Dry-run mode (show files without deleting)
-- Confirmation prompt before deletion
-- Configurable retention days (default: 30)
-- Target only `archive/` directory (never touch inbox/ or outbox/)
+- Default behavior: dry-run (list expired files to stdout)
+- `--execute` flag for actual deletion
+- `--days N` for configurable retention (default: 30)
+- Target only `archive/*.md` files (never touch inbox/ or outbox/)
