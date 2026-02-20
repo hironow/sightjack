@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
+	"time"
 )
 
 const adrSubdir = "docs/adr"
@@ -60,6 +62,32 @@ func sanitizeADRTitle(title string) string {
 		return "untitled"
 	}
 	return s
+}
+
+// RenderADRFromDiscuss generates an ADR Markdown document from a DiscussResult.
+// This is a pure transformer — no Claude invocation needed.
+func RenderADRFromDiscuss(dr DiscussResult, adrNum int) string {
+	title := dr.ADRTitle
+	if title == "" {
+		title = dr.WaveID
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %04d. %s\n\n", adrNum, title)
+	fmt.Fprintf(&b, "**Date:** %s\n", time.Now().Format("2006-01-02"))
+	fmt.Fprintf(&b, "**Status:** Accepted\n\n")
+	fmt.Fprintf(&b, "## Context\n\n%s\n\n", dr.Analysis)
+	fmt.Fprintf(&b, "## Decision\n\n%s\n\n", dr.Decision)
+	fmt.Fprintf(&b, "## Consequences\n\n%s\n", dr.Reasoning)
+
+	if len(dr.Modifications) > 0 {
+		fmt.Fprintf(&b, "\n### Modifications\n\n")
+		for _, m := range dr.Modifications {
+			fmt.Fprintf(&b, "- Action %d: %s\n", m.ActionIndex, m.Change)
+		}
+	}
+
+	return b.String()
 }
 
 // CountADRFiles returns the number of files matching NNNN-*.md in adrDir.

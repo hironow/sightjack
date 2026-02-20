@@ -59,7 +59,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -119,6 +119,10 @@ func main() {
 		defer cancel()
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runDiscuss(ctx, cfg, baseDir, dryRun)
+		sightjack.EndRootSpan(ctx)
+	case "adr":
+		ctx := sightjack.StartRootSpan(context.Background(), subcmd)
+		runADR(baseDir)
 		sightjack.EndRootSpan(ctx)
 	case "apply":
 		cfg := loadConfigOrExit(configPath)
@@ -239,6 +243,7 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "  select    Interactively pick a wave from stdin WavePlan\n")
 		fmt.Fprintf(out, "  discuss   Architect discussion from stdin Wave JSON\n")
 		fmt.Fprintf(out, "  apply     Apply a wave to Linear from stdin Wave JSON\n")
+		fmt.Fprintf(out, "  adr       Generate ADR Markdown from stdin DiscussResult\n")
 		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
 		fmt.Fprintf(out, "  init      Create .siren/config.yaml interactively\n")
@@ -279,7 +284,7 @@ func configExplicitlySet(fs *flag.FlagSet) bool {
 // At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "show": true, "session": true, "init": true, "doctor": true}
+	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "adr": true, "show": true, "session": true, "init": true, "doctor": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
@@ -329,7 +334,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|show|session|init|doctor] [flags] [path]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|show|session|init|doctor] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
@@ -416,6 +421,35 @@ func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun 
 	}
 
 	sightjack.LogOK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
+}
+
+func runADR(baseDir string) {
+	// Read DiscussResult JSON from stdin.
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		sightjack.LogError("Failed to read stdin: %v", err)
+		os.Exit(1)
+	}
+	if len(data) == 0 {
+		sightjack.LogError("No input on stdin. Pipe discuss result: sightjack discuss | sightjack adr")
+		os.Exit(1)
+	}
+
+	var dr sightjack.DiscussResult
+	if err := json.Unmarshal(data, &dr); err != nil {
+		sightjack.LogError("Invalid DiscussResult JSON: %v", err)
+		os.Exit(1)
+	}
+
+	adrDir := sightjack.ADRDir(baseDir)
+	adrNum, err := sightjack.NextADRNumber(adrDir)
+	if err != nil {
+		sightjack.LogError("Failed to determine ADR number: %v", err)
+		os.Exit(1)
+	}
+
+	md := sightjack.RenderADRFromDiscuss(dr, adrNum)
+	fmt.Print(md)
 }
 
 func runDiscuss(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool) {
