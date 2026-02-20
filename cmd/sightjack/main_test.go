@@ -25,7 +25,7 @@ func TestUsageOutput_ContainsSubcommands(t *testing.T) {
 
 	// then: output contains all subcommands
 	output := buf.String()
-	for _, cmd := range []string{"scan", "waves", "select", "discuss", "apply", "adr", "nextgen", "session", "show", "init", "doctor"} {
+	for _, cmd := range []string{"scan", "waves", "select", "discuss", "apply", "adr", "nextgen", "run", "show", "init", "doctor"} {
 		if !strings.Contains(output, cmd) {
 			t.Errorf("expected usage output to contain %q, got:\n%s", cmd, output)
 		}
@@ -43,9 +43,9 @@ func TestExtractSubcommand(t *testing.T) {
 	}{
 		// --- existing bool-flag cases (path="" expected) ---
 		{
-			name:      "verbose true before session",
-			args:      []string{"--verbose", "true", "session"},
-			wantCmd:   "session",
+			name:      "verbose true before run",
+			args:      []string{"--verbose", "true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--verbose=true"},
 		},
 		{
@@ -55,21 +55,21 @@ func TestExtractSubcommand(t *testing.T) {
 			wantFlags: []string{"--dry-run=false"},
 		},
 		{
-			name:      "short verbose true before session",
-			args:      []string{"-v", "true", "session"},
-			wantCmd:   "session",
+			name:      "short verbose true before run",
+			args:      []string{"-v", "true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"-v=true"},
 		},
 		{
 			name:      "bool flag without value still works",
-			args:      []string{"--verbose", "session"},
-			wantCmd:   "session",
+			args:      []string{"--verbose", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--verbose"},
 		},
 		{
 			name:      "config with value and bool flag with value",
-			args:      []string{"-c", "custom.yaml", "--verbose", "true", "session"},
-			wantCmd:   "session",
+			args:      []string{"-c", "custom.yaml", "--verbose", "true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"-c", "custom.yaml", "--verbose=true"},
 		},
 		{
@@ -86,14 +86,14 @@ func TestExtractSubcommand(t *testing.T) {
 		},
 		{
 			name:      "bool flag with equals syntax preserved",
-			args:      []string{"--verbose=true", "session"},
-			wantCmd:   "session",
+			args:      []string{"--verbose=true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--verbose=true"},
 		},
 		{
 			name:      "dry-run false is preserved for flag parser",
-			args:      []string{"--dry-run", "false", "session"},
-			wantCmd:   "session",
+			args:      []string{"--dry-run", "false", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--dry-run=false"},
 		},
 		{

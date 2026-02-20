@@ -59,7 +59,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|run|init|doctor] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -150,7 +150,7 @@ func main() {
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runSelect(ctx)
 		sightjack.EndRootSpan(ctx)
-	case "session":
+	case "run":
 		cfg := loadConfigOrExit(configPath)
 		if lang != "" {
 			cfg.Lang = lang
@@ -255,7 +255,7 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "  apply     Apply a wave to Linear from stdin Wave JSON\n")
 		fmt.Fprintf(out, "  adr       Generate ADR Markdown from stdin DiscussResult\n")
 		fmt.Fprintf(out, "  nextgen   Generate follow-up waves from stdin ApplyResult\n")
-		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
+		fmt.Fprintf(out, "  run       Interactive wave approval and apply loop\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
 		fmt.Fprintf(out, "  init      Create .siren/config.yaml interactively\n")
 		fmt.Fprintf(out, "  doctor    Check environment and tool availability\n\n")
@@ -295,7 +295,7 @@ func configExplicitlySet(fs *flag.FlagSet) bool {
 // At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "adr": true, "nextgen": true, "show": true, "session": true, "init": true, "doctor": true}
+	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "adr": true, "nextgen": true, "show": true, "run": true, "init": true, "doctor": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
@@ -345,7 +345,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|session|init|doctor] [flags] [path]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|run|init|doctor] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
