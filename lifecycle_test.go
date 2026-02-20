@@ -736,7 +736,7 @@ func TestMockDispatcher_WritesFile(t *testing.T) {
 
 	// when: simulate a Claude call with -p containing the output path
 	prompt := "Write JSON to " + outputPath
-	cmd := newCmd(context.Background(), "claude", "--print", "-p", prompt)
+	cmd := newCmd(context.Background(), "claude", "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd.Run()
 
 	// then

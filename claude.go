@@ -21,17 +21,6 @@ func defaultNewCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
 }
 
-// BuildClaudeArgs constructs the argument list for the Claude CLI based on
-// the given configuration and prompt text.
-func BuildClaudeArgs(cfg *Config, prompt string) []string {
-	args := []string{"--print"}
-	if cfg.Claude.Model != "" {
-		args = append(args, "--model", cfg.Claude.Model)
-	}
-	args = append(args, "-p", prompt)
-	return args
-}
-
 // RunClaudeOnce executes the Claude CLI as a subprocess once without retry.
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
@@ -55,7 +44,11 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer)
 		defer cancel()
 	}
 
-	args := BuildClaudeArgs(cfg, prompt)
+	var args []string
+	if cfg.Claude.Model != "" {
+		args = append(args, "--model", cfg.Claude.Model)
+	}
+	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, cfg.Claude.Command, args...)
 
 	stdout, err := cmd.StdoutPipe()
