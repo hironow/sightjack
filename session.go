@@ -54,6 +54,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			LogWarn("D-Mail monitor failed: %v", monitorErr)
 		}
 		DrainInboxFeedback(inboxCh)
+		LogInboxFeedbackAsync(inboxCh)
 	}
 
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -598,6 +599,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 		LogWarn("D-Mail monitor failed: %v", monitorErr)
 	}
 	DrainInboxFeedback(inboxCh)
+	LogInboxFeedbackAsync(inboxCh)
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
@@ -634,6 +636,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		LogWarn("D-Mail monitor failed: %v", monitorErr)
 	}
 	DrainInboxFeedback(inboxCh)
+	LogInboxFeedbackAsync(inboxCh)
 
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)

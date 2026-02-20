@@ -285,6 +285,25 @@ loop:
 	return len(feedback)
 }
 
+// LogInboxFeedbackAsync starts a background goroutine that displays
+// feedback d-mails as they arrive on the monitor channel.
+// Safe to call with a nil channel (no-op).
+func LogInboxFeedbackAsync(ch <-chan *DMail) {
+	if ch == nil {
+		return
+	}
+	go func() {
+		for mail := range ch {
+			switch mail.Severity {
+			case "high":
+				LogWarn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
+			default:
+				LogInfo("[D-Mail] [%s] %s", mail.Name, mail.Description)
+			}
+		}
+	}()
+}
+
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.
 func ReceiveDMail(baseDir, filename string) (*DMail, error) {
 	inboxPath := filepath.Join(MailDir(baseDir, inboxDir), filename)

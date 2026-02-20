@@ -683,3 +683,50 @@ func TestDrainInboxFeedback_NilChannel(t *testing.T) {
 		t.Errorf("expected 0 for nil channel, got %d", count)
 	}
 }
+
+func TestLogInboxFeedbackAsync_ConsumesLateArrivals(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// Drain initial (empty)
+	DrainInboxFeedback(ch)
+
+	// Start background consumer
+	LogInboxFeedbackAsync(ch)
+
+	// Wait for watcher to be ready
+	time.Sleep(50 * time.Millisecond)
+
+	// Write feedback AFTER drain
+	fb := &DMail{
+		Name:        "feedback-late-001",
+		Kind:        DMailFeedback,
+		Description: "Late feedback",
+		Severity:    "high",
+		Body:        "# Late\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+
+	// Wait for background processing
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify: file should be archived (consumed by background goroutine)
+	archivePath := filepath.Join(MailDir(dir, "archive"), fb.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("late feedback not archived (background consumer didn't process): %v", err)
+	}
+}
+
+func TestLogInboxFeedbackAsync_NilChannel(t *testing.T) {
+	// Should not panic
+	LogInboxFeedbackAsync(nil)
+}
