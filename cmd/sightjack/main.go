@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -35,6 +36,7 @@ func main() {
 		verbose    bool
 		dryRun     bool
 		showVer    bool
+		jsonOutput bool
 	)
 
 	fs := flag.NewFlagSet("sightjack", flag.ExitOnError)
@@ -46,6 +48,8 @@ func main() {
 	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
 	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
 	fs.BoolVar(&dryRun, "dry-run", false, "Generate prompts without executing Claude")
+	fs.BoolVar(&jsonOutput, "json", false, "Output scan result as JSON")
+	fs.BoolVar(&jsonOutput, "j", false, "Output scan result as JSON (shorthand)")
 	fs.BoolVar(&showVer, "version", false, "Show version")
 	fs.Parse(flagArgs)
 
@@ -94,7 +98,7 @@ func main() {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
-		runScan(ctx, cfg, baseDir, dryRun)
+		runScan(ctx, cfg, baseDir, dryRun, jsonOutput)
 		sightjack.EndRootSpan(ctx)
 	case "session":
 		cfg := loadConfigOrExit(configPath)
@@ -246,6 +250,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		"-verbose": true, "--verbose": true, "-v": true,
 		"-dry-run": true, "--dry-run": true,
 		"-version": true, "--version": true,
+		"-json": true, "--json": true, "-j": true,
 	}
 
 	var subcmd string
@@ -315,7 +320,7 @@ func loadConfigOrExit(configPath string) *sightjack.Config {
 	return cfg
 }
 
-func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool) {
+func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool, jsonOutput bool) {
 	sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
 
 	sightjack.LogInfo("Starting sightjack scan...")
@@ -332,10 +337,19 @@ func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun 
 		return
 	}
 
-	// Display Link Navigator
-	nav := sightjack.RenderNavigator(result, cfg.Linear.Project)
-	fmt.Println()
-	fmt.Print(nav)
+	if jsonOutput {
+		data, jsonErr := json.MarshalIndent(result, "", "  ")
+		if jsonErr != nil {
+			sightjack.LogError("JSON marshal failed: %v", jsonErr)
+			os.Exit(1)
+		}
+		fmt.Println(string(data))
+	} else {
+		// Display Link Navigator
+		nav := sightjack.RenderNavigator(result, cfg.Linear.Project)
+		fmt.Println()
+		fmt.Print(nav)
+	}
 
 	// Save state
 	state := &sightjack.SessionState{

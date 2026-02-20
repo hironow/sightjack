@@ -189,6 +189,31 @@ func TestExtractSubcommand(t *testing.T) {
 			wantCmd:  "scan",
 			wantPath: "repo",
 		},
+		// --- --json flag cases ---
+		{
+			name:      "json flag before scan",
+			args:      []string{"--json", "scan"},
+			wantCmd:   "scan",
+			wantFlags: []string{"--json"},
+		},
+		{
+			name:      "short json flag before scan",
+			args:      []string{"-j", "scan"},
+			wantCmd:   "scan",
+			wantFlags: []string{"-j"},
+		},
+		{
+			name:      "scan with json flag after",
+			args:      []string{"scan", "--json"},
+			wantCmd:   "scan",
+			wantFlags: []string{"--json"},
+		},
+		{
+			name:      "json true before scan",
+			args:      []string{"--json", "true", "scan"},
+			wantCmd:   "scan",
+			wantFlags: []string{"--json=true"},
+		},
 	}
 
 	for _, tt := range tests {
