@@ -111,7 +111,7 @@ func ComposeDMail(baseDir string, mail *DMail) error {
 		return err
 	}
 	filename := mail.Filename()
-	for _, sub := range []string{outboxDir, archiveDir} {
+	for _, sub := range []string{archiveDir, outboxDir} {
 		path := filepath.Join(MailDir(baseDir, sub), filename)
 		if err := os.WriteFile(path, data, 0644); err != nil {
 			return fmt.Errorf("dmail compose to %s: %w", sub, err)
