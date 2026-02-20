@@ -49,3 +49,16 @@ func TestValidateDMail_MissingDescription(t *testing.T) {
 		t.Error("expected error for missing description")
 	}
 }
+
+func TestValidateDMail_Nil(t *testing.T) {
+	if err := ValidateDMail(nil); err == nil {
+		t.Error("expected error for nil mail")
+	}
+}
+
+func TestDMail_Filename(t *testing.T) {
+	mail := &DMail{Name: "spec-my-42"}
+	if got := mail.Filename(); got != "spec-my-42.md" {
+		t.Errorf("got %s, want spec-my-42.md", got)
+	}
+}

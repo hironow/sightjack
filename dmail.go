@@ -29,6 +29,9 @@ func (d *DMail) Filename() string {
 
 // ValidateDMail checks required fields and kind validity.
 func ValidateDMail(mail *DMail) error {
+	if mail == nil {
+		return fmt.Errorf("dmail: mail is nil")
+	}
 	if mail.Name == "" {
 		return fmt.Errorf("dmail: name is required")
 	}
