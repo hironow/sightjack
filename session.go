@@ -200,7 +200,7 @@ const (
 // existing elements via PropagateWaveUpdate — it never appends or reassigns.
 // Returns the (possibly modified) wave and whether it was approved.
 func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
-	cfg *Config, scanDir string, selected Wave, resolvedStrictness string,
+	cfg *Config, scanDir, baseDir string, selected Wave, resolvedStrictness string,
 	waves []Wave, completed map[string]bool,
 	sessionRejected map[string][]WaveAction, adrDir string, adrCount *int,
 	loopSpan trace.Span) (Wave, approvalPhaseResult) {
@@ -483,7 +483,7 @@ outerLoop:
 
 		resolvedStrictness := string(ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, loopSpan)
+		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, baseDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, loopSpan)
 		if approvalResult != approvalApproved {
 			continue
 		}
