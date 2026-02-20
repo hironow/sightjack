@@ -226,6 +226,10 @@ func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 				if !ok {
 					return
 				}
+				// NOTE: Write events handle partial-write resilience. If Create fires
+				// before the file is fully written, receiveDMailIfNew fails and leaves
+				// the file in inbox/. Subsequent Write events re-trigger processing.
+				// Archive-based dedup in receiveDMailIfNew prevents double delivery.
 				if (event.Has(fsnotify.Create) || event.Has(fsnotify.Write)) && strings.HasSuffix(event.Name, ".md") {
 					filename := filepath.Base(event.Name)
 					if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
