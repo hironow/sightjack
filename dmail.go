@@ -3,6 +3,8 @@ package sightjack
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -27,6 +29,27 @@ const (
 	DMailReport        DMailKind = "report"
 	DMailFeedback      DMailKind = "feedback"
 )
+
+const (
+	inboxDir   = "inbox"
+	outboxDir  = "outbox"
+	archiveDir = "archive"
+)
+
+// MailDir returns the path to a mail subdirectory under the state root.
+func MailDir(baseDir, sub string) string {
+	return filepath.Join(baseDir, stateDir, sub)
+}
+
+// EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.
+func EnsureMailDirs(baseDir string) error {
+	for _, sub := range []string{inboxDir, outboxDir, archiveDir} {
+		if err := os.MkdirAll(MailDir(baseDir, sub), 0755); err != nil {
+			return fmt.Errorf("create %s dir: %w", sub, err)
+		}
+	}
+	return nil
+}
 
 // Filename returns the canonical filename: "<name>.md".
 func (d *DMail) Filename() string {

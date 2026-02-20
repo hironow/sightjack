@@ -1,6 +1,8 @@
 package sightjack
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -141,5 +143,41 @@ func TestParseDMail_NoFrontmatter(t *testing.T) {
 	_, err := ParseDMail(data)
 	if err == nil {
 		t.Error("expected error for missing frontmatter")
+	}
+}
+
+func TestMailDir(t *testing.T) {
+	got := MailDir("/project", "inbox")
+	want := filepath.Join("/project", ".siren", "inbox")
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestEnsureMailDirs_CreatesAll(t *testing.T) {
+	dir := t.TempDir()
+	if err := EnsureMailDirs(dir); err != nil {
+		t.Fatalf("EnsureMailDirs: %v", err)
+	}
+	for _, sub := range []string{"inbox", "outbox", "archive"} {
+		path := MailDir(dir, sub)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("%s not created: %v", sub, err)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("%s is not a directory", sub)
+		}
+	}
+}
+
+func TestEnsureMailDirs_Idempotent(t *testing.T) {
+	dir := t.TempDir()
+	if err := EnsureMailDirs(dir); err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	if err := EnsureMailDirs(dir); err != nil {
+		t.Fatalf("second: %v", err)
 	}
 }

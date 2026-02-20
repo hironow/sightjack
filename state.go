@@ -25,7 +25,7 @@ func ConfigPath(baseDir string) string {
 // files (state.json and .run/) from version control.
 // The write is idempotent — the file is always overwritten with the canonical content.
 func WriteGitIgnore(baseDir string) error {
-	content := "state.json\n.run/\n"
+	content := "state.json\n.run/\ninbox/\noutbox/\n"
 	path := filepath.Join(baseDir, stateDir, ".gitignore")
 	return os.WriteFile(path, []byte(content), 0644)
 }

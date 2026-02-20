@@ -538,3 +538,22 @@ func TestLoadScanResult_MalformedJSON(t *testing.T) {
 		t.Fatal("expected error for malformed JSON")
 	}
 }
+
+func TestWriteGitIgnore_IncludesMailDirs(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, stateDir), 0755)
+	if err := WriteGitIgnore(dir); err != nil {
+		t.Fatalf("WriteGitIgnore: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, stateDir, ".gitignore"))
+	content := string(data)
+	if !strings.Contains(content, "inbox/") {
+		t.Error("expected inbox/ in .gitignore")
+	}
+	if !strings.Contains(content, "outbox/") {
+		t.Error("expected outbox/ in .gitignore")
+	}
+	if strings.Contains(content, "archive/") {
+		t.Error("archive/ should NOT be in .gitignore (git-tracked)")
+	}
+}
