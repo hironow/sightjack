@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -135,4 +136,42 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback)", mail.Kind)
 	}
 	return nil
+}
+
+// ListDMail returns all .md filenames in the given mail subdirectory.
+func ListDMail(baseDir, sub string) ([]string, error) {
+	dir := MailDir(baseDir, sub)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("dmail list %s: %w", sub, err)
+	}
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+// ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.
+func ReceiveDMail(baseDir, filename string) (*DMail, error) {
+	inboxPath := filepath.Join(MailDir(baseDir, inboxDir), filename)
+	data, err := os.ReadFile(inboxPath)
+	if err != nil {
+		return nil, fmt.Errorf("dmail read inbox: %w", err)
+	}
+	mail, err := ParseDMail(data)
+	if err != nil {
+		return nil, fmt.Errorf("dmail parse inbox %s: %w", filename, err)
+	}
+	archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
+	if err := os.WriteFile(archivePath, data, 0644); err != nil {
+		return nil, fmt.Errorf("dmail archive %s: %w", filename, err)
+	}
+	if err := os.Remove(inboxPath); err != nil {
+		return nil, fmt.Errorf("dmail remove inbox %s: %w", filename, err)
+	}
+	return mail, nil
 }

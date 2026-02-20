@@ -228,3 +228,77 @@ func TestComposeDMail_ValidationError(t *testing.T) {
 		t.Error("expected validation error for empty name")
 	}
 }
+
+func TestListDMail_Empty(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	files, err := ListDMail(dir, "inbox")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("expected 0 files, got %d", len(files))
+	}
+}
+
+func TestListDMail_FindsFiles(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), "a.md"), []byte("x"), 0644)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), "b.md"), []byte("y"), 0644)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), "not-md.txt"), []byte("z"), 0644)
+	files, err := ListDMail(dir, "inbox")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(files) != 2 {
+		t.Errorf("expected 2 .md files, got %d", len(files))
+	}
+}
+
+func TestReceiveDMail_MovesToArchive(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	mail := &DMail{
+		Name:        "feedback-d-001",
+		Kind:        DMailFeedback,
+		Description: "Architecture drift detected",
+		Severity:    "high",
+		Body:        "# Feedback\n\nDrift in auth module.\n",
+	}
+	data, _ := MarshalDMail(mail)
+	inboxPath := filepath.Join(MailDir(dir, "inbox"), mail.Filename())
+	os.WriteFile(inboxPath, data, 0644)
+
+	// receive
+	received, err := ReceiveDMail(dir, mail.Filename())
+	if err != nil {
+		t.Fatalf("receive: %v", err)
+	}
+	if received.Name != "feedback-d-001" {
+		t.Errorf("name: got %s", received.Name)
+	}
+	if received.Severity != "high" {
+		t.Errorf("severity: got %s", received.Severity)
+	}
+
+	// inbox file removed
+	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+		t.Error("inbox file should be removed after receive")
+	}
+
+	// archive file exists
+	archivePath := filepath.Join(MailDir(dir, "archive"), mail.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
+
+func TestReceiveDMail_FileNotFound(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	_, err := ReceiveDMail(dir, "nonexistent.md")
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+}
