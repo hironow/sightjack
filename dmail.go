@@ -111,7 +111,7 @@ func ComposeDMail(baseDir string, mail *DMail) error {
 		return err
 	}
 	filename := mail.Filename()
-	for _, sub := range []string{outboxDir, archiveDir} {
+	for _, sub := range []string{archiveDir, outboxDir} {
 		path := filepath.Join(MailDir(baseDir, sub), filename)
 		if err := os.WriteFile(path, data, 0644); err != nil {
 			return fmt.Errorf("dmail compose to %s: %w", sub, err)
@@ -157,22 +157,67 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 	return files, nil
 }
 
-// WatchInbox monitors the inbox/ directory for new .md files using fsnotify.
-// Returns a channel that receives filenames of newly created d-mails.
+// receiveDMailIfNew reads a d-mail from inbox, applies consumer-side dedup (MY-271),
+// archives it, and returns it only if it is a feedback d-mail.
+// Returns nil for already-archived, non-feedback, or unreadable files.
+func receiveDMailIfNew(baseDir, filename string) *DMail {
+	// Consumer-side dedup: skip if already in archive.
+	// NOTE: Dedup is filename-based by design — the d-mail filename acts as a
+	// message ID in the protocol. Senders that need to deliver updated content
+	// for the same wave must use a distinct filename (e.g. append a sequence number).
+	archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
+	if _, err := os.Stat(archivePath); err == nil {
+		os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename))
+		return nil
+	}
+
+	mail, err := ReceiveDMail(baseDir, filename)
+	if err != nil {
+		LogWarn("Failed to receive d-mail %s: %v", filename, err)
+		return nil
+	}
+	if mail.Kind != DMailFeedback {
+		return nil
+	}
+	return mail
+}
+
+// MonitorInbox starts monitoring the inbox directory for feedback d-mails.
+// It first drains existing files (initial scan), then watches for new files via fsnotify.
+// Each d-mail is received (archived + removed from inbox). Only feedback d-mails
+// are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
-func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
+func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, fmt.Errorf("dmail watch: create watcher: %w", err)
+		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
 	}
 
 	inboxPath := MailDir(baseDir, inboxDir)
 	if err := watcher.Add(inboxPath); err != nil {
 		watcher.Close()
-		return nil, fmt.Errorf("dmail watch: add inbox: %w", err)
+		return nil, fmt.Errorf("dmail monitor: add inbox: %w", err)
 	}
 
-	ch := make(chan string)
+	// Phase 1: Initial drain (synchronous, before goroutine starts).
+	// watcher.Add is called first so files created during the drain
+	// are caught by fsnotify and deduplicated by receiveDMailIfNew.
+	var initial []*DMail
+	files, listErr := ListDMail(baseDir, inboxDir)
+	if listErr == nil {
+		for _, filename := range files {
+			if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
+				initial = append(initial, mail)
+			}
+		}
+	}
+
+	ch := make(chan *DMail, len(initial))
+	for _, mail := range initial {
+		ch <- mail
+	}
+
+	// Phase 2: Watch for new files (async).
 	go func() {
 		defer close(ch)
 		defer watcher.Close()
@@ -184,12 +229,18 @@ func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
 				if !ok {
 					return
 				}
-				if event.Has(fsnotify.Create) && strings.HasSuffix(event.Name, ".md") {
+				// NOTE: Write events handle partial-write resilience. If Create fires
+				// before the file is fully written, receiveDMailIfNew fails and leaves
+				// the file in inbox/. Subsequent Write events re-trigger processing.
+				// Archive-based dedup in receiveDMailIfNew prevents double delivery.
+				if (event.Has(fsnotify.Create) || event.Has(fsnotify.Write)) && strings.HasSuffix(event.Name, ".md") {
 					filename := filepath.Base(event.Name)
-					select {
-					case ch <- filename:
-					case <-ctx.Done():
-						return
+					if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
+						select {
+						case ch <- mail:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			case _, ok := <-watcher.Errors:
@@ -201,6 +252,59 @@ func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
 	}()
 
 	return ch, nil
+}
+
+// DrainInboxFeedback reads all currently buffered feedback from the monitor channel
+// and displays them to the CLI. Returns the number of feedback messages displayed.
+func DrainInboxFeedback(ch <-chan *DMail) int {
+	if ch == nil {
+		return 0
+	}
+	var feedback []*DMail
+loop:
+	for {
+		select {
+		case mail, ok := <-ch:
+			if !ok {
+				break loop
+			}
+			feedback = append(feedback, mail)
+		default:
+			break loop
+		}
+	}
+	if len(feedback) == 0 {
+		return 0
+	}
+	LogInfo("Received %d feedback d-mail(s):", len(feedback))
+	for _, fb := range feedback {
+		switch fb.Severity {
+		case "high":
+			LogWarn("[%s] %s (severity: HIGH)", fb.Name, fb.Description)
+		default:
+			LogInfo("[%s] %s", fb.Name, fb.Description)
+		}
+	}
+	return len(feedback)
+}
+
+// LogInboxFeedbackAsync starts a background goroutine that displays
+// feedback d-mails as they arrive on the monitor channel.
+// Safe to call with a nil channel (no-op).
+func LogInboxFeedbackAsync(ch <-chan *DMail) {
+	if ch == nil {
+		return
+	}
+	go func() {
+		for mail := range ch {
+			switch mail.Severity {
+			case "high":
+				LogWarn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
+			default:
+				LogInfo("[D-Mail] [%s] %s", mail.Name, mail.Description)
+			}
+		}
+	}()
 }
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.
@@ -222,4 +326,102 @@ func ReceiveDMail(baseDir, filename string) (*DMail, error) {
 		return nil, fmt.Errorf("dmail remove inbox %s: %w", filename, err)
 	}
 	return mail, nil
+}
+
+// DMailName generates a sanitized d-mail name from a prefix and wave key.
+// Example: DMailName("spec", "auth:w1") → "spec-auth-w1"
+func DMailName(prefix, waveKey string) string {
+	var b strings.Builder
+	b.WriteString(prefix)
+	b.WriteRune('-')
+	for _, r := range strings.ToLower(waveKey) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+			b.WriteRune(r)
+		case r == ':':
+			b.WriteRune('-')
+		case r == ' ':
+			b.WriteRune('_')
+		default:
+			b.WriteRune('_')
+		}
+	}
+	return strings.TrimRight(b.String(), "_")
+}
+
+// waveIssueIDs extracts unique, sorted issue IDs from wave actions.
+func waveIssueIDs(wave Wave) []string {
+	seen := make(map[string]bool)
+	for _, a := range wave.Actions {
+		if a.IssueID != "" {
+			seen[a.IssueID] = true
+		}
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// specificationBody formats wave actions as Markdown body for a specification d-mail.
+func specificationBody(wave Wave) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", wave.Title)
+	if wave.Description != "" {
+		fmt.Fprintf(&b, "%s\n\n", wave.Description)
+	}
+	fmt.Fprintf(&b, "## Actions\n\n")
+	for _, a := range wave.Actions {
+		fmt.Fprintf(&b, "- [%s] %s: %s\n", a.Type, a.IssueID, a.Description)
+	}
+	return b.String()
+}
+
+// reportBody formats wave apply results as Markdown body for a report d-mail.
+func reportBody(wave Wave, result *WaveApplyResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Wave Completed: %s\n\n", wave.Title)
+	fmt.Fprintf(&b, "Applied %d action(s).\n\n", result.Applied)
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(&b, "## Errors\n\n")
+		for _, e := range result.Errors {
+			fmt.Fprintf(&b, "- %s\n", e)
+		}
+		b.WriteString("\n")
+	}
+	if len(result.Ripples) > 0 {
+		fmt.Fprintf(&b, "## Ripple Effects\n\n")
+		for _, r := range result.Ripples {
+			fmt.Fprintf(&b, "- [%s] %s\n", r.ClusterName, r.Description)
+		}
+	}
+	return b.String()
+}
+
+// ComposeReport creates and sends a report d-mail for a completed wave.
+func ComposeReport(baseDir string, wave Wave, result *WaveApplyResult) error {
+	key := WaveKey(wave)
+	mail := &DMail{
+		Name:        DMailName("report", key),
+		Kind:        DMailReport,
+		Description: fmt.Sprintf("Wave %s completed", key),
+		Issues:      waveIssueIDs(wave),
+		Body:        reportBody(wave, result),
+	}
+	return ComposeDMail(baseDir, mail)
+}
+
+// ComposeSpecification creates and sends a specification d-mail for an approved wave.
+func ComposeSpecification(baseDir string, wave Wave) error {
+	key := WaveKey(wave)
+	mail := &DMail{
+		Name:        DMailName("spec", key),
+		Kind:        DMailSpecification,
+		Description: wave.Title,
+		Issues:      waveIssueIDs(wave),
+		Body:        specificationBody(wave),
+	}
+	return ComposeDMail(baseDir, mail)
 }

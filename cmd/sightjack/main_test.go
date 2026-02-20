@@ -25,7 +25,7 @@ func TestUsageOutput_ContainsSubcommands(t *testing.T) {
 
 	// then: output contains all subcommands
 	output := buf.String()
-	for _, cmd := range []string{"scan", "waves", "select", "discuss", "apply", "adr", "nextgen", "session", "show", "init", "doctor"} {
+	for _, cmd := range []string{"scan", "waves", "select", "discuss", "apply", "adr", "nextgen", "run", "show", "init", "doctor"} {
 		if !strings.Contains(output, cmd) {
 			t.Errorf("expected usage output to contain %q, got:\n%s", cmd, output)
 		}
@@ -43,9 +43,9 @@ func TestExtractSubcommand(t *testing.T) {
 	}{
 		// --- existing bool-flag cases (path="" expected) ---
 		{
-			name:      "verbose true before session",
-			args:      []string{"--verbose", "true", "session"},
-			wantCmd:   "session",
+			name:      "verbose true before run",
+			args:      []string{"--verbose", "true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--verbose=true"},
 		},
 		{
@@ -55,21 +55,21 @@ func TestExtractSubcommand(t *testing.T) {
 			wantFlags: []string{"--dry-run=false"},
 		},
 		{
-			name:      "short verbose true before session",
-			args:      []string{"-v", "true", "session"},
-			wantCmd:   "session",
+			name:      "short verbose true before run",
+			args:      []string{"-v", "true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"-v=true"},
 		},
 		{
 			name:      "bool flag without value still works",
-			args:      []string{"--verbose", "session"},
-			wantCmd:   "session",
+			args:      []string{"--verbose", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--verbose"},
 		},
 		{
 			name:      "config with value and bool flag with value",
-			args:      []string{"-c", "custom.yaml", "--verbose", "true", "session"},
-			wantCmd:   "session",
+			args:      []string{"-c", "custom.yaml", "--verbose", "true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"-c", "custom.yaml", "--verbose=true"},
 		},
 		{
@@ -86,14 +86,14 @@ func TestExtractSubcommand(t *testing.T) {
 		},
 		{
 			name:      "bool flag with equals syntax preserved",
-			args:      []string{"--verbose=true", "session"},
-			wantCmd:   "session",
+			args:      []string{"--verbose=true", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--verbose=true"},
 		},
 		{
 			name:      "dry-run false is preserved for flag parser",
-			args:      []string{"--dry-run", "false", "session"},
-			wantCmd:   "session",
+			args:      []string{"--dry-run", "false", "run"},
+			wantCmd:   "run",
 			wantFlags: []string{"--dry-run=false"},
 		},
 		{
@@ -613,5 +613,60 @@ func TestRunInit_CreatesGitIgnore(t *testing.T) {
 	content := string(data)
 	if !strings.Contains(content, "state.json") {
 		t.Errorf("expected state.json in .gitignore, got:\n%s", content)
+	}
+}
+
+func TestRunInit_InstallsSkills(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	input := strings.NewReader("Team\nProject\n\n\n")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then: skill files should be installed
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+	sendable, readErr := os.ReadFile(filepath.Join(dir, ".siren", "skills", "dmail-sendable", "SKILL.md"))
+	if readErr != nil {
+		t.Fatalf("dmail-sendable SKILL.md not installed: %v", readErr)
+	}
+	if !strings.Contains(string(sendable), "name: dmail-sendable") {
+		t.Errorf("unexpected dmail-sendable content: %s", sendable)
+	}
+	readable, readErr := os.ReadFile(filepath.Join(dir, ".siren", "skills", "dmail-readable", "SKILL.md"))
+	if readErr != nil {
+		t.Fatalf("dmail-readable SKILL.md not installed: %v", readErr)
+	}
+	if !strings.Contains(string(readable), "name: dmail-readable") {
+		t.Errorf("unexpected dmail-readable content: %s", readable)
+	}
+}
+
+func TestRunInit_CreatesMailDirs(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	input := strings.NewReader("Team\nProject\n\n\n")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then: mail directories should be created
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+	for _, sub := range []string{"inbox", "outbox", "archive"} {
+		path := filepath.Join(dir, ".siren", sub)
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			t.Errorf("%s not created: %v", sub, statErr)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("%s is not a directory", sub)
+		}
 	}
 }

@@ -305,92 +305,339 @@ func TestReceiveDMail_FileNotFound(t *testing.T) {
 	}
 }
 
-func TestWatchInbox_DetectsNewFile(t *testing.T) {
-	dir := t.TempDir()
-	if err := EnsureMailDirs(dir); err != nil {
-		t.Fatalf("ensure: %v", err)
+func TestDMailName_SanitizesWaveKey(t *testing.T) {
+	got := DMailName("spec", "auth:w1")
+	if got != "spec-auth-w1" {
+		t.Errorf("got %s, want spec-auth-w1", got)
 	}
+}
+
+func TestDMailName_HandlesSpecialChars(t *testing.T) {
+	got := DMailName("report", "My Cluster:wave-2")
+	if got != "report-my_cluster-wave-2" {
+		t.Errorf("got %s, want report-my_cluster-wave-2", got)
+	}
+}
+
+func TestComposeSpecification_CreatesFiles(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "auth",
+		Title:       "Add DoD to auth issues",
+		Description: "First wave for auth cluster",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket rate limiting"},
+			{Type: "add_dependency", IssueID: "MY-42", Description: "Depends on auth middleware"},
+			{Type: "add_dod", IssueID: "MY-43", Description: "Session management"},
+		},
+	}
+
+	err := ComposeSpecification(dir, wave)
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+
+	// outbox file exists
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "spec-auth-w1.md")
+	data, readErr := os.ReadFile(outboxPath)
+	if readErr != nil {
+		t.Fatalf("outbox file missing: %v", readErr)
+	}
+
+	// parse and verify
+	mail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse: %v", parseErr)
+	}
+	if mail.Kind != DMailSpecification {
+		t.Errorf("kind: got %s, want specification", mail.Kind)
+	}
+	if mail.Name != "spec-auth-w1" {
+		t.Errorf("name: got %s", mail.Name)
+	}
+	// issues should be unique and sorted
+	if len(mail.Issues) != 2 {
+		t.Errorf("issues count: got %d, want 2 (MY-42, MY-43)", len(mail.Issues))
+	}
+	if mail.Body == "" {
+		t.Error("body should not be empty")
+	}
+	if !strings.Contains(mail.Body, "Token bucket rate limiting") {
+		t.Error("body should contain action descriptions")
+	}
+
+	// archive file also exists
+	archivePath := filepath.Join(MailDir(dir, "archive"), "spec-auth-w1.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
+
+func TestComposeReport_CreatesFiles(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "auth",
+		Title:       "Add DoD to auth issues",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket"},
+		},
+	}
+	applyResult := &WaveApplyResult{
+		WaveID:  "w1",
+		Applied: 1,
+		Ripples: []Ripple{
+			{ClusterName: "api", Description: "Rate limiting affects API cluster"},
+		},
+	}
+
+	err := ComposeReport(dir, wave, applyResult)
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+
+	// outbox file exists and is parseable
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "report-auth-w1.md")
+	data, readErr := os.ReadFile(outboxPath)
+	if readErr != nil {
+		t.Fatalf("outbox file missing: %v", readErr)
+	}
+
+	mail, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse: %v", parseErr)
+	}
+	if mail.Kind != DMailReport {
+		t.Errorf("kind: got %s, want report", mail.Kind)
+	}
+	if mail.Name != "report-auth-w1" {
+		t.Errorf("name: got %s", mail.Name)
+	}
+	if !strings.Contains(mail.Body, "Rate limiting affects API cluster") {
+		t.Error("body should contain ripple description")
+	}
+
+	// archive file also exists
+	archivePath := filepath.Join(MailDir(dir, "archive"), "report-auth-w1.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
+
+func TestComposeReport_NoRipples(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	wave := Wave{
+		ID:          "w2",
+		ClusterName: "db",
+		Title:       "Database migrations",
+		Actions: []WaveAction{
+			{Type: "add_dod", IssueID: "MY-50", Description: "Schema migration"},
+		},
+	}
+	applyResult := &WaveApplyResult{
+		WaveID:  "w2",
+		Applied: 1,
+	}
+
+	err := ComposeReport(dir, wave, applyResult)
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+
+	outboxPath := filepath.Join(MailDir(dir, "outbox"), "report-db-w2.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := ParseDMail(data)
+	if mail.Body == "" {
+		t.Error("body should not be empty even without ripples")
+	}
+}
+
+func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// Place feedback in inbox before starting monitor
+	fb := &DMail{
+		Name:        "feedback-mon-001",
+		Kind:        DMailFeedback,
+		Description: "Drift detected",
+		Severity:    "high",
+		Body:        "# Feedback\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := WatchInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir)
 	if err != nil {
-		t.Fatalf("watch: %v", err)
+		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// give watcher time to start
-	time.Sleep(50 * time.Millisecond)
-
-	// write a .md file to inbox
-	mail := &DMail{
-		Name:        "spec-test-1",
-		Kind:        DMailSpecification,
-		Description: "test",
-		Body:        "body\n",
-	}
-	data, _ := MarshalDMail(mail)
-	inboxPath := filepath.Join(MailDir(dir, "inbox"), mail.Filename())
-	if err := os.WriteFile(inboxPath, data, 0644); err != nil {
-		t.Fatalf("write inbox: %v", err)
-	}
-
-	// expect notification
+	// Should receive the existing feedback immediately (buffered)
 	select {
-	case filename := <-ch:
-		if filename != "spec-test-1.md" {
-			t.Errorf("got %s, want spec-test-1.md", filename)
+	case mail, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed unexpectedly")
+		}
+		if mail.Name != "feedback-mon-001" {
+			t.Errorf("name: got %s, want feedback-mon-001", mail.Name)
+		}
+		if mail.Severity != "high" {
+			t.Errorf("severity: got %s, want high", mail.Severity)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for inbox notification")
+		t.Fatal("timeout waiting for initial feedback")
+	}
+
+	// inbox should be empty (archived)
+	files, _ := ListDMail(dir, "inbox")
+	if len(files) != 0 {
+		t.Errorf("inbox not empty: %d files", len(files))
+	}
+
+	// archive should have the file
+	archivePath := filepath.Join(MailDir(dir, "archive"), fb.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
 	}
 }
 
-func TestWatchInbox_IgnoresNonMD(t *testing.T) {
+func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	dir := t.TempDir()
-	if err := EnsureMailDirs(dir); err != nil {
-		t.Fatalf("ensure: %v", err)
+	EnsureMailDirs(dir)
+
+	// Place a specification d-mail in inbox
+	spec := &DMail{
+		Name:        "spec-mon-001",
+		Kind:        DMailSpecification,
+		Description: "Spec for issue",
+		Body:        "# Spec\n",
 	}
+	data, _ := MarshalDMail(spec)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), spec.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := WatchInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir)
 	if err != nil {
-		t.Fatalf("watch: %v", err)
+		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-
-	// write a non-.md file
-	txtPath := filepath.Join(MailDir(dir, "inbox"), "notes.txt")
-	os.WriteFile(txtPath, []byte("not a dmail"), 0644)
-
-	// should NOT receive notification
+	// Should NOT receive anything (spec is not feedback)
 	select {
-	case filename := <-ch:
-		t.Errorf("unexpected notification for non-.md file: %s", filename)
+	case mail := <-ch:
+		t.Errorf("unexpected feedback: %s", mail.Name)
 	case <-time.After(200 * time.Millisecond):
-		// expected: no notification
+		// expected: no feedback
+	}
+
+	// But the spec should be archived (received, just not sent to channel)
+	archivePath := filepath.Join(MailDir(dir, "archive"), spec.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
 	}
 }
 
-func TestWatchInbox_StopsOnCancel(t *testing.T) {
+func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 	dir := t.TempDir()
-	if err := EnsureMailDirs(dir); err != nil {
-		t.Fatalf("ensure: %v", err)
+	EnsureMailDirs(dir)
+
+	// Place feedback in both inbox and archive (already processed)
+	fb := &DMail{
+		Name:        "feedback-mon-dup",
+		Kind:        DMailFeedback,
+		Description: "Duplicate",
+		Body:        "# Dup\n",
 	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(MailDir(dir, "archive"), fb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch, err := WatchInbox(ctx, dir)
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
 	if err != nil {
-		t.Fatalf("watch: %v", err)
+		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// cancel context
+	// Should NOT receive anything (already archived = dedup)
+	select {
+	case mail := <-ch:
+		t.Errorf("unexpected feedback (should be deduped): %s", mail.Name)
+	case <-time.After(200 * time.Millisecond):
+		// expected: dedup skipped
+	}
+
+	// inbox should be cleaned up
+	files, _ := ListDMail(dir, "inbox")
+	if len(files) != 0 {
+		t.Errorf("inbox should be empty after dedup cleanup: %d files", len(files))
+	}
+}
+
+func TestMonitorInbox_DetectsNewFile(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// Wait for watcher to be ready
+	time.Sleep(50 * time.Millisecond)
+
+	// Write a new feedback d-mail to inbox
+	fb := &DMail{
+		Name:        "feedback-mon-new",
+		Kind:        DMailFeedback,
+		Description: "New feedback via fsnotify",
+		Severity:    "high",
+		Body:        "# New\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+
+	// Should receive via fsnotify
+	select {
+	case mail, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed unexpectedly")
+		}
+		if mail.Name != "feedback-mon-new" {
+			t.Errorf("name: got %s, want feedback-mon-new", mail.Name)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for fsnotify notification")
+	}
+}
+
+func TestMonitorInbox_StopsOnCancel(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
 	cancel()
 
-	// channel should close
 	select {
 	case _, ok := <-ch:
 		if ok {
@@ -399,4 +646,87 @@ func TestWatchInbox_StopsOnCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for channel close")
 	}
+}
+
+func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	// Place feedback in inbox
+	fb := &DMail{
+		Name:        "feedback-drain-001",
+		Kind:        DMailFeedback,
+		Description: "Drain test",
+		Severity:    "high",
+		Body:        "# Drain\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	count := DrainInboxFeedback(ch)
+	if count != 1 {
+		t.Errorf("expected 1 drained, got %d", count)
+	}
+}
+
+func TestDrainInboxFeedback_NilChannel(t *testing.T) {
+	count := DrainInboxFeedback(nil)
+	if count != 0 {
+		t.Errorf("expected 0 for nil channel, got %d", count)
+	}
+}
+
+func TestLogInboxFeedbackAsync_ConsumesLateArrivals(t *testing.T) {
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// Drain initial (empty)
+	DrainInboxFeedback(ch)
+
+	// Start background consumer
+	LogInboxFeedbackAsync(ch)
+
+	// Wait for watcher to be ready
+	time.Sleep(50 * time.Millisecond)
+
+	// Write feedback AFTER drain
+	fb := &DMail{
+		Name:        "feedback-late-001",
+		Kind:        DMailFeedback,
+		Description: "Late feedback",
+		Severity:    "high",
+		Body:        "# Late\n",
+	}
+	data, _ := MarshalDMail(fb)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+
+	// Wait for background processing
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify: file should be archived (consumed by background goroutine)
+	archivePath := filepath.Join(MailDir(dir, "archive"), fb.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("late feedback not archived (background consumer didn't process): %v", err)
+	}
+}
+
+func TestLogInboxFeedbackAsync_NilChannel(t *testing.T) {
+	// Should not panic
+	LogInboxFeedbackAsync(nil)
 }

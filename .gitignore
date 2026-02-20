@@ -3,7 +3,7 @@
 # test
 coverage.out
 # sightjack runtime state on target repository
-.siren/
+.siren/*
 # claude local settings
 .claude/*.local.*
 # git worktrees

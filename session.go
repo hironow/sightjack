@@ -40,6 +40,23 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		return fmt.Errorf("input reader is required for interactive session")
 	}
 
+	// Ensure D-Mail directories exist before any mail operations
+	if err := EnsureMailDirs(baseDir); err != nil {
+		return fmt.Errorf("ensure mail dirs: %w", err)
+	}
+
+	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	if !dryRun {
+		monitorCtx, monitorCancel := context.WithCancel(ctx)
+		defer monitorCancel()
+		inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
+		if monitorErr != nil {
+			LogWarn("D-Mail monitor failed: %v", monitorErr)
+		}
+		DrainInboxFeedback(inboxCh)
+		LogInboxFeedbackAsync(inboxCh)
+	}
+
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
@@ -122,6 +139,329 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime)
 }
 
+// selectPhaseResult describes the outcome of the wave selection phase.
+type selectPhaseResult int
+
+const (
+	selectChosen selectPhaseResult = iota
+	selectQuit
+	selectRetry
+)
+
+// selectPhase handles the wave selection UI: navigator display, shibito warnings,
+// wave selection prompt, go-back handling, and quit handling.
+// Returns the selected wave, a result code, and the updated shibitoShown flag.
+func selectPhase(ctx context.Context, scanner *bufio.Scanner,
+	scanResult *ScanResult, cfg *Config, available []Wave, waves []Wave,
+	adrCount int, resumedAt *time.Time, shibitoShown bool,
+	loopSpan trace.Span) (Wave, selectPhaseResult, bool) {
+
+	// Display Link Navigator
+	nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
+	fmt.Println()
+	fmt.Print(nav)
+
+	// Display shibito warnings once (static data, does not change during session)
+	if !shibitoShown {
+		DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
+		shibitoShown = true
+	}
+
+	// Prompt wave selection
+	selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
+	if err == ErrQuit {
+		loopSpan.AddEvent("session.paused")
+		LogInfo("Session paused. State saved.")
+		return Wave{}, selectQuit, shibitoShown
+	}
+	if err == ErrGoBack {
+		completedList := CompletedWaves(waves)
+		if len(completedList) == 0 {
+			LogInfo("No completed waves to revisit.")
+			return Wave{}, selectRetry, shibitoShown
+		}
+		revisit, backErr := PromptCompletedWaveSelection(ctx, os.Stdout, scanner, completedList)
+		if backErr == ErrQuit {
+			LogInfo("Session paused. State saved.")
+			return Wave{}, selectQuit, shibitoShown
+		}
+		if backErr != nil {
+			return Wave{}, selectRetry, shibitoShown
+		}
+		DisplayCompletedWaveActions(os.Stdout, revisit)
+		return Wave{}, selectRetry, shibitoShown
+	}
+	if err != nil {
+		LogWarn("Invalid selection: %v", err)
+		return Wave{}, selectRetry, shibitoShown
+	}
+
+	return selected, selectChosen, shibitoShown
+}
+
+// approvalPhaseResult describes the outcome of the wave approval phase.
+type approvalPhaseResult int
+
+const (
+	approvalApproved approvalPhaseResult = iota
+	approvalRejected
+)
+
+// approvalPhase handles the wave approval/reject/discuss/selective loop.
+// waves is passed by value (not pointer) because this phase only mutates
+// existing elements via PropagateWaveUpdate — it never appends or reassigns.
+// Returns the (possibly modified) wave and whether it was approved.
+func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
+	cfg *Config, scanDir, baseDir string, selected Wave, resolvedStrictness string,
+	waves []Wave, completed map[string]bool,
+	sessionRejected map[string][]WaveAction, adrDir string, adrCount *int,
+	loopSpan trace.Span) (Wave, approvalPhaseResult) {
+
+	for {
+		choice, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
+		if err == ErrQuit {
+			return selected, approvalRejected
+		}
+		if err != nil {
+			LogWarn("Invalid input: %v", err)
+			continue
+		}
+
+		switch choice {
+		case ApprovalApprove:
+			delete(sessionRejected, WaveKey(selected))
+			loopSpan.AddEvent("wave.approved",
+				trace.WithAttributes(
+					attribute.String("wave.id", selected.ID),
+					attribute.String("wave.cluster_name", selected.ClusterName),
+				),
+			)
+			if err := ComposeSpecification(baseDir, selected); err != nil {
+				LogWarn("D-Mail specification failed (non-fatal): %v", err)
+			}
+			return selected, approvalApproved
+		case ApprovalReject:
+			delete(sessionRejected, WaveKey(selected))
+			loopSpan.AddEvent("wave.rejected",
+				trace.WithAttributes(
+					attribute.String("wave.id", selected.ID),
+					attribute.String("wave.cluster_name", selected.ClusterName),
+				),
+			)
+			LogInfo("Wave rejected.")
+			return selected, approvalRejected
+		case ApprovalDiscuss:
+			topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
+			if topicErr == ErrQuit {
+				continue
+			}
+			if topicErr != nil {
+				LogWarn("Invalid topic: %v", topicErr)
+				continue
+			}
+			result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness)
+			if discussErr != nil {
+				LogError("Architect discussion failed: %v", discussErr)
+				continue
+			}
+			DisplayArchitectResponse(os.Stdout, result)
+			if result.ModifiedWave != nil {
+				selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+				PropagateWaveUpdate(waves, selected)
+				// Trigger Scribe to generate ADR for the modification
+				// (runs even for locked waves — the decision itself is worth recording)
+				if cfg.Scribe.Enabled {
+					scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness)
+					if scribeErr != nil {
+						LogWarn("Scribe failed (non-fatal): %v", scribeErr)
+					} else {
+						DisplayScribeResponse(os.Stdout, scribeResp)
+						DisplayADRConflicts(os.Stdout, scribeResp.Conflicts)
+						*adrCount++
+					}
+				}
+				if selected.Status == "locked" {
+					LogWarn("Architect added unmet prerequisites — wave is now locked.")
+					return selected, approvalRejected
+				}
+			}
+			continue // back to approval prompt with (possibly modified) wave
+		case ApprovalSelective:
+			approved, rejected, selErr := PromptSelectiveApproval(ctx, os.Stdout, scanner, selected)
+			if selErr == ErrQuit {
+				return selected, approvalRejected
+			}
+			if selErr != nil {
+				LogWarn("Selective approval error: %v", selErr)
+				continue
+			}
+			if len(approved) == 0 {
+				LogInfo("No actions selected. Wave skipped.")
+				return selected, approvalRejected
+			}
+			selected.Actions = approved
+			// Recompute delta proportionally when actions were rejected
+			totalActions := len(approved) + len(rejected)
+			if totalActions > 0 && len(rejected) > 0 {
+				fraction := float64(len(approved)) / float64(totalActions)
+				selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
+			}
+			PropagateWaveUpdate(waves, selected)
+			sessionRejected[WaveKey(selected)] = rejected
+			if err := ComposeSpecification(baseDir, selected); err != nil {
+				LogWarn("D-Mail specification failed (non-fatal): %v", err)
+			}
+			return selected, approvalApproved
+		}
+		return selected, approvalRejected
+	}
+}
+
+// applyPhase handles wave apply, partial failure check, completion marking,
+// cluster completeness update, unlock evaluation, nextgen wave generation,
+// ready labels, and mid-session state save.
+// waves is passed as *[]Wave because append/EvaluateUnlocks may reallocate the slice.
+func applyPhase(ctx context.Context, cfg *Config,
+	scanDir, scanResultPath, baseDir, sessionID, adrDir string,
+	selected Wave, resolvedStrictness string,
+	waves *[]Wave, completed map[string]bool,
+	scanResult *ScanResult, sessionRejected map[string][]WaveAction,
+	labeledReady map[string]bool, adrCount int,
+	scanTimestamp time.Time, loopSpan trace.Span) {
+
+	// --- Pass 4: Wave Apply ---
+	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness)
+	if err != nil {
+		LogError("Apply failed: %v", err)
+		return
+	}
+
+	// Count new waves unlocked by this completion
+	oldAvailable := len(AvailableWaves(*waves, completed))
+
+	if !IsWaveApplyComplete(applyResult) {
+		loopSpan.AddEvent("wave.partial_failure",
+			trace.WithAttributes(
+				attribute.String("wave.id", selected.ID),
+				attribute.String("wave.cluster_name", selected.ClusterName),
+				attribute.Int("wave.error_count", len(applyResult.Errors)),
+			),
+		)
+		LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
+		DisplayRippleEffects(os.Stdout, applyResult.Ripples)
+		return
+	}
+
+	loopSpan.AddEvent("wave.completed",
+		trace.WithAttributes(
+			attribute.String("wave.id", selected.ID),
+			attribute.String("wave.cluster_name", selected.ClusterName),
+			attribute.Int("wave.action_count", len(selected.Actions)),
+		),
+	)
+
+	// Mark wave completed using composite key (ClusterName:ID)
+	completed[WaveKey(selected)] = true
+	selectedKey := WaveKey(selected)
+	for i, w := range *waves {
+		if WaveKey(w) == selectedKey {
+			(*waves)[i].Status = "completed"
+			break
+		}
+	}
+
+	// Compose report d-mail for the completed wave
+	if err := ComposeReport(baseDir, selected, applyResult); err != nil {
+		LogWarn("D-Mail report failed (non-fatal): %v", err)
+	}
+
+	// Update cluster completeness from delta, then recalculate overall
+	for i, c := range scanResult.Clusters {
+		if c.Name == selected.ClusterName {
+			adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
+			scanResult.Clusters[i].Completeness = adjustedAfter
+			// Note: per-issue completeness is NOT updated here because
+			// action types vary (add_dod vs add_dependency) and we lack
+			// accurate per-issue deltas. The nextgen prompt already
+			// receives CompletedWaves JSON listing all applied actions,
+			// which is sufficient for the LLM to avoid re-proposals.
+			break
+		}
+	}
+	scanResult.CalculateCompleteness()
+
+	// Display rich completion summary with grouped ripple effects
+	*waves = EvaluateUnlocks(*waves, completed)
+	newAvailable := len(AvailableWaves(*waves, completed))
+	newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
+	DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
+
+	// --- Post-completion: Generate next waves ---
+	var clusterForNextgen ClusterScanResult
+	for _, c := range scanResult.Clusters {
+		if c.Name == selected.ClusterName {
+			clusterForNextgen = c
+			break
+		}
+	}
+	if clusterForNextgen.Name == "" {
+		LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
+	} else if !NeedsMoreWaves(clusterForNextgen, *waves) {
+		loopSpan.AddEvent("nextgen.skipped",
+			trace.WithAttributes(
+				attribute.String("wave.cluster_name", selected.ClusterName),
+			),
+		)
+		LogDebug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
+	} else {
+		completedWavesForCluster := CompletedWavesForCluster(*waves, selected.ClusterName)
+		existingADRs, adrErr := ReadExistingADRs(adrDir)
+		if adrErr != nil {
+			LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
+		}
+		rejectedForWave := sessionRejected[WaveKey(selected)]
+		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness)
+		if nextgenErr != nil {
+			LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
+		} else if len(newWaves) > 0 {
+			*waves = append(*waves, newWaves...)
+			*waves = EvaluateUnlocks(*waves, completed)
+		}
+	}
+
+	// Apply ready labels after nextgen so the final wave list is used.
+	// Only label newly ready issues to avoid redundant API calls.
+	if cfg.Labels.Enabled {
+		readyIDs := ReadyIssueIDs(*waves)
+		var newlyReady []string
+		for _, id := range readyIDs {
+			if !labeledReady[id] {
+				newlyReady = append(newlyReady, id)
+			}
+		}
+		if len(newlyReady) > 0 {
+			readyIssueStr := strings.Join(newlyReady, ", ")
+			if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
+				LogWarn("Ready label failed: %v", err)
+			} else {
+				for _, id := range newlyReady {
+					labeledReady[id] = true
+				}
+			}
+		}
+	}
+
+	// Save state after each wave completion (crash resilience)
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to update cached scan result: %v", err)
+	}
+	midState := BuildSessionState(cfg, sessionID, scanResult, *waves, adrCount, &scanTimestamp)
+	midState.ScanResultPath = scanResultPath
+	if err := WriteState(baseDir, midState); err != nil {
+		LogWarn("Failed to save mid-session state: %v", err)
+	}
+}
+
 // runInteractiveLoop runs the wave selection/approval/apply loop shared by
 // RunSession, RunResumeSession, and RunRescanSession.
 // resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
@@ -145,6 +485,7 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 	// across the entire cluster.
 	sessionRejected := make(map[string][]WaveAction)
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
+outerLoop:
 	for {
 		waves = EvaluateUnlocks(waves, completed)
 		available := AvailableWaves(waves, completed)
@@ -153,272 +494,27 @@ func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, sc
 			break
 		}
 
-		// Display Link Navigator
-		nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
-		fmt.Println()
-		fmt.Print(nav)
-
-		// Display shibito warnings once (static data, does not change during session)
-		if !shibitoShown {
-			DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
-			shibitoShown = true
-		}
-
-		// Prompt wave selection
-		selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
-		if err == ErrQuit {
-			loopSpan.AddEvent("session.paused")
-			LogInfo("Session paused. State saved.")
-			break
-		}
-		if err == ErrGoBack {
-			completedList := CompletedWaves(waves)
-			if len(completedList) == 0 {
-				LogInfo("No completed waves to revisit.")
-				continue
-			}
-			revisit, backErr := PromptCompletedWaveSelection(ctx, os.Stdout, scanner, completedList)
-			if backErr == ErrQuit {
-				LogInfo("Session paused. State saved.")
-				break
-			}
-			if backErr != nil {
-				continue
-			}
-			DisplayCompletedWaveActions(os.Stdout, revisit)
-			continue
-		}
-		if err != nil {
-			LogWarn("Invalid selection: %v", err)
+		var selected Wave
+		var result selectPhaseResult
+		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, loopSpan)
+		switch result {
+		case selectQuit:
+			break outerLoop
+		case selectRetry:
 			continue
 		}
 
-		// Resolve strictness using cluster name + labels from scan result
 		resolvedStrictness := string(ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-		// Prompt wave approval (with discuss loop)
-		var applyWave bool
-		for {
-			choice, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
-			if err == ErrQuit {
-				break
-			}
-			if err != nil {
-				LogWarn("Invalid input: %v", err)
-				continue
-			}
-
-			switch choice {
-			case ApprovalApprove:
-				delete(sessionRejected, WaveKey(selected))
-				loopSpan.AddEvent("wave.approved",
-					trace.WithAttributes(
-						attribute.String("wave.id", selected.ID),
-						attribute.String("wave.cluster_name", selected.ClusterName),
-					),
-				)
-				applyWave = true
-			case ApprovalReject:
-				delete(sessionRejected, WaveKey(selected))
-				loopSpan.AddEvent("wave.rejected",
-					trace.WithAttributes(
-						attribute.String("wave.id", selected.ID),
-						attribute.String("wave.cluster_name", selected.ClusterName),
-					),
-				)
-				LogInfo("Wave rejected.")
-			case ApprovalDiscuss:
-				topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
-				if topicErr == ErrQuit {
-					continue
-				}
-				if topicErr != nil {
-					LogWarn("Invalid topic: %v", topicErr)
-					continue
-				}
-				result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness)
-				if discussErr != nil {
-					LogError("Architect discussion failed: %v", discussErr)
-					continue
-				}
-				DisplayArchitectResponse(os.Stdout, result)
-				if result.ModifiedWave != nil {
-					selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
-					PropagateWaveUpdate(waves, selected)
-					// Trigger Scribe to generate ADR for the modification
-					// (runs even for locked waves — the decision itself is worth recording)
-					if cfg.Scribe.Enabled {
-						scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness)
-						if scribeErr != nil {
-							LogWarn("Scribe failed (non-fatal): %v", scribeErr)
-						} else {
-							DisplayScribeResponse(os.Stdout, scribeResp)
-							DisplayADRConflicts(os.Stdout, scribeResp.Conflicts)
-							adrCount++
-						}
-					}
-					if selected.Status == "locked" {
-						LogWarn("Architect added unmet prerequisites — wave is now locked.")
-						break
-					}
-				}
-				continue // back to approval prompt with (possibly modified) wave
-			case ApprovalSelective:
-				approved, rejected, selErr := PromptSelectiveApproval(ctx, os.Stdout, scanner, selected)
-				if selErr == ErrQuit {
-					break
-				}
-				if selErr != nil {
-					LogWarn("Selective approval error: %v", selErr)
-					continue
-				}
-				if len(approved) == 0 {
-					LogInfo("No actions selected. Wave skipped.")
-					break
-				}
-				selected.Actions = approved
-				// Recompute delta proportionally when actions were rejected
-				totalActions := len(approved) + len(rejected)
-				if totalActions > 0 && len(rejected) > 0 {
-					fraction := float64(len(approved)) / float64(totalActions)
-					selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
-				}
-				PropagateWaveUpdate(waves, selected)
-				sessionRejected[WaveKey(selected)] = rejected
-				applyWave = true
-			}
-			break
-		}
-		if !applyWave {
+		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, baseDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, loopSpan)
+		if approvalResult != approvalApproved {
 			continue
 		}
 
-		// --- Pass 4: Wave Apply ---
-		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness)
-		if err != nil {
-			LogError("Apply failed: %v", err)
-			continue
-		}
-
-		// Count new waves unlocked by this completion
-		oldAvailable := len(AvailableWaves(waves, completed))
-
-		if !IsWaveApplyComplete(applyResult) {
-			loopSpan.AddEvent("wave.partial_failure",
-				trace.WithAttributes(
-					attribute.String("wave.id", selected.ID),
-					attribute.String("wave.cluster_name", selected.ClusterName),
-					attribute.Int("wave.error_count", len(applyResult.Errors)),
-				),
-			)
-			LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
-			DisplayRippleEffects(os.Stdout, applyResult.Ripples)
-			continue
-		}
-
-		loopSpan.AddEvent("wave.completed",
-			trace.WithAttributes(
-				attribute.String("wave.id", selected.ID),
-				attribute.String("wave.cluster_name", selected.ClusterName),
-				attribute.Int("wave.action_count", len(selected.Actions)),
-			),
-		)
-
-		// Mark wave completed using composite key (ClusterName:ID)
-		completed[WaveKey(selected)] = true
-		selectedKey := WaveKey(selected)
-		for i, w := range waves {
-			if WaveKey(w) == selectedKey {
-				waves[i].Status = "completed"
-				break
-			}
-		}
-
-		// Update cluster completeness from delta, then recalculate overall
-		for i, c := range scanResult.Clusters {
-			if c.Name == selected.ClusterName {
-				adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
-				scanResult.Clusters[i].Completeness = adjustedAfter
-				// Note: per-issue completeness is NOT updated here because
-				// action types vary (add_dod vs add_dependency) and we lack
-				// accurate per-issue deltas. The nextgen prompt already
-				// receives CompletedWaves JSON listing all applied actions,
-				// which is sufficient for the LLM to avoid re-proposals.
-				break
-			}
-		}
-		scanResult.CalculateCompleteness()
-
-		// Display rich completion summary with grouped ripple effects
-		waves = EvaluateUnlocks(waves, completed)
-		newAvailable := len(AvailableWaves(waves, completed))
-		newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
-		DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
-
-		// --- Post-completion: Generate next waves ---
-		var clusterForNextgen ClusterScanResult
-		for _, c := range scanResult.Clusters {
-			if c.Name == selected.ClusterName {
-				clusterForNextgen = c
-				break
-			}
-		}
-		if clusterForNextgen.Name == "" {
-			LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
-		} else if !NeedsMoreWaves(clusterForNextgen, waves) {
-			loopSpan.AddEvent("nextgen.skipped",
-				trace.WithAttributes(
-					attribute.String("wave.cluster_name", selected.ClusterName),
-				),
-			)
-			LogDebug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
-		} else {
-			completedWavesForCluster := CompletedWavesForCluster(waves, selected.ClusterName)
-			existingADRs, adrErr := ReadExistingADRs(adrDir)
-			if adrErr != nil {
-				LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
-			}
-			rejectedForWave := sessionRejected[WaveKey(selected)]
-			newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness)
-			if nextgenErr != nil {
-				LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
-			} else if len(newWaves) > 0 {
-				waves = append(waves, newWaves...)
-				waves = EvaluateUnlocks(waves, completed)
-			}
-		}
-
-		// Apply ready labels after nextgen so the final wave list is used.
-		// Only label newly ready issues to avoid redundant API calls.
-		if cfg.Labels.Enabled {
-			readyIDs := ReadyIssueIDs(waves)
-			var newlyReady []string
-			for _, id := range readyIDs {
-				if !labeledReady[id] {
-					newlyReady = append(newlyReady, id)
-				}
-			}
-			if len(newlyReady) > 0 {
-				readyIssueStr := strings.Join(newlyReady, ", ")
-				if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
-					LogWarn("Ready label failed: %v", err)
-				} else {
-					for _, id := range newlyReady {
-						labeledReady[id] = true
-					}
-				}
-			}
-		}
-
-		// Save state after each wave completion (crash resilience)
-		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
-			LogWarn("Failed to update cached scan result: %v", err)
-		}
-		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, &scanTimestamp)
-		midState.ScanResultPath = scanResultPath
-		if err := WriteState(baseDir, midState); err != nil {
-			LogWarn("Failed to save mid-session state: %v", err)
-		}
+		applyPhase(ctx, cfg, scanDir, scanResultPath, baseDir, sessionID, adrDir,
+			selected, resolvedStrictness,
+			&waves, completed, scanResult, sessionRejected,
+			labeledReady, adrCount, scanTimestamp, loopSpan)
 	}
 
 	// Final consistency check
@@ -489,6 +585,22 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
+
+	// Ensure D-Mail directories exist before any mail operations
+	if err := EnsureMailDirs(baseDir); err != nil {
+		return fmt.Errorf("ensure mail dirs: %w", err)
+	}
+
+	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	monitorCtx, monitorCancel := context.WithCancel(ctx)
+	defer monitorCancel()
+	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
+	if monitorErr != nil {
+		LogWarn("D-Mail monitor failed: %v", monitorErr)
+	}
+	DrainInboxFeedback(inboxCh)
+	LogInboxFeedbackAsync(inboxCh)
+
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
 		return fmt.Errorf("resume: %w", err)
@@ -510,6 +622,22 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
+
+	// Ensure D-Mail directories exist before any mail operations
+	if err := EnsureMailDirs(baseDir); err != nil {
+		return fmt.Errorf("ensure mail dirs: %w", err)
+	}
+
+	// Start inbox monitor (fsnotify-based) for feedback d-mails
+	monitorCtx, monitorCancel := context.WithCancel(ctx)
+	defer monitorCancel()
+	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir)
+	if monitorErr != nil {
+		LogWarn("D-Mail monitor failed: %v", monitorErr)
+	}
+	DrainInboxFeedback(inboxCh)
+	LogInboxFeedbackAsync(inboxCh)
+
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
