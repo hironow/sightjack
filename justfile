@@ -96,6 +96,10 @@ jaeger:
 jaeger-down:
     docker compose -f docker/compose.yaml down
 
+# Generate CLI Markdown docs from cobra commands
+docs:
+    go run ./internal/tools/docgen
+
 # Clean build artifacts
 clean:
     rm -f sightjack coverage.out
