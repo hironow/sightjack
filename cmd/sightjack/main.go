@@ -121,6 +121,7 @@ func main() {
 				for {
 					choice, promptErr := sightjack.PromptResume(ctx, os.Stdout, scanner, existingState)
 					if promptErr == sightjack.ErrQuit {
+						sightjack.EndRootSpan(ctx)
 						return
 					}
 					if promptErr != nil {
