@@ -226,7 +226,7 @@ func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 				if !ok {
 					return
 				}
-				if event.Has(fsnotify.Create) && strings.HasSuffix(event.Name, ".md") {
+				if (event.Has(fsnotify.Create) || event.Has(fsnotify.Write)) && strings.HasSuffix(event.Name, ".md") {
 					filename := filepath.Base(event.Name)
 					if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
 						select {
