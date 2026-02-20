@@ -2,12 +2,14 @@ package sightjack
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
 )
 
@@ -153,6 +155,52 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+// WatchInbox monitors the inbox/ directory for new .md files using fsnotify.
+// Returns a channel that receives filenames of newly created d-mails.
+// The channel is closed when the context is cancelled.
+func WatchInbox(ctx context.Context, baseDir string) (<-chan string, error) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("dmail watch: create watcher: %w", err)
+	}
+
+	inboxPath := MailDir(baseDir, inboxDir)
+	if err := watcher.Add(inboxPath); err != nil {
+		watcher.Close()
+		return nil, fmt.Errorf("dmail watch: add inbox: %w", err)
+	}
+
+	ch := make(chan string)
+	go func() {
+		defer close(ch)
+		defer watcher.Close()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Has(fsnotify.Create) && strings.HasSuffix(event.Name, ".md") {
+					filename := filepath.Base(event.Name)
+					select {
+					case ch <- filename:
+					case <-ctx.Done():
+						return
+					}
+				}
+			case _, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+			}
+		}
+	}()
+
+	return ch, nil
 }
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.

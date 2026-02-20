@@ -1,10 +1,12 @@
 package sightjack
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDMailKind_Valid(t *testing.T) {
@@ -300,5 +302,101 @@ func TestReceiveDMail_FileNotFound(t *testing.T) {
 	_, err := ReceiveDMail(dir, "nonexistent.md")
 	if err == nil {
 		t.Error("expected error for missing file")
+	}
+}
+
+func TestWatchInbox_DetectsNewFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := EnsureMailDirs(dir); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := WatchInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("watch: %v", err)
+	}
+
+	// give watcher time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// write a .md file to inbox
+	mail := &DMail{
+		Name:        "spec-test-1",
+		Kind:        DMailSpecification,
+		Description: "test",
+		Body:        "body\n",
+	}
+	data, _ := MarshalDMail(mail)
+	inboxPath := filepath.Join(MailDir(dir, "inbox"), mail.Filename())
+	if err := os.WriteFile(inboxPath, data, 0644); err != nil {
+		t.Fatalf("write inbox: %v", err)
+	}
+
+	// expect notification
+	select {
+	case filename := <-ch:
+		if filename != "spec-test-1.md" {
+			t.Errorf("got %s, want spec-test-1.md", filename)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for inbox notification")
+	}
+}
+
+func TestWatchInbox_IgnoresNonMD(t *testing.T) {
+	dir := t.TempDir()
+	if err := EnsureMailDirs(dir); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := WatchInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("watch: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	// write a non-.md file
+	txtPath := filepath.Join(MailDir(dir, "inbox"), "notes.txt")
+	os.WriteFile(txtPath, []byte("not a dmail"), 0644)
+
+	// should NOT receive notification
+	select {
+	case filename := <-ch:
+		t.Errorf("unexpected notification for non-.md file: %s", filename)
+	case <-time.After(200 * time.Millisecond):
+		// expected: no notification
+	}
+}
+
+func TestWatchInbox_StopsOnCancel(t *testing.T) {
+	dir := t.TempDir()
+	if err := EnsureMailDirs(dir); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, err := WatchInbox(ctx, dir)
+	if err != nil {
+		t.Fatalf("watch: %v", err)
+	}
+
+	// cancel context
+	cancel()
+
+	// channel should close
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("expected channel to be closed after cancel")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for channel close")
 	}
 }
