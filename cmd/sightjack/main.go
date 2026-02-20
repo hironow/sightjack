@@ -1037,6 +1037,11 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 	// Write .gitignore (best-effort)
 	_ = sightjack.WriteGitIgnore(baseDir)
 
+	// Install skill definitions from embedded templates
+	if err := sightjack.InstallSkills(baseDir); err != nil {
+		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
+	}
+
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Created .siren/config.yaml\n")
 	return nil

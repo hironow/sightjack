@@ -615,3 +615,32 @@ func TestRunInit_CreatesGitIgnore(t *testing.T) {
 		t.Errorf("expected state.json in .gitignore, got:\n%s", content)
 	}
 }
+
+func TestRunInit_InstallsSkills(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	input := strings.NewReader("Team\nProject\n\n\n")
+	var output bytes.Buffer
+
+	// when
+	err := runInit(dir, input, &output)
+
+	// then: skill files should be installed
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+	sendable, readErr := os.ReadFile(filepath.Join(dir, ".siren", "skills", "dmail-sendable", "SKILL.md"))
+	if readErr != nil {
+		t.Fatalf("dmail-sendable SKILL.md not installed: %v", readErr)
+	}
+	if !strings.Contains(string(sendable), "name: dmail-sendable") {
+		t.Errorf("unexpected dmail-sendable content: %s", sendable)
+	}
+	readable, readErr := os.ReadFile(filepath.Join(dir, ".siren", "skills", "dmail-readable", "SKILL.md"))
+	if readErr != nil {
+		t.Fatalf("dmail-readable SKILL.md not installed: %v", readErr)
+	}
+	if !strings.Contains(string(readable), "name: dmail-readable") {
+		t.Errorf("unexpected dmail-readable content: %s", readable)
+	}
+}
