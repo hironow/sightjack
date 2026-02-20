@@ -161,7 +161,10 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 // archives it, and returns it only if it is a feedback d-mail.
 // Returns nil for already-archived, non-feedback, or unreadable files.
 func receiveDMailIfNew(baseDir, filename string) *DMail {
-	// Consumer-side dedup: skip if already in archive
+	// Consumer-side dedup: skip if already in archive.
+	// NOTE: Dedup is filename-based by design — the d-mail filename acts as a
+	// message ID in the protocol. Senders that need to deliver updated content
+	// for the same wave must use a distinct filename (e.g. append a sequence number).
 	archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
 	if _, err := os.Stat(archivePath); err == nil {
 		os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename))
