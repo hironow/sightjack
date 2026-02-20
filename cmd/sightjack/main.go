@@ -59,7 +59,7 @@ func main() {
 	}
 
 	if fs.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|session|init|doctor] [flags] [path]\n", fs.Arg(0))
 		os.Exit(1)
 	}
 
@@ -119,6 +119,16 @@ func main() {
 		defer cancel()
 		ctx = sightjack.StartRootSpan(ctx, subcmd)
 		runDiscuss(ctx, cfg, baseDir, dryRun)
+		sightjack.EndRootSpan(ctx)
+	case "nextgen":
+		cfg := loadConfigOrExit(configPath)
+		if lang != "" {
+			cfg.Lang = lang
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		ctx = sightjack.StartRootSpan(ctx, subcmd)
+		runNextgen(ctx, cfg, baseDir, dryRun)
 		sightjack.EndRootSpan(ctx)
 	case "adr":
 		ctx := sightjack.StartRootSpan(context.Background(), subcmd)
@@ -244,6 +254,7 @@ func setUsage(fs *flag.FlagSet) {
 		fmt.Fprintf(out, "  discuss   Architect discussion from stdin Wave JSON\n")
 		fmt.Fprintf(out, "  apply     Apply a wave to Linear from stdin Wave JSON\n")
 		fmt.Fprintf(out, "  adr       Generate ADR Markdown from stdin DiscussResult\n")
+		fmt.Fprintf(out, "  nextgen   Generate follow-up waves from stdin ApplyResult\n")
 		fmt.Fprintf(out, "  session   Interactive wave approval and apply session\n")
 		fmt.Fprintf(out, "  show      Display last scan results\n")
 		fmt.Fprintf(out, "  init      Create .siren/config.yaml interactively\n")
@@ -284,7 +295,7 @@ func configExplicitlySet(fs *flag.FlagSet) bool {
 // At most one path is allowed; a second non-command positional is an error.
 // Correctly skips flag values so that e.g. "-c custom.yaml scan" works.
 func extractSubcommand(args []string) (string, string, []string, error) {
-	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "adr": true, "show": true, "session": true, "init": true, "doctor": true}
+	knownCmds := map[string]bool{"scan": true, "waves": true, "select": true, "discuss": true, "apply": true, "adr": true, "nextgen": true, "show": true, "session": true, "init": true, "doctor": true}
 	// Flags that consume the next token as their value.
 	valuedFlags := map[string]bool{
 		"-config": true, "--config": true, "-c": true,
@@ -334,7 +345,7 @@ func extractSubcommand(args []string) (string, string, []string, error) {
 		}
 		if knownCmds[arg] {
 			if subcmd != "" {
-				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|show|session|init|doctor] [flags] [path]", arg)
+				return "", "", nil, fmt.Errorf("unexpected argument: %s\nUsage: sightjack [scan|waves|select|discuss|apply|adr|nextgen|show|session|init|doctor] [flags] [path]", arg)
 			}
 			subcmd = arg
 			continue
@@ -421,6 +432,111 @@ func runScan(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun 
 	}
 
 	sightjack.LogOK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
+}
+
+func runNextgen(ctx context.Context, cfg *sightjack.Config, baseDir string, dryRun bool) {
+	// Read ApplyResult JSON from stdin.
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		sightjack.LogError("Failed to read stdin: %v", err)
+		os.Exit(1)
+	}
+	if len(data) == 0 {
+		sightjack.LogError("No input on stdin. Pipe apply result: sightjack apply | sightjack nextgen")
+		os.Exit(1)
+	}
+
+	var applyResult sightjack.ApplyResult
+	if err := json.Unmarshal(data, &applyResult); err != nil {
+		sightjack.LogError("Invalid ApplyResult JSON: %v", err)
+		os.Exit(1)
+	}
+
+	// If completeness target reached, output empty plan.
+	if applyResult.NewCompleteness >= 0.95 {
+		sightjack.LogOK("Completeness %.0f%% — no follow-up waves needed.", applyResult.NewCompleteness*100)
+		emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
+		fmt.Println(string(emptyPlan))
+		return
+	}
+
+	// Read state to reconstruct context for wave generation.
+	state, stateErr := sightjack.ReadState(baseDir)
+	if stateErr != nil {
+		sightjack.LogError("Cannot read state for nextgen context: %v\nRun 'sightjack scan' first.", stateErr)
+		os.Exit(1)
+	}
+
+	// Find the cluster matching the completed wave.
+	var cluster sightjack.ClusterScanResult
+	clusterFound := false
+	waves := sightjack.RestoreWaves(state.Waves)
+	var completedWave sightjack.Wave
+	for _, w := range waves {
+		if sightjack.WaveKey(w) == state.Project+":"+applyResult.WaveID || w.ID == applyResult.WaveID {
+			completedWave = w
+			for _, cs := range state.Clusters {
+				if cs.Name == w.ClusterName {
+					cluster = sightjack.ClusterScanResult{
+						Name:         cs.Name,
+						Completeness: cs.Completeness,
+						IssueCount:   cs.IssueCount,
+					}
+					clusterFound = true
+					break
+				}
+			}
+			break
+		}
+	}
+
+	if !clusterFound {
+		sightjack.LogError("Could not find cluster context for wave %q in state.", applyResult.WaveID)
+		os.Exit(1)
+	}
+
+	// Check if more waves are needed.
+	if !sightjack.NeedsMoreWaves(cluster, waves) {
+		sightjack.LogOK("No more waves needed for %s.", cluster.Name)
+		emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
+		fmt.Println(string(emptyPlan))
+		return
+	}
+
+	sessionID := fmt.Sprintf("nextgen-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	if err := os.MkdirAll(scanDir, 0755); err != nil {
+		sightjack.LogError("Failed to create scan dir: %v", err)
+		os.Exit(1)
+	}
+
+	adrDir := sightjack.ADRDir(baseDir)
+	existingADRs, _ := sightjack.ReadExistingADRs(adrDir)
+	completedWaves := sightjack.CompletedWavesForCluster(waves, cluster.Name)
+	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
+
+	if dryRun {
+		if err := sightjack.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness); err != nil {
+			sightjack.LogError("Dry-run failed: %v", err)
+			os.Exit(1)
+		}
+		sightjack.LogOK("Dry-run complete. Check %s for generated prompt.", scanDir)
+		return
+	}
+
+	newWaves, err := sightjack.GenerateNextWaves(ctx, cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness)
+	if err != nil {
+		sightjack.LogError("Nextgen failed: %v", err)
+		os.Exit(1)
+	}
+
+	plan := sightjack.WavePlan{Waves: newWaves}
+	out, jsonErr := json.MarshalIndent(plan, "", "  ")
+	if jsonErr != nil {
+		sightjack.LogError("JSON marshal failed: %v", jsonErr)
+		os.Exit(1)
+	}
+	fmt.Println(string(out))
 }
 
 func runADR(baseDir string) {
