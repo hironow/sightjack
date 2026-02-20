@@ -41,11 +41,11 @@ install: build
 
 # Run all tests
 test:
-    go test ./...
+    go test ./... -count=1 -timeout=60s
 
 # Run tests with verbose output
 test-v:
-    go test -v ./...
+    go test ./... -count=1 -timeout=60s -v
 
 # Run tests with race detector
 test-race:
@@ -75,7 +75,24 @@ lint: vet lint-md
 # Format, vet, test — full check before commit
 check: fmt vet test
 
+# Run sightjack doctor (quick smoke test after build)
+doctor: build
+    ./sightjack doctor
+
+# Start Jaeger (OTel trace viewer) on http://localhost:16686
+jaeger:
+    docker compose -f docker/compose.yaml up -d
+    @echo "Jaeger UI: http://localhost:16686"
+    @echo "OTLP endpoint: http://localhost:4318"
+    @echo ""
+    @echo "Run sightjack with tracing:"
+    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack session"
+
+# Stop Jaeger
+jaeger-down:
+    docker compose -f docker/compose.yaml down
+
 # Clean build artifacts
 clean:
-    rm -f coverage.out
+    rm -f sightjack coverage.out
     go clean

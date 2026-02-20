@@ -126,16 +126,6 @@ Linear (via MCP Server)
     +-- Ready labels applied
 ```
 
-Legend:
-- Classify: Issue classification into thematic clusters
-- DeepScan: Per-cluster completeness and dependency analysis
-- WaveGenerate: Ordered execution wave creation
-- WaveApply: Approved wave changes applied to Linear
-- Matrix Navigator: Cluster x Wave interactive selection UI
-- Architect Agent: Design discussion support
-- Scribe Agent: ADR auto-generation from design decisions
-- MCP Server: Model Context Protocol for Linear API access
-
 ### AI Agent Team
 
 | Agent | Role | Game Concept |
@@ -149,19 +139,13 @@ Legend:
 
 ```bash
 # Build and install
-go install github.com/hironow/sightjack/cmd/sightjack@latest
+just install
 
-# Create config interactively
+# Initialize project config (Linear team key, etc.)
 sightjack init
 
-# Or create manually
-mkdir -p .siren
-cat > .siren/config.yaml <<EOF
-linear:
-  team: "ENG"
-  project: "My Project"
-lang: "en"
-EOF
+# Check environment
+sightjack doctor
 
 # Run — .siren/ is created automatically
 sightjack session
@@ -169,7 +153,26 @@ sightjack session
 
 Sightjack creates `.siren/` and all state/run files automatically at runtime.
 
+## Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `sightjack scan` | Classify and deep-scan Linear issues (default) |
+| `sightjack session` | Interactive wave approval and apply session |
+| `sightjack show` | Display last scan results |
+| `sightjack init` | Initialize `.siren/config.yaml` interactively |
+| `sightjack doctor` | Check environment and tool availability |
+| `sightjack --version` | Show version and exit |
+
 ## Usage
+
+Flags and subcommand can be placed in any order:
+
+```bash
+sightjack scan --dry-run         # flags after subcommand
+sightjack --dry-run scan         # flags before subcommand
+sightjack --lang=ja session      # --flag=value form
+```
 
 ```bash
 # Scan only (classify + deep-scan, no interactive session)
@@ -193,6 +196,9 @@ sightjack session --config .siren/config.yaml
 
 # Verbose logging
 sightjack session --verbose
+
+# Scan a different repository
+sightjack scan /path/to/repo
 ```
 
 ## Options
@@ -228,6 +234,9 @@ scribe:
 
 strictness:
   default: "fog"         # Default strictness (fog/alert/lockdown)
+  overrides:             # Per-label/cluster strictness (strictest wins)
+    security: "lockdown"
+    spike: "fog"
 
 retry:
   max_attempts: 3        # Retry on Claude failures
@@ -235,6 +244,8 @@ retry:
 
 labels:
   enabled: true          # Auto-label ready issues in Linear
+  prefix: "sj:"          # Label prefix (default: "sj:")
+  ready_label: "ready"   # Ready-for-execution label name
 
 dod_templates:           # Custom DoD templates by issue type
   api_endpoint:
@@ -247,11 +258,53 @@ dod_templates:           # Custom DoD templates by issue type
 lang: "ja"               # Language (en/ja)
 ```
 
+## Tracing (OpenTelemetry)
+
+Sightjack instruments key operations (scan, wave generation, architect discussion, etc.) with OpenTelemetry spans and events. Tracing is off by default (noop tracer) and activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+```bash
+# Start Jaeger (all-in-one trace viewer)
+just jaeger
+
+# Run with tracing enabled
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack session
+
+# View traces at http://localhost:16686
+
+# Stop Jaeger
+just jaeger-down
+```
+
+## Development
+
+```bash
+# Task runner (just)
+just build          # Build binary
+just install        # Build and install to /usr/local/bin
+just test           # Run all tests
+just test-v         # Verbose test output
+just test-race      # Tests with race detector
+just cover          # Coverage report
+just cover-html     # Open coverage in browser
+just fmt            # Format code (gofmt)
+just vet            # Run go vet
+just lint           # fmt check + go vet + markdown lint
+just lint-md        # Lint markdown files only
+just check          # fmt + vet + test (pre-commit check)
+just doctor         # Build + run sightjack doctor
+just clean          # Clean build artifacts
+just prek-install   # Install prek hooks (pre-commit + pre-push)
+just prek-run       # Run all prek hooks on all files
+just jaeger         # Start Jaeger trace viewer (docker)
+just jaeger-down    # Stop Jaeger
+```
+
 ## File Structure
 
 ```
 +-- cmd/sightjack/
 |   +-- main.go              CLI entry point + subcommand routing
+|   +-- main_test.go         CLI arg parsing tests
 +-- scanner.go               Scanner Agent (classify + deep-scan)
 +-- architect.go             Architect Agent (design discussion)
 +-- scribe.go                Scribe Agent (ADR generation)
@@ -267,7 +320,13 @@ lang: "ja"               # Language (en/ja)
 +-- state.go                 State persistence + path helpers (.siren/)
 +-- prompt.go                Go template renderer for AI prompts
 +-- logger.go                Colored logging (LogOK, LogWarn, LogError, LogInfo)
-+-- *_test.go                Tests (227+)
++-- init.go                  Config scaffolding (sightjack init)
++-- doctor.go                Environment health check (sightjack doctor)
++-- telemetry.go             OpenTelemetry tracing (OTLP export, noop fallback)
++-- *_test.go                Tests (443+)
++-- justfile                 Task runner
++-- docker/
+|   +-- compose.yaml         Jaeger all-in-one for trace viewing
 +-- templates/
     +-- scanner_classify_{en,ja}.md.tmpl
     +-- scanner_deepscan_{en,ja}.md.tmpl
@@ -284,6 +343,7 @@ lang: "ja"               # Language (en/ja)
 - Go 1.25+
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - [Linear MCP Server](https://github.com/anthropics/model-context-protocol) configured for Claude
+- [Docker](https://www.docker.com/) for tracing (Jaeger)
 
 ## License
 
