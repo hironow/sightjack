@@ -752,3 +752,344 @@ func TestMockDispatcher_WritesFile(t *testing.T) {
 		t.Errorf("expected callLog [classify.json], got %v", log)
 	}
 }
+
+// --- Phase 6: D-Mail Lifecycle Tests ---
+
+func TestLifecycle_DMailFullCycle(t *testing.T) {
+	// given: pre-place feedback d-mail in inbox before session starts
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-dmail-full"
+
+	// Set up mail directories and pre-place feedback
+	if err := EnsureMailDirs(baseDir); err != nil {
+		t.Fatal(err)
+	}
+	feedbackMail := &DMail{
+		Name:        "fb-arch-001",
+		Kind:        DMailFeedback,
+		Description: "Token rotation drift detected",
+		Severity:    "high",
+		Body:        "JWT rotation interval misaligned with refresh window.",
+	}
+	feedbackData, err := MarshalDMail(feedbackMail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inboxPath := filepath.Join(MailDir(baseDir, inboxDir), feedbackMail.Filename())
+	if err := os.WriteFile(inboxPath, feedbackData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	d.Register("wave_*_*.json", waveGenAuth())
+	d.Register("apply_*_*.json", waveApplySuccess("auth-w1"))
+	cleanup := d.Install()
+	defer cleanup()
+
+	ctx := context.Background()
+	// select wave 1, approve, quit
+	input := strings.NewReader("1\na\nq\n")
+
+	// when
+	err = RunSession(ctx, cfg, baseDir, sessionID, false, input)
+
+	// then: session completes without error
+	if err != nil {
+		t.Fatalf("RunSession: %v", err)
+	}
+
+	// Feedback should be removed from inbox (received + archived)
+	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+		t.Error("feedback should have been removed from inbox")
+	}
+
+	// Feedback should exist in archive
+	archiveFeedback := filepath.Join(MailDir(baseDir, archiveDir), feedbackMail.Filename())
+	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
+		t.Error("feedback should exist in archive")
+	}
+
+	// Verify archived feedback content is parseable and correct
+	archivedData, err := os.ReadFile(archiveFeedback)
+	if err != nil {
+		t.Fatalf("read archived feedback: %v", err)
+	}
+	archivedFeedback, err := ParseDMail(archivedData)
+	if err != nil {
+		t.Fatalf("parse archived feedback: %v", err)
+	}
+	if archivedFeedback.Kind != DMailFeedback {
+		t.Errorf("expected feedback kind, got %q", archivedFeedback.Kind)
+	}
+	if archivedFeedback.Severity != "high" {
+		t.Errorf("expected high severity, got %q", archivedFeedback.Severity)
+	}
+
+	// Specification d-mail should exist in outbox and archive
+	outboxFiles, _ := ListDMail(baseDir, outboxDir)
+	var foundSpec, foundReport bool
+	for _, f := range outboxFiles {
+		if strings.Contains(f, "spec") {
+			foundSpec = true
+			data, readErr := os.ReadFile(filepath.Join(MailDir(baseDir, outboxDir), f))
+			if readErr != nil {
+				t.Fatalf("read spec: %v", readErr)
+			}
+			mail, parseErr := ParseDMail(data)
+			if parseErr != nil {
+				t.Fatalf("parse spec: %v", parseErr)
+			}
+			if mail.Kind != DMailSpecification {
+				t.Errorf("expected specification kind, got %q", mail.Kind)
+			}
+			if !strings.Contains(mail.Body, "AUTH-1") {
+				t.Error("spec body should reference AUTH-1")
+			}
+		}
+		if strings.Contains(f, "report") {
+			foundReport = true
+			data, readErr := os.ReadFile(filepath.Join(MailDir(baseDir, outboxDir), f))
+			if readErr != nil {
+				t.Fatalf("read report: %v", readErr)
+			}
+			mail, parseErr := ParseDMail(data)
+			if parseErr != nil {
+				t.Fatalf("parse report: %v", parseErr)
+			}
+			if mail.Kind != DMailReport {
+				t.Errorf("expected report kind, got %q", mail.Kind)
+			}
+		}
+	}
+	if !foundSpec {
+		t.Error("expected specification d-mail in outbox")
+	}
+	if !foundReport {
+		t.Error("expected report d-mail in outbox")
+	}
+
+	// Both should also be in archive
+	archiveFiles, _ := ListDMail(baseDir, archiveDir)
+	var archiveSpec, archiveReport bool
+	for _, f := range archiveFiles {
+		if strings.Contains(f, "spec") {
+			archiveSpec = true
+		}
+		if strings.Contains(f, "report") {
+			archiveReport = true
+		}
+	}
+	if !archiveSpec {
+		t.Error("expected specification in archive")
+	}
+	if !archiveReport {
+		t.Error("expected report in archive")
+	}
+}
+
+func TestLifecycle_DMailResumeCycle(t *testing.T) {
+	// given: pre-existing state with wave 1 completed, wave 2 available
+	// Pre-place feedback in inbox before resuming
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-dmail-resume"
+
+	// Set up scan directory and cache scan result
+	scanDir, err := EnsureScanDir(baseDir, sessionID)
+	if err != nil {
+		t.Fatalf("EnsureScanDir: %v", err)
+	}
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	scanResult := &ScanResult{
+		Clusters: []ClusterScanResult{
+			{
+				Name:         "Auth",
+				Completeness: 0.55,
+				Issues: []IssueDetail{
+					{ID: "AUTH-1", Identifier: "AUTH-1", Title: "Login flow", Completeness: 0.5},
+					{ID: "AUTH-2", Identifier: "AUTH-2", Title: "Token refresh", Completeness: 0.6},
+				},
+			},
+		},
+		TotalIssues: 2,
+	}
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		t.Fatalf("WriteScanResult: %v", err)
+	}
+
+	// Write pre-existing state
+	state := &SessionState{
+		Version:      StateFormatVersion,
+		SessionID:    sessionID,
+		Project:      "TestProject",
+		Completeness: 0.55,
+		Clusters:     []ClusterState{{Name: "Auth", Completeness: 0.55, IssueCount: 2}},
+		Waves: []WaveState{
+			{
+				ID: "auth-w1", ClusterName: "Auth", Title: "Add DoD",
+				Status: "completed", ActionCount: 1,
+				Delta: WaveDelta{Before: 0.35, After: 0.55},
+			},
+			{
+				ID: "auth-w2", ClusterName: "Auth", Title: "Add Tests",
+				Status: "available", ActionCount: 1,
+				Actions: []WaveAction{{Type: "add_test", IssueID: "AUTH-2", Description: "Add tests"}},
+				Delta:   WaveDelta{Before: 0.55, After: 0.75},
+			},
+		},
+		ScanResultPath: scanResultPath,
+	}
+	if err := WriteState(baseDir, state); err != nil {
+		t.Fatalf("WriteState: %v", err)
+	}
+
+	// Set up mail directories and pre-place feedback
+	if err := EnsureMailDirs(baseDir); err != nil {
+		t.Fatal(err)
+	}
+	feedbackMail := &DMail{
+		Name:        "fb-perf-001",
+		Kind:        DMailFeedback,
+		Description: "Auth latency spike in token validation",
+		Severity:    "high",
+		Body:        "p99 latency exceeds 500ms under load.",
+	}
+	feedbackData, marshalErr := MarshalDMail(feedbackMail)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	inboxPath := filepath.Join(MailDir(baseDir, inboxDir), feedbackMail.Filename())
+	if err := os.WriteFile(inboxPath, feedbackData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Register mock for apply only
+	d := newMockDispatcher(t)
+	d.Register("apply_*_*.json", waveApplySuccess("auth-w2"))
+	cleanup := d.Install()
+	defer cleanup()
+
+	ctx := context.Background()
+	// select wave 1 (only available), approve, quit
+	input := strings.NewReader("1\na\nq\n")
+
+	// when
+	err = RunResumeSession(ctx, cfg, baseDir, state, input)
+
+	// then
+	if err != nil {
+		t.Fatalf("RunResumeSession: %v", err)
+	}
+
+	// Feedback should be archived
+	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+		t.Error("feedback should have been removed from inbox")
+	}
+	archiveFeedback := filepath.Join(MailDir(baseDir, archiveDir), feedbackMail.Filename())
+	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
+		t.Error("feedback should exist in archive")
+	}
+
+	// Spec and report d-mails should exist for wave auth-w2
+	outboxFiles, _ := ListDMail(baseDir, outboxDir)
+	var specFound, reportFound bool
+	for _, f := range outboxFiles {
+		if strings.Contains(f, "spec") && strings.Contains(f, "auth") {
+			specFound = true
+			data, readErr := os.ReadFile(filepath.Join(MailDir(baseDir, outboxDir), f))
+			if readErr != nil {
+				t.Fatalf("read spec: %v", readErr)
+			}
+			mail, parseErr := ParseDMail(data)
+			if parseErr != nil {
+				t.Fatalf("parse spec: %v", parseErr)
+			}
+			if mail.Kind != DMailSpecification {
+				t.Errorf("expected specification, got %q", mail.Kind)
+			}
+			if len(mail.Issues) == 0 {
+				t.Error("spec should have issue references")
+			}
+		}
+		if strings.Contains(f, "report") && strings.Contains(f, "auth") {
+			reportFound = true
+		}
+	}
+	if !specFound {
+		t.Error("expected specification d-mail in outbox for auth-w2")
+	}
+	if !reportFound {
+		t.Error("expected report d-mail in outbox for auth-w2")
+	}
+
+	// Final state should have both waves completed
+	finalState, stateErr := ReadState(baseDir)
+	if stateErr != nil {
+		t.Fatalf("ReadState: %v", stateErr)
+	}
+	completedCount := 0
+	for _, w := range finalState.Waves {
+		if w.Status == "completed" {
+			completedCount++
+		}
+	}
+	if completedCount != 2 {
+		t.Errorf("expected 2 completed waves, got %d", completedCount)
+	}
+}
+
+func TestLifecycle_DMailNoFeedback_StillGeneratesSpecAndReport(t *testing.T) {
+	// given: no feedback in inbox, verify spec + report are still generated
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-dmail-nofb"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	d.Register("wave_*_*.json", waveGenAuth())
+	d.Register("apply_*_*.json", waveApplySuccess("auth-w1"))
+	cleanup := d.Install()
+	defer cleanup()
+
+	ctx := context.Background()
+	input := strings.NewReader("1\na\nq\n")
+
+	// when
+	err := RunSession(ctx, cfg, baseDir, sessionID, false, input)
+
+	// then
+	if err != nil {
+		t.Fatalf("RunSession: %v", err)
+	}
+
+	// Spec and report should still be generated even without feedback
+	outboxFiles, listErr := ListDMail(baseDir, outboxDir)
+	if listErr != nil {
+		t.Fatalf("list outbox: %v", listErr)
+	}
+	var specCount, reportCount int
+	for _, f := range outboxFiles {
+		if strings.Contains(f, "spec") {
+			specCount++
+		}
+		if strings.Contains(f, "report") {
+			reportCount++
+		}
+	}
+	if specCount != 1 {
+		t.Errorf("expected 1 spec d-mail, got %d", specCount)
+	}
+	if reportCount != 1 {
+		t.Errorf("expected 1 report d-mail, got %d", reportCount)
+	}
+
+	// Inbox should be empty (no feedback was placed)
+	inboxFiles, _ := ListDMail(baseDir, inboxDir)
+	if len(inboxFiles) != 0 {
+		t.Errorf("expected empty inbox, got %d files", len(inboxFiles))
+	}
+}
