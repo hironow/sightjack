@@ -165,6 +165,16 @@ func TestExtractSubcommand(t *testing.T) {
 			wantCmd:  "doctor",
 			wantPath: "/tmp/repo",
 		},
+		{
+			name:    "mistyped command rejected",
+			args:    []string{"scna"},
+			wantErr: true,
+		},
+		{
+			name:    "unknown command rejected",
+			args:    []string{"deploy"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
