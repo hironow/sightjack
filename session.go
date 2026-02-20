@@ -191,6 +191,8 @@ const (
 )
 
 // approvalPhase handles the wave approval/reject/discuss/selective loop.
+// waves is passed by value (not pointer) because this phase only mutates
+// existing elements via PropagateWaveUpdate — it never appends or reassigns.
 // Returns the (possibly modified) wave and whether it was approved.
 func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *Config, scanDir string, selected Wave, resolvedStrictness string,
@@ -292,6 +294,146 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	}
 }
 
+// applyPhase handles wave apply, partial failure check, completion marking,
+// cluster completeness update, unlock evaluation, nextgen wave generation,
+// ready labels, and mid-session state save.
+// waves is passed as *[]Wave because append/EvaluateUnlocks may reallocate the slice.
+func applyPhase(ctx context.Context, cfg *Config,
+	scanDir, scanResultPath, baseDir, sessionID, adrDir string,
+	selected Wave, resolvedStrictness string,
+	waves *[]Wave, completed map[string]bool,
+	scanResult *ScanResult, sessionRejected map[string][]WaveAction,
+	labeledReady map[string]bool, adrCount int,
+	scanTimestamp time.Time, loopSpan trace.Span) {
+
+	// --- Pass 4: Wave Apply ---
+	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness)
+	if err != nil {
+		LogError("Apply failed: %v", err)
+		return
+	}
+
+	// Count new waves unlocked by this completion
+	oldAvailable := len(AvailableWaves(*waves, completed))
+
+	if !IsWaveApplyComplete(applyResult) {
+		loopSpan.AddEvent("wave.partial_failure",
+			trace.WithAttributes(
+				attribute.String("wave.id", selected.ID),
+				attribute.String("wave.cluster_name", selected.ClusterName),
+				attribute.Int("wave.error_count", len(applyResult.Errors)),
+			),
+		)
+		LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
+		DisplayRippleEffects(os.Stdout, applyResult.Ripples)
+		return
+	}
+
+	loopSpan.AddEvent("wave.completed",
+		trace.WithAttributes(
+			attribute.String("wave.id", selected.ID),
+			attribute.String("wave.cluster_name", selected.ClusterName),
+			attribute.Int("wave.action_count", len(selected.Actions)),
+		),
+	)
+
+	// Mark wave completed using composite key (ClusterName:ID)
+	completed[WaveKey(selected)] = true
+	selectedKey := WaveKey(selected)
+	for i, w := range *waves {
+		if WaveKey(w) == selectedKey {
+			(*waves)[i].Status = "completed"
+			break
+		}
+	}
+
+	// Update cluster completeness from delta, then recalculate overall
+	for i, c := range scanResult.Clusters {
+		if c.Name == selected.ClusterName {
+			adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
+			scanResult.Clusters[i].Completeness = adjustedAfter
+			// Note: per-issue completeness is NOT updated here because
+			// action types vary (add_dod vs add_dependency) and we lack
+			// accurate per-issue deltas. The nextgen prompt already
+			// receives CompletedWaves JSON listing all applied actions,
+			// which is sufficient for the LLM to avoid re-proposals.
+			break
+		}
+	}
+	scanResult.CalculateCompleteness()
+
+	// Display rich completion summary with grouped ripple effects
+	*waves = EvaluateUnlocks(*waves, completed)
+	newAvailable := len(AvailableWaves(*waves, completed))
+	newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
+	DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
+
+	// --- Post-completion: Generate next waves ---
+	var clusterForNextgen ClusterScanResult
+	for _, c := range scanResult.Clusters {
+		if c.Name == selected.ClusterName {
+			clusterForNextgen = c
+			break
+		}
+	}
+	if clusterForNextgen.Name == "" {
+		LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
+	} else if !NeedsMoreWaves(clusterForNextgen, *waves) {
+		loopSpan.AddEvent("nextgen.skipped",
+			trace.WithAttributes(
+				attribute.String("wave.cluster_name", selected.ClusterName),
+			),
+		)
+		LogDebug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
+	} else {
+		completedWavesForCluster := CompletedWavesForCluster(*waves, selected.ClusterName)
+		existingADRs, adrErr := ReadExistingADRs(adrDir)
+		if adrErr != nil {
+			LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
+		}
+		rejectedForWave := sessionRejected[WaveKey(selected)]
+		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness)
+		if nextgenErr != nil {
+			LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
+		} else if len(newWaves) > 0 {
+			*waves = append(*waves, newWaves...)
+			*waves = EvaluateUnlocks(*waves, completed)
+		}
+	}
+
+	// Apply ready labels after nextgen so the final wave list is used.
+	// Only label newly ready issues to avoid redundant API calls.
+	if cfg.Labels.Enabled {
+		readyIDs := ReadyIssueIDs(*waves)
+		var newlyReady []string
+		for _, id := range readyIDs {
+			if !labeledReady[id] {
+				newlyReady = append(newlyReady, id)
+			}
+		}
+		if len(newlyReady) > 0 {
+			readyIssueStr := strings.Join(newlyReady, ", ")
+			if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
+				LogWarn("Ready label failed: %v", err)
+			} else {
+				for _, id := range newlyReady {
+					labeledReady[id] = true
+				}
+			}
+		}
+	}
+
+	// Save state after each wave completion (crash resilience)
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+		LogWarn("Failed to update cached scan result: %v", err)
+	}
+	midState := BuildSessionState(cfg, sessionID, scanResult, *waves, adrCount, &scanTimestamp)
+	midState.ScanResultPath = scanResultPath
+	if err := WriteState(baseDir, midState); err != nil {
+		LogWarn("Failed to save mid-session state: %v", err)
+	}
+}
+
 // runInteractiveLoop runs the wave selection/approval/apply loop shared by
 // RunSession, RunResumeSession, and RunRescanSession.
 // resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
@@ -341,132 +483,10 @@ outerLoop:
 			continue
 		}
 
-		// --- Pass 4: Wave Apply ---
-		applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness)
-		if err != nil {
-			LogError("Apply failed: %v", err)
-			continue
-		}
-
-		// Count new waves unlocked by this completion
-		oldAvailable := len(AvailableWaves(waves, completed))
-
-		if !IsWaveApplyComplete(applyResult) {
-			loopSpan.AddEvent("wave.partial_failure",
-				trace.WithAttributes(
-					attribute.String("wave.id", selected.ID),
-					attribute.String("wave.cluster_name", selected.ClusterName),
-					attribute.Int("wave.error_count", len(applyResult.Errors)),
-				),
-			)
-			LogWarn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
-			DisplayRippleEffects(os.Stdout, applyResult.Ripples)
-			continue
-		}
-
-		loopSpan.AddEvent("wave.completed",
-			trace.WithAttributes(
-				attribute.String("wave.id", selected.ID),
-				attribute.String("wave.cluster_name", selected.ClusterName),
-				attribute.Int("wave.action_count", len(selected.Actions)),
-			),
-		)
-
-		// Mark wave completed using composite key (ClusterName:ID)
-		completed[WaveKey(selected)] = true
-		selectedKey := WaveKey(selected)
-		for i, w := range waves {
-			if WaveKey(w) == selectedKey {
-				waves[i].Status = "completed"
-				break
-			}
-		}
-
-		// Update cluster completeness from delta, then recalculate overall
-		for i, c := range scanResult.Clusters {
-			if c.Name == selected.ClusterName {
-				adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
-				scanResult.Clusters[i].Completeness = adjustedAfter
-				// Note: per-issue completeness is NOT updated here because
-				// action types vary (add_dod vs add_dependency) and we lack
-				// accurate per-issue deltas. The nextgen prompt already
-				// receives CompletedWaves JSON listing all applied actions,
-				// which is sufficient for the LLM to avoid re-proposals.
-				break
-			}
-		}
-		scanResult.CalculateCompleteness()
-
-		// Display rich completion summary with grouped ripple effects
-		waves = EvaluateUnlocks(waves, completed)
-		newAvailable := len(AvailableWaves(waves, completed))
-		newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
-		DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
-
-		// --- Post-completion: Generate next waves ---
-		var clusterForNextgen ClusterScanResult
-		for _, c := range scanResult.Clusters {
-			if c.Name == selected.ClusterName {
-				clusterForNextgen = c
-				break
-			}
-		}
-		if clusterForNextgen.Name == "" {
-			LogWarn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
-		} else if !NeedsMoreWaves(clusterForNextgen, waves) {
-			loopSpan.AddEvent("nextgen.skipped",
-				trace.WithAttributes(
-					attribute.String("wave.cluster_name", selected.ClusterName),
-				),
-			)
-			LogDebug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
-		} else {
-			completedWavesForCluster := CompletedWavesForCluster(waves, selected.ClusterName)
-			existingADRs, adrErr := ReadExistingADRs(adrDir)
-			if adrErr != nil {
-				LogWarn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
-			}
-			rejectedForWave := sessionRejected[WaveKey(selected)]
-			newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness)
-			if nextgenErr != nil {
-				LogWarn("Nextgen failed (non-fatal): %v", nextgenErr)
-			} else if len(newWaves) > 0 {
-				waves = append(waves, newWaves...)
-				waves = EvaluateUnlocks(waves, completed)
-			}
-		}
-
-		// Apply ready labels after nextgen so the final wave list is used.
-		// Only label newly ready issues to avoid redundant API calls.
-		if cfg.Labels.Enabled {
-			readyIDs := ReadyIssueIDs(waves)
-			var newlyReady []string
-			for _, id := range readyIDs {
-				if !labeledReady[id] {
-					newlyReady = append(newlyReady, id)
-				}
-			}
-			if len(newlyReady) > 0 {
-				readyIssueStr := strings.Join(newlyReady, ", ")
-				if err := RunReadyLabel(ctx, cfg, readyIssueStr); err != nil {
-					LogWarn("Ready label failed: %v", err)
-				} else {
-					for _, id := range newlyReady {
-						labeledReady[id] = true
-					}
-				}
-			}
-		}
-
-		// Save state after each wave completion (crash resilience)
-		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
-			LogWarn("Failed to update cached scan result: %v", err)
-		}
-		midState := BuildSessionState(cfg, sessionID, scanResult, waves, adrCount, &scanTimestamp)
-		midState.ScanResultPath = scanResultPath
-		if err := WriteState(baseDir, midState); err != nil {
-			LogWarn("Failed to save mid-session state: %v", err)
-		}
+		applyPhase(ctx, cfg, scanDir, scanResultPath, baseDir, sessionID, adrDir,
+			selected, resolvedStrictness,
+			&waves, completed, scanResult, sessionRejected,
+			labeledReady, adrCount, scanTimestamp, loopSpan)
 	}
 
 	// Final consistency check
