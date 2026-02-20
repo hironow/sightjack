@@ -87,7 +87,7 @@ jaeger:
     @echo "MCP endpoint:   http://localhost:16687/mcp"
     @echo ""
     @echo "Run sightjack with tracing:"
-    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack session"
+    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack run"
 
 # Stop Jaeger
 jaeger-down:

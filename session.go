@@ -135,7 +135,7 @@ const (
 // wave selection prompt, go-back handling, and quit handling.
 // Returns the selected wave, a result code, and the updated shibitoShown flag.
 func selectPhase(ctx context.Context, scanner *bufio.Scanner,
-	scanResult *ScanResult, cfg *Config, available []Wave, waves []Wave, completed map[string]bool,
+	scanResult *ScanResult, cfg *Config, available []Wave, waves []Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
 	loopSpan trace.Span) (Wave, selectPhaseResult, bool) {
 
@@ -468,7 +468,7 @@ outerLoop:
 
 		var selected Wave
 		var result selectPhaseResult
-		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, completed, adrCount, resumedAt, shibitoShown, loopSpan)
+		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, loopSpan)
 		switch result {
 		case selectQuit:
 			break outerLoop
