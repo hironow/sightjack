@@ -33,6 +33,7 @@ func ListExpiredArchive(baseDir string, days int) ([]string, error) {
 		}
 		info, err := e.Info()
 		if err != nil {
+			LogWarn("Failed to stat %s: %v", e.Name(), err)
 			continue
 		}
 		if info.ModTime().Before(cutoff) {
@@ -42,15 +43,10 @@ func ListExpiredArchive(baseDir string, days int) ([]string, error) {
 	return expired, nil
 }
 
-// PruneArchive deletes expired .md files from .siren/archive/ and returns the
-// list of deleted filenames. Uses the same criteria as ListExpiredArchive.
-// Returns an empty slice (not error) when the archive directory does not exist.
-func PruneArchive(baseDir string, days int) ([]string, error) {
-	files, err := ListExpiredArchive(baseDir, days)
-	if err != nil {
-		return nil, err
-	}
-
+// DeleteArchiveFiles deletes the named files from .siren/archive/.
+// Files that no longer exist are silently skipped (ErrNotExist is not an error).
+// Returns the list of filenames that were processed.
+func DeleteArchiveFiles(baseDir string, files []string) ([]string, error) {
 	dir := MailDir(baseDir, archiveDir)
 	var deleted []string
 	for _, name := range files {
@@ -61,4 +57,15 @@ func PruneArchive(baseDir string, days int) ([]string, error) {
 		deleted = append(deleted, name)
 	}
 	return deleted, nil
+}
+
+// PruneArchive deletes expired .md files from .siren/archive/ and returns the
+// list of deleted filenames. Uses the same criteria as ListExpiredArchive.
+// Returns an empty slice (not error) when the archive directory does not exist.
+func PruneArchive(baseDir string, days int) ([]string, error) {
+	files, err := ListExpiredArchive(baseDir, days)
+	if err != nil {
+		return nil, err
+	}
+	return DeleteArchiveFiles(baseDir, files)
 }

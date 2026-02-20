@@ -242,7 +242,9 @@ func main() {
 		runDoctor(ctx, configPath, baseDir)
 		sightjack.EndRootSpan(ctx)
 	case "archive-prune":
+		ctx := sightjack.StartRootSpan(context.Background(), subcmd)
 		runArchivePrune(baseDir, days, execute)
+		sightjack.EndRootSpan(ctx)
 	}
 }
 
@@ -886,7 +888,7 @@ func runArchivePrune(baseDir string, days int, execute bool) {
 		return
 	}
 
-	deleted, err := sightjack.PruneArchive(baseDir, days)
+	deleted, err := sightjack.DeleteArchiveFiles(baseDir, files)
 	if err != nil {
 		sightjack.LogError("Prune failed: %v", err)
 		os.Exit(1)

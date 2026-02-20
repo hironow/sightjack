@@ -32,10 +32,10 @@ func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 	if err := EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archiveDir := MailDir(baseDir, archiveDir)
+	archDir := MailDir(baseDir, archiveDir)
 
 	// Create old file (40 days ago)
-	oldFile := filepath.Join(archiveDir, "report-old-w1.md")
+	oldFile := filepath.Join(archDir, "report-old-w1.md")
 	if err := os.WriteFile(oldFile, []byte("old"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 	}
 
 	// Create recent file (5 days ago)
-	recentFile := filepath.Join(archiveDir, "spec-new-w2.md")
+	recentFile := filepath.Join(archDir, "spec-new-w2.md")
 	if err := os.WriteFile(recentFile, []byte("recent"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -75,22 +75,26 @@ func TestListExpiredArchive_OnlyMdFiles(t *testing.T) {
 	if err := EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archiveDir := MailDir(baseDir, archiveDir)
+	archDir := MailDir(baseDir, archiveDir)
 
 	// Create old .md file
-	mdFile := filepath.Join(archiveDir, "feedback-001.md")
+	mdFile := filepath.Join(archDir, "feedback-001.md")
 	if err := os.WriteFile(mdFile, []byte("md"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	// Create old .txt file (should be ignored)
-	txtFile := filepath.Join(archiveDir, "notes.txt")
+	txtFile := filepath.Join(archDir, "notes.txt")
 	if err := os.WriteFile(txtFile, []byte("txt"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
-	os.Chtimes(mdFile, oldTime, oldTime)
-	os.Chtimes(txtFile, oldTime, oldTime)
+	if err := os.Chtimes(mdFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(txtFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
 
 	// when
 	files, err := ListExpiredArchive(baseDir, 30)
@@ -136,7 +140,9 @@ func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
-	os.Chtimes(oldFile, oldTime, oldTime)
+	if err := os.Chtimes(oldFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
 
 	keepFile := filepath.Join(ad, "spec-new-w2.md")
 	if err := os.WriteFile(keepFile, []byte("keep"), 0644); err != nil {
@@ -209,5 +215,83 @@ func TestPruneArchive_NoDirReturnsEmpty(t *testing.T) {
 	}
 	if len(deleted) != 0 {
 		t.Errorf("expected 0 deleted when archive dir missing, got %d", len(deleted))
+	}
+}
+
+func TestDeleteArchiveFiles_DeletesSpecifiedFiles(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	if err := EnsureMailDirs(baseDir); err != nil {
+		t.Fatal(err)
+	}
+	archDir := MailDir(baseDir, archiveDir)
+
+	f1 := filepath.Join(archDir, "report-old-w1.md")
+	if err := os.WriteFile(f1, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	f2 := filepath.Join(archDir, "spec-keep-w2.md")
+	if err := os.WriteFile(f2, []byte("keep"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when — delete only f1
+	deleted, err := DeleteArchiveFiles(baseDir, []string{"report-old-w1.md"})
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(deleted) != 1 {
+		t.Fatalf("expected 1 deleted, got %d", len(deleted))
+	}
+	if deleted[0] != "report-old-w1.md" {
+		t.Errorf("expected report-old-w1.md, got %s", deleted[0])
+	}
+	// f1 should be gone
+	if _, err := os.Stat(f1); !os.IsNotExist(err) {
+		t.Error("expected f1 to be deleted")
+	}
+	// f2 should remain
+	if _, err := os.Stat(f2); err != nil {
+		t.Error("expected f2 to remain")
+	}
+}
+
+func TestDeleteArchiveFiles_EmptyListNoOp(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	if err := EnsureMailDirs(baseDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	deleted, err := DeleteArchiveFiles(baseDir, nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(deleted) != 0 {
+		t.Errorf("expected 0 deleted, got %d", len(deleted))
+	}
+}
+
+func TestDeleteArchiveFiles_AlreadyDeletedIgnored(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	if err := EnsureMailDirs(baseDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// when — file doesn't exist
+	deleted, err := DeleteArchiveFiles(baseDir, []string{"nonexistent.md"})
+
+	// then — should succeed silently (ErrNotExist ignored)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(deleted) != 1 {
+		t.Fatalf("expected 1 deleted (tolerant), got %d", len(deleted))
 	}
 }
