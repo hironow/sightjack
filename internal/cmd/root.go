@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	sightjack "github.com/hironow/sightjack"
 )
@@ -29,7 +31,10 @@ var (
 
 // shutdownTracer holds the OTel tracer shutdown function registered by
 // PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
-var shutdownTracer func(context.Context) error
+var (
+	shutdownTracer func(context.Context) error
+	finalizerOnce  sync.Once
+)
 
 // NewRootCommand creates the root cobra command with all subcommands attached.
 // Returning *cobra.Command enables test injection via SetArgs/SetOut/SetErr.
@@ -55,10 +60,12 @@ func NewRootCommand() *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	cobra.OnFinalize(func() {
-		if shutdownTracer != nil {
-			shutdownTracer(context.Background())
-		}
+	finalizerOnce.Do(func() {
+		cobra.OnFinalize(func() {
+			if shutdownTracer != nil {
+				shutdownTracer(context.Background())
+			}
+		})
 	})
 
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", ".siren/config.yaml", "Config file path")
@@ -112,13 +119,32 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 		}
 	}
 
-	// If the first positional argument (non-flag) is a known subcommand,
-	// leave args unchanged. Otherwise prepend "scan".
+	// Persistent flags that consume a separate value argument (non-boolean).
+	valueTakers := make(map[string]bool)
+	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+		if f.Value.Type() != "bool" {
+			valueTakers["--"+f.Name] = true
+			if f.Shorthand != "" {
+				valueTakers["-"+f.Shorthand] = true
+			}
+		}
+	})
+
+	// Find the first positional argument, skipping flags and their values.
+	skipNext := false
 	for _, arg := range args {
+		if skipNext {
+			skipNext = false
+			continue
+		}
 		if arg == "--" {
 			break
 		}
 		if strings.HasPrefix(arg, "-") {
+			// --flag=value doesn't consume the next arg.
+			if !strings.Contains(arg, "=") && valueTakers[arg] {
+				skipNext = true
+			}
 			continue
 		}
 		if known[arg] {

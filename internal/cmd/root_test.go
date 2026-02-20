@@ -154,7 +154,7 @@ func TestDefaultToScan_HelpFlag(t *testing.T) {
 }
 
 func TestDefaultToScan_PersistentFlagBeforeSubcommand(t *testing.T) {
-	// given: --verbose (persistent) before explicit subcommand
+	// given: --verbose (persistent boolean) before explicit subcommand
 	rootCmd := NewRootCommand()
 
 	// when
@@ -163,5 +163,57 @@ func TestDefaultToScan_PersistentFlagBeforeSubcommand(t *testing.T) {
 	// then: "doctor" is a known subcommand, should not change
 	if len(got) != 3 || !strings.Contains(strings.Join(got, " "), "doctor") {
 		t.Errorf("expected unchanged [--verbose doctor .], got %v", got)
+	}
+}
+
+func TestDefaultToScan_ValueFlagBeforeSubcommand(t *testing.T) {
+	// given: --config takes a value — "custom.yaml" must be skipped, "waves" found
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--config", "custom.yaml", "waves"})
+
+	// then: should not change — "waves" is the subcommand, not "custom.yaml"
+	if len(got) != 3 || got[2] != "waves" {
+		t.Errorf("expected unchanged [--config custom.yaml waves], got %v", got)
+	}
+}
+
+func TestDefaultToScan_ShortValueFlagBeforeSubcommand(t *testing.T) {
+	// given: -c (shorthand for --config) takes a value
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"-c", "custom.yaml", "doctor"})
+
+	// then: should not change — "doctor" is the subcommand
+	if len(got) != 3 || got[2] != "doctor" {
+		t.Errorf("expected unchanged [-c custom.yaml doctor], got %v", got)
+	}
+}
+
+func TestDefaultToScan_ValueFlagEqualsForm(t *testing.T) {
+	// given: --config=custom.yaml (equals form) — no separate value arg
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--config=custom.yaml", "waves"})
+
+	// then: should not change — "waves" is found as subcommand
+	if len(got) != 2 || got[1] != "waves" {
+		t.Errorf("expected unchanged [--config=custom.yaml waves], got %v", got)
+	}
+}
+
+func TestDefaultToScan_ValueFlagBeforePath(t *testing.T) {
+	// given: --lang ja /path — /path is not a subcommand, should prepend scan
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--lang", "ja", "/some/path"})
+
+	// then: should prepend scan
+	if len(got) != 4 || got[0] != "scan" {
+		t.Errorf("expected [scan --lang ja /some/path], got %v", got)
 	}
 }

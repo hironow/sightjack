@@ -130,6 +130,7 @@ func TestCobraRouting_UnknownCommand(t *testing.T) {
 
 func TestCobraFlagInheritance_Verbose(t *testing.T) {
 	// given: pass --verbose to a subcommand
+	t.Cleanup(func() { verbose = false })
 	dir := t.TempDir()
 	var stdout bytes.Buffer
 
@@ -149,6 +150,7 @@ func TestCobraFlagInheritance_Verbose(t *testing.T) {
 
 func TestCobraFlagInheritance_Config(t *testing.T) {
 	// given: pass --config to a subcommand
+	t.Cleanup(func() { cfgPath = ".siren/config.yaml" })
 	dir := t.TempDir()
 
 	rootCmd := NewRootCommand()
