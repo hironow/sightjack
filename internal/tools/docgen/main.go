@@ -1,31 +1,30 @@
-// Command docgen generates Markdown CLI documentation from cobra commands.
-//
-// Usage:
-//
-//	go run ./internal/tools/docgen
+// Command docgen generates markdown CLI documentation from cobra commands.
+// Output goes to docs/cli/ for LLM consumption and llms.txt aggregation.
 package main
 
 import (
-	"log"
+	"fmt"
 	"os"
+	"path/filepath"
 
+	cmd "github.com/hironow/sightjack/internal/cmd"
 	"github.com/spf13/cobra/doc"
-
-	"github.com/hironow/sightjack/internal/cmd"
 )
 
 func main() {
+	outDir := filepath.Join("docs", "cli")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
+		os.Exit(1)
+	}
+
 	rootCmd := cmd.NewRootCommand()
 	rootCmd.DisableAutoGenTag = true
 
-	outDir := "./docs/cli"
-	if err := os.MkdirAll(outDir, 0755); err != nil {
-		log.Fatalf("failed to create output dir: %v", err)
-	}
-
 	if err := doc.GenMarkdownTree(rootCmd, outDir); err != nil {
-		log.Fatalf("failed to generate docs: %v", err)
+		fmt.Fprintf(os.Stderr, "docgen: %v\n", err)
+		os.Exit(1)
 	}
 
-	log.Printf("CLI docs generated in %s", outDir)
+	fmt.Fprintf(os.Stderr, "docs generated in %s/\n", outDir)
 }

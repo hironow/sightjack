@@ -1,13 +1,20 @@
 version: 2
 
+project_name: sightjack
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./... -count=1 -short
+
 builds:
-  - main: ./cmd/sightjack
+  - main: ./cmd/sightjack/
     binary: sightjack
     env:
       - CGO_ENABLED=0
     goos:
-      - linux
       - darwin
+      - linux
       - windows
     goarch:
       - amd64
@@ -44,19 +51,6 @@ signs:
       - ${artifact}
     artifacts: checksum
 
-brews:
-  - repository:
-      owner: hironow
-      name: homebrew-tap
-    directory: Formula
-    homepage: https://github.com/hironow/sightjack
-    description: SIREN-inspired issue architecture tool for Linear
-    license: MIT
-    install: |
-      bin.install "sightjack"
-    test: |
-      system "#{bin}/sightjack", "version"
-
 changelog:
   sort: asc
   filters:
@@ -64,3 +58,16 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^ci:"
+      - "^chore:"
+
+brews:
+  - repository:
+      owner: hironow
+      name: homebrew-tap
+    homepage: "https://github.com/hironow/sightjack"
+    description: "SIREN-inspired issue architecture tool for Linear"
+    license: "Apache-2.0"
+    install: |
+      bin.install "sightjack"
+    test: |
+      system "#{bin}/sightjack", "version"
