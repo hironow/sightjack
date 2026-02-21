@@ -67,9 +67,9 @@ if state is found in .siren/state.json.`,
 								logger.Warn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}
-							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), logger)
+							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), logger)
 						case sightjack.ResumeChoiceRescan:
-							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), logger)
+							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -83,7 +83,7 @@ if state is found in .siren/state.json.`,
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
 			}
-			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, logger)
+			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), logger)
 		},
 	}
 }

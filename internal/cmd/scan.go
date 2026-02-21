@@ -46,7 +46,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			logger.Info("Starting sightjack scan...")
 			logger.Info("Team: %s | Project: %s | Lang: %s", cfg.Linear.Team, cfg.Linear.Project, cfg.Lang)
 
-			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, logger)
+			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, cmd.OutOrStdout(), logger)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}

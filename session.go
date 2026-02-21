@@ -35,7 +35,7 @@ func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
 }
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
-func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, logger *Logger) error {
+func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, logger *Logger) error {
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
@@ -69,7 +69,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	}
 
 	// --- Pass 1+2: Scan (reuse v0.1 RunScan) ---
-	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, dryRun, logger)
+	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, dryRun, out, logger)
 	if err != nil {
 		return fmt.Errorf("scan: %w", err)
 	}
@@ -142,7 +142,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, out, logger)
 }
 
 // selectPhaseResult describes the outcome of the wave selection phase.
@@ -160,21 +160,21 @@ const (
 func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	scanResult *ScanResult, cfg *Config, available []Wave, waves []Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
-	loopSpan trace.Span, logger *Logger) (Wave, selectPhaseResult, bool) {
+	out io.Writer, loopSpan trace.Span, logger *Logger) (Wave, selectPhaseResult, bool) {
 
 	// Display Link Navigator
 	nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
-	fmt.Println()
-	fmt.Print(nav)
+	fmt.Fprintln(out)
+	fmt.Fprint(out, nav)
 
 	// Display shibito warnings once (static data, does not change during session)
 	if !shibitoShown {
-		DisplayShibitoWarnings(os.Stdout, scanResult.ShibitoWarnings)
+		DisplayShibitoWarnings(out, scanResult.ShibitoWarnings)
 		shibitoShown = true
 	}
 
 	// Prompt wave selection
-	selected, err := PromptWaveSelection(ctx, os.Stdout, scanner, available)
+	selected, err := PromptWaveSelection(ctx, out, scanner, available)
 	if err == ErrQuit {
 		loopSpan.AddEvent("session.paused")
 		logger.Info("Session paused. State saved.")
@@ -186,7 +186,7 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 			logger.Info("No completed waves to revisit.")
 			return Wave{}, selectRetry, shibitoShown
 		}
-		revisit, backErr := PromptCompletedWaveSelection(ctx, os.Stdout, scanner, completedList)
+		revisit, backErr := PromptCompletedWaveSelection(ctx, out, scanner, completedList)
 		if backErr == ErrQuit {
 			logger.Info("Session paused. State saved.")
 			return Wave{}, selectQuit, shibitoShown
@@ -194,7 +194,7 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 		if backErr != nil {
 			return Wave{}, selectRetry, shibitoShown
 		}
-		DisplayCompletedWaveActions(os.Stdout, revisit)
+		DisplayCompletedWaveActions(out, revisit)
 		return Wave{}, selectRetry, shibitoShown
 	}
 	if err != nil {
@@ -221,10 +221,10 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *Config, scanDir, baseDir string, selected Wave, resolvedStrictness string,
 	waves []Wave, completed map[string]bool,
 	sessionRejected map[string][]WaveAction, adrDir string, adrCount *int,
-	loopSpan trace.Span, logger *Logger) (Wave, approvalPhaseResult) {
+	out io.Writer, loopSpan trace.Span, logger *Logger) (Wave, approvalPhaseResult) {
 
 	for {
-		choice, err := PromptWaveApproval(ctx, os.Stdout, scanner, selected)
+		choice, err := PromptWaveApproval(ctx, out, scanner, selected)
 		if err == ErrQuit {
 			return selected, approvalRejected
 		}
@@ -257,7 +257,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			logger.Info("Wave rejected.")
 			return selected, approvalRejected
 		case ApprovalDiscuss:
-			topic, topicErr := PromptDiscussTopic(ctx, os.Stdout, scanner)
+			topic, topicErr := PromptDiscussTopic(ctx, out, scanner)
 			if topicErr == ErrQuit {
 				continue
 			}
@@ -265,24 +265,24 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				logger.Warn("Invalid topic: %v", topicErr)
 				continue
 			}
-			result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, logger)
+			result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
 			if discussErr != nil {
 				logger.Error("Architect discussion failed: %v", discussErr)
 				continue
 			}
-			DisplayArchitectResponse(os.Stdout, result)
+			DisplayArchitectResponse(out, result)
 			if result.ModifiedWave != nil {
 				selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
 				PropagateWaveUpdate(waves, selected)
 				// Trigger Scribe to generate ADR for the modification
 				// (runs even for locked waves — the decision itself is worth recording)
 				if cfg.Scribe.Enabled {
-					scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness, logger)
+					scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness, out, logger)
 					if scribeErr != nil {
 						logger.Warn("Scribe failed (non-fatal): %v", scribeErr)
 					} else {
-						DisplayScribeResponse(os.Stdout, scribeResp)
-						DisplayADRConflicts(os.Stdout, scribeResp.Conflicts)
+						DisplayScribeResponse(out, scribeResp)
+						DisplayADRConflicts(out, scribeResp.Conflicts)
 						*adrCount++
 					}
 				}
@@ -293,7 +293,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			}
 			continue // back to approval prompt with (possibly modified) wave
 		case ApprovalSelective:
-			approved, rejected, selErr := PromptSelectiveApproval(ctx, os.Stdout, scanner, selected)
+			approved, rejected, selErr := PromptSelectiveApproval(ctx, out, scanner, selected)
 			if selErr == ErrQuit {
 				return selected, approvalRejected
 			}
@@ -333,10 +333,10 @@ func applyPhase(ctx context.Context, cfg *Config,
 	waves *[]Wave, completed map[string]bool,
 	scanResult *ScanResult, sessionRejected map[string][]WaveAction,
 	labeledReady map[string]bool, adrCount int,
-	scanTimestamp time.Time, fbCollector *feedbackCollector, loopSpan trace.Span, logger *Logger) {
+	scanTimestamp time.Time, fbCollector *feedbackCollector, out io.Writer, loopSpan trace.Span, logger *Logger) {
 
 	// --- Pass 4: Wave Apply ---
-	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, logger)
+	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
 	if err != nil {
 		logger.Error("Apply failed: %v", err)
 		return
@@ -354,7 +354,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 			),
 		)
 		logger.Warn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
-		DisplayRippleEffects(os.Stdout, applyResult.Ripples)
+		DisplayRippleEffects(out, applyResult.Ripples)
 		return
 	}
 
@@ -400,7 +400,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 	*waves = EvaluateUnlocks(*waves, completed)
 	newAvailable := len(AvailableWaves(*waves, completed))
 	newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
-	DisplayWaveCompletion(os.Stdout, selected, applyResult.Ripples, scanResult.Completeness, newCount)
+	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 	// --- Post-completion: Generate next waves ---
 	var clusterForNextgen ClusterScanResult
@@ -451,7 +451,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 		}
 		if len(newlyReady) > 0 {
 			readyIssueStr := strings.Join(newlyReady, ", ")
-			if err := RunReadyLabel(ctx, cfg, readyIssueStr, logger); err != nil {
+			if err := RunReadyLabel(ctx, cfg, readyIssueStr, out, logger); err != nil {
 				logger.Warn("Ready label failed: %v", err)
 			} else {
 				for _, id := range newlyReady {
@@ -478,7 +478,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
 func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
-	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *feedbackCollector, logger *Logger) error {
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *feedbackCollector, out io.Writer, logger *Logger) error {
 
 	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
@@ -506,7 +506,7 @@ outerLoop:
 
 		var selected Wave
 		var result selectPhaseResult
-		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, loopSpan, logger)
+		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, out, loopSpan, logger)
 		switch result {
 		case selectQuit:
 			break outerLoop
@@ -516,7 +516,7 @@ outerLoop:
 
 		resolvedStrictness := string(ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, baseDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, loopSpan, logger)
+		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, baseDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, out, loopSpan, logger)
 		if approvalResult != approvalApproved {
 			continue
 		}
@@ -524,7 +524,7 @@ outerLoop:
 		applyPhase(ctx, cfg, scanDir, scanResultPath, baseDir, sessionID, adrDir,
 			selected, resolvedStrictness,
 			&waves, completed, scanResult, sessionRejected,
-			labeledReady, adrCount, scanTimestamp, fbCollector, loopSpan, logger)
+			labeledReady, adrCount, scanTimestamp, fbCollector, out, loopSpan, logger)
 	}
 
 	// Final consistency check
@@ -591,7 +591,7 @@ func ResumeScanDir(state *SessionState, baseDir string) string {
 }
 
 // RunResumeSession resumes an existing session from saved state.
-func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader, logger *Logger) error {
+func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader, out io.Writer, logger *Logger) error {
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
@@ -628,11 +628,11 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	logger.OK("Resumed session: %d waves, %d completed", len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, out, logger)
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
-func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState *SessionState, input io.Reader, logger *Logger) error {
+func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState *SessionState, input io.Reader, out io.Writer, logger *Logger) error {
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
@@ -661,7 +661,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if err != nil {
 		return err
 	}
-	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, false, logger)
+	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, false, out, logger)
 	if err != nil {
 		return fmt.Errorf("re-scan: %w", err)
 	}
@@ -689,7 +689,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		len(scanResult.Clusters), len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, out, logger)
 }
 
 // BuildSessionState creates a SessionState from current session data.

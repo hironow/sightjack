@@ -91,7 +91,7 @@ suitable for piping into 'adr' for ADR generation.`,
 				return nil
 			}
 
-			resp, err := sightjack.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, logger)
+			resp, err := sightjack.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, cmd.OutOrStdout(), logger)
 			if err != nil {
 				return fmt.Errorf("discussion failed: %w", err)
 			}

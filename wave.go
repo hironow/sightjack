@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,7 +150,7 @@ func waveApplyFileName(wave Wave) string {
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
-func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, strictness string, logger *Logger) (*WaveApplyResult, error) {
+func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, strictness string, out io.Writer, logger *Logger) (*WaveApplyResult, error) {
 	ctx, applySpan := tracer.Start(ctx, "wave.apply",
 		trace.WithAttributes(
 			attribute.String("wave.id", wave.ID),
@@ -184,7 +185,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 	}
 
 	logger.Scan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
-	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout, logger); err != nil {
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
 
@@ -199,7 +200,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 
 // RunReadyLabel applies the ready label to issues whose all waves have completed.
 // This must only be called after a successful wave apply.
-func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string, logger *Logger) error {
+func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string, out io.Writer, logger *Logger) error {
 	prompt, err := RenderReadyLabelPrompt(cfg.Lang, ReadyLabelPromptData{
 		ReadyLabel:    cfg.Labels.ReadyLabel,
 		ReadyIssueIDs: readyIssueIDs,
@@ -209,7 +210,7 @@ func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string, logge
 	}
 
 	logger.Scan("Applying ready labels to: %s", readyIssueIDs)
-	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout, logger); err != nil {
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger); err != nil {
 		return fmt.Errorf("ready label: %w", err)
 	}
 	return nil

@@ -70,7 +70,7 @@ suitable for piping into 'nextgen' for follow-up wave generation.`,
 				return nil
 			}
 
-			internal, err := sightjack.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness, logger)
+			internal, err := sightjack.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness, cmd.OutOrStdout(), logger)
 			if err != nil {
 				return fmt.Errorf("apply failed: %w", err)
 			}

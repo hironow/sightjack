@@ -55,7 +55,7 @@ func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWar
 // RunScan executes the full two-pass scan.
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
-func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, logger *Logger) (*ScanResult, error) {
+func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger *Logger) (*ScanResult, error) {
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
@@ -96,12 +96,12 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
 	if cfg.Labels.Enabled {
-		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, os.Stdout, logger); err != nil {
+		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, out, logger); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
-		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, os.Stdout, logger); err != nil {
+		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, out, logger); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
