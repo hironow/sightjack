@@ -119,10 +119,16 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 		}
 	}
 
-	// Persistent flags that consume a separate value argument (non-boolean).
+	// Classify persistent flags by whether they consume a separate value arg.
 	valueTakers := make(map[string]bool)
+	boolFlags := make(map[string]bool)
 	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		if f.Value.Type() != "bool" {
+		if f.Value.Type() == "bool" {
+			boolFlags["--"+f.Name] = true
+			if f.Shorthand != "" {
+				boolFlags["-"+f.Shorthand] = true
+			}
+		} else {
 			valueTakers["--"+f.Name] = true
 			if f.Shorthand != "" {
 				valueTakers["-"+f.Shorthand] = true
@@ -132,18 +138,30 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 
 	// Find the first positional argument, skipping flags and their values.
 	skipNext := false
+	skipBoolValue := false
 	for _, arg := range args {
 		if skipNext {
 			skipNext = false
 			continue
+		}
+		if skipBoolValue {
+			skipBoolValue = false
+			lower := strings.ToLower(arg)
+			if lower == "true" || lower == "false" || lower == "0" || lower == "1" {
+				continue
+			}
 		}
 		if arg == "--" {
 			break
 		}
 		if strings.HasPrefix(arg, "-") {
 			// --flag=value doesn't consume the next arg.
-			if !strings.Contains(arg, "=") && valueTakers[arg] {
-				skipNext = true
+			if !strings.Contains(arg, "=") {
+				if valueTakers[arg] {
+					skipNext = true
+				} else if boolFlags[arg] {
+					skipBoolValue = true
+				}
 			}
 			continue
 		}

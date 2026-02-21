@@ -217,3 +217,42 @@ func TestDefaultToScan_ValueFlagBeforePath(t *testing.T) {
 		t.Errorf("expected [scan --lang ja /some/path], got %v", got)
 	}
 }
+
+func TestDefaultToScan_BoolFlagExplicitValueBeforeSubcommand(t *testing.T) {
+	// given: --dry-run false waves — "false" is a bool value, not a path
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--dry-run", "false", "waves"})
+
+	// then: should not change — "waves" is the subcommand
+	if len(got) != 3 || got[2] != "waves" {
+		t.Errorf("expected unchanged [--dry-run false waves], got %v", got)
+	}
+}
+
+func TestDefaultToScan_BoolFlagExplicitTrueBeforeSubcommand(t *testing.T) {
+	// given: --verbose true doctor — "true" is a bool value, not a path
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--verbose", "true", "doctor"})
+
+	// then: should not change — "doctor" is the subcommand
+	if len(got) != 3 || got[2] != "doctor" {
+		t.Errorf("expected unchanged [--verbose true doctor], got %v", got)
+	}
+}
+
+func TestDefaultToScan_BoolFlagNonBoolValueTreatedAsPositional(t *testing.T) {
+	// given: --verbose mypath — "mypath" is NOT a bool value, treat as positional
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--verbose", "mypath"})
+
+	// then: should prepend scan — "mypath" is a path, not a bool value
+	if len(got) != 3 || got[0] != "scan" {
+		t.Errorf("expected [scan --verbose mypath], got %v", got)
+	}
+}
