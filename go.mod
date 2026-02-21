@@ -19,9 +19,11 @@ require (
 require (
 	code.gitea.io/sdk/gitea v0.22.1 // indirect
 	github.com/42wim/httpsig v1.2.3 // indirect
+	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/creack/pty v1.1.17 // indirect
 	github.com/davidmz/go-pageant v1.0.2 // indirect
 	github.com/go-fed/httpsig v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
