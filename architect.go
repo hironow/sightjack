@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -117,7 +118,7 @@ func clearArchitectOutput(scanDir string, wave Wave) {
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
-func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string, strictness string, logger *Logger) (*ArchitectResponse, error) {
+func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string, strictness string, out io.Writer, logger *Logger) (*ArchitectResponse, error) {
 	ctx, discussSpan := tracer.Start(ctx, "architect.discuss",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", wave.ClusterName),
@@ -147,7 +148,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 	}
 
 	logger.Scan("Architect discussing: %s - %s", wave.ClusterName, topic)
-	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout, logger); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, out, logger); err != nil {
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}
 

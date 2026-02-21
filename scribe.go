@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -218,7 +219,7 @@ func ParseScribeResult(path string) (*ScribeResponse, error) {
 }
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
-func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string, logger *Logger) (*ScribeResponse, error) {
+func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string, out io.Writer, logger *Logger) (*ScribeResponse, error) {
 	clearScribeOutput(scanDir, wave)
 
 	adrNum, err := NextADRNumber(adrDir)
@@ -254,7 +255,7 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 	}
 
 	logger.Scan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout, logger); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, out, logger); err != nil {
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 
