@@ -63,7 +63,7 @@ func NewRootCommand() *cobra.Command {
 			return nil
 		},
 		SilenceUsage:  true,
-		SilenceErrors: true,
+		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output
 	}
 
 	finalizerOnce.Do(func() {

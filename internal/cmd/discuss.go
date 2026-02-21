@@ -38,7 +38,7 @@ suitable for piping into 'adr' for ADR generation.`,
 			if err != nil {
 				return err
 			}
-			data, err := io.ReadAll(os.Stdin)
+			data, err := io.ReadAll(cmd.InOrStdin())
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
 			}
@@ -52,26 +52,14 @@ suitable for piping into 'adr' for ADR generation.`,
 			}
 
 			// Open terminal for interactive input (stdin is consumed by pipe).
-			// Try /dev/tty first (Unix); fall back to cmd.InOrStdin() for
-			// platforms without /dev/tty (e.g., Windows).
-			var ttyCloser io.Closer
-			tty, err := os.Open("/dev/tty")
+			// /dev/tty is required because cmd.InOrStdin() is already exhausted
+			// after io.ReadAll above — falling back to it would yield immediate EOF.
+			tty, err := os.Open("/dev/tty") // nosemgrep: devtty-hard-fail-needs-fallback
 			if err != nil {
-				tty = nil
-			} else {
-				ttyCloser = tty
+				return fmt.Errorf("cannot open terminal for interactive input (stdin consumed by pipe): %w", err)
 			}
-			if ttyCloser != nil {
-				defer ttyCloser.Close()
-			}
-
-			var input io.Reader
-			if tty != nil {
-				input = tty
-			} else {
-				input = cmd.InOrStdin()
-			}
-			scanner := bufio.NewScanner(input)
+			defer tty.Close()
+			scanner := bufio.NewScanner(tty)
 
 			// Prompt for discussion topic on stderr.
 			errW := cmd.ErrOrStderr()

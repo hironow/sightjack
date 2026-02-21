@@ -1,98 +1,98 @@
 rules:
-  # ============================================================
-  # cobra/pflag best practices — derived from cross-tool review
-  # sightjack (MY-330), phonewave (MY-331), amadeus (MY-332), paintress (MY-333)
-  # ============================================================
+  # ==========================================================================
+  # cobra / pflag migration rules (unified across 4 tools)
+  # paintress, sightjack, amadeus, phonewave のレビュー教訓から抽出
+  # Ref: MY-329 コンセンサス + PR #12, #14, #3, #7 レビューまとめ
+  # ==========================================================================
 
-  # Rule 1: fmt.Print* in cobra RunE — use cmd.OutOrStdout()
-  # Source: amadeus #3, sightjack cross-check
-  - id: cobra-no-fmt-print-in-rune
+  # --- cobra I/O abstraction ------------------------------------------------
+
+  # Rule 1: context.Background() in cobra RunE — use cmd.Context()
+  # amadeus #1, paintress #2, phonewave #3
+  - id: cobra-use-cmd-context
     languages: [go]
     message: |
-      cobra RunE 内で fmt.Print/Println/Printf を直接呼ばないでください。
-      cmd.OutOrStdout() を使用して fmt.Fprint/Fprintln/Fprintf に書き換えてください。
-      テスト時に bytes.Buffer で出力をキャプチャできなくなります。
-      例: fmt.Println(x) → fmt.Fprintln(cmd.OutOrStdout(), x)
-    severity: WARNING
+      cobra の RunE/PreRunE 内で context.Background() を使うと、
+      ExecuteContext() で渡された context のキャンセルが伝播しません。
+      cmd.Context() を使用してください。
+    severity: ERROR
     patterns:
-      - pattern-either:
-          - pattern: fmt.Print(...)
-          - pattern: fmt.Println(...)
-          - pattern: fmt.Printf(...)
+      - pattern: context.Background()
       - pattern-inside: |
-          RunE: func($CMD *cobra.Command, $ARGS []string) error {
+          func($CMD *cobra.Command, $ARGS []string) error {
             ...
           }
 
-  # Rule 2: os.Stderr in cobra RunE — use cmd.ErrOrStderr()
-  # Source: amadeus #4-5, sightjack cross-check
-  - id: cobra-no-os-stderr-in-rune
+  # Rule 2: os.Stdin in cobra command — use cmd.InOrStdin()
+  # paintress #3, sightjack cross-check
+  - id: cobra-use-cmd-in-or-stdin
     languages: [go]
     message: |
-      cobra RunE 内で os.Stderr を直接参照しないでください。
-      cmd.ErrOrStderr() を使用してください。
-      テスト時に stderr 出力をキャプチャできなくなります。
+      cobra コマンド内で os.Stdin を直接使用すると、テスト時に
+      cmd.SetIn() で差し替えられません。cmd.InOrStdin() を使用してください。
+    severity: WARNING
+    patterns:
+      - pattern: os.Stdin
+      - pattern-inside: |
+          func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 3: fmt.Print* in cobra command — use cmd.OutOrStdout()
+  # amadeus #2-3, sightjack cross-check
+  - id: cobra-use-cmd-out
+    languages: [go]
+    message: |
+      cobra コマンド内で fmt.Print/Println/Printf を直接使用すると、テスト時に
+      cmd.SetOut() で出力先を差し替えられません。
+      fmt.Fprint*(cmd.OutOrStdout(), ...) を使用してください。
+    severity: WARNING
+    pattern-either:
+      - patterns:
+          - pattern: fmt.Print(...)
+          - pattern-inside: |
+              func($CMD *cobra.Command, $ARGS []string) error {
+                ...
+              }
+      - patterns:
+          - pattern: fmt.Printf(...)
+          - pattern-inside: |
+              func($CMD *cobra.Command, $ARGS []string) error {
+                ...
+              }
+      - patterns:
+          - pattern: fmt.Println(...)
+          - pattern-inside: |
+              func($CMD *cobra.Command, $ARGS []string) error {
+                ...
+              }
+
+  # Rule 4: os.Stderr in cobra command — use cmd.ErrOrStderr()
+  # amadeus #4-5, sightjack cross-check
+  - id: cobra-use-cmd-err
+    languages: [go]
+    message: |
+      cobra コマンド内で os.Stderr を直接参照すると、テスト時に
+      stderr 出力をキャプチャできません。cmd.ErrOrStderr() を使用してください。
       例: fmt.Fprintf(os.Stderr, ...) → fmt.Fprintf(cmd.ErrOrStderr(), ...)
     severity: WARNING
     patterns:
       - pattern: os.Stderr
       - pattern-inside: |
-          RunE: func($CMD *cobra.Command, $ARGS []string) error {
+          func($CMD *cobra.Command, $ARGS []string) error {
             ...
           }
 
-  # Rule 3: context.Background() in cobra RunE — use cmd.Context()
-  # Source: amadeus #1, paintress #2
-  - id: cobra-no-context-background-in-rune
-    languages: [go]
-    message: |
-      cobra RunE 内で context.Background() を使用しないでください。
-      cmd.Context() を使用してください。
-      ExecuteContext() で渡された context のキャンセルが伝播しなくなります。
-    severity: ERROR
-    patterns:
-      - pattern: context.Background()
-      - pattern-inside: |
-          RunE: func($CMD *cobra.Command, $ARGS []string) error {
-            ...
-          }
+  # --- cobra global state ---------------------------------------------------
 
-  # Rule 4: os.IsNotExist — use errors.Is(err, fs.ErrNotExist)
-  # Source: amadeus #6
-  - id: prefer-errors-is-for-not-exist
-    languages: [go]
-    message: |
-      os.IsNotExist() は wrapped error をアンラップしません。
-      errors.Is(err, fs.ErrNotExist) を使用してください（Go 1.13+）。
-    severity: WARNING
-    pattern: os.IsNotExist(...)
-
-  # Rule 5: os.Open("/dev/tty") with hard error return (no fallback)
-  # Source: paintress #3, sightjack discuss.go fix
-  # Safe pattern (fallback): if err != nil { tty = nil }
-  # Dangerous pattern (hard fail): if err != nil { return fmt.Errorf(...) }
-  - id: devtty-hard-fail-needs-fallback
-    languages: [go]
-    message: |
-      /dev/tty エラー時に即 return しています。Windows/CI環境では常に失敗します。
-      cmd.InOrStdin() へフォールバックしてください。
-      修正例: if err != nil { tty = nil } ... if tty != nil { input = tty } else { input = cmd.InOrStdin() }
-    severity: ERROR
-    patterns:
-      - pattern: |
-          $TTY, $ERR := os.Open("/dev/tty")
-          if $ERR != nil {
-            return ...
-          }
-
-  # Rule 6: cobra.EnableTraverseRunHooks should be in init()
-  # Source: phonewave, sightjack #2, paintress cross-check
+  # Rule 5: cobra.EnableTraverseRunHooks in constructor — use init()
+  # sightjack #2, paintress cross-tool fix, phonewave
   - id: cobra-traverse-hooks-in-init
     languages: [go]
     message: |
-      cobra.EnableTraverseRunHooks はグローバル変数です。
-      関数内ではなく init() で設定してください。
-      NewRootCommand() 内で設定するとテスト時に副作用が発生します。
+      cobra.EnableTraverseRunHooks をコンストラクタ内で設定すると、
+      テストや docgen で複数回呼ばれた際にグローバル変数が副作用として
+      変更されます。package init() で1回だけ設定してください。
     severity: WARNING
     patterns:
       - pattern: cobra.EnableTraverseRunHooks = true
@@ -101,14 +101,14 @@ rules:
             ...
           }
 
-  # Rule 7: cobra.OnFinalize without sync.Once
-  # Source: phonewave #1, sightjack Copilot review
-  - id: cobra-onfinalize-needs-once
+  # Rule 6: cobra.OnFinalize in constructor — global accumulation
+  # sightjack #1, phonewave #1
+  - id: cobra-on-finalize-accumulation
     languages: [go]
     message: |
-      cobra.OnFinalize() はグローバルに蓄積されます。
-      NewRootCommand() がテストで複数回呼ばれるとコールバックが累積します。
-      sync.Once で囲んでください。
+      cobra.OnFinalize() をコンストラクタ内で呼ぶと、テストや docgen で
+      複数回実行されるたびにグローバルレジストリに finalizer が蓄積します。
+      sync.Once で1回限りの登録にするか、PersistentPostRunE を使用してください。
     severity: WARNING
     patterns:
       - pattern: cobra.OnFinalize(...)
@@ -116,3 +116,92 @@ rules:
           $ONCE.Do(func() {
             ...
           })
+
+  # --- cobra config ---------------------------------------------------------
+
+  # Rule 7: SilenceErrors without error output
+  # phonewave #3
+  - id: cobra-silence-errors-without-output
+    languages: [go]
+    message: |
+      SilenceErrors: true を設定すると cobra がエラーを表示しなくなります。
+      main() で err を os.Stderr に出力するか、SilenceErrors を使わず
+      SilenceUsage のみ設定してください。
+    severity: WARNING
+    pattern-regex: 'SilenceErrors:\s*true'
+
+  # --- signal handling ------------------------------------------------------
+
+  # Rule 8: signal.Notify without signal.Stop — goroutine leak
+  # paintress #1, sightjack #1 (variant)
+  - id: signal-notify-without-stop
+    languages: [go]
+    message: |
+      signal.Notify を呼んだ後に signal.Stop を defer していません。
+      goroutine リークの原因になります。
+      defer signal.Stop(ch) を追加してください。
+    severity: ERROR
+    patterns:
+      - pattern: |
+          signal.Notify($CH, ...)
+      - pattern-not-inside: |
+          signal.Notify($CH, ...)
+          ...
+          defer signal.Stop($CH)
+      - pattern-not-inside: |
+          signal.Notify($CH, ...)
+          ...
+          signal.Stop($CH)
+
+  # --- error handling -------------------------------------------------------
+
+  # Rule 9: semver.MustParse with potentially invalid version string
+  # sightjack #5, phonewave #5
+  - id: semver-must-parse-panic
+    languages: [go]
+    message: |
+      semver.MustParse() は無効なバージョン文字列で panic します。
+      開発ビルド ("dev") やコミットハッシュが渡される可能性がある場合は、
+      semver.NewVersion() でエラーハンドリングしてください。
+    severity: ERROR
+    pattern: semver.MustParse($VERSION)
+
+  # Rule 10: os.IsNotExist — use errors.Is(err, fs.ErrNotExist)
+  # amadeus #6
+  - id: prefer-errors-is-for-not-exist
+    languages: [go]
+    message: |
+      os.IsNotExist() は wrapped error をアンラップしません。
+      errors.Is(err, fs.ErrNotExist) を使用してください（Go 1.13+）。
+    severity: WARNING
+    pattern: os.IsNotExist(...)
+
+  # --- platform -------------------------------------------------------------
+
+  # Rule 11: /dev/tty hard fail without fallback
+  # paintress #3, sightjack discuss.go fix
+  - id: devtty-hard-fail-needs-fallback
+    languages: [go]
+    message: |
+      /dev/tty エラー時に即 return しています。Windows/CI環境では常に失敗します。
+      cmd.InOrStdin() へフォールバックしてください。
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $TTY, $ERR := os.Open("/dev/tty")
+          if $ERR != nil {
+            return ...
+          }
+
+  # --- readability ----------------------------------------------------------
+
+  # Rule 12: Raw nanosecond duration literals
+  # phonewave #2
+  - id: raw-nanosecond-duration
+    languages: [go]
+    message: |
+      生のナノ秒リテラルは可読性が低いです。
+      time.Second, time.Minute 等の定数を使用してください。
+      例: 5_000_000_000 → 5 * time.Second
+    severity: WARNING
+    pattern-regex: '(?<!["\x60])\b\d{9,}\b(?!["\x60])'

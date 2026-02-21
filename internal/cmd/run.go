@@ -50,9 +50,9 @@ if state is found in .siren/state.json.`,
 					}
 				}
 				if stateErr == nil {
-					scanner := bufio.NewScanner(os.Stdin)
+					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
-						choice, promptErr := sightjack.PromptResume(cmd.Context(), os.Stdout, scanner, existingState)
+						choice, promptErr := sightjack.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, existingState)
 						if promptErr == sightjack.ErrQuit {
 							return nil
 						}
@@ -66,9 +66,9 @@ if state is found in .siren/state.json.`,
 								sightjack.LogWarn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}
-							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, os.Stdin)
+							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin())
 						case sightjack.ResumeChoiceRescan:
-							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, os.Stdin)
+							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin())
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -80,7 +80,7 @@ if state is found in .siren/state.json.`,
 			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 			var sessionInput io.Reader
 			if !dryRun {
-				sessionInput = os.Stdin
+				sessionInput = cmd.InOrStdin()
 			}
 			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput)
 		},

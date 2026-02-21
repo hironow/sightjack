@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -31,7 +30,7 @@ Output is written to stdout for redirection to docs/adr/.`,
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
-			data, err := io.ReadAll(os.Stdin)
+			data, err := io.ReadAll(cmd.InOrStdin())
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
 			}

@@ -36,7 +36,7 @@ suitable for piping into 'nextgen' for follow-up wave generation.`,
 			if err != nil {
 				return err
 			}
-			data, err := io.ReadAll(os.Stdin)
+			data, err := io.ReadAll(cmd.InOrStdin())
 			if err != nil {
 				return fmt.Errorf("failed to read stdin: %w", err)
 			}
