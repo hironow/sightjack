@@ -72,7 +72,7 @@ for downstream commands (apply, discuss).`,
 				return fmt.Errorf("no available waves (all locked or completed)")
 			}
 
-			selected, err := sightjack.PromptWaveSelection(cmd.Context(), os.Stderr, scanner, available)
+			selected, err := sightjack.PromptWaveSelection(cmd.Context(), cmd.ErrOrStderr(), scanner, available)
 			if err != nil {
 				if err == sightjack.ErrQuit || err == sightjack.ErrGoBack {
 					return nil

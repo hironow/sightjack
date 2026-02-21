@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -42,8 +41,9 @@ Pass --execute to actually remove the files.`,
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
 
+			errW := cmd.ErrOrStderr()
 			if len(files) == 0 {
-				fmt.Fprintf(os.Stderr, "No expired files in archive (threshold: %d days).\n", days)
+				fmt.Fprintf(errW, "No expired files in archive (threshold: %d days).\n", days)
 				return nil
 			}
 
@@ -51,10 +51,10 @@ Pass --execute to actually remove the files.`,
 			for _, f := range files {
 				fmt.Fprintln(w, f)
 			}
-			fmt.Fprintf(os.Stderr, "\n%d file(s) older than %d days.\n", len(files), days)
+			fmt.Fprintf(errW, "\n%d file(s) older than %d days.\n", len(files), days)
 
 			if !execute {
-				fmt.Fprintln(os.Stderr, "(dry-run — pass --execute to delete)")
+				fmt.Fprintln(errW, "(dry-run — pass --execute to delete)")
 				return nil
 			}
 
@@ -62,7 +62,7 @@ Pass --execute to actually remove the files.`,
 			if err != nil {
 				return fmt.Errorf("prune failed: %w", err)
 			}
-			fmt.Fprintf(os.Stderr, "Pruned %d file(s).\n", len(deleted))
+			fmt.Fprintf(errW, "Pruned %d file(s).\n", len(deleted))
 			return nil
 		},
 	}

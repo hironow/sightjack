@@ -51,18 +51,32 @@ suitable for piping into 'adr' for ADR generation.`,
 				return fmt.Errorf("invalid Wave JSON: %w", err)
 			}
 
-			// Open /dev/tty for interactive input (stdin is consumed by pipe).
+			// Open terminal for interactive input (stdin is consumed by pipe).
+			// Try /dev/tty first (Unix); fall back to cmd.InOrStdin() for
+			// platforms without /dev/tty (e.g., Windows).
+			var ttyCloser io.Closer
 			tty, err := os.Open("/dev/tty")
 			if err != nil {
-				return fmt.Errorf("cannot open /dev/tty: %w (not a terminal?)", err)
+				tty = nil
+			} else {
+				ttyCloser = tty
 			}
-			defer tty.Close()
+			if ttyCloser != nil {
+				defer ttyCloser.Close()
+			}
 
-			scanner := bufio.NewScanner(tty)
+			var input io.Reader
+			if tty != nil {
+				input = tty
+			} else {
+				input = cmd.InOrStdin()
+			}
+			scanner := bufio.NewScanner(input)
 
 			// Prompt for discussion topic on stderr.
-			fmt.Fprintf(os.Stderr, "\nDiscuss wave: %s - %s\n", wave.ClusterName, wave.Title)
-			fmt.Fprint(os.Stderr, "Topic (or Enter to discuss the wave as-is): ")
+			errW := cmd.ErrOrStderr()
+			fmt.Fprintf(errW, "\nDiscuss wave: %s - %s\n", wave.ClusterName, wave.Title)
+			fmt.Fprint(errW, "Topic (or Enter to discuss the wave as-is): ")
 			var topic string
 			if scanner.Scan() {
 				topic = strings.TrimSpace(scanner.Text())

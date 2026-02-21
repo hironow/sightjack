@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,7 +207,7 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
 	resolved := resolveConfigPath(cmd, baseDir)
 	cfg, err := sightjack.LoadConfig(resolved)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("config not found: %s\nRun 'sightjack init' to create one", resolved)
 		}
 		return nil, fmt.Errorf("error loading config: %w", err)

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +32,7 @@ func TestCobraRouting_Init(t *testing.T) {
 		t.Fatalf("init command failed: %v", err)
 	}
 	cfgFile := filepath.Join(dir, ".siren", "config.yaml")
-	if _, statErr := os.Stat(cfgFile); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(cfgFile); errors.Is(statErr, fs.ErrNotExist) {
 		t.Errorf("expected config file at %s", cfgFile)
 	}
 }
