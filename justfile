@@ -71,8 +71,12 @@ fmt:
 vet:
     go vet ./...
 
-# Lint (fmt check + vet + markdown lint)
-lint: vet lint-md
+# Lint semgrep rules (cobra best practices)
+lint-semgrep:
+    semgrep --config .semgrep/ ./internal/cmd/ ./cmd/sightjack/
+
+# Lint (fmt check + vet + markdown lint + semgrep)
+lint: vet lint-md lint-semgrep
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit

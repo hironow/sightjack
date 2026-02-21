@@ -1,0 +1,118 @@
+rules:
+  # ============================================================
+  # cobra/pflag best practices — derived from cross-tool review
+  # sightjack (MY-330), phonewave (MY-331), amadeus (MY-332), paintress (MY-333)
+  # ============================================================
+
+  # Rule 1: fmt.Print* in cobra RunE — use cmd.OutOrStdout()
+  # Source: amadeus #3, sightjack cross-check
+  - id: cobra-no-fmt-print-in-rune
+    languages: [go]
+    message: |
+      cobra RunE 内で fmt.Print/Println/Printf を直接呼ばないでください。
+      cmd.OutOrStdout() を使用して fmt.Fprint/Fprintln/Fprintf に書き換えてください。
+      テスト時に bytes.Buffer で出力をキャプチャできなくなります。
+      例: fmt.Println(x) → fmt.Fprintln(cmd.OutOrStdout(), x)
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: fmt.Print(...)
+          - pattern: fmt.Println(...)
+          - pattern: fmt.Printf(...)
+      - pattern-inside: |
+          RunE: func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 2: os.Stderr in cobra RunE — use cmd.ErrOrStderr()
+  # Source: amadeus #4-5, sightjack cross-check
+  - id: cobra-no-os-stderr-in-rune
+    languages: [go]
+    message: |
+      cobra RunE 内で os.Stderr を直接参照しないでください。
+      cmd.ErrOrStderr() を使用してください。
+      テスト時に stderr 出力をキャプチャできなくなります。
+      例: fmt.Fprintf(os.Stderr, ...) → fmt.Fprintf(cmd.ErrOrStderr(), ...)
+    severity: WARNING
+    patterns:
+      - pattern: os.Stderr
+      - pattern-inside: |
+          RunE: func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 3: context.Background() in cobra RunE — use cmd.Context()
+  # Source: amadeus #1, paintress #2
+  - id: cobra-no-context-background-in-rune
+    languages: [go]
+    message: |
+      cobra RunE 内で context.Background() を使用しないでください。
+      cmd.Context() を使用してください。
+      ExecuteContext() で渡された context のキャンセルが伝播しなくなります。
+    severity: ERROR
+    patterns:
+      - pattern: context.Background()
+      - pattern-inside: |
+          RunE: func($CMD *cobra.Command, $ARGS []string) error {
+            ...
+          }
+
+  # Rule 4: os.IsNotExist — use errors.Is(err, fs.ErrNotExist)
+  # Source: amadeus #6
+  - id: prefer-errors-is-for-not-exist
+    languages: [go]
+    message: |
+      os.IsNotExist() は wrapped error をアンラップしません。
+      errors.Is(err, fs.ErrNotExist) を使用してください（Go 1.13+）。
+    severity: WARNING
+    pattern: os.IsNotExist(...)
+
+  # Rule 5: os.Open("/dev/tty") with hard error return (no fallback)
+  # Source: paintress #3, sightjack discuss.go fix
+  # Safe pattern (fallback): if err != nil { tty = nil }
+  # Dangerous pattern (hard fail): if err != nil { return fmt.Errorf(...) }
+  - id: devtty-hard-fail-needs-fallback
+    languages: [go]
+    message: |
+      /dev/tty エラー時に即 return しています。Windows/CI環境では常に失敗します。
+      cmd.InOrStdin() へフォールバックしてください。
+      修正例: if err != nil { tty = nil } ... if tty != nil { input = tty } else { input = cmd.InOrStdin() }
+    severity: ERROR
+    patterns:
+      - pattern: |
+          $TTY, $ERR := os.Open("/dev/tty")
+          if $ERR != nil {
+            return ...
+          }
+
+  # Rule 6: cobra.EnableTraverseRunHooks should be in init()
+  # Source: phonewave, sightjack #2, paintress cross-check
+  - id: cobra-traverse-hooks-in-init
+    languages: [go]
+    message: |
+      cobra.EnableTraverseRunHooks はグローバル変数です。
+      関数内ではなく init() で設定してください。
+      NewRootCommand() 内で設定するとテスト時に副作用が発生します。
+    severity: WARNING
+    patterns:
+      - pattern: cobra.EnableTraverseRunHooks = true
+      - pattern-not-inside: |
+          func init() {
+            ...
+          }
+
+  # Rule 7: cobra.OnFinalize without sync.Once
+  # Source: phonewave #1, sightjack Copilot review
+  - id: cobra-onfinalize-needs-once
+    languages: [go]
+    message: |
+      cobra.OnFinalize() はグローバルに蓄積されます。
+      NewRootCommand() がテストで複数回呼ばれるとコールバックが累積します。
+      sync.Once で囲んでください。
+    severity: WARNING
+    patterns:
+      - pattern: cobra.OnFinalize(...)
+      - pattern-not-inside: |
+          $ONCE.Do(func() {
+            ...
+          })
