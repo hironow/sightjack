@@ -140,7 +140,9 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 		}
 	})
 
-	// Find the first positional argument, skipping flags and their values.
+	// Scan all args to find a known subcommand, skipping flags and their values.
+	// We must look past unknown positional args (e.g., "--json" is a scan-local
+	// flag unknown to root, so "sightjack --json scan" must find "scan").
 	skipNext := false
 	skipBoolValue := false
 	for _, arg := range args {
@@ -172,10 +174,10 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 		if known[arg] {
 			return args
 		}
-		return append([]string{"scan"}, args...)
+		// Unknown positional — continue scanning (don't return early).
 	}
 
-	// All args are flags (e.g., "--json") → default to scan.
+	// No subcommand found → default to scan.
 	return append([]string{"scan"}, args...)
 }
 

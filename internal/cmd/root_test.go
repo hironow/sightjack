@@ -256,3 +256,44 @@ func TestDefaultToScan_BoolFlagNonBoolValueTreatedAsPositional(t *testing.T) {
 		t.Errorf("expected [scan --verbose mypath], got %v", got)
 	}
 }
+
+func TestDefaultToScan_ScanLocalFlagBeforeSubcommand(t *testing.T) {
+	// given: --json scan — --json is a scan-local flag unknown to root,
+	// "scan" is a known subcommand that must be found.
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--json", "scan"})
+
+	// then: "scan" found as subcommand — return unchanged
+	if len(got) != 2 || got[0] != "--json" || got[1] != "scan" {
+		t.Errorf("expected [--json scan] unchanged, got %v", got)
+	}
+}
+
+func TestDefaultToScan_UnknownFlagBeforeSubcommand(t *testing.T) {
+	// given: --days 7 archive-prune — --days is a subcommand-local flag,
+	// "7" is its value, "archive-prune" is a known subcommand.
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"--days", "7", "archive-prune"})
+
+	// then: "archive-prune" found as subcommand — return unchanged
+	if len(got) != 3 || got[2] != "archive-prune" {
+		t.Errorf("expected [--days 7 archive-prune] unchanged, got %v", got)
+	}
+}
+
+func TestDefaultToScan_MultipleUnknownPositionalsNoSubcommand(t *testing.T) {
+	// given: multiple unknown positional args with no subcommand
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"path1", "path2"})
+
+	// then: no subcommand found — prepend scan
+	if len(got) != 3 || got[0] != "scan" {
+		t.Errorf("expected [scan path1 path2], got %v", got)
+	}
+}
