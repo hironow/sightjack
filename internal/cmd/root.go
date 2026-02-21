@@ -24,6 +24,10 @@ var (
 	date    = "dev"
 )
 
+type loggerKeyType struct{}
+
+var loggerKey loggerKeyType
+
 var (
 	cfgPath string
 	lang    string
@@ -52,9 +56,10 @@ func NewRootCommand() *cobra.Command {
 		Short: "SIREN-inspired issue architecture tool for Linear",
 		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse DefaultToScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			sightjack.SetVerbose(verbose)
+			logger := sightjack.NewLogger(cmd.ErrOrStderr(), verbose)
+			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = sightjack.InitTracer("sightjack", version)
-			spanCtx := sightjack.StartRootSpan(cmd.Context(), cmd.Name())
+			spanCtx := sightjack.StartRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 			return nil
 		},
@@ -218,6 +223,11 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
 		cfg.Lang = lang
 	}
 	return cfg, nil
+}
+
+// loggerFrom extracts the *sightjack.Logger from the cobra command context.
+func loggerFrom(cmd *cobra.Command) *sightjack.Logger {
+	return cmd.Context().Value(loggerKey).(*sightjack.Logger)
 }
 
 // resolveConfigPath returns the final config file path.

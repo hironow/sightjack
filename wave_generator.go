@@ -70,17 +70,17 @@ func ParseNextGenResult(path string) (*NextGenResult, error) {
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt to a file instead of executing Claude.
-func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string, feedback []*DMail) error {
+func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string, feedback []*DMail, logger *Logger) error {
 	prompt, err := buildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness, feedback)
 	if err != nil {
 		return err
 	}
 	dryRunName := fmt.Sprintf("nextgen_%s_%s", sanitizeName(completedWave.ClusterName), sanitizeName(completedWave.ID))
-	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName)
+	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string, feedback []*DMail) ([]Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string, feedback []*DMail, logger *Logger) ([]Wave, error) {
 	ctx, nextgenSpan := tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", completedWave.ClusterName),
@@ -96,8 +96,8 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 		return nil, err
 	}
 
-	LogScan("Generating next waves: %s", completedWave.ClusterName)
-	if _, err := RunClaude(ctx, cfg, prompt, io.Discard); err != nil {
+	logger.Scan("Generating next waves: %s", completedWave.ClusterName)
+	if _, err := RunClaude(ctx, cfg, prompt, io.Discard, logger); err != nil {
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}
 
@@ -108,7 +108,7 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 
 	newWaves := NormalizeWavePrerequisites(result.Waves)
 	if len(newWaves) > 0 {
-		LogOK("Generated %d new wave(s) for %s: %s", len(newWaves), completedWave.ClusterName, result.Reasoning)
+		logger.OK("Generated %d new wave(s) for %s: %s", len(newWaves), completedWave.ClusterName, result.Reasoning)
 	}
 	return newWaves, nil
 }

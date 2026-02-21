@@ -50,10 +50,12 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				return fmt.Errorf("invalid ApplyResult JSON: %w", err)
 			}
 
+			logger := loggerFrom(cmd)
+
 			// If completeness target reached, output empty plan.
 			w := cmd.OutOrStdout()
 			if applyResult.NewCompleteness >= 0.95 {
-				sightjack.LogOK("Completeness %.0f%% — no follow-up waves needed.", applyResult.NewCompleteness*100)
+				logger.OK("Completeness %.0f%% — no follow-up waves needed.", applyResult.NewCompleteness*100)
 				emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
 				fmt.Fprintln(w, string(emptyPlan))
 				return nil
@@ -114,7 +116,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			}
 
 			if !sightjack.NeedsMoreWaves(cluster, allWaves) {
-				sightjack.LogOK("No more waves needed for %s.", cluster.Name)
+				logger.OK("No more waves needed for %s.", cluster.Name)
 				emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
 				fmt.Fprintln(w, string(emptyPlan))
 				return nil
@@ -132,14 +134,14 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 			if dryRun {
-				if err := sightjack.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil); err != nil {
+				if err := sightjack.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, logger); err != nil {
 					return fmt.Errorf("dry-run failed: %w", err)
 				}
-				sightjack.LogOK("Dry-run complete. Check %s for generated prompt.", scanDir)
+				logger.OK("Dry-run complete. Check %s for generated prompt.", scanDir)
 				return nil
 			}
 
-			newWaves, err := sightjack.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil)
+			newWaves, err := sightjack.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, logger)
 			if err != nil {
 				return fmt.Errorf("nextgen failed: %w", err)
 			}

@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,7 +115,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	}
 
 	// when
-	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog")
+	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -199,7 +200,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	}
 
 	// when
-	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog")
+	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {

@@ -31,6 +31,7 @@ if state is found in .siren/state.json.`,
   sightjack run --dry-run`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			logger := loggerFrom(cmd)
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
@@ -43,7 +44,7 @@ if state is found in .siren/state.json.`,
 			if !dryRun {
 				existingState, stateErr := sightjack.ReadState(baseDir)
 				if stateErr != nil {
-					recovered, recErr := sightjack.RecoverLatestState(baseDir)
+					recovered, recErr := sightjack.RecoverLatestState(baseDir, logger)
 					if recErr == nil {
 						existingState = recovered
 						stateErr = nil
@@ -57,18 +58,18 @@ if state is found in .siren/state.json.`,
 							return nil
 						}
 						if promptErr != nil {
-							sightjack.LogWarn("Invalid input: %v", promptErr)
+							logger.Warn("Invalid input: %v", promptErr)
 							continue
 						}
 						switch choice {
 						case sightjack.ResumeChoiceResume:
 							if !sightjack.CanResume(existingState) {
-								sightjack.LogWarn("Cached scan data missing — starting fresh session instead.")
+								logger.Warn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}
-							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin())
+							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), logger)
 						case sightjack.ResumeChoiceRescan:
-							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin())
+							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -82,7 +83,7 @@ if state is found in .siren/state.json.`,
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
 			}
-			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput)
+			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, logger)
 		},
 	}
 }

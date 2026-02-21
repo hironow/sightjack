@@ -32,6 +32,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
   sightjack scan /path/to/project`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			logger := loggerFrom(cmd)
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
@@ -42,16 +43,16 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			}
 			sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
 
-			sightjack.LogInfo("Starting sightjack scan...")
-			sightjack.LogInfo("Team: %s | Project: %s | Lang: %s", cfg.Linear.Team, cfg.Linear.Project, cfg.Lang)
+			logger.Info("Starting sightjack scan...")
+			logger.Info("Team: %s | Project: %s | Lang: %s", cfg.Linear.Team, cfg.Linear.Project, cfg.Lang)
 
-			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun)
+			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, logger)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}
 
 			if dryRun {
-				sightjack.LogOK("Dry-run complete. Check .siren/.run/ for generated prompts.")
+				logger.OK("Dry-run complete. Check .siren/.run/ for generated prompts.")
 				return nil
 			}
 
@@ -87,12 +88,12 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			}
 
 			if err := sightjack.WriteState(baseDir, state); err != nil {
-				sightjack.LogWarn("Failed to save state: %v", err)
+				logger.Warn("Failed to save state: %v", err)
 			} else {
-				sightjack.LogOK("State saved to %s", sightjack.StatePath(baseDir))
+				logger.OK("State saved to %s", sightjack.StatePath(baseDir))
 			}
 
-			sightjack.LogOK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
+			logger.OK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
 			return nil
 		},
 	}

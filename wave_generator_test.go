@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -404,7 +405,7 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 	}
 	completedWaves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
 
-	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil)
+	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}

@@ -55,7 +55,7 @@ func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWar
 // RunScan executes the full two-pass scan.
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
-func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool) (*ScanResult, error) {
+func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, logger *Logger) (*ScanResult, error) {
 	ctx, scanSpan := tracer.Start(ctx, "scan",
 		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
 	)
@@ -67,7 +67,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	}
 
 	// --- Pass 1: Classify ---
-	LogScan("Pass 1: Classifying issues...")
+	logger.Scan("Pass 1: Classifying issues...")
 	classifyCtx, classifySpan := tracer.Start(ctx, "classify")
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
@@ -87,18 +87,18 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 	if dryRun {
 		classifySpan.End()
-		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify")
+		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify", logger)
 	}
 
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
 	if cfg.Labels.Enabled {
-		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, os.Stdout); err != nil {
+		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, os.Stdout, logger); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
-		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, os.Stdout); err != nil {
+		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, os.Stdout, logger); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
@@ -109,7 +109,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		classifySpan.End()
 		return nil, err
 	}
-	LogOK("Found %d clusters with %d total issues", len(classify.Clusters), classify.TotalIssues)
+	logger.OK("Found %d clusters with %d total issues", len(classify.Clusters), classify.TotalIssues)
 	classifySpan.End()
 
 	scanSpan.SetAttributes(
@@ -119,7 +119,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 	// --- Pass 2: Deep scan per cluster (parallel) ---
 	deepscanCtx, deepscanSpan := tracer.Start(ctx, "deepscan")
-	LogScan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
+	logger.Scan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
 	// Build scan cluster list from classify results. The index parameter in
 	// DeepScanFunc maps directly to classify.Clusters, so duplicate cluster
@@ -151,8 +151,8 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
 			}
 
-			LogScan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-			if _, runErr := RunClaude(ctx, cfg, prompt, io.Discard); runErr != nil {
+			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
+			if _, runErr := RunClaude(ctx, cfg, prompt, io.Discard, logger); runErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
 			}
 
@@ -165,11 +165,11 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 		merged := mergeClusterChunks(cc.Name, chunkResults)
 		merged.Labels = cc.Labels
-		LogOK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
+		logger.OK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
 		return merged, nil
 	}
 
-	clusters, scanWarnings := RunParallelDeepScan(deepscanCtx, cfg, scanDir, scanClusters, deepScanFn)
+	clusters, scanWarnings := RunParallelDeepScan(deepscanCtx, cfg, scanDir, scanClusters, deepScanFn, logger)
 	deepscanSpan.End()
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -183,13 +183,13 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 }
 
 // RunWaveGenerate executes Pass 3: generate waves for each cluster in parallel.
-func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool) ([]Wave, error) {
+func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool, logger *Logger) ([]Wave, error) {
 	ctx, waveGenSpan := tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
 	defer waveGenSpan.End()
 
-	LogScan("Pass 3: Generating waves for %d clusters...", len(clusters))
+	logger.Scan("Pass 3: Generating waves for %d clusters...", len(clusters))
 
 	waveResults := make([]WaveGenerateResult, len(clusters))
 
@@ -222,11 +222,11 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 
 			if dryRun {
 				dryRunName := fmt.Sprintf("wave_%02d_%s", i, sanitizeName(cluster.Name))
-				return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName)
+				return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 			}
 
-			LogScan("Generating waves: %s", cluster.Name)
-			if _, err := RunClaude(gCtx, cfg, prompt, io.Discard); err != nil {
+			logger.Scan("Generating waves: %s", cluster.Name)
+			if _, err := RunClaude(gCtx, cfg, prompt, io.Discard, logger); err != nil {
 				return fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 			}
 
@@ -235,7 +235,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				return fmt.Errorf("parse waves %s: %w", cluster.Name, err)
 			}
 			waveResults[i] = *result
-			LogOK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
+			logger.OK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
 			return nil
 		})
 	}
@@ -256,7 +256,7 @@ type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, index i
 // semaphore-based concurrency control. Failed clusters get LogWarn and are skipped;
 // remaining clusters continue. Returns successful results and warning messages.
 func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
-	clusters []ClusterScanResult, scanFn DeepScanFunc) ([]ClusterScanResult, []string) {
+	clusters []ClusterScanResult, scanFn DeepScanFunc, logger *Logger) ([]ClusterScanResult, []string) {
 
 	maxConcurrency := cfg.Scan.MaxConcurrency
 	if maxConcurrency < 1 {
@@ -313,7 +313,7 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 		ordered[r.index] = &indexedResult{cluster: r.cluster, err: r.err}
 		if r.err != nil {
 			msg := fmt.Sprintf("Cluster %q scan failed: %v", clusters[r.index].Name, r.err)
-			LogWarn("%s", msg)
+			logger.Warn("%s", msg)
 			warnings = append(warnings, msg)
 		}
 	}

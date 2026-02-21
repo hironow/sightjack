@@ -89,7 +89,7 @@ func checkTool(ctx context.Context, name string) CheckResult {
 // checkLinearMCP verifies Linear MCP connectivity by sending a lightweight
 // prompt to Claude and checking if it responds without error.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func checkLinearMCP(ctx context.Context, cfg *Config) CheckResult {
+func checkLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
 	if cfg == nil {
 		return CheckResult{
 			Name:    "Linear MCP",
@@ -99,7 +99,7 @@ func checkLinearMCP(ctx context.Context, cfg *Config) CheckResult {
 	}
 
 	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Linear.Team)
-	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard)
+	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger)
 	if err != nil {
 		return CheckResult{
 			Name:    "Linear MCP",
@@ -146,7 +146,7 @@ func checkStateDir(baseDir string) CheckResult {
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
 // baseDir is used to verify the .siren/ state directory is writable.
-func RunDoctor(ctx context.Context, configPath string, baseDir string) []CheckResult {
+func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *Logger) []CheckResult {
 	var results []CheckResult
 
 	// 1. Config check
@@ -181,7 +181,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string) []CheckRe
 			Message: "skipped (claude not available)",
 		})
 	} else {
-		results = append(results, checkLinearMCP(ctx, cfg))
+		results = append(results, checkLinearMCP(ctx, cfg, logger))
 	}
 
 	return results

@@ -1,6 +1,7 @@
 package sightjack
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +16,7 @@ func TestListExpiredArchive_EmptyDir(t *testing.T) {
 	}
 
 	// when
-	files, err := ListExpiredArchive(baseDir, 30)
+	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -55,7 +56,7 @@ func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 	}
 
 	// when — threshold 30 days
-	files, err := ListExpiredArchive(baseDir, 30)
+	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -97,7 +98,7 @@ func TestListExpiredArchive_OnlyMdFiles(t *testing.T) {
 	}
 
 	// when
-	files, err := ListExpiredArchive(baseDir, 30)
+	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -116,7 +117,7 @@ func TestListExpiredArchive_NoDirReturnsEmpty(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	files, err := ListExpiredArchive(baseDir, 30)
+	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -150,7 +151,7 @@ func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 	}
 
 	// when
-	deleted, err := PruneArchive(baseDir, 30)
+	deleted, err := PruneArchive(baseDir, 30, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -178,7 +179,7 @@ func TestListExpiredArchive_NegativeDaysReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	_, err := ListExpiredArchive(baseDir, -1)
+	_, err := ListExpiredArchive(baseDir, -1, NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -194,7 +195,7 @@ func TestPruneArchive_NegativeDaysReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	_, err := PruneArchive(baseDir, -1)
+	_, err := PruneArchive(baseDir, -1, NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -207,7 +208,7 @@ func TestPruneArchive_NoDirReturnsEmpty(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	deleted, err := PruneArchive(baseDir, 30)
+	deleted, err := PruneArchive(baseDir, 30, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {

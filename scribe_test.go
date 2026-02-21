@@ -1,6 +1,7 @@
 package sightjack
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,7 +149,7 @@ func TestRunScribeADRDryRun(t *testing.T) {
 	}
 
 	// when
-	err := RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog")
+	err := RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog", NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -403,7 +404,7 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 	resp := &ArchitectResponse{Analysis: "test", Reasoning: "test"}
 
 	// when
-	err := RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog")
+	err := RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog", NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -424,7 +425,7 @@ func TestNormalizeScribeResult_MatchingID(t *testing.T) {
 	result := &ScribeResponse{ADRID: "0003", Title: "test"}
 
 	// when
-	normalizeScribeResult(result, "0003")
+	normalizeScribeResult(result, "0003", NewLogger(io.Discard, false))
 
 	// then: no change
 	if result.ADRID != "0003" {
@@ -437,7 +438,7 @@ func TestNormalizeScribeResult_MismatchID(t *testing.T) {
 	result := &ScribeResponse{ADRID: "9999", Title: "test"}
 
 	// when
-	normalizeScribeResult(result, "0003")
+	normalizeScribeResult(result, "0003", NewLogger(io.Discard, false))
 
 	// then: overwritten with authoritative ID
 	if result.ADRID != "0003" {
@@ -450,7 +451,7 @@ func TestNormalizeScribeResult_EmptyID(t *testing.T) {
 	result := &ScribeResponse{ADRID: "", Title: "test"}
 
 	// when
-	normalizeScribeResult(result, "0003")
+	normalizeScribeResult(result, "0003", NewLogger(io.Discard, false))
 
 	// then: filled with authoritative ID
 	if result.ADRID != "0003" {

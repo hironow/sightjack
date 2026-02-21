@@ -63,12 +63,14 @@ suitable for piping into 'nextgen' for follow-up wave generation.`,
 
 			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
 
+			logger := loggerFrom(cmd)
+
 			if dryRun {
-				sightjack.LogOK("Dry-run: would apply wave %s (%s)", wave.ID, wave.ClusterName)
+				logger.OK("Dry-run: would apply wave %s (%s)", wave.ID, wave.ClusterName)
 				return nil
 			}
 
-			internal, err := sightjack.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness)
+			internal, err := sightjack.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness, logger)
 			if err != nil {
 				return fmt.Errorf("apply failed: %w", err)
 			}

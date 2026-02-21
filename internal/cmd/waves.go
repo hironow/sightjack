@@ -55,13 +55,15 @@ for piping into 'select' or 'show'.`,
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
 
-			waves, err := sightjack.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun)
+			logger := loggerFrom(cmd)
+
+			waves, err := sightjack.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun, logger)
 			if err != nil {
 				return fmt.Errorf("wave generation failed: %w", err)
 			}
 
 			if dryRun {
-				sightjack.LogOK("Dry-run complete. Check %s for generated prompts.", scanDir)
+				logger.OK("Dry-run complete. Check %s for generated prompts.", scanDir)
 				return nil
 			}
 
