@@ -1,0 +1,28 @@
+{
+  "waves": [
+    {
+      "id": "auth-w1",
+      "cluster_name": "Auth",
+      "title": "Add DoD",
+      "description": "Define acceptance criteria",
+      "status": "available",
+      "actions": [{"type": "add_dod", "issue_id": "AUTH-1", "description": "Add DoD for login", "detail": ""}],
+      "prerequisites": [],
+      "delta": {"before": 0.35, "after": 0.65}
+    }
+  ],
+  "scan_result": {
+    "clusters": [
+      {
+        "name": "Auth",
+        "completeness": 0.35,
+        "issues": [
+          {"id": "AUTH-1", "identifier": "AUTH-1", "title": "Login flow", "completeness": 0.3, "gaps": ["DoD missing"]}
+        ],
+        "observations": []
+      }
+    ],
+    "total_issues": 1,
+    "completeness": 0.35
+  }
+}

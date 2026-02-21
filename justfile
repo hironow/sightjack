@@ -103,6 +103,21 @@ jaeger-down:
 docgen:
     go run ./internal/tools/docgen/
 
+# Run E2E tests in Docker
+test-e2e:
+    docker compose -f tests/e2e/compose-e2e.yaml build
+    docker compose -f tests/e2e/compose-e2e.yaml run --rm e2e \
+        go test -tags e2e ./tests/e2e/ -count=1 -v -timeout=600s
+
+# Open interactive shell in E2E Docker container
+test-e2e-shell:
+    docker compose -f tests/e2e/compose-e2e.yaml build
+    docker compose -f tests/e2e/compose-e2e.yaml run --rm -it e2e /bin/sh
+
+# Clean up E2E Docker containers
+test-e2e-down:
+    docker compose -f tests/e2e/compose-e2e.yaml down -v
+
 # Clean build artifacts
 clean:
     rm -f {{TOOL}} coverage.out
