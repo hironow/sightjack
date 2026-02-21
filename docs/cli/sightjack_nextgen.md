@@ -35,7 +35,7 @@ sightjack nextgen [path] [flags]
 
 ```
   -c, --config string   Config file path (default ".siren/config.yaml")
-      --dry-run         Generate prompts without executing Claude
+  -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
   -v, --verbose         Verbose logging
 ```

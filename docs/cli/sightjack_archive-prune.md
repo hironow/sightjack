@@ -30,8 +30,8 @@ sightjack archive-prune [path] [flags]
 ### Options
 
 ```
-      --days int   Retention days for archive-prune (default 30)
-      --execute    Execute archive pruning (default: dry-run)
+  -d, --days int   Retention days for archive-prune (default 30)
+  -x, --execute    Execute archive pruning (default: dry-run)
   -h, --help       help for archive-prune
 ```
 
@@ -39,7 +39,7 @@ sightjack archive-prune [path] [flags]
 
 ```
   -c, --config string   Config file path (default ".siren/config.yaml")
-      --dry-run         Generate prompts without executing Claude
+  -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
   -v, --verbose         Verbose logging
 ```

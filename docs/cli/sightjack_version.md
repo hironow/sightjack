@@ -27,14 +27,14 @@ sightjack version [flags]
 
 ```
   -h, --help   help for version
-      --json   Output version info as JSON
+  -j, --json   Output version info as JSON
 ```
 
 ### Options inherited from parent commands
 
 ```
   -c, --config string   Config file path (default ".siren/config.yaml")
-      --dry-run         Generate prompts without executing Claude
+  -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
   -v, --verbose         Verbose logging
 ```
