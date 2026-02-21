@@ -179,16 +179,18 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime.
 
 | Command | Description |
 |---------|-------------|
-| `sightjack scan` | Classify and deep-scan Linear issues (default) |
-| `sightjack run` | Interactive wave approval and apply loop |
+| `sightjack scan` | Classify and deep-scan Linear issues (default when no subcommand given) |
+| `sightjack run` | Interactive wave approval and apply loop (supports `--resume`) |
 | `sightjack show` | Display last scan results (or pipe JSON from stdin) |
 | `sightjack init` | Initialize `.siren/config.yaml` interactively |
 | `sightjack doctor` | Check environment and tool availability |
-| `sightjack --version` | Show version and exit |
+| `sightjack version` | Print version, commit, date, and Go version (`-j` for JSON) |
+| `sightjack update` | Self-update to the latest GitHub release (`-C` to check only) |
+| `sightjack archive-prune` | Remove expired scan archives (`-x` to execute, default: dry-run) |
 
 ### Pipe-friendly (Unix pipeline)
 
-Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stderr. Interactive prompts use `/dev/tty`.
+Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stderr. Interactive prompts use `/dev/tty` (falls back to `CONIN$` on Windows).
 
 | Command | stdin | stdout | Description |
 |---------|-------|--------|-------------|
@@ -203,11 +205,12 @@ Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stde
 
 ## Usage
 
-Flags and subcommand can be placed in any order:
+Flags and subcommand can be placed in any order. All flags support GNU/POSIX long (`--flag`) and short (`-f`) forms:
 
 ```bash
 sightjack scan --dry-run         # flags after subcommand
 sightjack --dry-run scan         # flags before subcommand
+sightjack -n scan                # short alias
 sightjack --lang=ja run          # --flag=value form
 ```
 
@@ -222,20 +225,32 @@ sightjack run
 sightjack show
 
 # Dry run (generate prompts without executing Claude)
-sightjack scan --dry-run
+sightjack scan -n
 sightjack run --dry-run
 
 # Japanese prompts
-sightjack run --lang ja
+sightjack run -l ja
 
 # Custom config path
-sightjack run --config .siren/config.yaml
+sightjack run -c .siren/config.yaml
 
 # Verbose logging
-sightjack run --verbose
+sightjack run -v
 
 # Scan a different repository
 sightjack scan /path/to/repo
+
+# Version info
+sightjack version
+sightjack version -j             # JSON output
+
+# Check for updates
+sightjack update -C              # check only
+sightjack update                 # check and install
+
+# Archive pruning
+sightjack archive-prune -d 14   # 14-day retention (dry-run)
+sightjack archive-prune -x      # execute deletion
 ```
 
 ### Unix pipeline
@@ -259,14 +274,24 @@ cat wave.json | sightjack apply | sightjack nextgen
 
 ## Options
 
+### Global flags (all subcommands)
+
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--config` | `-c` | `.siren/config.yaml` | Config file path |
 | `--lang` | `-l` | config (`ja`) | Language override (`en` / `ja`) |
 | `--verbose` | `-v` | `false` | Verbose logging |
-| `--dry-run` | | `false` | Generate prompts without executing Claude |
-| `--json` | `-j` | `false` | Output structured JSON (scan subcommand) |
-| `--version` | | | Show version and exit |
+| `--dry-run` | `-n` | `false` | Generate prompts without executing Claude |
+
+### Subcommand flags
+
+| Subcommand | Flag | Short | Default | Description |
+|------------|------|-------|---------|-------------|
+| `scan` | `--json` | `-j` | `false` | Output structured JSON |
+| `version` | `--json` | `-j` | `false` | Output version info as JSON |
+| `update` | `--check` | `-C` | `false` | Check for updates without installing |
+| `archive-prune` | `--days` | `-d` | `30` | Retention days |
+| `archive-prune` | `--execute` | `-x` | `false` | Execute deletion (default: dry-run) |
 
 ## Configuration
 
@@ -336,7 +361,7 @@ just jaeger-down
 
 ```bash
 # Task runner (just)
-just build          # Build binary
+just build          # Build binary with version info (ldflags)
 just install        # Build and install to /usr/local/bin
 just test           # Run all tests
 just test-v         # Verbose test output
@@ -345,10 +370,11 @@ just cover          # Coverage report
 just cover-html     # Open coverage in browser
 just fmt            # Format code (gofmt)
 just vet            # Run go vet
-just lint           # fmt check + go vet + markdown lint
+just semgrep        # Run semgrep on entire project
+just lint           # fmt check + vet + markdown lint + semgrep
 just lint-md        # Lint markdown files only
 just check          # fmt + vet + test (pre-commit check)
-just doctor         # Build + run sightjack doctor
+just docs           # Generate CLI Markdown docs (docs/cli/)
 just clean          # Clean build artifacts
 just prek-install   # Install prek hooks (pre-commit + pre-push)
 just prek-run       # Run all prek hooks on all files
@@ -360,8 +386,26 @@ just jaeger-down    # Stop Jaeger
 
 ```
 +-- cmd/sightjack/
-|   +-- main.go              CLI entry point + subcommand routing (pipe + monolithic)
-|   +-- main_test.go         CLI arg parsing tests
+|   +-- main.go              CLI entry point (signal handling, DefaultToScan, Execute)
++-- internal/cmd/
+|   +-- root.go              Cobra root command, persistent flags, OTel hooks
+|   +-- scan.go              scan subcommand (classify + deep-scan)
+|   +-- waves.go             waves subcommand (wave generation from stdin)
+|   +-- select.go            select subcommand (interactive wave picker via tty)
+|   +-- discuss.go           discuss subcommand (Architect agent via tty)
+|   +-- apply.go             apply subcommand (wave apply to Linear)
+|   +-- adr.go               adr subcommand (ADR generation from discuss result)
+|   +-- nextgen.go           nextgen subcommand (follow-up wave generation)
+|   +-- show.go              show subcommand (human-readable display)
+|   +-- run.go               run subcommand (interactive session loop)
+|   +-- init.go              init subcommand (config scaffolding)
+|   +-- doctor.go            doctor subcommand (environment check)
+|   +-- archive_prune.go     archive-prune subcommand (expired scan cleanup)
+|   +-- version.go           version subcommand (build info)
+|   +-- update.go            update subcommand (self-update via GitHub releases)
+|   +-- *_test.go            Unit + integration tests (cobra routing, flags, etc.)
++-- internal/tools/docgen/
+|   +-- main.go              CLI Markdown doc generator (cobra doc.GenMarkdownTree)
 +-- scanner.go               Scanner Agent (classify + deep-scan)
 +-- architect.go             Architect Agent (design discussion + ToDiscussResult)
 +-- scribe.go                Scribe Agent (ADR generation + RenderADRFromDiscuss)
@@ -377,12 +421,15 @@ just jaeger-down    # Stop Jaeger
 +-- state.go                 State persistence + path helpers (.siren/)
 +-- prompt.go                Go template renderer for AI prompts
 +-- logger.go                Colored logging to stderr (LogOK, LogWarn, LogError, LogInfo)
-+-- init.go                  Config scaffolding (sightjack init)
-+-- doctor.go                Environment health check (sightjack doctor)
++-- init.go                  Config scaffolding logic
++-- doctor.go                Environment health check logic
 +-- dmail.go                 D-Mail protocol (inbox/outbox/archive, fsnotify monitor)
 +-- telemetry.go             OpenTelemetry tracing (OTLP export, noop fallback)
 +-- *_test.go                Tests
 +-- justfile                 Task runner
++-- .semgrep/
+|   +-- cobra.yaml           Semgrep rules (cobra I/O, context, safety, readability)
++-- docs/cli/                Auto-generated CLI reference (just docs)
 +-- docker/
 |   +-- compose.yaml         Jaeger all-in-one for trace viewing
 |   +-- jaeger-v2-config.yaml  Jaeger v2 OTLP configuration
@@ -403,6 +450,7 @@ just jaeger-down    # Stop Jaeger
 ## Prerequisites
 
 - Go 1.25+
+- [just](https://just.systems/) task runner
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - [Linear MCP Server](https://github.com/anthropics/model-context-protocol) configured for Claude
 - [Docker](https://www.docker.com/) for tracing (Jaeger)
