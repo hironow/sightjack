@@ -3,7 +3,9 @@ package sightjack
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,7 +28,7 @@ func ADRDir(baseDir string) string {
 func NextADRNumber(adrDir string) (int, error) {
 	entries, err := os.ReadDir(adrDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return 1, nil
 		}
 		return 0, err
@@ -117,7 +119,7 @@ type ExistingADR struct {
 func ReadExistingADRs(adrDir string) ([]ExistingADR, error) {
 	entries, err := os.ReadDir(adrDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, err

@@ -1,0 +1,66 @@
+version: 2
+
+builds:
+  - main: ./cmd/sightjack
+    binary: sightjack
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/hironow/sightjack/internal/cmd.version={{.Version}}
+      - -X github.com/hironow/sightjack/internal/cmd.commit={{.ShortCommit}}
+      - -X github.com/hironow/sightjack/internal/cmd.date={{.Date}}
+
+archives:
+  - formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+signs:
+  - cmd: cosign
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature=${signature}
+      - ${artifact}
+    artifacts: checksum
+
+brews:
+  - repository:
+      owner: hironow
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/hironow/sightjack
+    description: SIREN-inspired issue architecture tool for Linear
+    license: MIT
+    install: |
+      bin.install "sightjack"
+    test: |
+      system "#{bin}/sightjack", "version"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"

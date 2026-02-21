@@ -30,10 +30,13 @@ lint-md:
 
 # Version from git tags
 VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
+COMMIT := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
+DATE := `date -u +%Y-%m-%dT%H:%M:%SZ`
+LDFLAGS := "-X github.com/hironow/sightjack/internal/cmd.version=" + VERSION + " -X github.com/hironow/sightjack/internal/cmd.commit=" + COMMIT + " -X github.com/hironow/sightjack/internal/cmd.date=" + DATE
 
 # Build the binary with version info
 build:
-    go build -ldflags "-X main.version={{VERSION}}" -o sightjack ./cmd/sightjack
+    go build -ldflags "{{LDFLAGS}}" -o sightjack ./cmd/sightjack
 
 # Build and install to /usr/local/bin
 install: build
@@ -68,8 +71,12 @@ fmt:
 vet:
     go vet ./...
 
-# Lint (fmt check + vet + markdown lint)
-lint: vet lint-md
+# Run semgrep on entire project
+semgrep:
+    semgrep --config .semgrep/ .
+
+# Lint (fmt check + vet + markdown lint + semgrep)
+lint: vet lint-md semgrep
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
@@ -92,6 +99,10 @@ jaeger:
 # Stop Jaeger
 jaeger-down:
     docker compose -f docker/compose.yaml down
+
+# Generate CLI Markdown docs from cobra commands
+docs:
+    go run ./internal/tools/docgen
 
 # Clean build artifacts
 clean:
