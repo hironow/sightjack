@@ -12,7 +12,9 @@ import (
 
 func main() {
 	rootCmd := cmd.NewRootCommand()
-	rootCmd.SetArgs(cmd.DefaultToScan(rootCmd, os.Args[1:]))
+	args := cmd.DefaultToScan(rootCmd, os.Args[1:])
+	args = cmd.RewriteBoolFlags(rootCmd, args)
+	rootCmd.SetArgs(args)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

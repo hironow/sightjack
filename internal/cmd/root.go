@@ -194,6 +194,58 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 	return append([]string{"scan"}, args...)
 }
 
+// RewriteBoolFlags converts space-separated boolean flag values into equals
+// form so pflag parses them correctly. pflag's NoOptDefVal causes --flag false
+// to be parsed as --flag (true) + positional "false". This rewrites
+// --flag true/false/0/1 → --flag=true/false/0/1 for all known bool flags
+// across root persistent flags and all subcommand local flags.
+func RewriteBoolFlags(rootCmd *cobra.Command, args []string) []string {
+	boolFlags := make(map[string]bool)
+	// Collect from root persistent flags.
+	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+		if f.Value.Type() == "bool" {
+			boolFlags["--"+f.Name] = true
+			if f.Shorthand != "" {
+				boolFlags["-"+f.Shorthand] = true
+			}
+		}
+	})
+	// Collect from all subcommand local flags.
+	for _, sub := range rootCmd.Commands() {
+		sub.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			if f.Value.Type() == "bool" {
+				boolFlags["--"+f.Name] = true
+				if f.Shorthand != "" {
+					boolFlags["-"+f.Shorthand] = true
+				}
+			}
+		})
+	}
+
+	result := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			result = append(result, args[i:]...)
+			break
+		}
+		if strings.Contains(arg, "=") || !strings.HasPrefix(arg, "-") {
+			result = append(result, arg)
+			continue
+		}
+		if boolFlags[arg] && i+1 < len(args) {
+			next := strings.ToLower(args[i+1])
+			if next == "true" || next == "false" || next == "0" || next == "1" {
+				result = append(result, arg+"="+args[i+1])
+				i++ // consume next
+				continue
+			}
+		}
+		result = append(result, arg)
+	}
+	return result
+}
+
 // resolveBaseDir returns the absolute path from the first arg or cwd.
 func resolveBaseDir(args []string) (string, error) {
 	if len(args) > 0 {

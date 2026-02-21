@@ -296,3 +296,87 @@ func TestDefaultToScan_MultipleUnknownPositionalsNoSubcommand(t *testing.T) {
 		t.Errorf("expected [scan path1 path2], got %v", got)
 	}
 }
+
+// --- RewriteBoolFlags tests ---
+
+func TestRewriteBoolFlags_DryRunFalse(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--dry-run", "false"})
+	want := []string{"scan", "--dry-run=false"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_DryRunTrue(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--dry-run", "true"})
+	want := []string{"scan", "--dry-run=true"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_VerboseFalse(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--verbose", "false"})
+	want := []string{"scan", "--verbose=false"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_ShortFlagFalse(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "-v", "false"})
+	want := []string{"scan", "-v=false"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_AlreadyEqualsForm(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--dry-run=false"})
+	want := []string{"scan", "--dry-run=false"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_BoolFlagWithoutValue(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--dry-run"})
+	want := []string{"scan", "--dry-run"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_BoolFlagNonBoolValue(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--dry-run", "mypath"})
+	want := []string{"scan", "--dry-run", "mypath"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_NonBoolFlagNotRewritten(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--config", "false"})
+	want := []string{"scan", "--config", "false"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_MultipleBoolFlags(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--dry-run", "false", "--verbose", "true"})
+	want := []string{"scan", "--dry-run=false", "--verbose=true"}
+	assertArgs(t, want, got)
+}
+
+func TestRewriteBoolFlags_StopsAtDoubleDash(t *testing.T) {
+	rootCmd := NewRootCommand()
+	got := RewriteBoolFlags(rootCmd, []string{"scan", "--dry-run", "false", "--", "--verbose", "true"})
+	want := []string{"scan", "--dry-run=false", "--", "--verbose", "true"}
+	assertArgs(t, want, got)
+}
+
+func assertArgs(t *testing.T, want, got []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("length mismatch: want %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("arg[%d]: want %q, got %q (full: %v)", i, want[i], got[i], got)
+		}
+	}
+}
