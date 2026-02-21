@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -160,9 +159,9 @@ func TestDefaultToScan_PersistentFlagBeforeSubcommand(t *testing.T) {
 	// when
 	got := DefaultToScan(rootCmd, []string{"--verbose", "doctor", "."})
 
-	// then: "doctor" is a known subcommand, should not change
-	if len(got) != 3 || !strings.Contains(strings.Join(got, " "), "doctor") {
-		t.Errorf("expected unchanged [--verbose doctor .], got %v", got)
+	// then: "doctor" reordered to front (persistent flags work after subcommand)
+	if len(got) != 3 || got[0] != "doctor" {
+		t.Errorf("expected [doctor --verbose .], got %v", got)
 	}
 }
 
@@ -173,9 +172,9 @@ func TestDefaultToScan_ValueFlagBeforeSubcommand(t *testing.T) {
 	// when
 	got := DefaultToScan(rootCmd, []string{"--config", "custom.yaml", "waves"})
 
-	// then: should not change — "waves" is the subcommand, not "custom.yaml"
-	if len(got) != 3 || got[2] != "waves" {
-		t.Errorf("expected unchanged [--config custom.yaml waves], got %v", got)
+	// then: "waves" reordered to front
+	if len(got) != 3 || got[0] != "waves" {
+		t.Errorf("expected [waves --config custom.yaml], got %v", got)
 	}
 }
 
@@ -186,9 +185,9 @@ func TestDefaultToScan_ShortValueFlagBeforeSubcommand(t *testing.T) {
 	// when
 	got := DefaultToScan(rootCmd, []string{"-c", "custom.yaml", "doctor"})
 
-	// then: should not change — "doctor" is the subcommand
-	if len(got) != 3 || got[2] != "doctor" {
-		t.Errorf("expected unchanged [-c custom.yaml doctor], got %v", got)
+	// then: "doctor" reordered to front
+	if len(got) != 3 || got[0] != "doctor" {
+		t.Errorf("expected [doctor -c custom.yaml], got %v", got)
 	}
 }
 
@@ -199,9 +198,9 @@ func TestDefaultToScan_ValueFlagEqualsForm(t *testing.T) {
 	// when
 	got := DefaultToScan(rootCmd, []string{"--config=custom.yaml", "waves"})
 
-	// then: should not change — "waves" is found as subcommand
-	if len(got) != 2 || got[1] != "waves" {
-		t.Errorf("expected unchanged [--config=custom.yaml waves], got %v", got)
+	// then: "waves" reordered to front
+	if len(got) != 2 || got[0] != "waves" {
+		t.Errorf("expected [waves --config=custom.yaml], got %v", got)
 	}
 }
 
@@ -225,9 +224,9 @@ func TestDefaultToScan_BoolFlagExplicitValueBeforeSubcommand(t *testing.T) {
 	// when
 	got := DefaultToScan(rootCmd, []string{"--dry-run", "false", "waves"})
 
-	// then: should not change — "waves" is the subcommand
-	if len(got) != 3 || got[2] != "waves" {
-		t.Errorf("expected unchanged [--dry-run false waves], got %v", got)
+	// then: "waves" reordered to front
+	if len(got) != 3 || got[0] != "waves" {
+		t.Errorf("expected [waves --dry-run false], got %v", got)
 	}
 }
 
@@ -238,9 +237,9 @@ func TestDefaultToScan_BoolFlagExplicitTrueBeforeSubcommand(t *testing.T) {
 	// when
 	got := DefaultToScan(rootCmd, []string{"--verbose", "true", "doctor"})
 
-	// then: should not change — "doctor" is the subcommand
-	if len(got) != 3 || got[2] != "doctor" {
-		t.Errorf("expected unchanged [--verbose true doctor], got %v", got)
+	// then: "doctor" reordered to front
+	if len(got) != 3 || got[0] != "doctor" {
+		t.Errorf("expected [doctor --verbose true], got %v", got)
 	}
 }
 
@@ -259,15 +258,15 @@ func TestDefaultToScan_BoolFlagNonBoolValueTreatedAsPositional(t *testing.T) {
 
 func TestDefaultToScan_ScanLocalFlagBeforeSubcommand(t *testing.T) {
 	// given: --json scan — --json is a scan-local flag unknown to root,
-	// "scan" is a known subcommand that must be found.
+	// "scan" is a known subcommand that must be found and reordered to front.
 	rootCmd := NewRootCommand()
 
 	// when
 	got := DefaultToScan(rootCmd, []string{"--json", "scan"})
 
-	// then: "scan" found as subcommand — return unchanged
-	if len(got) != 2 || got[0] != "--json" || got[1] != "scan" {
-		t.Errorf("expected [--json scan] unchanged, got %v", got)
+	// then: "scan" reordered to front so cobra routes correctly
+	if len(got) != 2 || got[0] != "scan" || got[1] != "--json" {
+		t.Errorf("expected [scan --json], got %v", got)
 	}
 }
 
@@ -279,9 +278,9 @@ func TestDefaultToScan_UnknownFlagBeforeSubcommand(t *testing.T) {
 	// when
 	got := DefaultToScan(rootCmd, []string{"--days", "7", "archive-prune"})
 
-	// then: "archive-prune" found as subcommand — return unchanged
-	if len(got) != 3 || got[2] != "archive-prune" {
-		t.Errorf("expected [--days 7 archive-prune] unchanged, got %v", got)
+	// then: "archive-prune" reordered to front
+	if len(got) != 3 || got[0] != "archive-prune" {
+		t.Errorf("expected [archive-prune --days 7], got %v", got)
 	}
 }
 

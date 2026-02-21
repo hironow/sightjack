@@ -141,11 +141,14 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 	})
 
 	// Scan all args to find a known subcommand, skipping flags and their values.
-	// We must look past unknown positional args (e.g., "--json" is a scan-local
+	// We must look past unknown flags/positionals (e.g., "--json" is a scan-local
 	// flag unknown to root, so "sightjack --json scan" must find "scan").
+	// When found at index > 0, reorder so the subcommand comes first — cobra
+	// parses flags left-to-right and would reject unknown flags before the
+	// subcommand (persistent flags work anywhere, so reorder is always safe).
 	skipNext := false
 	skipBoolValue := false
-	for _, arg := range args {
+	for i, arg := range args {
 		if skipNext {
 			skipNext = false
 			continue
@@ -172,7 +175,15 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 			continue
 		}
 		if known[arg] {
-			return args
+			if i == 0 {
+				return args
+			}
+			// Move subcommand to front so cobra routes correctly.
+			reordered := make([]string, 0, len(args))
+			reordered = append(reordered, arg)
+			reordered = append(reordered, args[:i]...)
+			reordered = append(reordered, args[i+1:]...)
+			return reordered
 		}
 		// Unknown positional — continue scanning (don't return early).
 	}
