@@ -117,7 +117,9 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 	}
 
 	// Build set of known subcommand names.
-	known := make(map[string]bool)
+	// Include cobra-injected commands (help, completion) that are only added
+	// at Execute() time — DefaultToScan runs before Execute().
+	known := map[string]bool{"help": true, "completion": true}
 	for _, sub := range rootCmd.Commands() {
 		known[sub.Name()] = true
 		for _, alias := range sub.Aliases {
@@ -244,6 +246,22 @@ func RewriteBoolFlags(rootCmd *cobra.Command, args []string) []string {
 		result = append(result, arg)
 	}
 	return result
+}
+
+// openTTY opens the platform-appropriate controlling terminal for interactive
+// input. On Unix this is /dev/tty; on Windows it is CONIN$. Returns an error
+// if neither device is available (e.g., in a non-interactive container).
+func openTTY() (*os.File, error) {
+	// Try Unix first, then Windows.
+	tty, err := os.Open("/dev/tty")
+	if err == nil {
+		return tty, nil
+	}
+	tty, winErr := os.Open("CONIN$")
+	if winErr == nil {
+		return tty, nil
+	}
+	return nil, fmt.Errorf("no controlling terminal available (/dev/tty: %v, CONIN$: %v)", err, winErr)
 }
 
 // resolveBaseDir returns the absolute path from the first arg or cwd.

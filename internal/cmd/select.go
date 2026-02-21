@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -46,9 +45,9 @@ for downstream commands (apply, discuss).`,
 			}
 
 			// Open terminal for interactive input (stdin is consumed by pipe).
-			// /dev/tty is required because cmd.InOrStdin() is already exhausted
-			// after io.ReadAll above — falling back to it would yield immediate EOF.
-			tty, err := os.Open("/dev/tty") // nosemgrep: devtty-hard-fail-needs-fallback
+			// cmd.InOrStdin() is already exhausted after io.ReadAll above,
+			// so we must open the controlling terminal directly.
+			tty, err := openTTY() // nosemgrep: devtty-hard-fail-needs-fallback
 			if err != nil {
 				return fmt.Errorf("cannot open terminal for interactive input (stdin consumed by pipe): %w", err)
 			}

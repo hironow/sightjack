@@ -297,6 +297,45 @@ func TestDefaultToScan_MultipleUnknownPositionalsNoSubcommand(t *testing.T) {
 	}
 }
 
+func TestDefaultToScan_HelpSubcommand(t *testing.T) {
+	// given: "help" is a cobra-injected subcommand not in rootCmd.Commands()
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"help"})
+
+	// then: "help" must NOT be rewritten to "scan help"
+	if len(got) != 1 || got[0] != "help" {
+		t.Errorf("expected [help], got %v", got)
+	}
+}
+
+func TestDefaultToScan_HelpSubcommandWithTopic(t *testing.T) {
+	// given: "help scan" — help with a topic
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"help", "scan"})
+
+	// then: must preserve as-is
+	if len(got) != 2 || got[0] != "help" || got[1] != "scan" {
+		t.Errorf("expected [help scan], got %v", got)
+	}
+}
+
+func TestDefaultToScan_CompletionSubcommand(t *testing.T) {
+	// given: "completion" is another cobra-injected subcommand
+	rootCmd := NewRootCommand()
+
+	// when
+	got := DefaultToScan(rootCmd, []string{"completion", "bash"})
+
+	// then: must preserve as-is
+	if len(got) != 2 || got[0] != "completion" || got[1] != "bash" {
+		t.Errorf("expected [completion bash], got %v", got)
+	}
+}
+
 // --- RewriteBoolFlags tests ---
 
 func TestRewriteBoolFlags_DryRunFalse(t *testing.T) {
