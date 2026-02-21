@@ -250,6 +250,104 @@ func TestCobraRouting_DefaultToScanWithFlag(t *testing.T) {
 	}
 }
 
+func TestShortAliases(t *testing.T) {
+	rootCmd := NewRootCommand()
+
+	// Root persistent flags: -n for --dry-run
+	t.Run("dry-run has -n shorthand", func(t *testing.T) {
+		f := rootCmd.PersistentFlags().Lookup("dry-run")
+		if f == nil {
+			t.Fatal("--dry-run flag not found")
+		}
+		if f.Shorthand != "n" {
+			t.Errorf("expected shorthand 'n', got %q", f.Shorthand)
+		}
+	})
+
+	// archive-prune: -d for --days, -x for --execute
+	t.Run("archive-prune days has -d shorthand", func(t *testing.T) {
+		var ap *cobra.Command
+		for _, sub := range rootCmd.Commands() {
+			if sub.Name() == "archive-prune" {
+				ap = sub
+				break
+			}
+		}
+		if ap == nil {
+			t.Fatal("archive-prune command not found")
+		}
+		f := ap.Flags().Lookup("days")
+		if f == nil {
+			t.Fatal("--days flag not found")
+		}
+		if f.Shorthand != "d" {
+			t.Errorf("expected shorthand 'd', got %q", f.Shorthand)
+		}
+	})
+
+	t.Run("archive-prune execute has -x shorthand", func(t *testing.T) {
+		var ap *cobra.Command
+		for _, sub := range rootCmd.Commands() {
+			if sub.Name() == "archive-prune" {
+				ap = sub
+				break
+			}
+		}
+		if ap == nil {
+			t.Fatal("archive-prune command not found")
+		}
+		f := ap.Flags().Lookup("execute")
+		if f == nil {
+			t.Fatal("--execute flag not found")
+		}
+		if f.Shorthand != "x" {
+			t.Errorf("expected shorthand 'x', got %q", f.Shorthand)
+		}
+	})
+
+	// version: -j for --json
+	t.Run("version json has -j shorthand", func(t *testing.T) {
+		var ver *cobra.Command
+		for _, sub := range rootCmd.Commands() {
+			if sub.Name() == "version" {
+				ver = sub
+				break
+			}
+		}
+		if ver == nil {
+			t.Fatal("version command not found")
+		}
+		f := ver.Flags().Lookup("json")
+		if f == nil {
+			t.Fatal("--json flag not found")
+		}
+		if f.Shorthand != "j" {
+			t.Errorf("expected shorthand 'j', got %q", f.Shorthand)
+		}
+	})
+
+	// update: -C for --check
+	t.Run("update check has -C shorthand", func(t *testing.T) {
+		var upd *cobra.Command
+		for _, sub := range rootCmd.Commands() {
+			if sub.Name() == "update" {
+				upd = sub
+				break
+			}
+		}
+		if upd == nil {
+			t.Fatal("update command not found")
+		}
+		f := upd.Flags().Lookup("check")
+		if f == nil {
+			t.Fatal("--check flag not found")
+		}
+		if f.Shorthand != "C" {
+			t.Errorf("expected shorthand 'C', got %q", f.Shorthand)
+		}
+	})
+}
+
 func TestAllCommands_HaveLongAndExample(t *testing.T) {
 	// given
 	rootCmd := NewRootCommand()
