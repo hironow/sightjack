@@ -31,6 +31,12 @@ func main() {
 		return
 	}
 
+	// Log prompt when FAKE_CLAUDE_PROMPT_LOG_DIR is set.
+	// Used by E2E tests to verify feedback injection into nextgen prompts.
+	if logDir := os.Getenv("FAKE_CLAUDE_PROMPT_LOG_DIR"); logDir != "" {
+		logPrompt(logDir, prompt)
+	}
+
 	outputPath := jsonPathRe.FindString(prompt)
 	if outputPath == "" {
 		// No stdout output — data exchange is file-based.
@@ -39,9 +45,11 @@ func main() {
 	}
 
 	filename := filepath.Base(outputPath)
+	matched := false
 	for _, f := range fixtures {
-		matched, _ := filepath.Match(f.pattern, filename)
-		if matched {
+		ok, _ := filepath.Match(f.pattern, filename)
+		if ok {
+			matched = true
 			if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 				fmt.Fprintf(os.Stderr, "fake-claude: mkdir: %v\n", err)
 				os.Exit(1)
@@ -53,9 +61,21 @@ func main() {
 			break
 		}
 	}
+	if !matched {
+		fmt.Fprintf(os.Stderr, "fake-claude: no fixture for %q\n", filename)
+		os.Exit(2)
+	}
+}
 
-	// No stdout output — data exchange is file-based.
-	// Printing here would leak into sightjack's stdout via RunClaude streaming.
+// logPrompt appends the prompt text to a sequentially-named file in dir.
+func logPrompt(dir, prompt string) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	entries, _ := os.ReadDir(dir)
+	seq := len(entries) + 1
+	filename := fmt.Sprintf("prompt_%03d.txt", seq)
+	os.WriteFile(filepath.Join(dir, filename), []byte(prompt), 0o644)
 }
 
 // extractPrompt finds the value of the -p flag.
@@ -81,6 +101,7 @@ var fixtures = []fixture{
 	{pattern: "cluster_*_c*.json", content: deepScanAuth},
 	{pattern: "wave_*_*.json", content: waveGenAuth},
 	{pattern: "apply_*_*.json", content: waveApplySuccess},
+	{pattern: "nextgen_*_*.json", content: nextgenEmpty},
 }
 
 // --- Canned JSON responses (ported from lifecycle_test.go) ---
@@ -123,5 +144,13 @@ var waveApplySuccess = strings.TrimSpace(`
   "wave_id": "auth-w1", "applied": 1, "total_count": 1,
   "errors": [],
   "ripples": []
+}
+`)
+
+var nextgenEmpty = strings.TrimSpace(`
+{
+  "cluster_name": "Auth",
+  "waves": [],
+  "reasoning": "Cluster is sufficiently complete."
 }
 `)
