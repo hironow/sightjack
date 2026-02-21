@@ -181,15 +181,27 @@ func TestE2E_Pipe_SelectInteractive(t *testing.T) {
 		t.Fatalf("start select: %v", startErr)
 	}
 
-	// Expect wave listing and send selection "1"
-	c.ExpectString("1")
-	c.SendLine("1")
+	// select opens /dev/tty directly for interactive input (separate from stdin).
+	// In environments without a controlling terminal, ExpectString will timeout.
+	if _, expErr := c.ExpectString("1"); expErr != nil {
+		// select likely failed to open /dev/tty — skip in non-TTY environments
+		c.Tty().Close()
+		if waitErr := cmd.Wait(); waitErr != nil {
+			t.Skipf("select requires controlling terminal: expect=%v, wait=%v", expErr, waitErr)
+		}
+		t.Skipf("select requires controlling terminal: %v", expErr)
+	}
+	if _, expErr := c.SendLine("1"); expErr != nil {
+		t.Fatalf("failed to send '1': %v", expErr)
+	}
 
 	c.Tty().Close()
 	c.ExpectEOF()
 
 	if waitErr := cmd.Wait(); waitErr != nil {
-		// select may fail if /dev/tty is not available (expected in some CI)
-		t.Skipf("select requires controlling terminal: %v", waitErr)
+		if isTTYError(waitErr) {
+			t.Skipf("select requires controlling terminal: %v", waitErr)
+		}
+		t.Fatalf("select exited with error: %v", waitErr)
 	}
 }

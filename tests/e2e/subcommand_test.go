@@ -149,18 +149,37 @@ func TestE2E_Init_Interactive(t *testing.T) {
 	}
 
 	// Send interactive input matching exact prompt strings from init.go
-	c.ExpectString("Linear team name:")
-	c.SendLine("TestTeam")
-	c.ExpectString("Linear project name:")
-	c.SendLine("TestProject")
-	c.ExpectString("Language")
-	c.SendLine("")
-	c.ExpectString("Strictness")
-	c.SendLine("")
+	if _, expErr := c.ExpectString("Linear team name:"); expErr != nil {
+		t.Fatalf("expected 'Linear team name:' prompt: %v", expErr)
+	}
+	if _, expErr := c.SendLine("TestTeam"); expErr != nil {
+		t.Fatalf("failed to send team name: %v", expErr)
+	}
+	if _, expErr := c.ExpectString("Linear project name:"); expErr != nil {
+		t.Fatalf("expected 'Linear project name:' prompt: %v", expErr)
+	}
+	if _, expErr := c.SendLine("TestProject"); expErr != nil {
+		t.Fatalf("failed to send project name: %v", expErr)
+	}
+	if _, expErr := c.ExpectString("Language"); expErr != nil {
+		t.Fatalf("expected 'Language' prompt: %v", expErr)
+	}
+	if _, expErr := c.SendLine(""); expErr != nil {
+		t.Fatalf("failed to send language default: %v", expErr)
+	}
+	if _, expErr := c.ExpectString("Strictness"); expErr != nil {
+		t.Fatalf("expected 'Strictness' prompt: %v", expErr)
+	}
+	if _, expErr := c.SendLine(""); expErr != nil {
+		t.Fatalf("failed to send strictness default: %v", expErr)
+	}
 
 	c.Tty().Close()
 	c.ExpectEOF()
-	cmd.Wait()
+
+	if waitErr := cmd.Wait(); waitErr != nil {
+		t.Fatalf("init exited with error: %v", waitErr)
+	}
 
 	// then: config file should exist
 	cfgFile := filepath.Join(dir, ".siren", "config.yaml")

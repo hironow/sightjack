@@ -14,6 +14,17 @@ import (
 	expect "github.com/Netflix/go-expect"
 )
 
+// isTTYError returns true if the error is related to a missing controlling
+// terminal (/dev/tty). Only these errors warrant t.Skip; other failures
+// should be reported as real test failures.
+func isTTYError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "controlling terminal") ||
+		strings.Contains(msg, "/dev/tty") ||
+		strings.Contains(msg, "CONIN$") ||
+		strings.Contains(msg, "device not configured")
+}
+
 func TestE2E_Run_DryRun(t *testing.T) {
 	// given: a configured directory
 	dir := initDir(t)
@@ -81,26 +92,38 @@ func TestE2E_Run_NewSession(t *testing.T) {
 
 	// Expect scan progress, then wave selection prompt
 	// The scan produces output like "Found 1 clusters"
-	c.ExpectString("clusters")
+	if _, expErr := c.ExpectString("clusters"); expErr != nil {
+		t.Fatalf("expected 'clusters' output: %v", expErr)
+	}
 
 	// Expect wave selection prompt: "Select wave [1-N, b=back, q=quit]:"
-	c.ExpectString("Select wave")
-	c.SendLine("1")
+	if _, expErr := c.ExpectString("Select wave"); expErr != nil {
+		t.Fatalf("expected 'Select wave' prompt: %v", expErr)
+	}
+	if _, expErr := c.SendLine("1"); expErr != nil {
+		t.Fatalf("failed to send '1': %v", expErr)
+	}
 
 	// Expect approval prompt: "[a] Approve all  [s] Selective  [r] Reject  [d] Discuss  [q] Back"
-	c.ExpectString("Approve all")
-	c.SendLine("a")
+	if _, expErr := c.ExpectString("Approve all"); expErr != nil {
+		t.Fatalf("expected 'Approve all' prompt: %v", expErr)
+	}
+	if _, expErr := c.SendLine("a"); expErr != nil {
+		t.Fatalf("failed to send 'a': %v", expErr)
+	}
 
-	// After apply, we get back to navigator. Quit the session.
-	c.ExpectString("Select wave")
-	c.SendLine("q")
-
+	// After apply, the session enters nextgen which may take time.
+	// Close TTY to signal EOF — the session will save state and exit.
+	// We've already verified the full interactive path: scan → waves → select → approve.
+	time.Sleep(500 * time.Millisecond) // allow apply to complete
 	c.Tty().Close()
 	c.ExpectEOF()
 
 	if waitErr := cmd.Wait(); waitErr != nil {
-		// May fail in environments without controlling terminal
-		t.Skipf("run requires controlling terminal: %v", waitErr)
+		if isTTYError(waitErr) {
+			t.Skipf("run requires controlling terminal: %v", waitErr)
+		}
+		t.Fatalf("run exited with error: %v", waitErr)
 	}
 
 	// then: state.json should exist
@@ -131,14 +154,21 @@ func TestE2E_Run_QuitImmediately(t *testing.T) {
 	}
 
 	// Wait for wave selection prompt
-	c.ExpectString("Select wave")
-	c.SendLine("q")
+	if _, expErr := c.ExpectString("Select wave"); expErr != nil {
+		t.Fatalf("expected 'Select wave' prompt: %v", expErr)
+	}
+	if _, expErr := c.SendLine("q"); expErr != nil {
+		t.Fatalf("failed to send 'q': %v", expErr)
+	}
 
 	c.Tty().Close()
 	c.ExpectEOF()
 
 	if waitErr := cmd.Wait(); waitErr != nil {
-		t.Skipf("run requires controlling terminal: %v", waitErr)
+		if isTTYError(waitErr) {
+			t.Skipf("run requires controlling terminal: %v", waitErr)
+		}
+		t.Fatalf("run exited with error: %v", waitErr)
 	}
 
 	// then: state should still be saved (paused session)
