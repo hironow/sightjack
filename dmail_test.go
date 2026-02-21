@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -477,7 +478,7 @@ func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -528,7 +529,7 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -566,7 +567,7 @@ func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -593,7 +594,7 @@ func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -631,7 +632,7 @@ func TestMonitorInbox_StopsOnCancel(t *testing.T) {
 	EnsureMailDirs(dir)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -666,12 +667,12 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	feedback := DrainInboxFeedback(ch)
+	feedback := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 	if len(feedback) != 1 {
 		t.Errorf("expected 1 drained, got %d", len(feedback))
 	}
@@ -681,7 +682,7 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 }
 
 func TestDrainInboxFeedback_NilChannel(t *testing.T) {
-	feedback := DrainInboxFeedback(nil)
+	feedback := DrainInboxFeedback(nil, NewLogger(io.Discard, false))
 	if feedback != nil {
 		t.Errorf("expected nil for nil channel, got %d items", len(feedback))
 	}
@@ -705,16 +706,16 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// Drain initial feedback
-	initial := DrainInboxFeedback(ch)
+	initial := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 
 	// Start collector with initial feedback
-	collector := CollectFeedback(initial, ch)
+	collector := CollectFeedback(initial, ch, NewLogger(io.Discard, false))
 
 	// All() should return initial feedback
 	all := collector.All()
@@ -761,7 +762,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 		{Name: "fb-001", Kind: DMailFeedback, Description: "Item 1"},
 		{Name: "fb-002", Kind: DMailFeedback, Description: "Item 2"},
 	}
-	collector := CollectFeedback(initial, nil)
+	collector := CollectFeedback(initial, nil, NewLogger(io.Discard, false))
 
 	// when: call All() multiple times
 	first := collector.All()
@@ -778,7 +779,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 
 func TestFeedbackCollector_NilChannel(t *testing.T) {
 	// given: nil channel
-	collector := CollectFeedback(nil, nil)
+	collector := CollectFeedback(nil, nil, NewLogger(io.Discard, false))
 
 	// then: All() returns nil
 	if all := collector.All(); all != nil {
@@ -789,7 +790,7 @@ func TestFeedbackCollector_NilChannel(t *testing.T) {
 func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
 	// given: nil initial but channel that will receive items
 	ch := make(chan *DMail, 1)
-	collector := CollectFeedback(nil, ch)
+	collector := CollectFeedback(nil, ch, NewLogger(io.Discard, false))
 
 	// when: send one item
 	ch <- &DMail{Name: "fb-late", Kind: DMailFeedback, Description: "Late only"}
@@ -954,13 +955,13 @@ func TestMonitorInbox_MultipleFeedbackInitialDrain(t *testing.T) {
 	defer cancel()
 
 	// when
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: all 3 drained
-	feedback := DrainInboxFeedback(ch)
+	feedback := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 	if len(feedback) != 3 {
 		t.Errorf("expected 3 feedback, got %d", len(feedback))
 	}
@@ -995,13 +996,13 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 	defer cancel()
 
 	// when
-	ch, err := MonitorInbox(ctx, dir)
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: only 2 feedback come through channel
-	feedback := DrainInboxFeedback(ch)
+	feedback := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 	if len(feedback) != 2 {
 		t.Fatalf("expected 2 feedback, got %d", len(feedback))
 	}
@@ -1027,7 +1028,7 @@ func TestDrainInboxFeedback_MultipleFeedback(t *testing.T) {
 	ch <- &DMail{Name: "fb-3", Kind: DMailFeedback, Description: "third", Severity: "high"}
 
 	// when
-	feedback := DrainInboxFeedback(ch)
+	feedback := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 
 	// then
 	if len(feedback) != 3 {
@@ -1045,7 +1046,7 @@ func TestDrainInboxFeedback_ClosedChannel(t *testing.T) {
 	close(ch)
 
 	// when
-	feedback := DrainInboxFeedback(ch)
+	feedback := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 
 	// then: should drain the buffered item
 	if len(feedback) != 1 {
@@ -1061,7 +1062,7 @@ func TestDrainInboxFeedback_EmptyChannel(t *testing.T) {
 	ch := make(chan *DMail, 5)
 
 	// when
-	feedback := DrainInboxFeedback(ch)
+	feedback := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 
 	// then: returns nil (no feedback)
 	if feedback != nil {

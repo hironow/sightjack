@@ -155,7 +155,7 @@ func clearScribeOutput(scanDir string, wave Wave) {
 }
 
 // RunScribeADRDryRun saves the scribe prompt to a file instead of executing Claude.
-func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string) error {
+func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string, logger *Logger) error {
 	adrNum, err := NextADRNumber(adrDir)
 	if err != nil {
 		return fmt.Errorf("next adr number: %w", err)
@@ -189,16 +189,16 @@ func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *A
 	}
 
 	dryRunName := fmt.Sprintf("scribe_%s_%s", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
-	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName)
+	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 
 // normalizeScribeResult ensures the parsed ADRID matches the filesystem-derived
 // adrID. Claude may return a mismatched or empty adr_id; the generated ID is
 // authoritative because it is used to name the ADR file on disk.
-func normalizeScribeResult(result *ScribeResponse, adrID string) {
+func normalizeScribeResult(result *ScribeResponse, adrID string, logger *Logger) {
 	if result.ADRID != adrID {
 		if result.ADRID != "" {
-			LogScan("Scribe ADR ID mismatch: generated %s, parsed %s; using %s", adrID, result.ADRID, adrID)
+			logger.Scan("Scribe ADR ID mismatch: generated %s, parsed %s; using %s", adrID, result.ADRID, adrID)
 		}
 		result.ADRID = adrID
 	}
@@ -218,7 +218,7 @@ func ParseScribeResult(path string) (*ScribeResponse, error) {
 }
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
-func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string) (*ScribeResponse, error) {
+func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, architectResp *ArchitectResponse, adrDir string, strictness string, logger *Logger) (*ScribeResponse, error) {
 	clearScribeOutput(scanDir, wave)
 
 	adrNum, err := NextADRNumber(adrDir)
@@ -253,8 +253,8 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		return nil, fmt.Errorf("render scribe prompt: %w", err)
 	}
 
-	LogScan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout); err != nil {
+	logger.Scan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
+	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout, logger); err != nil {
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 
@@ -262,7 +262,7 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 	if err != nil {
 		return nil, fmt.Errorf("parse scribe result %s: %w", wave.ID, err)
 	}
-	normalizeScribeResult(result, adrID)
+	normalizeScribeResult(result, adrID, logger)
 
 	// Write ADR file to adrDir (sanitize title to prevent path traversal)
 	if err := os.MkdirAll(adrDir, 0755); err != nil {

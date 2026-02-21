@@ -149,7 +149,7 @@ func waveApplyFileName(wave Wave) string {
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
-func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, strictness string) (*WaveApplyResult, error) {
+func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, strictness string, logger *Logger) (*WaveApplyResult, error) {
 	ctx, applySpan := tracer.Start(ctx, "wave.apply",
 		trace.WithAttributes(
 			attribute.String("wave.id", wave.ID),
@@ -183,8 +183,8 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 		return nil, fmt.Errorf("render apply prompt: %w", err)
 	}
 
-	LogScan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
-	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout); err != nil {
+	logger.Scan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout, logger); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
 
@@ -193,13 +193,13 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 		return nil, fmt.Errorf("parse apply result %s: %w", wave.ID, err)
 	}
 
-	LogOK("Wave %s applied: %d actions", wave.ID, result.Applied)
+	logger.OK("Wave %s applied: %d actions", wave.ID, result.Applied)
 	return result, nil
 }
 
 // RunReadyLabel applies the ready label to issues whose all waves have completed.
 // This must only be called after a successful wave apply.
-func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string) error {
+func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string, logger *Logger) error {
 	prompt, err := RenderReadyLabelPrompt(cfg.Lang, ReadyLabelPromptData{
 		ReadyLabel:    cfg.Labels.ReadyLabel,
 		ReadyIssueIDs: readyIssueIDs,
@@ -208,8 +208,8 @@ func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string) error
 		return fmt.Errorf("render ready label prompt: %w", err)
 	}
 
-	LogScan("Applying ready labels to: %s", readyIssueIDs)
-	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout); err != nil {
+	logger.Scan("Applying ready labels to: %s", readyIssueIDs)
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, os.Stdout, logger); err != nil {
 		return fmt.Errorf("ready label: %w", err)
 	}
 	return nil

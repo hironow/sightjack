@@ -81,15 +81,17 @@ suitable for piping into 'adr' for ADR generation.`,
 
 			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
 
+			logger := loggerFrom(cmd)
+
 			if dryRun {
-				if err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, topic, strictness); err != nil {
+				if err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, topic, strictness, logger); err != nil {
 					return fmt.Errorf("dry-run failed: %w", err)
 				}
-				sightjack.LogOK("Dry-run complete. Check %s for generated prompt.", scanDir)
+				logger.OK("Dry-run complete. Check %s for generated prompt.", scanDir)
 				return nil
 			}
 
-			resp, err := sightjack.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness)
+			resp, err := sightjack.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, logger)
 			if err != nil {
 				return fmt.Errorf("discussion failed: %w", err)
 			}

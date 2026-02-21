@@ -72,7 +72,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
-	_, err := RunClaude(context.Background(), cfg, "test prompt", io.Discard)
+	_, err := RunClaude(context.Background(), cfg, "test prompt", io.Discard, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunClaude failed: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 
 	// Create a parent span so retry events have a recording span to attach to.
 	ctx, parentSpan := tracer.Start(context.Background(), "test-parent")
-	_, _ = RunClaude(ctx, cfg, "test", io.Discard)
+	_, _ = RunClaude(ctx, cfg, "test", io.Discard, NewLogger(io.Discard, false))
 	parentSpan.End()
 
 	spans := exp.GetSpans()

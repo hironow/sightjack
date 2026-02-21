@@ -25,7 +25,7 @@ func defaultNewCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
-func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger) (string, error) {
 	ctx, span := tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("claude.model", cfg.Claude.Model),
@@ -77,7 +77,9 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer)
 			}
 			if readErr != nil {
 				if readErr != io.EOF {
-					LogWarn("stdout read: %v", readErr)
+					if logger != nil {
+						logger.Warn("stdout read: %v", readErr)
+					}
 				}
 				break
 			}
@@ -103,7 +105,7 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer)
 // complete.
 // Pass os.Stdout for interactive single-process usage, or io.Discard for
 // parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (string, error) {
+func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger) (string, error) {
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
@@ -127,14 +129,14 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 				shift = 30 // cap to prevent overflow of time.Duration
 			}
 			delay := baseDelay * time.Duration(1<<shift) // exponential: base*2^0, base*2^1, base*2^2...
-			LogInfo("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
+			logger.Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
 			select {
 			case <-ctx.Done():
 				return "", ctx.Err()
 			case <-time.After(delay):
 			}
 		}
-		output, err := RunClaudeOnce(ctx, cfg, prompt, w)
+		output, err := RunClaudeOnce(ctx, cfg, prompt, w, logger)
 		if err == nil {
 			return output, nil
 		}
@@ -157,7 +159,7 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer) (st
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
-func RunClaudeDryRun(cfg *Config, prompt, outputPath string, name string) error {
+func RunClaudeDryRun(cfg *Config, prompt, outputPath string, name string, logger *Logger) error {
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return fmt.Errorf("create dry-run dir: %w", err)
 	}
@@ -165,6 +167,6 @@ func RunClaudeDryRun(cfg *Config, prompt, outputPath string, name string) error 
 	if err := os.WriteFile(promptFile, []byte(prompt), 0644); err != nil {
 		return fmt.Errorf("write prompt: %w", err)
 	}
-	LogInfo("Dry-run: prompt saved to %s", promptFile)
+	logger.Info("Dry-run: prompt saved to %s", promptFile)
 	return nil
 }

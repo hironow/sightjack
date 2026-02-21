@@ -161,7 +161,7 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 // receiveDMailIfNew reads a d-mail from inbox, applies consumer-side dedup (MY-271),
 // archives it, and returns it only if it is a feedback d-mail.
 // Returns nil for already-archived, non-feedback, or unreadable files.
-func receiveDMailIfNew(baseDir, filename string) *DMail {
+func receiveDMailIfNew(baseDir, filename string, logger *Logger) *DMail {
 	// Consumer-side dedup: skip if already in archive.
 	// NOTE: Dedup is filename-based by design — the d-mail filename acts as a
 	// message ID in the protocol. Senders that need to deliver updated content
@@ -174,7 +174,7 @@ func receiveDMailIfNew(baseDir, filename string) *DMail {
 
 	mail, err := ReceiveDMail(baseDir, filename)
 	if err != nil {
-		LogWarn("Failed to receive d-mail %s: %v", filename, err)
+		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
 	if mail.Kind != DMailFeedback {
@@ -188,7 +188,7 @@ func receiveDMailIfNew(baseDir, filename string) *DMail {
 // Each d-mail is received (archived + removed from inbox). Only feedback d-mails
 // are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
-func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
+func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
@@ -207,7 +207,7 @@ func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 	files, listErr := ListDMail(baseDir, inboxDir)
 	if listErr == nil {
 		for _, filename := range files {
-			if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
+			if mail := receiveDMailIfNew(baseDir, filename, logger); mail != nil {
 				initial = append(initial, mail)
 			}
 		}
@@ -236,7 +236,7 @@ func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 				// Archive-based dedup in receiveDMailIfNew prevents double delivery.
 				if (event.Has(fsnotify.Create) || event.Has(fsnotify.Write)) && strings.HasSuffix(event.Name, ".md") {
 					filename := filepath.Base(event.Name)
-					if mail := receiveDMailIfNew(baseDir, filename); mail != nil {
+					if mail := receiveDMailIfNew(baseDir, filename, logger); mail != nil {
 						select {
 						case ch <- mail:
 						case <-ctx.Done():
@@ -257,7 +257,7 @@ func MonitorInbox(ctx context.Context, baseDir string) (<-chan *DMail, error) {
 
 // DrainInboxFeedback reads all currently buffered feedback from the monitor channel
 // and displays them to the CLI. Returns the drained feedback messages for downstream use.
-func DrainInboxFeedback(ch <-chan *DMail) []*DMail {
+func DrainInboxFeedback(ch <-chan *DMail, logger *Logger) []*DMail {
 	if ch == nil {
 		return nil
 	}
@@ -277,13 +277,13 @@ loop:
 	if len(feedback) == 0 {
 		return nil
 	}
-	LogInfo("Received %d feedback d-mail(s):", len(feedback))
+	logger.Info("Received %d feedback d-mail(s):", len(feedback))
 	for _, fb := range feedback {
 		switch fb.Severity {
 		case "high":
-			LogWarn("[%s] %s (severity: HIGH)", fb.Name, fb.Description)
+			logger.Warn("[%s] %s (severity: HIGH)", fb.Name, fb.Description)
 		default:
-			LogInfo("[%s] %s", fb.Name, fb.Description)
+			logger.Info("[%s] %s", fb.Name, fb.Description)
 		}
 	}
 	return feedback
@@ -324,7 +324,7 @@ type feedbackCollector struct {
 // CollectFeedback creates a feedbackCollector seeded with initial feedback
 // and starts a background goroutine to accumulate late-arriving items
 // from the channel. Safe to call with nil initial and/or nil channel.
-func CollectFeedback(initial []*DMail, ch <-chan *DMail) *feedbackCollector {
+func CollectFeedback(initial []*DMail, ch <-chan *DMail, logger *Logger) *feedbackCollector {
 	c := &feedbackCollector{}
 	if len(initial) > 0 {
 		c.items = make([]*DMail, len(initial))
@@ -338,9 +338,9 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail) *feedbackCollector {
 				c.mu.Unlock()
 				switch mail.Severity {
 				case "high":
-					LogWarn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
+					logger.Warn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
 				default:
-					LogInfo("[D-Mail] [%s] %s", mail.Name, mail.Description)
+					logger.Info("[D-Mail] [%s] %s", mail.Name, mail.Description)
 				}
 			}
 		}()

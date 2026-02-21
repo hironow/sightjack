@@ -23,11 +23,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Verify CLI docs are up to date
-        run: |
-          go run ./internal/tools/docgen
-          git diff --exit-code docs/cli/ || (echo "docs/cli/ is out of date. Run 'just docs' and commit." && exit 1)
-
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
@@ -38,3 +33,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,7 +117,7 @@ func TestCheckLinearMCP_Success(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkLinearMCP(ctx, cfg)
+	result := checkLinearMCP(ctx, cfg, NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != CheckOK {
@@ -139,7 +140,7 @@ func TestCheckLinearMCP_Failure(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkLinearMCP(ctx, cfg)
+	result := checkLinearMCP(ctx, cfg, NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != CheckFail {
@@ -152,7 +153,7 @@ func TestCheckLinearMCP_NilConfig_Skips(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkLinearMCP(ctx, nil)
+	result := checkLinearMCP(ctx, nil, NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != CheckSkip {
@@ -216,7 +217,7 @@ func TestRunDoctor_ConfigFailure_LinearMCPSkipped(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir)
+	results := RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, NewLogger(io.Discard, false))
 
 	// then: should have 5 results
 	if len(results) != 5 {
@@ -258,7 +259,7 @@ claude:
 	ctx := context.Background()
 
 	// when
-	results := RunDoctor(ctx, cfgPath, dir)
+	results := RunDoctor(ctx, cfgPath, dir, NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 5 {
@@ -300,7 +301,7 @@ linear:
 	ctx := context.Background()
 
 	// when
-	results := RunDoctor(ctx, cfgPath, dir)
+	results := RunDoctor(ctx, cfgPath, dir, NewLogger(io.Discard, false))
 
 	// then: should have 5 results (config, state dir, claude, git, linear mcp)
 	if len(results) != 5 {

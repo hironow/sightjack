@@ -14,7 +14,7 @@ Use DefaultToScan() to preprocess args before Execute.
 
 ```
   -c, --config string   Config file path (default ".siren/config.yaml")
-      --dry-run         Generate prompts without executing Claude
+  -n, --dry-run         Generate prompts without executing Claude
   -h, --help            help for sightjack
   -l, --lang string     Language override (ja/en)
   -v, --verbose         Verbose logging

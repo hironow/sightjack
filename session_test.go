@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,7 +89,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil)
+	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil, NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -144,7 +145,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil)
+	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil, NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -169,7 +170,7 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil)
+	err := RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, NewLogger(io.Discard, false))
 
 	// then: should get an input-related error, not a panic or scan error
 	if err == nil {
@@ -909,7 +910,7 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil)
+	err := RunSession(ctx, cfg, baseDir, sessionID, true, nil, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1248,7 +1249,7 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil)
+	err := RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1272,7 +1273,7 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := RunRescanSession(context.Background(), cfg, t.TempDir(), state, nil)
+	err := RunRescanSession(context.Background(), cfg, t.TempDir(), state, nil, NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1600,7 +1601,7 @@ func TestTryRecoverState(t *testing.T) {
 	}
 
 	// when
-	recovered, recErr := TryRecoverState(dir, sessionID)
+	recovered, recErr := TryRecoverState(dir, sessionID, NewLogger(io.Discard, false))
 
 	// then
 	if recErr != nil {
@@ -1637,7 +1638,7 @@ func TestTryRecoverState_LegacyScansDir(t *testing.T) {
 	}
 
 	// when: TryRecoverState should find it despite ScanDir() pointing to .run/
-	recovered, err := TryRecoverState(dir, sessionID)
+	recovered, err := TryRecoverState(dir, sessionID, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1808,7 +1809,7 @@ func TestRecoverLatestState_FromLegacyScansDir(t *testing.T) {
 	WriteScanResult(filepath.Join(legacyDir, "scan_result.json"), scanResult)
 
 	// when
-	recovered, err := RecoverLatestState(dir)
+	recovered, err := RecoverLatestState(dir, NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1845,7 +1846,7 @@ func TestRecoverLatestState_PrefersNewest(t *testing.T) {
 	})
 
 	// when
-	recovered, err := RecoverLatestState(dir)
+	recovered, err := RecoverLatestState(dir, NewLogger(io.Discard, false))
 
 	// then: should pick the newest (session-2000-1)
 	if err != nil {
@@ -1879,7 +1880,7 @@ func TestRecoverLatestState_MixedPrefixes_PrefersNewerScan(t *testing.T) {
 	})
 
 	// when
-	recovered, err := RecoverLatestState(dir)
+	recovered, err := RecoverLatestState(dir, NewLogger(io.Discard, false))
 
 	// then: should pick scan-2000-1 (newer timestamp) not session-1000-1
 	if err != nil {
@@ -1895,7 +1896,7 @@ func TestRecoverLatestState_NoSessions(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	recovered, err := RecoverLatestState(dir)
+	recovered, err := RecoverLatestState(dir, NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1910,7 +1911,7 @@ func TestTryRecoverStateNoFiles(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	recovered, err := TryRecoverState(dir, "nonexistent")
+	recovered, err := TryRecoverState(dir, "nonexistent", NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {

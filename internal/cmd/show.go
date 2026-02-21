@@ -31,6 +31,7 @@ reads from .siren/state.json and displays the matrix navigator.`,
   sightjack scan --json | sightjack waves | sightjack show`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			logger := loggerFrom(cmd)
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
@@ -39,7 +40,7 @@ reads from .siren/state.json and displays the matrix navigator.`,
 			if stdinIsPipe() {
 				return runShowFromStdin(w)
 			}
-			return runShowFromState(w, baseDir)
+			return runShowFromState(w, baseDir, logger)
 		},
 	}
 }
@@ -89,10 +90,10 @@ func runShowFromStdin(w io.Writer) error {
 	return nil
 }
 
-func runShowFromState(w io.Writer, baseDir string) error {
+func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) error {
 	state, err := sightjack.ReadState(baseDir)
 	if err != nil {
-		sightjack.LogInfo("Run 'sightjack scan' first.")
+		logger.Info("Run 'sightjack scan' first.")
 		return fmt.Errorf("no previous scan found: %w", err)
 	}
 
@@ -116,6 +117,6 @@ func runShowFromState(w io.Writer, baseDir string) error {
 	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, (*time.Time)(nil), strictness, state.ShibitoCount)
 	fmt.Fprintln(w)
 	fmt.Fprint(w, nav)
-	sightjack.LogInfo("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
+	logger.Info("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
 	return nil
 }

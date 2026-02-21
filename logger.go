@@ -8,86 +8,67 @@ import (
 	"time"
 )
 
-const (
-	colorReset  = "\033[0m"
-	colorCyan   = "\033[36m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorRed    = "\033[31m"
-	colorBlue   = "\033[34m"
-	colorPurple = "\033[35m"
-)
+type Logger struct {
+	out     io.Writer
+	mu      sync.Mutex
+	logFile *os.File
+	verbose bool
+}
 
-var (
-	logMu       sync.Mutex
-	logFile     *os.File
-	verboseMode bool
-	logStdout   io.Writer = os.Stdout
-	logStderr   io.Writer = os.Stderr
-)
-
-func InitLogFile(path string) error {
-	logMu.Lock()
-	defer logMu.Unlock()
-	if logFile != nil {
-		logFile.Close()
-		logFile = nil
+func NewLogger(out io.Writer, verbose bool) *Logger {
+	if out == nil {
+		out = io.Discard
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	return &Logger{out: out, verbose: verbose}
+}
+
+func (l *Logger) logLine(prefix, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	ts := time.Now().Format("15:04:05")
+	line := fmt.Sprintf("[%s] %s %s\n", ts, prefix, msg)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	fmt.Fprint(l.out, line)
+	if l.logFile != nil {
+		fmt.Fprint(l.logFile, line)
+	}
+}
+
+func (l *Logger) Info(format string, args ...any)  { l.logLine("INFO", format, args...) }
+func (l *Logger) OK(format string, args ...any)    { l.logLine(" OK ", format, args...) }
+func (l *Logger) Warn(format string, args ...any)  { l.logLine("WARN", format, args...) }
+func (l *Logger) Error(format string, args ...any) { l.logLine(" ERR", format, args...) }
+func (l *Logger) Scan(format string, args ...any)  { l.logLine("SCAN", format, args...) }
+func (l *Logger) Nav(format string, args ...any)   { l.logLine(" NAV", format, args...) }
+
+func (l *Logger) Debug(format string, args ...any) {
+	if l.verbose {
+		l.logLine("DBUG", format, args...)
+	}
+}
+
+func (l *Logger) Writer() io.Writer { return l.out }
+
+func (l *Logger) SetLogFile(path string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.logFile != nil {
+		l.logFile.Close()
+		l.logFile = nil
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
 	}
-	logFile = f
+	l.logFile = f
 	return nil
 }
 
-func CloseLogFile() {
-	logMu.Lock()
-	defer logMu.Unlock()
-	if logFile != nil {
-		logFile.Close()
-		logFile = nil
-	}
-}
-
-func formatLogLine(w io.Writer, prefix, color string, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	ts := time.Now().Format("15:04:05")
-	if color != "" {
-		fmt.Fprintf(w, "[%s] %s%s%s %s\n", ts, color, prefix, colorReset, msg)
-	} else {
-		fmt.Fprintf(w, "[%s] %s %s\n", ts, prefix, msg)
-	}
-}
-
-func logLineTo(w io.Writer, prefix, color string, format string, args ...any) {
-	formatLogLine(w, prefix, color, format, args...)
-	logMu.Lock()
-	defer logMu.Unlock()
-	if logFile != nil {
-		msg := fmt.Sprintf(format, args...)
-		ts := time.Now().Format("15:04:05")
-		fmt.Fprintf(logFile, "[%s] %s %s\n", ts, prefix, msg)
-	}
-}
-
-func LogInfo(format string, args ...any)  { logLineTo(logStderr, "INFO", colorCyan, format, args...) }
-func LogOK(format string, args ...any)    { logLineTo(logStderr, " OK ", colorGreen, format, args...) }
-func LogWarn(format string, args ...any)  { logLineTo(logStderr, "WARN", colorYellow, format, args...) }
-func LogError(format string, args ...any) { logLineTo(logStderr, " ERR", colorRed, format, args...) }
-func LogScan(format string, args ...any)  { logLineTo(logStderr, "SCAN", colorBlue, format, args...) }
-func LogNav(format string, args ...any)   { logLineTo(logStderr, " NAV", colorPurple, format, args...) }
-func LogDebug(format string, args ...any) {
-	if verboseMode {
-		logLineTo(logStderr, "DBUG", colorCyan, format, args...)
-	}
-}
-
-func SetVerbose(v bool) { verboseMode = v }
-func IsVerbose() bool   { return verboseMode }
-
-func formatDebugLine(w io.Writer, format string, args ...any) {
-	if verboseMode {
-		formatLogLine(w, "DBUG", colorCyan, format, args...)
+func (l *Logger) CloseLogFile() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.logFile != nil {
+		l.logFile.Close()
+		l.logFile = nil
 	}
 }

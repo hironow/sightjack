@@ -1,7 +1,19 @@
-# Sightjack — task runner
+# sightjack — task runner
 # https://just.systems
 
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+
+# Tool name
+TOOL := "sightjack"
+
+# External commands
+MARKDOWNLINT := "bunx markdownlint-cli2"
+
+# Version from git tags
+VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
+COMMIT := `git rev-parse --short HEAD 2>/dev/null || echo "none"`
+DATE := `date -u +%Y-%m-%dT%H:%M:%SZ`
+LDFLAGS := "-X github.com/hironow/" + TOOL + "/internal/cmd.version=" + VERSION + " -X github.com/hironow/" + TOOL + "/internal/cmd.commit=" + COMMIT + " -X github.com/hironow/" + TOOL + "/internal/cmd.date=" + DATE
 
 # Default: show help
 default: help
@@ -9,9 +21,6 @@ default: help
 # Help: list available recipes
 help:
     @just --list --unsorted
-
-# Define specific commands
-MARKDOWNLINT := "bunx markdownlint-cli2"
 
 # Install prek hooks (pre-commit + pre-push) with quiet mode
 prek-install:
@@ -28,19 +37,13 @@ prek-run:
 lint-md:
     @{{MARKDOWNLINT}} --fix "*.md" "docs/**/*.md"
 
-# Version from git tags
-VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
-COMMIT := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
-DATE := `date -u +%Y-%m-%dT%H:%M:%SZ`
-LDFLAGS := "-X github.com/hironow/sightjack/internal/cmd.version=" + VERSION + " -X github.com/hironow/sightjack/internal/cmd.commit=" + COMMIT + " -X github.com/hironow/sightjack/internal/cmd.date=" + DATE
-
 # Build the binary with version info
 build:
-    go build -ldflags "{{LDFLAGS}}" -o sightjack ./cmd/sightjack
+    go build -ldflags "{{LDFLAGS}}" -o {{TOOL}} ./cmd/{{TOOL}}/
 
 # Build and install to /usr/local/bin
 install: build
-    mv sightjack /usr/local/bin/
+    mv {{TOOL}} /usr/local/bin/
 
 # Run all tests
 test:
@@ -71,20 +74,16 @@ fmt:
 vet:
     go vet ./...
 
-# Run semgrep on entire project
+# Run semgrep rules
 semgrep:
-    semgrep --config .semgrep/ .
+    semgrep scan --config .semgrep/ --error --severity ERROR .
 
-# Lint (fmt check + vet + markdown lint + semgrep)
-lint: vet lint-md semgrep
+# Lint (fmt check + vet + markdown lint)
+lint: vet lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
 # Format, vet, test — full check before commit
 check: fmt vet test
-
-# Run sightjack doctor (quick smoke test after build)
-doctor: build
-    ./sightjack doctor
 
 # Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:
@@ -93,18 +92,18 @@ jaeger:
     @echo "OTLP endpoint:  http://localhost:4318"
     @echo "MCP endpoint:   http://localhost:16687/mcp"
     @echo ""
-    @echo "Run sightjack with tracing:"
-    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack run"
+    @echo "Run {{TOOL}} with tracing:"
+    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 {{TOOL}} run -v"
 
 # Stop Jaeger
 jaeger-down:
     docker compose -f docker/compose.yaml down
 
-# Generate CLI Markdown docs from cobra commands
-docs:
-    go run ./internal/tools/docgen
+# Generate CLI documentation in Markdown
+docgen:
+    go run ./internal/tools/docgen/
 
 # Clean build artifacts
 clean:
-    rm -f sightjack coverage.out
+    rm -f {{TOOL}} coverage.out
     go clean

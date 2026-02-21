@@ -12,8 +12,13 @@ import (
 
 func main() {
 	rootCmd := cmd.NewRootCommand()
+	// NOTE: RewriteBoolFlags was removed intentionally (MY-336, per MY-334 consensus).
+	// The rewriter converted "--dry-run false" → "--dry-run=false", overriding pflag's
+	// NoOptDefVal behavior. This was identified as non-POSIX in MY-334 cross-tool review
+	// and all 4 tools (phonewave, amadeus, paintress, sightjack) agreed to remove it.
+	// Standard behavior: "--dry-run false" = --dry-run (true) + positional "false".
+	// To explicitly set false, use the equals form: "--dry-run=false".
 	args := cmd.DefaultToScan(rootCmd, os.Args[1:])
-	args = cmd.RewriteBoolFlags(rootCmd, args)
 	rootCmd.SetArgs(args)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

@@ -85,7 +85,7 @@ func architectDiscussFileName(wave Wave) string {
 }
 
 // RunArchitectDiscussDryRun saves the architect prompt to a file instead of executing Claude.
-func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic string, strictness string) error {
+func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic string, strictness string, logger *Logger) error {
 	actionsJSON, err := json.Marshal(wave.Actions)
 	if err != nil {
 		return fmt.Errorf("marshal wave actions: %w", err)
@@ -105,7 +105,7 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 	}
 
 	dryRunName := fmt.Sprintf("architect_%s_%s", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
-	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName)
+	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 
 // clearArchitectOutput removes any existing architect output file to prevent
@@ -117,7 +117,7 @@ func clearArchitectOutput(scanDir string, wave Wave) {
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
-func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string, strictness string) (*ArchitectResponse, error) {
+func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave Wave, topic string, strictness string, logger *Logger) (*ArchitectResponse, error) {
 	ctx, discussSpan := tracer.Start(ctx, "architect.discuss",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", wave.ClusterName),
@@ -146,8 +146,8 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 		return nil, fmt.Errorf("render architect prompt: %w", err)
 	}
 
-	LogScan("Architect discussing: %s - %s", wave.ClusterName, topic)
-	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout); err != nil {
+	logger.Scan("Architect discussing: %s - %s", wave.ClusterName, topic)
+	if _, err := RunClaude(ctx, cfg, prompt, os.Stdout, logger); err != nil {
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}
 

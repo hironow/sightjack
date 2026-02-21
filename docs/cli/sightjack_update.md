@@ -27,7 +27,7 @@ sightjack update [flags]
 ### Options
 
 ```
-      --check   Check for updates without installing
+  -C, --check   Check for updates without installing
   -h, --help    help for update
 ```
 
@@ -35,7 +35,7 @@ sightjack update [flags]
 
 ```
   -c, --config string   Config file path (default ".siren/config.yaml")
-      --dry-run         Generate prompts without executing Claude
+  -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
   -v, --verbose         Verbose logging
 ```

@@ -24,6 +24,10 @@ var (
 	date    = "dev"
 )
 
+type loggerKeyType struct{}
+
+var loggerKey loggerKeyType
+
 var (
 	cfgPath string
 	lang    string
@@ -52,9 +56,10 @@ func NewRootCommand() *cobra.Command {
 		Short: "SIREN-inspired issue architecture tool for Linear",
 		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse DefaultToScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			sightjack.SetVerbose(verbose)
+			logger := sightjack.NewLogger(cmd.ErrOrStderr(), verbose)
+			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = sightjack.InitTracer("sightjack", version)
-			spanCtx := sightjack.StartRootSpan(cmd.Context(), cmd.Name())
+			spanCtx := sightjack.StartRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 			return nil
 		},
@@ -77,7 +82,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", ".siren/config.yaml", "Config file path")
 	rootCmd.PersistentFlags().StringVarP(&lang, "lang", "l", "", "Language override (ja/en)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose logging")
-	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Generate prompts without executing Claude")
+	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false, "Generate prompts without executing Claude")
 
 	rootCmd.Version = version
 
@@ -127,16 +132,12 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 		}
 	}
 
-	// Classify persistent flags by whether they consume a separate value arg.
+	// Classify persistent flags that consume a separate value arg (non-bool).
+	// Bool flags never consume the next arg in pflag (NoOptDefVal), so we
+	// only need to track value-taking flags to skip their arguments.
 	valueTakers := make(map[string]bool)
-	boolFlags := make(map[string]bool)
 	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		if f.Value.Type() == "bool" {
-			boolFlags["--"+f.Name] = true
-			if f.Shorthand != "" {
-				boolFlags["-"+f.Shorthand] = true
-			}
-		} else {
+		if f.Value.Type() != "bool" {
 			valueTakers["--"+f.Name] = true
 			if f.Shorthand != "" {
 				valueTakers["-"+f.Shorthand] = true
@@ -151,30 +152,18 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 	// parses flags left-to-right and would reject unknown flags before the
 	// subcommand (persistent flags work anywhere, so reorder is always safe).
 	skipNext := false
-	skipBoolValue := false
 	for i, arg := range args {
 		if skipNext {
 			skipNext = false
 			continue
-		}
-		if skipBoolValue {
-			skipBoolValue = false
-			lower := strings.ToLower(arg)
-			if lower == "true" || lower == "false" || lower == "0" || lower == "1" {
-				continue
-			}
 		}
 		if arg == "--" {
 			break
 		}
 		if strings.HasPrefix(arg, "-") {
 			// --flag=value doesn't consume the next arg.
-			if !strings.Contains(arg, "=") {
-				if valueTakers[arg] {
-					skipNext = true
-				} else if boolFlags[arg] {
-					skipBoolValue = true
-				}
+			if !strings.Contains(arg, "=") && valueTakers[arg] {
+				skipNext = true
 			}
 			continue
 		}
@@ -194,58 +183,6 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 
 	// No subcommand found → default to scan.
 	return append([]string{"scan"}, args...)
-}
-
-// RewriteBoolFlags converts space-separated boolean flag values into equals
-// form so pflag parses them correctly. pflag's NoOptDefVal causes --flag false
-// to be parsed as --flag (true) + positional "false". This rewrites
-// --flag true/false/0/1 → --flag=true/false/0/1 for all known bool flags
-// across root persistent flags and all subcommand local flags.
-func RewriteBoolFlags(rootCmd *cobra.Command, args []string) []string {
-	boolFlags := make(map[string]bool)
-	// Collect from root persistent flags.
-	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		if f.Value.Type() == "bool" {
-			boolFlags["--"+f.Name] = true
-			if f.Shorthand != "" {
-				boolFlags["-"+f.Shorthand] = true
-			}
-		}
-	})
-	// Collect from all subcommand local flags.
-	for _, sub := range rootCmd.Commands() {
-		sub.LocalFlags().VisitAll(func(f *pflag.Flag) {
-			if f.Value.Type() == "bool" {
-				boolFlags["--"+f.Name] = true
-				if f.Shorthand != "" {
-					boolFlags["-"+f.Shorthand] = true
-				}
-			}
-		})
-	}
-
-	result := make([]string, 0, len(args))
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "--" {
-			result = append(result, args[i:]...)
-			break
-		}
-		if strings.Contains(arg, "=") || !strings.HasPrefix(arg, "-") {
-			result = append(result, arg)
-			continue
-		}
-		if boolFlags[arg] && i+1 < len(args) {
-			next := strings.ToLower(args[i+1])
-			if next == "true" || next == "false" || next == "0" || next == "1" {
-				result = append(result, arg+"="+args[i+1])
-				i++ // consume next
-				continue
-			}
-		}
-		result = append(result, arg)
-	}
-	return result
 }
 
 // openTTY opens the platform-appropriate controlling terminal for interactive
@@ -286,6 +223,15 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
 		cfg.Lang = lang
 	}
 	return cfg, nil
+}
+
+// loggerFrom extracts the *sightjack.Logger from the cobra command context.
+// Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
+func loggerFrom(cmd *cobra.Command) *sightjack.Logger {
+	if l, ok := cmd.Context().Value(loggerKey).(*sightjack.Logger); ok {
+		return l
+	}
+	return sightjack.NewLogger(cmd.ErrOrStderr(), false)
 }
 
 // resolveConfigPath returns the final config file path.

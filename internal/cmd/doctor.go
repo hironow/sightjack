@@ -35,7 +35,8 @@ is working. Reports pass/fail/skip for each check.`,
 			fmt.Fprintln(w, "sightjack doctor — environment health check")
 			fmt.Fprintln(w)
 
-			results := sightjack.RunDoctor(cmd.Context(), resolved, baseDir)
+			logger := loggerFrom(cmd)
+			results := sightjack.RunDoctor(cmd.Context(), resolved, baseDir, logger)
 
 			var fails, skips int
 			for _, r := range results {

@@ -24,7 +24,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	}
 
 	// when
-	RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard)
+	RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard, NewLogger(io.Discard, false))
 
 	// then
 	expected := []string{"--model", "opus", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
@@ -53,7 +53,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	}
 
 	// when
-	RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard)
+	RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard, NewLogger(io.Discard, false))
 
 	// then
 	expected := []string{"--dangerously-skip-permissions", "--print", "-p", "test prompt"}
@@ -73,7 +73,7 @@ func TestRunClaudeDryRun(t *testing.T) {
 	prompt := "test prompt content"
 	outDir := dir + "/dryrun"
 
-	err := RunClaudeDryRun(cfg, prompt, outDir, "classify")
+	err := RunClaudeDryRun(cfg, prompt, outDir, "classify", NewLogger(io.Discard, false))
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -94,10 +94,10 @@ func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	cfg := &Config{Claude: ClaudeConfig{Command: "claude"}}
 
 	// when
-	if err := RunClaudeDryRun(cfg, "prompt A", dir, "wave_00_auth"); err != nil {
+	if err := RunClaudeDryRun(cfg, "prompt A", dir, "wave_00_auth", NewLogger(io.Discard, false)); err != nil {
 		t.Fatal(err)
 	}
-	if err := RunClaudeDryRun(cfg, "prompt B", dir, "wave_01_api"); err != nil {
+	if err := RunClaudeDryRun(cfg, "prompt B", dir, "wave_01_api", NewLogger(io.Discard, false)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -133,7 +133,7 @@ func TestRunClaudeOnceNoRetry(t *testing.T) {
 	}
 
 	// when
-	_, err := RunClaudeOnce(context.Background(), cfg, "test", io.Discard)
+	_, err := RunClaudeOnce(context.Background(), cfg, "test", io.Discard, NewLogger(io.Discard, false))
 
 	// then: should fail immediately without retrying
 	if err == nil {
@@ -159,7 +159,7 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
 	}
-	output, err := RunClaude(context.Background(), cfg, "test", io.Discard)
+	output, err := RunClaude(context.Background(), cfg, "test", io.Discard, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("expected success after retries, got: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
-	_, err := RunClaude(ctx, cfg, "test", io.Discard)
+	_, err := RunClaude(ctx, cfg, "test", io.Discard, NewLogger(io.Discard, false))
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -207,7 +207,7 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
-	_, err := RunClaude(context.Background(), cfg, "test", io.Discard)
+	_, err := RunClaude(context.Background(), cfg, "test", io.Discard, NewLogger(io.Discard, false))
 	if err == nil {
 		t.Fatal("expected error after exhausting retries")
 	}

@@ -3,6 +3,7 @@ package sightjack
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -418,7 +419,7 @@ func TestRunParallelDeepScan(t *testing.T) {
 	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
 		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
 			return ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
-		})
+		}, NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 3 {
@@ -448,7 +449,7 @@ func TestRunParallelDeepScanWithFailure(t *testing.T) {
 				return ClusterScanResult{}, fmt.Errorf("auth scan failed")
 			}
 			return ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
-		})
+		}, NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 1 {
@@ -475,7 +476,7 @@ func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 	results, _ := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
 		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
 			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		})
+		}, NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 1 {
@@ -508,7 +509,7 @@ func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
 				Completeness: 0.5,
 				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
 			}, nil
-		})
+		}, NewLogger(io.Discard, false))
 
 	// then
 	if len(warnings) != 0 {
@@ -553,7 +554,7 @@ func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
 				Completeness: float64(len(cc.IssueIDs)) * 0.25,
 				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
 			}, nil
-		})
+		}, NewLogger(io.Discard, false))
 
 	// then: both clusters scanned with correct issue counts (order is non-deterministic)
 	if len(warnings) != 0 {
@@ -605,7 +606,7 @@ func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
 			callCount.Add(1)
 			return ClusterScanResult{Name: cluster.Name}, nil
-		})
+		}, NewLogger(io.Discard, false))
 
 	// then: no goroutines should have been launched
 	if callCount.Load() != 0 {
@@ -638,7 +639,7 @@ func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
 				cancel() // cancel while second cluster waits for semaphore
 			}
 			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		})
+		}, NewLogger(io.Discard, false))
 
 	// then: only the first cluster should have been scanned
 	if callCount.Load() != 1 {

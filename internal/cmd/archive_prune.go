@@ -36,7 +36,8 @@ Pass --execute to actually remove the files.`,
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
-			files, err := sightjack.ListExpiredArchive(baseDir, days)
+			logger := loggerFrom(cmd)
+			files, err := sightjack.ListExpiredArchive(baseDir, days, logger)
 			if err != nil {
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
@@ -67,8 +68,8 @@ Pass --execute to actually remove the files.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&execute, "execute", false, "Execute archive pruning (default: dry-run)")
-	cmd.Flags().IntVar(&days, "days", 30, "Retention days for archive-prune")
+	cmd.Flags().BoolVarP(&execute, "execute", "x", false, "Execute archive pruning (default: dry-run)")
+	cmd.Flags().IntVarP(&days, "days", "d", 30, "Retention days for archive-prune")
 
 	return cmd
 }
