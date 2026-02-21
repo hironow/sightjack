@@ -79,7 +79,7 @@ suitable for piping into 'nextgen' for follow-up wave generation.`,
 			if jsonErr != nil {
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
 			}
-			fmt.Println(string(out))
+			fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			return nil
 		},
 	}

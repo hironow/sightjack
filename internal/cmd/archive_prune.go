@@ -47,8 +47,9 @@ Pass --execute to actually remove the files.`,
 				return nil
 			}
 
+			w := cmd.OutOrStdout()
 			for _, f := range files {
-				fmt.Println(f)
+				fmt.Fprintln(w, f)
 			}
 			fmt.Fprintf(os.Stderr, "\n%d file(s) older than %d days.\n", len(files), days)
 

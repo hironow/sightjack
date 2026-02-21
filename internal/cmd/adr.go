@@ -51,7 +51,7 @@ Output is written to stdout for redirection to docs/adr/.`,
 			}
 
 			md := sightjack.RenderADRFromDiscuss(dr, adrNum)
-			fmt.Print(md)
+			fmt.Fprint(cmd.OutOrStdout(), md)
 			return nil
 		},
 	}

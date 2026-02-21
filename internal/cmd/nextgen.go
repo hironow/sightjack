@@ -51,10 +51,11 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			}
 
 			// If completeness target reached, output empty plan.
+			w := cmd.OutOrStdout()
 			if applyResult.NewCompleteness >= 0.95 {
 				sightjack.LogOK("Completeness %.0f%% — no follow-up waves needed.", applyResult.NewCompleteness*100)
 				emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
-				fmt.Println(string(emptyPlan))
+				fmt.Fprintln(w, string(emptyPlan))
 				return nil
 			}
 
@@ -115,7 +116,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			if !sightjack.NeedsMoreWaves(cluster, allWaves) {
 				sightjack.LogOK("No more waves needed for %s.", cluster.Name)
 				emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
-				fmt.Println(string(emptyPlan))
+				fmt.Fprintln(w, string(emptyPlan))
 				return nil
 			}
 
@@ -148,7 +149,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			if jsonErr != nil {
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
 			}
-			fmt.Println(string(out))
+			fmt.Fprintln(w, string(out))
 			return nil
 		},
 	}

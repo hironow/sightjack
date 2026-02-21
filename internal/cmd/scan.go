@@ -55,16 +55,17 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				return nil
 			}
 
+			w := cmd.OutOrStdout()
 			if jsonOutput {
 				data, jsonErr := json.MarshalIndent(result, "", "  ")
 				if jsonErr != nil {
 					return fmt.Errorf("JSON marshal failed: %w", jsonErr)
 				}
-				fmt.Println(string(data))
+				fmt.Fprintln(w, string(data))
 			} else {
 				nav := sightjack.RenderNavigator(result, cfg.Linear.Project)
-				fmt.Println()
-				fmt.Print(nav)
+				fmt.Fprintln(w)
+				fmt.Fprint(w, nav)
 			}
 
 			// Save state

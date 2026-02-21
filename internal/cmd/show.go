@@ -35,10 +35,11 @@ reads from .siren/state.json and displays the matrix navigator.`,
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
+			w := cmd.OutOrStdout()
 			if stdinIsPipe() {
-				return runShowFromStdin()
+				return runShowFromStdin(w)
 			}
-			return runShowFromState(baseDir)
+			return runShowFromState(w, baseDir)
 		},
 	}
 }
@@ -51,7 +52,7 @@ func stdinIsPipe() bool {
 	return fi.Mode()&os.ModeCharDevice == 0
 }
 
-func runShowFromStdin() error {
+func runShowFromStdin(w io.Writer) error {
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return fmt.Errorf("failed to read stdin: %w", err)
@@ -64,8 +65,8 @@ func runShowFromStdin() error {
 			return fmt.Errorf("parse ScanResult: %w", err)
 		}
 		nav := sightjack.RenderNavigator(&scanResult, "")
-		fmt.Println()
-		fmt.Print(nav)
+		fmt.Fprintln(w)
+		fmt.Fprint(w, nav)
 
 	case sightjack.PipeTypeWavePlan:
 		var plan sightjack.WavePlan
@@ -79,8 +80,8 @@ func runShowFromStdin() error {
 			result = &sightjack.ScanResult{}
 		}
 		nav := sightjack.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
-		fmt.Println()
-		fmt.Print(nav)
+		fmt.Fprintln(w)
+		fmt.Fprint(w, nav)
 
 	default:
 		return fmt.Errorf("could not parse stdin: expected ScanResult (with \"clusters\" key) or WavePlan (with \"waves\" key)")
@@ -88,7 +89,7 @@ func runShowFromStdin() error {
 	return nil
 }
 
-func runShowFromState(baseDir string) error {
+func runShowFromState(w io.Writer, baseDir string) error {
 	state, err := sightjack.ReadState(baseDir)
 	if err != nil {
 		sightjack.LogInfo("Run 'sightjack scan' first.")
@@ -113,8 +114,8 @@ func runShowFromState(baseDir string) error {
 		strictness = "fog"
 	}
 	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, (*time.Time)(nil), strictness, state.ShibitoCount)
-	fmt.Println()
-	fmt.Print(nav)
+	fmt.Fprintln(w)
+	fmt.Fprint(w, nav)
 	sightjack.LogInfo("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
 	return nil
 }
