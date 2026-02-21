@@ -36,11 +36,15 @@ var (
 	finalizerOnce  sync.Once
 )
 
+func init() {
+	// Ensure root PersistentPreRunE/PostRunE propagate to all subcommands.
+	// Set at package init (not in NewRootCommand) to avoid re-setting on every call.
+	cobra.EnableTraverseRunHooks = true
+}
+
 // NewRootCommand creates the root cobra command with all subcommands attached.
 // Returning *cobra.Command enables test injection via SetArgs/SetOut/SetErr.
 func NewRootCommand() *cobra.Command {
-	cobra.EnableTraverseRunHooks = true
-
 	rootCmd := &cobra.Command{
 		Use:   "sightjack",
 		Short: "SIREN-inspired issue architecture tool for Linear",
