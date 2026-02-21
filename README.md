@@ -180,7 +180,7 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime.
 | Command | Description |
 |---------|-------------|
 | `sightjack scan` | Classify and deep-scan Linear issues (default when no subcommand given) |
-| `sightjack run` | Interactive wave approval and apply loop (supports `--resume`) |
+| `sightjack run` | Interactive wave approval and apply loop (auto-resumes from state) |
 | `sightjack show` | Display last scan results (or pipe JSON from stdin) |
 | `sightjack init` | Initialize `.siren/config.yaml` interactively |
 | `sightjack doctor` | Check environment and tool availability |
@@ -370,7 +370,7 @@ just cover          # Coverage report
 just cover-html     # Open coverage in browser
 just fmt            # Format code (gofmt)
 just vet            # Run go vet
-just semgrep        # Run semgrep on entire project
+just semgrep        # Run semgrep rules (ERROR severity only)
 just lint           # fmt check + vet + markdown lint
 just lint-md        # Lint markdown files only
 just check          # fmt + vet + test (pre-commit check)
@@ -429,7 +429,7 @@ just jaeger-down    # Stop Jaeger
 +-- justfile                 Task runner
 +-- .semgrep/
 |   +-- cobra.yaml           Semgrep rules (cobra I/O, context, safety, readability)
-+-- docs/cli/                Auto-generated CLI reference (just docs)
++-- docs/cli/                Auto-generated CLI reference (just docgen)
 +-- docker/
 |   +-- compose.yaml         Jaeger all-in-one for trace viewing
 |   +-- jaeger-v2-config.yaml  Jaeger v2 OTLP configuration
