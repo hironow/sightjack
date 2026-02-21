@@ -33,8 +33,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Sign checksums with cosign (keyless)
-        run: cosign sign-blob --yes dist/checksums.txt --output-signature dist/checksums.txt.sig
-        env:
-          COSIGN_EXPERIMENTAL: "1"

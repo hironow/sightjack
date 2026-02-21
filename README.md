@@ -371,10 +371,10 @@ just cover-html     # Open coverage in browser
 just fmt            # Format code (gofmt)
 just vet            # Run go vet
 just semgrep        # Run semgrep on entire project
-just lint           # fmt check + vet + markdown lint + semgrep
+just lint           # fmt check + vet + markdown lint
 just lint-md        # Lint markdown files only
 just check          # fmt + vet + test (pre-commit check)
-just docs           # Generate CLI Markdown docs (docs/cli/)
+just docgen         # Generate CLI Markdown docs (docs/cli/)
 just clean          # Clean build artifacts
 just prek-install   # Install prek hooks (pre-commit + pre-push)
 just prek-run       # Run all prek hooks on all files
@@ -420,7 +420,7 @@ just jaeger-down    # Stop Jaeger
 +-- model.go                 Core types + JSON wire format (ScanResult, WavePlan, Wave, etc.)
 +-- state.go                 State persistence + path helpers (.siren/)
 +-- prompt.go                Go template renderer for AI prompts
-+-- logger.go                Colored logging to stderr (LogOK, LogWarn, LogError, LogInfo)
++-- logger.go                Structured logging (Logger struct, DI via cobra context)
 +-- init.go                  Config scaffolding logic
 +-- doctor.go                Environment health check logic
 +-- dmail.go                 D-Mail protocol (inbox/outbox/archive, fsnotify monitor)

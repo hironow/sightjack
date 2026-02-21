@@ -16,6 +16,9 @@ type Logger struct {
 }
 
 func NewLogger(out io.Writer, verbose bool) *Logger {
+	if out == nil {
+		out = io.Discard
+	}
 	return &Logger{out: out, verbose: verbose}
 }
 

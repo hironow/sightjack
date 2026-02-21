@@ -226,8 +226,12 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
 }
 
 // loggerFrom extracts the *sightjack.Logger from the cobra command context.
+// Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
 func loggerFrom(cmd *cobra.Command) *sightjack.Logger {
-	return cmd.Context().Value(loggerKey).(*sightjack.Logger)
+	if l, ok := cmd.Context().Value(loggerKey).(*sightjack.Logger); ok {
+		return l
+	}
+	return sightjack.NewLogger(cmd.ErrOrStderr(), false)
 }
 
 // resolveConfigPath returns the final config file path.
