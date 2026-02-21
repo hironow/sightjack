@@ -147,6 +147,9 @@ func checkStateDir(baseDir string) CheckResult {
 // the config check reports failure but other checks continue where possible.
 // baseDir is used to verify the .siren/ state directory is writable.
 func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *Logger) []CheckResult {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	var results []CheckResult
 
 	// 1. Config check

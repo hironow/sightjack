@@ -36,6 +36,9 @@ func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, logger *Logger) error {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	if !dryRun && input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -589,6 +592,9 @@ func ResumeScanDir(state *SessionState, baseDir string) string {
 
 // RunResumeSession resumes an existing session from saved state.
 func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader, logger *Logger) error {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -627,6 +633,9 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
 func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState *SessionState, input io.Reader, logger *Logger) error {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}

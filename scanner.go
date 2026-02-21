@@ -56,6 +56,9 @@ func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWar
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
 func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, logger *Logger) (*ScanResult, error) {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	ctx, scanSpan := tracer.Start(ctx, "scan",
 		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
 	)
