@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# NOTE: -e is intentionally omitted — some commands are expected to fail
+# (e.g., unknown command, show without state) and we check exit codes manually.
 set -uo pipefail
 
 # Manual E2E test script for sightjack.
@@ -22,8 +24,7 @@ else
     fail "version"
 fi
 
-if sightjack version --json | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null || \
-   sightjack version --json | grep -q '"version"'; then
+if sightjack version --json | grep -q '"version"'; then
     pass "version --json"
 else
     fail "version --json"

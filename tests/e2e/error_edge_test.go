@@ -131,7 +131,9 @@ func TestE2E_State_ArchivePrune_WithData(t *testing.T) {
 	}
 	// Set mtime to 60 days ago so it's expired
 	oldTime := time.Now().Add(-60 * 24 * time.Hour)
-	os.Chtimes(oldFile, oldTime, oldTime)
+	if err := os.Chtimes(oldFile, oldTime, oldTime); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
 
 	// when: archive-prune with --days 0 --execute (prune everything)
 	cmd := exec.Command(sightjackBin(), "archive-prune", "--days", "0", "--execute", dir)

@@ -53,7 +53,10 @@ func TestE2E_Run_DryRun(t *testing.T) {
 
 	// Check for classify prompt inside the session directory
 	sessionDir := filepath.Join(runDir, sessions[0].Name())
-	entries, _ := os.ReadDir(sessionDir)
+	entries, dirErr := os.ReadDir(sessionDir)
+	if dirErr != nil {
+		t.Fatalf("read session dir %s: %v", sessionDir, dirErr)
+	}
 	found := false
 	for _, e := range entries {
 		if strings.Contains(e.Name(), "classify") {
@@ -115,9 +118,12 @@ func TestE2E_Run_NewSession(t *testing.T) {
 	// After apply, the session enters nextgen which may take time.
 	// Close TTY to signal EOF — the session will save state and exit.
 	// We've already verified the full interactive path: scan → waves → select → approve.
-	time.Sleep(500 * time.Millisecond) // allow apply to complete
+	// Brief pause lets apply start before TTY close signals exit.
+	time.Sleep(500 * time.Millisecond)
 	c.Tty().Close()
-	c.ExpectEOF()
+	if _, eofErr := c.ExpectEOF(); eofErr != nil {
+		t.Logf("ExpectEOF: %v", eofErr)
+	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
 		if isTTYError(waitErr) {
@@ -162,7 +168,9 @@ func TestE2E_Run_QuitImmediately(t *testing.T) {
 	}
 
 	c.Tty().Close()
-	c.ExpectEOF()
+	if _, eofErr := c.ExpectEOF(); eofErr != nil {
+		t.Logf("ExpectEOF: %v", eofErr)
+	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
 		if isTTYError(waitErr) {

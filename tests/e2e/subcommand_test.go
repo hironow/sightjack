@@ -16,11 +16,16 @@ import (
 
 // sightjackBin returns the path to the sightjack binary.
 // In Docker it is /usr/local/bin/sightjack; locally fall back to PATH.
+// If neither is found, returns "sightjack" so exec.Command fails with a
+// clear error rather than silently running the wrong binary.
 func sightjackBin() string {
 	if _, err := os.Stat("/usr/local/bin/sightjack"); err == nil {
 		return "/usr/local/bin/sightjack"
 	}
-	p, _ := exec.LookPath("sightjack")
+	p, err := exec.LookPath("sightjack")
+	if err != nil {
+		return "sightjack"
+	}
 	return p
 }
 
@@ -175,7 +180,9 @@ func TestE2E_Init_Interactive(t *testing.T) {
 	}
 
 	c.Tty().Close()
-	c.ExpectEOF()
+	if _, eofErr := c.ExpectEOF(); eofErr != nil {
+		t.Logf("ExpectEOF: %v", eofErr)
+	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
 		t.Fatalf("init exited with error: %v", waitErr)

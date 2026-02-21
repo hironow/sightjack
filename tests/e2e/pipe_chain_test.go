@@ -196,7 +196,9 @@ func TestE2E_Pipe_SelectInteractive(t *testing.T) {
 	}
 
 	c.Tty().Close()
-	c.ExpectEOF()
+	if _, eofErr := c.ExpectEOF(); eofErr != nil {
+		t.Logf("ExpectEOF: %v", eofErr)
+	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
 		if isTTYError(waitErr) {
