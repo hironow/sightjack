@@ -82,10 +82,6 @@ lint: vet lint-md semgrep
 # Format, vet, test — full check before commit
 check: fmt vet test
 
-# Run sightjack doctor (quick smoke test after build)
-doctor: build
-    ./sightjack doctor
-
 # Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:
     docker compose -f docker/compose.yaml up -d
