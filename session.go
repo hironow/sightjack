@@ -82,10 +82,10 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		}
 		initial := DrainInboxFeedback(inboxCh, logger)
 
-		// Convergence gate: notify + approve before proceeding
+		// Convergence gate with re-drain: catches late-arriving convergence
 		notifier := buildNotifier(cfg)
 		approver := buildApprover(cfg, input, out)
-		approved, gateErr := RunConvergenceGate(ctx, initial, notifier, approver, logger)
+		allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 		if gateErr != nil {
 			return fmt.Errorf("convergence gate: %w", gateErr)
 		}
@@ -94,7 +94,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			return nil
 		}
 
-		fbCollector = CollectFeedback(initial, inboxCh, notifier, logger)
+		fbCollector = CollectFeedback(allDmails, inboxCh, notifier, logger)
 	}
 
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -648,10 +648,10 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	}
 	initial := DrainInboxFeedback(inboxCh, logger)
 
-	// Convergence gate: notify + approve before proceeding
+	// Convergence gate with re-drain: catches late-arriving convergence
 	notifier := buildNotifier(cfg)
 	approver := buildApprover(cfg, input, out)
-	approved, gateErr := RunConvergenceGate(ctx, initial, notifier, approver, logger)
+	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 	if gateErr != nil {
 		return fmt.Errorf("convergence gate: %w", gateErr)
 	}
@@ -660,7 +660,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 		return nil
 	}
 
-	fbCollector := CollectFeedback(initial, inboxCh, notifier, logger)
+	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
@@ -702,10 +702,10 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	}
 	initial := DrainInboxFeedback(inboxCh, logger)
 
-	// Convergence gate: notify + approve before proceeding
+	// Convergence gate with re-drain: catches late-arriving convergence
 	notifier := buildNotifier(cfg)
 	approver := buildApprover(cfg, input, out)
-	approved, gateErr := RunConvergenceGate(ctx, initial, notifier, approver, logger)
+	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 	if gateErr != nil {
 		return fmt.Errorf("convergence gate: %w", gateErr)
 	}
@@ -714,7 +714,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		return nil
 	}
 
-	fbCollector := CollectFeedback(initial, inboxCh, notifier, logger)
+	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)

@@ -140,9 +140,9 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 	// when
 	approved, err := a.RequestApproval(ctx, "proceed?")
 
-	// then: should deny (context cancelled)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	// then: should return ctx.Err() (not silently swallow as deny)
+	if err == nil {
+		t.Fatal("expected error on context cancel, got nil")
 	}
 	if approved {
 		t.Error("expected denial when context is cancelled")

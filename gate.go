@@ -52,6 +52,12 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier Notifier,
 		notifySpan.End()
 	}
 
+	// Context check before approval — early exit if already cancelled.
+	if ctx.Err() != nil {
+		gateSpan.AddEvent("gate.convergence.cancelled")
+		return false, ctx.Err()
+	}
+
 	// Approve (blocking — fail-closed on error).
 	approved, err := approver.RequestApproval(ctx, summary)
 	if err != nil {
@@ -66,4 +72,29 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier Notifier,
 	}
 	gateSpan.AddEvent("gate.convergence.approved")
 	return true, nil
+}
+
+// RunConvergenceGateWithRedrain runs the convergence gate in a loop,
+// re-draining the inbox channel after each approval to catch late-arriving
+// convergence D-Mails. Returns the accumulated D-Mails, approval status,
+// and any error. The loop exits when no new convergence D-Mails arrived
+// during the approval prompt.
+func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
+	notifier Notifier, approver Approver, logger *Logger) (dmails []*DMail, approved bool, err error) {
+	all := append([]*DMail{}, initial...)
+	for {
+		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)
+		if gateErr != nil {
+			return nil, false, gateErr
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		late := DrainInboxFeedback(inboxCh, logger)
+		all = append(all, late...)
+		if len(FilterConvergence(late)) == 0 {
+			return all, true, nil
+		}
+		logger.Info("[CONVERGENCE] Late convergence detected during approval, re-checking gate")
+	}
 }

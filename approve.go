@@ -41,7 +41,7 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 
 	select {
 	case <-ctx.Done():
-		return false, nil
+		return false, ctx.Err()
 	default:
 	}
 
@@ -71,7 +71,7 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 
 	select {
 	case <-ctx.Done():
-		return false, nil
+		return false, ctx.Err()
 	case r := <-ch:
 		stop()
 		// Evaluate answer even on io.EOF — piped input may not end with newline.
