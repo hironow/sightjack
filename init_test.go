@@ -101,6 +101,27 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 	if !strings.Contains(string(readable), "name: dmail-readable") {
 		t.Errorf("dmail-readable missing expected content, got:\n%s", readable)
 	}
+
+	// then: SKILL.md files contain metadata key (Agent Skills spec format)
+	if !strings.Contains(string(sendable), "metadata:") {
+		t.Errorf("dmail-sendable missing 'metadata:' key, got:\n%s", sendable)
+	}
+	if !strings.Contains(string(readable), "metadata:") {
+		t.Errorf("dmail-readable missing 'metadata:' key, got:\n%s", readable)
+	}
+
+	// then: schema version present
+	if !strings.Contains(string(sendable), "dmail-schema-version:") {
+		t.Errorf("dmail-sendable missing dmail-schema-version, got:\n%s", sendable)
+	}
+	if !strings.Contains(string(readable), "dmail-schema-version:") {
+		t.Errorf("dmail-readable missing dmail-schema-version, got:\n%s", readable)
+	}
+
+	// then: readable contains convergence kind
+	if !strings.Contains(string(readable), "convergence") {
+		t.Errorf("dmail-readable missing convergence kind, got:\n%s", readable)
+	}
 }
 
 func TestInstallSkills_Idempotent(t *testing.T) {

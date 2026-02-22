@@ -34,6 +34,27 @@ func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
 	return newCount
 }
 
+// buildNotifier creates the appropriate Notifier based on config.
+// If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
+func buildNotifier(cfg *Config) Notifier {
+	if cfg.Gate.NotifyCmd != "" {
+		return NewCmdNotifier(cfg.Gate.NotifyCmd)
+	}
+	return &LocalNotifier{}
+}
+
+// buildApprover creates the appropriate Approver based on config.
+// Priority: AutoApprove → CmdApprover → StdinApprover.
+func buildApprover(cfg *Config, input io.Reader, out io.Writer) Approver {
+	if cfg.Gate.AutoApprove {
+		return &AutoApprover{}
+	}
+	if cfg.Gate.ApproveCmd != "" {
+		return NewCmdApprover(cfg.Gate.ApproveCmd)
+	}
+	return NewStdinApprover(input, out)
+}
+
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, logger *Logger) error {
 	if logger == nil {
@@ -60,7 +81,20 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			logger.Warn("D-Mail monitor failed: %v", monitorErr)
 		}
 		initial := DrainInboxFeedback(inboxCh, logger)
-		fbCollector = CollectFeedback(initial, inboxCh, logger)
+
+		// Convergence gate: notify + approve before proceeding
+		notifier := buildNotifier(cfg)
+		approver := buildApprover(cfg, input, out)
+		approved, gateErr := RunConvergenceGate(ctx, initial, notifier, approver, logger)
+		if gateErr != nil {
+			return fmt.Errorf("convergence gate: %w", gateErr)
+		}
+		if !approved {
+			logger.Warn("Session aborted: convergence gate denied")
+			return nil
+		}
+
+		fbCollector = CollectFeedback(initial, inboxCh, notifier, logger)
 	}
 
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -613,7 +647,20 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 		logger.Warn("D-Mail monitor failed: %v", monitorErr)
 	}
 	initial := DrainInboxFeedback(inboxCh, logger)
-	fbCollector := CollectFeedback(initial, inboxCh, logger)
+
+	// Convergence gate: notify + approve before proceeding
+	notifier := buildNotifier(cfg)
+	approver := buildApprover(cfg, input, out)
+	approved, gateErr := RunConvergenceGate(ctx, initial, notifier, approver, logger)
+	if gateErr != nil {
+		return fmt.Errorf("convergence gate: %w", gateErr)
+	}
+	if !approved {
+		logger.Warn("Session aborted: convergence gate denied")
+		return nil
+	}
+
+	fbCollector := CollectFeedback(initial, inboxCh, notifier, logger)
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
@@ -654,7 +701,20 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		logger.Warn("D-Mail monitor failed: %v", monitorErr)
 	}
 	initial := DrainInboxFeedback(inboxCh, logger)
-	fbCollector := CollectFeedback(initial, inboxCh, logger)
+
+	// Convergence gate: notify + approve before proceeding
+	notifier := buildNotifier(cfg)
+	approver := buildApprover(cfg, input, out)
+	approved, gateErr := RunConvergenceGate(ctx, initial, notifier, approver, logger)
+	if gateErr != nil {
+		return fmt.Errorf("convergence gate: %w", gateErr)
+	}
+	if !approved {
+		logger.Warn("Session aborted: convergence gate denied")
+		return nil
+	}
+
+	fbCollector := CollectFeedback(initial, inboxCh, notifier, logger)
 
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)

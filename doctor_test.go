@@ -206,6 +206,56 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 	}
 }
 
+func TestCheckSkills_OK(t *testing.T) {
+	// given: valid SKILL.md files installed
+	baseDir := t.TempDir()
+	if err := InstallSkills(baseDir); err != nil {
+		t.Fatalf("InstallSkills: %v", err)
+	}
+
+	// when
+	result := checkSkills(baseDir)
+
+	// then
+	if result.Status != CheckOK {
+		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Name != "Skills" {
+		t.Errorf("expected name 'Skills', got %q", result.Name)
+	}
+}
+
+func TestCheckSkills_Missing(t *testing.T) {
+	// given: empty dir (no skills installed)
+	baseDir := t.TempDir()
+
+	// when
+	result := checkSkills(baseDir)
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail for missing SKILL.md files, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckSkills_MissingSchemaVersion(t *testing.T) {
+	// given: SKILL.md files exist but lack dmail-schema-version
+	baseDir := t.TempDir()
+	skillsDir := filepath.Join(baseDir, ".siren", "skills")
+	os.MkdirAll(filepath.Join(skillsDir, "dmail-sendable"), 0755)
+	os.MkdirAll(filepath.Join(skillsDir, "dmail-readable"), 0755)
+	os.WriteFile(filepath.Join(skillsDir, "dmail-sendable", "SKILL.md"), []byte("---\nname: dmail-sendable\n---\n"), 0644)
+	os.WriteFile(filepath.Join(skillsDir, "dmail-readable", "SKILL.md"), []byte("---\nname: dmail-readable\n---\n"), 0644)
+
+	// when
+	result := checkSkills(baseDir)
+
+	// then
+	if result.Status != CheckFail {
+		t.Errorf("expected CheckFail for missing schema version, got %v: %s", result.Status, result.Message)
+	}
+}
+
 func TestRunDoctor_ConfigFailure_LinearMCPSkipped(t *testing.T) {
 	// given: nonexistent config path → config check fails, cfg=nil
 	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -219,9 +269,9 @@ func TestRunDoctor_ConfigFailure_LinearMCPSkipped(t *testing.T) {
 	// when
 	results := RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, NewLogger(io.Discard, false))
 
-	// then: should have 5 results
-	if len(results) != 5 {
-		t.Fatalf("expected 5 results, got %d", len(results))
+	// then: should have 6 results
+	if len(results) != 6 {
+		t.Fatalf("expected 6 results, got %d", len(results))
 	}
 	// Config should fail
 	if results[0].Status != CheckFail {
@@ -229,7 +279,7 @@ func TestRunDoctor_ConfigFailure_LinearMCPSkipped(t *testing.T) {
 	}
 	// Linear MCP should be OK or Skip depending on cfg=nil path
 	// When cfg is nil, checkLinearMCP returns Skip
-	mcp := results[4]
+	mcp := results[5]
 	if mcp.Name != "Linear MCP" {
 		t.Errorf("expected 'Linear MCP', got %q", mcp.Name)
 	}
@@ -262,8 +312,8 @@ claude:
 	results := RunDoctor(ctx, cfgPath, dir, NewLogger(io.Discard, false))
 
 	// then
-	if len(results) != 5 {
-		t.Fatalf("expected 5 results, got %d", len(results))
+	if len(results) != 6 {
+		t.Fatalf("expected 6 results, got %d", len(results))
 	}
 	// Config should pass
 	if results[0].Status != CheckOK {
@@ -274,7 +324,7 @@ claude:
 		t.Errorf("claude: expected FAIL, got %v: %s", results[2].Status, results[2].Message)
 	}
 	// Linear MCP should be skipped because claude is unavailable
-	mcp := results[4]
+	mcp := results[5]
 	if mcp.Status != CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
 	}
@@ -303,9 +353,9 @@ linear:
 	// when
 	results := RunDoctor(ctx, cfgPath, dir, NewLogger(io.Discard, false))
 
-	// then: should have 5 results (config, state dir, claude, git, linear mcp)
-	if len(results) != 5 {
-		t.Fatalf("expected 5 results, got %d: %v", len(results), results)
+	// then: should have 6 results (config, state dir, claude, git, skills, linear mcp)
+	if len(results) != 6 {
+		t.Fatalf("expected 6 results, got %d: %v", len(results), results)
 	}
 	// Config check should succeed
 	if results[0].Name != "Config" || results[0].Status != CheckOK {

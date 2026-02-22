@@ -142,6 +142,39 @@ func checkStateDir(baseDir string) CheckResult {
 	}
 }
 
+// checkSkills verifies that SKILL.md files exist under .siren/skills/
+// and that their frontmatter contains a dmail-schema-version field.
+func checkSkills(baseDir string) CheckResult {
+	skillNames := []string{"dmail-sendable", "dmail-readable"}
+	skillsDir := filepath.Join(baseDir, stateDir, "skills")
+
+	for _, name := range skillNames {
+		path := filepath.Join(skillsDir, name, "SKILL.md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return CheckResult{
+				Name:    "Skills",
+				Status:  CheckFail,
+				Message: fmt.Sprintf("%s/SKILL.md: %v", name, err),
+			}
+		}
+		content := string(data)
+		if !strings.Contains(content, "dmail-schema-version:") {
+			return CheckResult{
+				Name:    "Skills",
+				Status:  CheckFail,
+				Message: fmt.Sprintf("%s/SKILL.md: missing dmail-schema-version", name),
+			}
+		}
+	}
+
+	return CheckResult{
+		Name:    "Skills",
+		Status:  CheckOK,
+		Message: fmt.Sprintf("%d skill(s) validated", len(skillNames)),
+	}
+}
+
 // RunDoctor executes all health checks and returns the results.
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
@@ -176,7 +209,10 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *L
 	// 4. git binary check
 	results = append(results, checkTool(ctx, "git"))
 
-	// 5. Linear MCP connectivity (skip if claude unavailable)
+	// 5. Skills check
+	results = append(results, checkSkills(baseDir))
+
+	// 6. Linear MCP connectivity (skip if claude unavailable)
 	if claudeResult.Status != CheckOK {
 		results = append(results, CheckResult{
 			Name:    "Linear MCP",

@@ -16,13 +16,14 @@ import (
 
 // DMail represents a d-mail message: YAML frontmatter + Markdown body.
 type DMail struct {
-	Name        string            `yaml:"name"`
-	Kind        DMailKind         `yaml:"kind"`
-	Description string            `yaml:"description"`
-	Issues      []string          `yaml:"issues,omitempty"`
-	Severity    string            `yaml:"severity,omitempty"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
-	Body        string            `yaml:"-"`
+	Name          string            `yaml:"name"`
+	Kind          DMailKind         `yaml:"kind"`
+	Description   string            `yaml:"description"`
+	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
+	Issues        []string          `yaml:"issues,omitempty"`
+	Severity      string            `yaml:"severity,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Body          string            `yaml:"-"`
 }
 
 // DMailKind is the message type for d-mails.
@@ -32,6 +33,7 @@ const (
 	DMailSpecification DMailKind = "specification"
 	DMailReport        DMailKind = "report"
 	DMailFeedback      DMailKind = "feedback"
+	DMailConvergence   DMailKind = "convergence"
 )
 
 const (
@@ -133,10 +135,10 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: description is required")
 	}
 	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailFeedback:
+	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence:
 		// valid
 	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback)", mail.Kind)
+		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence)", mail.Kind)
 	}
 	return nil
 }
@@ -177,7 +179,7 @@ func receiveDMailIfNew(baseDir, filename string, logger *Logger) *DMail {
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != DMailFeedback {
+	if mail.Kind != DMailFeedback && mail.Kind != DMailConvergence {
 		return nil
 	}
 	return mail
@@ -316,16 +318,23 @@ func FormatFeedbackForPrompt(feedback []*DMail) string {
 // drain and late-arriving items on the monitor channel. It replaces
 // LogInboxFeedbackAsync by both displaying AND storing late arrivals,
 // so they can be included in nextgen prompts.
+// Convergence d-mails are tracked separately for journaling.
 type feedbackCollector struct {
-	mu    sync.Mutex
-	items []*DMail
+	mu               sync.Mutex
+	items            []*DMail
+	convergenceNames []string
+	notifier         Notifier
 }
 
 // CollectFeedback creates a feedbackCollector seeded with initial feedback
 // and starts a background goroutine to accumulate late-arriving items
-// from the channel. Safe to call with nil initial and/or nil channel.
-func CollectFeedback(initial []*DMail, ch <-chan *DMail, logger *Logger) *feedbackCollector {
-	c := &feedbackCollector{}
+// from the channel. Convergence d-mails trigger a notification via notifier.
+// Safe to call with nil initial, nil channel, or nil notifier.
+func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier Notifier, logger *Logger) *feedbackCollector {
+	if notifier == nil {
+		notifier = &NopNotifier{}
+	}
+	c := &feedbackCollector{notifier: notifier}
 	if len(initial) > 0 {
 		c.items = make([]*DMail, len(initial))
 		copy(c.items, initial)
@@ -335,17 +344,41 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, logger *Logger) *feedba
 			for mail := range ch {
 				c.mu.Lock()
 				c.items = append(c.items, mail)
+				if mail.Kind == DMailConvergence {
+					c.convergenceNames = append(c.convergenceNames, mail.Name)
+				}
 				c.mu.Unlock()
-				switch mail.Severity {
-				case "high":
-					logger.Warn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
-				default:
-					logger.Info("[D-Mail] [%s] %s", mail.Name, mail.Description)
+
+				if mail.Kind == DMailConvergence {
+					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
+					if err := c.notifier.Notify(context.Background(), "Sightjack Convergence", mail.Description); err != nil {
+						logger.Warn("Convergence notification failed (non-fatal): %v", err)
+					}
+				} else {
+					switch mail.Severity {
+					case "high":
+						logger.Warn("[D-Mail] [%s] %s (severity: HIGH)", mail.Name, mail.Description)
+					default:
+						logger.Info("[D-Mail] [%s] %s", mail.Name, mail.Description)
+					}
 				}
 			}
 		}()
 	}
 	return c
+}
+
+// ConvergenceNames returns a copy of convergence d-mail names received
+// mid-session. Used for journaling/state persistence.
+func (c *feedbackCollector) ConvergenceNames() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.convergenceNames) == 0 {
+		return nil
+	}
+	cp := make([]string, len(c.convergenceNames))
+	copy(cp, c.convergenceNames)
+	return cp
 }
 
 // All returns a copy of all accumulated feedback (initial + late arrivals).
@@ -458,11 +491,12 @@ func reportBody(wave Wave, result *WaveApplyResult) string {
 func ComposeReport(baseDir string, wave Wave, result *WaveApplyResult) error {
 	key := WaveKey(wave)
 	mail := &DMail{
-		Name:        DMailName("report", key),
-		Kind:        DMailReport,
-		Description: fmt.Sprintf("Wave %s completed", key),
-		Issues:      waveIssueIDs(wave),
-		Body:        reportBody(wave, result),
+		Name:          DMailName("report", key),
+		Kind:          DMailReport,
+		Description:   fmt.Sprintf("Wave %s completed", key),
+		SchemaVersion: "1",
+		Issues:        waveIssueIDs(wave),
+		Body:          reportBody(wave, result),
 	}
 	return ComposeDMail(baseDir, mail)
 }
@@ -471,11 +505,12 @@ func ComposeReport(baseDir string, wave Wave, result *WaveApplyResult) error {
 func ComposeSpecification(baseDir string, wave Wave) error {
 	key := WaveKey(wave)
 	mail := &DMail{
-		Name:        DMailName("spec", key),
-		Kind:        DMailSpecification,
-		Description: wave.Title,
-		Issues:      waveIssueIDs(wave),
-		Body:        specificationBody(wave),
+		Name:          DMailName("spec", key),
+		Kind:          DMailSpecification,
+		Description:   wave.Title,
+		SchemaVersion: "1",
+		Issues:        waveIssueIDs(wave),
+		Body:          specificationBody(wave),
 	}
 	return ComposeDMail(baseDir, mail)
 }

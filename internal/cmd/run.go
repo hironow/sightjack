@@ -13,7 +13,7 @@ import (
 )
 
 func newRunCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "run [path]",
 		Short: "Interactive wave approval and apply loop",
 		Long: `Run an interactive session with wave approval and apply loop.
@@ -28,7 +28,13 @@ if state is found in .siren/state.json.`,
   sightjack run
 
   # Dry-run mode (generate prompts without executing)
-  sightjack run --dry-run`,
+  sightjack run --dry-run
+
+  # Auto-approve convergence gate
+  sightjack run --auto-approve
+
+  # Custom notification command
+  sightjack run --notify-cmd 'echo {title}: {message}'`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := loggerFrom(cmd)
@@ -39,6 +45,16 @@ if state is found in .siren/state.json.`,
 			cfg, err := loadConfig(cmd, baseDir)
 			if err != nil {
 				return err
+			}
+			// Override gate config from flags
+			if v, _ := cmd.Flags().GetString("notify-cmd"); v != "" {
+				cfg.Gate.NotifyCmd = v
+			}
+			if v, _ := cmd.Flags().GetString("approve-cmd"); v != "" {
+				cfg.Gate.ApproveCmd = v
+			}
+			if v, _ := cmd.Flags().GetBool("auto-approve"); v {
+				cfg.Gate.AutoApprove = true
 			}
 			// Check for existing state (resume detection)
 			if !dryRun {
@@ -86,4 +102,10 @@ if state is found in .siren/state.json.`,
 			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), logger)
 		},
 	}
+
+	cmd.Flags().String("notify-cmd", "", "Notification command ({title}, {message} placeholders)")
+	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
+	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for convergence D-Mail")
+
+	return cmd
 }
