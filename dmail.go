@@ -135,6 +135,9 @@ func ValidateDMail(mail *DMail) error {
 	if mail.Description == "" {
 		return fmt.Errorf("dmail: description is required")
 	}
+	if mail.SchemaVersion == "" {
+		return fmt.Errorf("dmail: dmail-schema-version is required")
+	}
 	switch mail.Kind {
 	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence:
 		// valid

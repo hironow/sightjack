@@ -17,7 +17,7 @@ CI-friendly auto-approve, and fail-closed semantics.
 
 ## Decision
 
-Implement a three-layer convergence gate architecture:
+Implement a convergence gate architecture with the following properties:
 
 1. **Fail-closed default**: Any error in the approval flow denies the gate.
    `RunConvergenceGate` returns `(false, err)` on failure, never `(true, err)`.

@@ -56,6 +56,28 @@ func TestCobraRouting_Doctor(t *testing.T) {
 	}
 }
 
+func TestCobraRouting_Doctor_OutputGoesToStderr(t *testing.T) {
+	// given: doctor diagnostic text is human-readable, not data (ADR 0002)
+	dir := t.TempDir()
+
+	var stdout, stderr bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"doctor", dir})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&stderr)
+
+	// when
+	_ = rootCmd.Execute()
+
+	// then: diagnostic output goes to stderr, not stdout
+	if stdout.Len() > 0 {
+		t.Errorf("doctor should not write diagnostic text to stdout (ADR 0002), got: %s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "sightjack doctor") {
+		t.Errorf("expected diagnostic header in stderr, got: %s", stderr.String())
+	}
+}
+
 func TestCobraRouting_Show_NoState(t *testing.T) {
 	// given: a directory with no .siren/state.json
 	dir := t.TempDir()

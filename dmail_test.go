@@ -22,9 +22,10 @@ func TestDMailKind_Valid(t *testing.T) {
 func TestValidateDMail_ConvergenceKind(t *testing.T) {
 	// given: a d-mail with convergence kind
 	mail := &DMail{
-		Name:        "convergence-test",
-		Kind:        DMailConvergence,
-		Description: "Convergence signal from phonewave",
+		Name:          "convergence-test",
+		Kind:          DMailConvergence,
+		Description:   "Convergence signal from phonewave",
+		SchemaVersion: "1",
 	}
 
 	// when
@@ -126,9 +127,10 @@ func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 
 func TestValidateDMail_Valid(t *testing.T) {
 	mail := &DMail{
-		Name:        "spec-my-42",
-		Kind:        DMailSpecification,
-		Description: "Issue MY-42 ready for implementation",
+		Name:          "spec-my-42",
+		Kind:          DMailSpecification,
+		Description:   "Issue MY-42 ready for implementation",
+		SchemaVersion: "1",
 	}
 	if err := ValidateDMail(mail); err != nil {
 		t.Errorf("expected valid, got: %v", err)
@@ -160,6 +162,41 @@ func TestValidateDMail_MissingDescription(t *testing.T) {
 	mail := &DMail{Name: "test", Kind: DMailFeedback}
 	if err := ValidateDMail(mail); err == nil {
 		t.Error("expected error for missing description")
+	}
+}
+
+func TestValidateDMail_MissingSchemaVersion(t *testing.T) {
+	// given: d-mail with all fields except SchemaVersion
+	mail := &DMail{
+		Name:        "test",
+		Kind:        DMailFeedback,
+		Description: "feedback message",
+	}
+
+	// when
+	err := ValidateDMail(mail)
+
+	// then
+	if err == nil {
+		t.Error("expected error for missing schema version")
+	}
+}
+
+func TestValidateDMail_ValidSchemaVersion(t *testing.T) {
+	// given: d-mail with SchemaVersion set
+	mail := &DMail{
+		Name:          "test",
+		Kind:          DMailFeedback,
+		Description:   "feedback message",
+		SchemaVersion: "1",
+	}
+
+	// when
+	err := ValidateDMail(mail)
+
+	// then
+	if err != nil {
+		t.Errorf("expected valid, got: %v", err)
 	}
 }
 
@@ -296,10 +333,11 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 		t.Fatalf("ensure: %v", err)
 	}
 	mail := &DMail{
-		Name:        "spec-my-42",
-		Kind:        DMailSpecification,
-		Description: "Ready for impl",
-		Body:        "# DoD\n- item 1\n",
+		Name:          "spec-my-42",
+		Kind:          DMailSpecification,
+		Description:   "Ready for impl",
+		SchemaVersion: "1",
+		Body:          "# DoD\n- item 1\n",
 	}
 	if err := ComposeDMail(dir, mail); err != nil {
 		t.Fatalf("compose: %v", err)
