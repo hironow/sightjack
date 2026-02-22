@@ -1,7 +1,6 @@
 package sightjack
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -46,12 +45,8 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 	}
 	ch := make(chan result, 1)
 	go func() {
-		scanner := bufio.NewScanner(a.input)
-		if scanner.Scan() {
-			ch <- result{line: scanner.Text()}
-		} else {
-			ch <- result{err: scanner.Err()}
-		}
+		line, err := readLine(a.input)
+		ch <- result{line: line, err: err}
 	}()
 
 	select {
@@ -63,6 +58,26 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 		}
 		answer := strings.TrimSpace(strings.ToLower(r.line))
 		return answer == "y" || answer == "yes", nil
+	}
+}
+
+// readLine reads one line from r without buffering ahead.
+// It reads one byte at a time to avoid consuming data beyond the newline,
+// which is critical when r is a shared reader (e.g. stdin).
+func readLine(r io.Reader) (string, error) {
+	var buf []byte
+	b := make([]byte, 1)
+	for {
+		n, err := r.Read(b)
+		if n > 0 {
+			if b[0] == '\n' {
+				return string(buf), nil
+			}
+			buf = append(buf, b[0])
+		}
+		if err != nil {
+			return string(buf), err
+		}
 	}
 }
 

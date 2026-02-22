@@ -46,15 +46,15 @@ if state is found in .siren/state.json.`,
 			if err != nil {
 				return err
 			}
-			// Override gate config from flags
-			if v, _ := cmd.Flags().GetString("notify-cmd"); v != "" {
-				cfg.Gate.NotifyCmd = v
+			// Override gate config from flags (Changed = user explicitly set the flag)
+			if cmd.Flags().Changed("notify-cmd") {
+				cfg.Gate.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")
 			}
-			if v, _ := cmd.Flags().GetString("approve-cmd"); v != "" {
-				cfg.Gate.ApproveCmd = v
+			if cmd.Flags().Changed("approve-cmd") {
+				cfg.Gate.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
 			}
-			if v, _ := cmd.Flags().GetBool("auto-approve"); v {
-				cfg.Gate.AutoApprove = true
+			if cmd.Flags().Changed("auto-approve") {
+				cfg.Gate.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 			}
 			// Check for existing state (resume detection)
 			if !dryRun {

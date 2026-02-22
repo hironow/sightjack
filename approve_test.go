@@ -111,6 +111,33 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 	}
 }
 
+func TestStdinApprover_SharedReader(t *testing.T) {
+	// given: a shared reader with approval line + subsequent data.
+	// After RequestApproval consumes "y\n", the remaining "next-line\n"
+	// must still be readable from the same reader.
+	input := strings.NewReader("y\nnext-line\n")
+	a := &StdinApprover{input: input}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "proceed?")
+
+	// then: approved
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Fatal("expected approval")
+	}
+
+	// then: remaining data is still available from the shared reader
+	remaining := make([]byte, 64)
+	n, _ := input.Read(remaining)
+	got := string(remaining[:n])
+	if got != "next-line\n" {
+		t.Errorf("shared reader lost data: got %q, want %q", got, "next-line\n")
+	}
+}
+
 func TestCmdApprover_Approve(t *testing.T) {
 	// given: command that exits 0
 	a := &CmdApprover{

@@ -348,6 +348,35 @@ func TestShortAliases(t *testing.T) {
 	})
 }
 
+func TestRunCmd_AutoApproveFlagChanged(t *testing.T) {
+	// given: run command with --auto-approve=false explicitly set
+	rootCmd := NewRootCommand()
+	var runCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "run" {
+			runCmd = sub
+			break
+		}
+	}
+	if runCmd == nil {
+		t.Fatal("run command not found")
+	}
+
+	// when: set --auto-approve=false explicitly
+	if err := runCmd.Flags().Set("auto-approve", "false"); err != nil {
+		t.Fatalf("failed to set flag: %v", err)
+	}
+
+	// then: Changed() must report true so config override applies
+	if !runCmd.Flags().Changed("auto-approve") {
+		t.Error("expected Changed() = true after explicitly setting --auto-approve=false")
+	}
+	v, _ := runCmd.Flags().GetBool("auto-approve")
+	if v {
+		t.Error("expected auto-approve value to be false")
+	}
+}
+
 func TestAllCommands_HaveLongAndExample(t *testing.T) {
 	// given
 	rootCmd := NewRootCommand()
