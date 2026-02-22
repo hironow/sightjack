@@ -94,6 +94,41 @@ func TestStdinApprover_EmptyInput(t *testing.T) {
 	}
 }
 
+func TestStdinApprover_EOFTerminatedYes(t *testing.T) {
+	// given: piped input "y" without trailing newline (echo -n "y" | sightjack run).
+	// readLine returns ("y", io.EOF). Should still approve.
+	input := strings.NewReader("y")
+	a := &StdinApprover{input: input}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "proceed?")
+
+	// then
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approval for EOF-terminated 'y' input")
+	}
+}
+
+func TestStdinApprover_EOFTerminatedNo(t *testing.T) {
+	// given: piped "n" without trailing newline — should still deny (not error)
+	input := strings.NewReader("n")
+	a := &StdinApprover{input: input}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "proceed?")
+
+	// then
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected denial for EOF-terminated 'n' input")
+	}
+}
+
 func TestStdinApprover_ContextCancel(t *testing.T) {
 	// given: context that is already cancelled + a reader that blocks
 	ctx, cancel := context.WithCancel(context.Background())

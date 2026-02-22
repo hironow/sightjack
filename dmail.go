@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
@@ -351,9 +352,14 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier Notifier, logg
 
 				if mail.Kind == DMailConvergence {
 					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
-					if err := c.notifier.Notify(context.Background(), "Sightjack Convergence", mail.Description); err != nil {
-						logger.Warn("Convergence notification failed (non-fatal): %v", err)
-					}
+					// Fire-and-forget with timeout to avoid blocking the drain loop.
+					go func(desc string) {
+						notifyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+						defer cancel()
+						if err := c.notifier.Notify(notifyCtx, "Sightjack Convergence", desc); err != nil {
+							logger.Warn("Convergence notification failed (non-fatal): %v", err)
+						}
+					}(mail.Description)
 				} else {
 					switch mail.Severity {
 					case "high":

@@ -74,10 +74,12 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 		return false, nil
 	case r := <-ch:
 		stop()
-		if r.err != nil {
+		// Evaluate answer even on io.EOF — piped input may not end with newline.
+		// Only deny on error if no content was read.
+		answer := strings.TrimSpace(strings.ToLower(r.line))
+		if answer == "" && r.err != nil {
 			return false, nil
 		}
-		answer := strings.TrimSpace(strings.ToLower(r.line))
 		return answer == "y" || answer == "yes", nil
 	}
 }

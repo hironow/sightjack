@@ -1732,6 +1732,37 @@ func (n *testNotifier) Notify(_ context.Context, title, message string) error {
 	return nil
 }
 
+func TestCollectFeedback_HangingNotifierDoesNotBlockDrain(t *testing.T) {
+	// given: a notifier that blocks for a long time + channel with convergence then feedback.
+	// The collector must drain both d-mails promptly even if the notifier hangs.
+	ch := make(chan *DMail, 2)
+	hangingNotifier := &testNotifier{onNotify: func(title, message string) {
+		time.Sleep(10 * time.Second) // simulate hung notifier
+	}}
+	collector := CollectFeedback(nil, ch, hangingNotifier, NewLogger(io.Discard, false))
+
+	// when: send convergence (triggers hanging notify) then feedback
+	ch <- &DMail{Name: "conv-hang", Kind: DMailConvergence, Description: "convergence"}
+	ch <- &DMail{Name: "fb-after", Kind: DMailFeedback, Description: "feedback after convergence"}
+	close(ch)
+
+	// then: both d-mails should be collected within a reasonable time,
+	// not blocked by the hanging notifier
+	deadline := time.After(2 * time.Second)
+	for {
+		all := collector.All()
+		if len(all) >= 2 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("collector blocked: only %d items collected, expected 2 (notifier hanging)", len(collector.All()))
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+}
+
 func TestMonitorInbox_DeliversConvergence(t *testing.T) {
 	// given: convergence d-mail in inbox
 	dir := t.TempDir()
