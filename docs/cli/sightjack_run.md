@@ -25,12 +25,21 @@ sightjack run [path] [flags]
 
   # Dry-run mode (generate prompts without executing)
   sightjack run --dry-run
+
+  # Auto-approve convergence gate
+  sightjack run --auto-approve
+
+  # Custom notification command
+  sightjack run --notify-cmd 'echo {title}: {message}'
 ```
 
 ### Options
 
 ```
-  -h, --help   help for run
+      --approve-cmd string   Approval command ({message} placeholder, exit 0 = approve)
+      --auto-approve         Skip approval gate for convergence D-Mail
+  -h, --help                 help for run
+      --notify-cmd string    Notification command ({title}, {message} placeholders)
 ```
 
 ### Options inherited from parent commands

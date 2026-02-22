@@ -8,7 +8,7 @@
 
 - Entry: `cmd/sightjack/main.go` (signal.NotifyContext + DefaultToScan)
 - CLI: `internal/cmd/` (cobra v1.10.2, `NewRootCommand()` exported for testability)
-- Library: root package `sightjack` (scan, wave, dmail, feedback, telemetry, logger)
+- Library: root package `sightjack` (scan, wave, dmail, feedback, gate, notify, approve, telemetry, logger)
 - OTel: `telemetry.go` (noop default + OTLP HTTP exporter, shutdown via cobra.OnFinalize)
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
@@ -22,6 +22,7 @@
 - `--config`, `--lang`, `--verbose`, `--dry-run` are PersistentFlags on root
 - Default subcommand: `sightjack [flags] <repo>` → prepends `scan` via `DefaultToScan`
 - OTel tracer shutdown: `cobra.OnFinalize` + `sync.Once`
+- `run` subcommand: `--notify-cmd`, `--approve-cmd`, `--auto-approve` local flags (convergence gate)
 
 ## Build & Test
 

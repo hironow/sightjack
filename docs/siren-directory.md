@@ -12,9 +12,9 @@ This document describes what each directory/file does, who creates it, and how i
   state.json              # current session state (waves, completeness, ADR count)
   skills/
     dmail-sendable/
-      SKILL.md            # agent skill manifest (phonewave discovery)
+      SKILL.md            # agent skill manifest (produces: specification, report)
     dmail-readable/
-      SKILL.md
+      SKILL.md            # agent skill manifest (consumes: feedback, convergence)
   inbox/                  # incoming d-mails (feedback from downstream)
     *.md
   outbox/                 # outgoing d-mails (specifications, reports)
@@ -93,8 +93,16 @@ All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent p
      |                      | MonitorInbox() [fsnotify]    |
      |                      | receiveDMailIfNew()          |
      |                      | -> DrainInboxFeedback()      |
+     |                      |                              |
+     |                      | RunConvergenceGateWithRedrain|
+     |                      |   FilterConvergence()        |
+     |                      |   Notifier.Notify() [async]  |
+     |                      |   Approver.RequestApproval() |
+     |                      |   re-drain if new convergence|
+     |                      |                              |
      |                      | -> CollectFeedback()         |
      |                      |    (accumulates for nextgen) |
+     |                      |    (convergence -> notify)   |
      |                      |                              |
      |                      | (wave approved)              |
      |                      |   ComposeSpecification()     |
@@ -109,9 +117,10 @@ All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent p
 ```
 
 - **inbox/** -> fsnotify monitor -> **archive/** (consumed by `ReceiveDMail`)
+- **convergence gate** -> `RunConvergenceGateWithRedrain()` runs notify + approve loop before session starts. Re-drains inbox after each approval to catch late-arriving convergence D-Mails.
 - **specification/report** -> **archive/** first, then **outbox/** (archive-first write order)
-- D-mail format: YAML frontmatter (`name`, `kind`, `description`, `issues`, `severity`, `metadata`) + Markdown body
-- D-mail kinds: `specification`, `report`, `feedback`
+- D-mail format: YAML frontmatter (`name`, `kind`, `description`, `dmail-schema-version`, `issues`, `severity`, `metadata`) + Markdown body
+- D-mail kinds: `specification`, `report`, `feedback`, `convergence`
 - Filename pattern: `{prefix}-{sanitized-wavekey}.md` (e.g., `spec-auth-w1.md`, `report-api-w2.md`)
 
 ## File Creators
