@@ -1,4 +1,4 @@
-# Architecture Decision Records — sightjack
+# Architecture Decision Records
 
 ## Shared ADRs (canonical: phonewave)
 
@@ -10,9 +10,9 @@
 | 0002 | stdio convention (stdout=data, stderr=logs) | MY-339 |
 | 0003 | OpenTelemetry noop-default + OTLP HTTP | — |
 | 0004 | D-Mail Schema v1 specification | MY-352, MY-353 |
-| 0005 | fsnotify daemon design (phonewave-specific) | — |
+| 0005 | fsnotify daemon design | — |
 
-## sightjack-specific ADRs (0006~)
+## sightjack ADRs (0006~)
 
 | # | Decision | Linear |
 |---|----------|--------|
