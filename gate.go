@@ -45,16 +45,19 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier Notifier,
 	summary := fmt.Sprintf("Convergence signal received: %s", strings.Join(names, ", "))
 
 	// Notify (fire-and-forget — non-blocking with 30s timeout).
+	// Use a detached context for the notification span so it is not tied to
+	// the lifetime or cancellation of the gate context.
 	if notifier != nil {
-		go func(title, msg string) {
-			_, notifySpan := tracer.Start(ctx, "notify.convergence")
+		notifySpanCtx := trace.ContextWithSpan(context.Background(), trace.SpanFromContext(ctx))
+		go func(spanCtx context.Context, title, msg string) {
+			_, notifySpan := tracer.Start(spanCtx, "notify.convergence")
 			defer notifySpan.End()
-			notifyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			notifyCtx, cancel := context.WithTimeout(spanCtx, 30*time.Second)
 			defer cancel()
 			if err := notifier.Notify(notifyCtx, title, msg); err != nil {
 				logger.Warn("Convergence notification failed (non-fatal): %v", err)
 			}
-		}("Sightjack Convergence", summary)
+		}(notifySpanCtx, "Sightjack Convergence", summary)
 	}
 
 	// Context check before approval — early exit if already cancelled.
