@@ -91,7 +91,7 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 
 // shellQuote wraps a string in single quotes with proper escaping
 // to prevent shell injection. Single quotes within the string are
-// escaped as '\” (end quote, escaped quote, start quote).
+// escaped by splitting: quote -> quote-backslash-quote-quote (see implementation).
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
