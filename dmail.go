@@ -391,6 +391,21 @@ func (c *feedbackCollector) ConvergenceNames() []string {
 	return cp
 }
 
+// FeedbackOnly returns a copy of accumulated d-mails filtered to feedback kind
+// only (excludes convergence). Use this for nextgen prompt injection where only
+// feedback d-mails are relevant.
+func (c *feedbackCollector) FeedbackOnly() []*DMail {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var result []*DMail
+	for _, m := range c.items {
+		if m.Kind == DMailFeedback {
+			result = append(result, m)
+		}
+	}
+	return result
+}
+
 // All returns a copy of all accumulated feedback (initial + late arrivals).
 // Non-destructive: repeated calls return the same data plus any new arrivals.
 func (c *feedbackCollector) All() []*DMail {

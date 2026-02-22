@@ -462,7 +462,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 		rejectedForWave := sessionRejected[WaveKey(selected)]
 		var feedback []*DMail
 		if fbCollector != nil {
-			feedback = fbCollector.All()
+			feedback = fbCollector.FeedbackOnly()
 		}
 		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, logger)
 		if nextgenErr != nil {

@@ -971,6 +971,29 @@ func TestFormatFeedbackForPrompt_NoBody(t *testing.T) {
 	}
 }
 
+func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
+	// given: collector with mixed feedback + convergence d-mails
+	initial := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "Architecture drift"},
+		{Name: "conv-001", Kind: DMailConvergence, Description: "Convergence signal"},
+		{Name: "fb-002", Kind: DMailFeedback, Description: "Naming convention"},
+	}
+	c := CollectFeedback(initial, nil, &NopNotifier{}, NewLogger(io.Discard, false))
+
+	// when
+	feedbackOnly := c.FeedbackOnly()
+
+	// then: only feedback d-mails, no convergence
+	if len(feedbackOnly) != 2 {
+		t.Fatalf("expected 2 feedback d-mails, got %d", len(feedbackOnly))
+	}
+	for _, m := range feedbackOnly {
+		if m.Kind == DMailConvergence {
+			t.Errorf("FeedbackOnly should not contain convergence d-mail: %s", m.Name)
+		}
+	}
+}
+
 // --- Receiving test group ---
 
 func TestReceiveDMail_MalformedContent(t *testing.T) {
