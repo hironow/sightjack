@@ -2,9 +2,12 @@ package sightjack
 
 import (
 	"context"
+	"io"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestAutoApprover_AlwaysApproves(t *testing.T) {
@@ -108,6 +111,92 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 	}
 	if approved {
 		t.Error("expected denial when context is cancelled")
+	}
+}
+
+func TestStdinApprover_ContextCancelUnblocksRead(t *testing.T) {
+	// given: a closable reader that tracks Close calls.
+	// When context cancels, the reader should be closed to unblock Read.
+	cr := &trackingReadCloser{blocking: true}
+	ctx, cancel := context.WithCancel(context.Background())
+	a := &StdinApprover{input: cr}
+
+	// when: cancel context after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		a.RequestApproval(ctx, "proceed?")
+		close(done)
+	}()
+
+	// then: RequestApproval returns within a reasonable time
+	select {
+	case <-done:
+		// OK
+	case <-time.After(2 * time.Second):
+		t.Fatal("RequestApproval did not return after context cancel")
+	}
+
+	// then: the reader was closed to unblock the read goroutine.
+	// context.AfterFunc fires in a separate goroutine, so allow a brief
+	// moment for it to execute after ctx.Done() resolves.
+	deadline := time.After(1 * time.Second)
+	for !cr.closed.Load() {
+		select {
+		case <-deadline:
+			t.Fatal("expected reader to be closed on context cancel to prevent goroutine leak")
+		default:
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+}
+
+// trackingReadCloser is a test helper that blocks on Read and tracks Close calls.
+type trackingReadCloser struct {
+	blocking bool
+	closed   atomic.Bool
+	ch       chan struct{}
+}
+
+func (r *trackingReadCloser) Read(p []byte) (int, error) {
+	if r.blocking && !r.closed.Load() {
+		if r.ch == nil {
+			r.ch = make(chan struct{})
+		}
+		<-r.ch // block until closed
+	}
+	return 0, io.EOF
+}
+
+func (r *trackingReadCloser) Close() error {
+	r.closed.Store(true)
+	if r.ch != nil {
+		select {
+		case <-r.ch:
+		default:
+			close(r.ch)
+		}
+	}
+	return nil
+}
+
+func TestStdinApprover_NilInput(t *testing.T) {
+	// given: StdinApprover with nil input (library/non-interactive usage)
+	a := &StdinApprover{input: nil}
+
+	// when: should not panic
+	approved, err := a.RequestApproval(context.Background(), "proceed?")
+
+	// then: safe default = deny, no error
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected denial for nil input")
 	}
 }
 

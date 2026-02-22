@@ -35,9 +35,29 @@ func NewStdinApprover(input io.Reader, out io.Writer) *StdinApprover {
 }
 
 func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bool, error) {
+	if a.input == nil {
+		return false, nil
+	}
+
+	select {
+	case <-ctx.Done():
+		return false, nil
+	default:
+	}
+
 	if a.out != nil {
 		fmt.Fprintf(a.out, "[CONVERGENCE] %s\nApprove? (y/N): ", message)
 	}
+
+	// On context cancellation, close the reader (if closable) to unblock
+	// the read goroutine. For stdin (*os.File) this is safe during shutdown.
+	// For readers without Close (e.g. strings.Reader), the goroutine stays
+	// blocked until Read returns; it exits via the buffered channel.
+	stop := context.AfterFunc(ctx, func() {
+		if c, ok := a.input.(io.Closer); ok {
+			c.Close()
+		}
+	})
 
 	type result struct {
 		line string
@@ -53,6 +73,7 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 	case <-ctx.Done():
 		return false, nil
 	case r := <-ch:
+		stop()
 		if r.err != nil {
 			return false, nil
 		}
