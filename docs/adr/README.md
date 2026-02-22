@@ -12,7 +12,7 @@
 | 0004 | D-Mail Schema v1 specification | MY-352, MY-353 |
 | 0005 | fsnotify daemon design | — |
 
-## sightjack ADRs (0006~)
+## sightjack-specific ADRs (0006~)
 
 | # | Decision | Linear |
 |---|----------|--------|
