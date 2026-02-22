@@ -782,7 +782,7 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 }
 
 // PartialApplyDelta computes the adjusted delta for a partially applied wave.
-// When TotalCount is 0 (legacy result), the original delta.After is returned.
+// When TotalCount is 0, the original delta.After is returned.
 func PartialApplyDelta(result *WaveApplyResult, delta WaveDelta) float64 {
 	if result.TotalCount == 0 || result.Applied >= result.TotalCount {
 		return delta.After
@@ -967,15 +967,7 @@ func TryRecoverState(baseDir string, sessionID string, logger *Logger) (*Session
 
 	scanResult, err := LoadScanResult(scanResultPath)
 	if err != nil {
-		// Fallback: check legacy .siren/scans/ path for pre-rename sessions.
-		legacyDir := filepath.Join(baseDir, stateDir, "scans", sessionID)
-		legacyPath := filepath.Join(legacyDir, "scan_result.json")
-		scanResult, err = LoadScanResult(legacyPath)
-		if err != nil {
-			return nil, fmt.Errorf("no recoverable scan data: %w", err)
-		}
-		scanDir = legacyDir
-		scanResultPath = legacyPath
+		return nil, fmt.Errorf("no recoverable scan data: %w", err)
 	}
 
 	logger.Warn("State file missing. Recovered from cached scan result.")
@@ -998,18 +990,16 @@ func sessionTimestamp(name string) int64 {
 	return ts
 }
 
-// RecoverLatestState scans both .siren/.run/ and legacy .siren/scans/ for
-// session directories and attempts recovery from the most recent one.
-// Session directories are named "{prefix}-{unixmilli}-{pid}" where prefix is
-// "session" or "scan". Sorted by timestamp descending so the newest is tried first.
+// RecoverLatestState scans .siren/.run/ for session directories and attempts
+// recovery from the most recent one. Session directories are named
+// "{prefix}-{unixmilli}-{pid}" where prefix is "session" or "scan".
+// Sorted by timestamp descending so the newest is tried first.
 // Returns error if no recoverable data.
 func RecoverLatestState(baseDir string, logger *Logger) (*SessionState, error) {
-	// Collect session directory names from both current and legacy paths.
 	var sessionIDs []string
 	seen := map[string]bool{}
 	for _, parent := range []string{
 		filepath.Join(baseDir, stateDir, ".run"),
-		filepath.Join(baseDir, stateDir, "scans"),
 	} {
 		entries, err := os.ReadDir(parent)
 		if err != nil {
