@@ -34,6 +34,27 @@ func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
 	return newCount
 }
 
+// buildNotifier creates the appropriate Notifier based on config.
+// If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
+func buildNotifier(cfg *Config) Notifier {
+	if cfg.Gate.NotifyCmd != "" {
+		return NewCmdNotifier(cfg.Gate.NotifyCmd)
+	}
+	return &LocalNotifier{}
+}
+
+// buildApprover creates the appropriate Approver based on config.
+// Priority: AutoApprove → CmdApprover → StdinApprover.
+func buildApprover(cfg *Config, input io.Reader, out io.Writer) Approver {
+	if cfg.Gate.AutoApprove {
+		return &AutoApprover{}
+	}
+	if cfg.Gate.ApproveCmd != "" {
+		return NewCmdApprover(cfg.Gate.ApproveCmd)
+	}
+	return NewStdinApprover(input, out)
+}
+
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, logger *Logger) error {
 	if logger == nil {
@@ -60,7 +81,20 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			logger.Warn("D-Mail monitor failed: %v", monitorErr)
 		}
 		initial := DrainInboxFeedback(inboxCh, logger)
-		fbCollector = CollectFeedback(initial, inboxCh, logger)
+
+		// Convergence gate with re-drain: catches late-arriving convergence
+		notifier := buildNotifier(cfg)
+		approver := buildApprover(cfg, input, out)
+		allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
+		if gateErr != nil {
+			return fmt.Errorf("convergence gate: %w", gateErr)
+		}
+		if !approved {
+			logger.Warn("Session aborted: convergence gate denied")
+			return nil
+		}
+
+		fbCollector = CollectFeedback(allDmails, inboxCh, notifier, logger)
 	}
 
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -428,7 +462,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 		rejectedForWave := sessionRejected[WaveKey(selected)]
 		var feedback []*DMail
 		if fbCollector != nil {
-			feedback = fbCollector.All()
+			feedback = fbCollector.FeedbackOnly()
 		}
 		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, logger)
 		if nextgenErr != nil {
@@ -613,7 +647,20 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 		logger.Warn("D-Mail monitor failed: %v", monitorErr)
 	}
 	initial := DrainInboxFeedback(inboxCh, logger)
-	fbCollector := CollectFeedback(initial, inboxCh, logger)
+
+	// Convergence gate with re-drain: catches late-arriving convergence
+	notifier := buildNotifier(cfg)
+	approver := buildApprover(cfg, input, out)
+	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
+	if gateErr != nil {
+		return fmt.Errorf("convergence gate: %w", gateErr)
+	}
+	if !approved {
+		logger.Warn("Session aborted: convergence gate denied")
+		return nil
+	}
+
+	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
@@ -654,7 +701,20 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		logger.Warn("D-Mail monitor failed: %v", monitorErr)
 	}
 	initial := DrainInboxFeedback(inboxCh, logger)
-	fbCollector := CollectFeedback(initial, inboxCh, logger)
+
+	// Convergence gate with re-drain: catches late-arriving convergence
+	notifier := buildNotifier(cfg)
+	approver := buildApprover(cfg, input, out)
+	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
+	if gateErr != nil {
+		return fmt.Errorf("convergence gate: %w", gateErr)
+	}
+	if !approved {
+		logger.Warn("Session aborted: convergence gate denied")
+		return nil
+	}
+
+	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
 	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
@@ -722,7 +782,7 @@ func BuildSessionState(cfg *Config, sessionID string, scanResult *ScanResult, wa
 }
 
 // PartialApplyDelta computes the adjusted delta for a partially applied wave.
-// When TotalCount is 0 (legacy result), the original delta.After is returned.
+// When TotalCount is 0, the original delta.After is returned.
 func PartialApplyDelta(result *WaveApplyResult, delta WaveDelta) float64 {
 	if result.TotalCount == 0 || result.Applied >= result.TotalCount {
 		return delta.After
@@ -907,15 +967,7 @@ func TryRecoverState(baseDir string, sessionID string, logger *Logger) (*Session
 
 	scanResult, err := LoadScanResult(scanResultPath)
 	if err != nil {
-		// Fallback: check legacy .siren/scans/ path for pre-rename sessions.
-		legacyDir := filepath.Join(baseDir, stateDir, "scans", sessionID)
-		legacyPath := filepath.Join(legacyDir, "scan_result.json")
-		scanResult, err = LoadScanResult(legacyPath)
-		if err != nil {
-			return nil, fmt.Errorf("no recoverable scan data: %w", err)
-		}
-		scanDir = legacyDir
-		scanResultPath = legacyPath
+		return nil, fmt.Errorf("no recoverable scan data: %w", err)
 	}
 
 	logger.Warn("State file missing. Recovered from cached scan result.")
@@ -938,18 +990,16 @@ func sessionTimestamp(name string) int64 {
 	return ts
 }
 
-// RecoverLatestState scans both .siren/.run/ and legacy .siren/scans/ for
-// session directories and attempts recovery from the most recent one.
-// Session directories are named "{prefix}-{unixmilli}-{pid}" where prefix is
-// "session" or "scan". Sorted by timestamp descending so the newest is tried first.
+// RecoverLatestState scans .siren/.run/ for session directories and attempts
+// recovery from the most recent one. Session directories are named
+// "{prefix}-{unixmilli}-{pid}" where prefix is "session" or "scan".
+// Sorted by timestamp descending so the newest is tried first.
 // Returns error if no recoverable data.
 func RecoverLatestState(baseDir string, logger *Logger) (*SessionState, error) {
-	// Collect session directory names from both current and legacy paths.
 	var sessionIDs []string
 	seen := map[string]bool{}
 	for _, parent := range []string{
 		filepath.Join(baseDir, stateDir, ".run"),
-		filepath.Join(baseDir, stateDir, "scans"),
 	} {
 		entries, err := os.ReadDir(parent)
 		if err != nil {

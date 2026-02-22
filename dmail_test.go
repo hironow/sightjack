@@ -11,11 +11,116 @@ import (
 )
 
 func TestDMailKind_Valid(t *testing.T) {
-	kinds := []DMailKind{DMailSpecification, DMailReport, DMailFeedback}
+	kinds := []DMailKind{DMailSpecification, DMailReport, DMailFeedback, DMailConvergence}
 	for _, k := range kinds {
 		if k == "" {
 			t.Errorf("kind constant should not be empty")
 		}
+	}
+}
+
+func TestValidateDMail_ConvergenceKind(t *testing.T) {
+	// given: a d-mail with convergence kind
+	mail := &DMail{
+		Name:        "convergence-test",
+		Kind:        DMailConvergence,
+		Description: "Convergence signal from phonewave",
+	}
+
+	// when
+	err := ValidateDMail(mail)
+
+	// then
+	if err != nil {
+		t.Errorf("expected convergence kind to be valid, got: %v", err)
+	}
+}
+
+func TestMarshalDMail_SchemaVersion(t *testing.T) {
+	// given: a d-mail with SchemaVersion set
+	mail := &DMail{
+		Name:          "schema-v1",
+		Kind:          DMailSpecification,
+		Description:   "Schema version test",
+		SchemaVersion: "1",
+	}
+
+	// when
+	data, err := MarshalDMail(mail)
+
+	// then
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "dmail-schema-version") {
+		t.Error("expected dmail-schema-version in frontmatter")
+	}
+	if !strings.Contains(content, `"1"`) && !strings.Contains(content, "'1'") && !strings.Contains(content, ": \"1\"") {
+		// YAML may quote differently; just check the value is present
+		if !strings.Contains(content, "1") {
+			t.Error("expected schema version value '1' in frontmatter")
+		}
+	}
+
+	// roundtrip: parse should preserve SchemaVersion
+	parsed, parseErr := ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse: %v", parseErr)
+	}
+	if parsed.SchemaVersion != "1" {
+		t.Errorf("SchemaVersion roundtrip: got %q, want %q", parsed.SchemaVersion, "1")
+	}
+}
+
+func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "gate",
+		Title:       "Gate test",
+		Actions:     []WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
+	}
+
+	// when
+	err := ComposeSpecification(dir, wave)
+
+	// then
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(MailDir(dir, "outbox"), "spec-gate-w1.md"))
+	mail, _ := ParseDMail(data)
+	if mail.SchemaVersion != "1" {
+		t.Errorf("SchemaVersion: got %q, want %q", mail.SchemaVersion, "1")
+	}
+}
+
+func TestComposeReport_SetsSchemaVersion(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+	wave := Wave{
+		ID:          "w1",
+		ClusterName: "gate",
+		Title:       "Gate test",
+		Actions:     []WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
+	}
+	result := &WaveApplyResult{WaveID: "w1", Applied: 1}
+
+	// when
+	err := ComposeReport(dir, wave, result)
+
+	// then
+	if err != nil {
+		t.Fatalf("ComposeReport: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(MailDir(dir, "outbox"), "report-gate-w1.md"))
+	mail, _ := ParseDMail(data)
+	if mail.SchemaVersion != "1" {
+		t.Errorf("SchemaVersion: got %q, want %q", mail.SchemaVersion, "1")
 	}
 }
 
@@ -715,7 +820,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	initial := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
 
 	// Start collector with initial feedback
-	collector := CollectFeedback(initial, ch, NewLogger(io.Discard, false))
+	collector := CollectFeedback(initial, ch, &NopNotifier{}, NewLogger(io.Discard, false))
 
 	// All() should return initial feedback
 	all := collector.All()
@@ -762,7 +867,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 		{Name: "fb-001", Kind: DMailFeedback, Description: "Item 1"},
 		{Name: "fb-002", Kind: DMailFeedback, Description: "Item 2"},
 	}
-	collector := CollectFeedback(initial, nil, NewLogger(io.Discard, false))
+	collector := CollectFeedback(initial, nil, &NopNotifier{}, NewLogger(io.Discard, false))
 
 	// when: call All() multiple times
 	first := collector.All()
@@ -779,7 +884,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 
 func TestFeedbackCollector_NilChannel(t *testing.T) {
 	// given: nil channel
-	collector := CollectFeedback(nil, nil, NewLogger(io.Discard, false))
+	collector := CollectFeedback(nil, nil, &NopNotifier{}, NewLogger(io.Discard, false))
 
 	// then: All() returns nil
 	if all := collector.All(); all != nil {
@@ -790,7 +895,7 @@ func TestFeedbackCollector_NilChannel(t *testing.T) {
 func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
 	// given: nil initial but channel that will receive items
 	ch := make(chan *DMail, 1)
-	collector := CollectFeedback(nil, ch, NewLogger(io.Discard, false))
+	collector := CollectFeedback(nil, ch, &NopNotifier{}, NewLogger(io.Discard, false))
 
 	// when: send one item
 	ch <- &DMail{Name: "fb-late", Kind: DMailFeedback, Description: "Late only"}
@@ -863,6 +968,29 @@ func TestFormatFeedbackForPrompt_NoBody(t *testing.T) {
 	got := FormatFeedbackForPrompt(feedback)
 	if !strings.Contains(got, "No body feedback") {
 		t.Error("expected description even without body")
+	}
+}
+
+func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
+	// given: collector with mixed feedback + convergence d-mails
+	initial := []*DMail{
+		{Name: "fb-001", Kind: DMailFeedback, Description: "Architecture drift"},
+		{Name: "conv-001", Kind: DMailConvergence, Description: "Convergence signal"},
+		{Name: "fb-002", Kind: DMailFeedback, Description: "Naming convention"},
+	}
+	c := CollectFeedback(initial, nil, &NopNotifier{}, NewLogger(io.Discard, false))
+
+	// when
+	feedbackOnly := c.FeedbackOnly()
+
+	// then: only feedback d-mails, no convergence
+	if len(feedbackOnly) != 2 {
+		t.Fatalf("expected 2 feedback d-mails, got %d", len(feedbackOnly))
+	}
+	for _, m := range feedbackOnly {
+		if m.Kind == DMailConvergence {
+			t.Errorf("FeedbackOnly should not contain convergence d-mail: %s", m.Name)
+		}
 	}
 }
 
@@ -1555,5 +1683,189 @@ func TestDMailName_TrailingSpecialChars(t *testing.T) {
 	// then: trailing underscores should be trimmed
 	if strings.HasSuffix(got, "_") {
 		t.Errorf("trailing underscores not trimmed: %q", got)
+	}
+}
+
+func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
+	// given: channel that will receive a convergence d-mail
+	ch := make(chan *DMail, 1)
+	notifyCalled := false
+	notifier := &testNotifier{onNotify: func(title, message string) {
+		notifyCalled = true
+	}}
+	collector := CollectFeedback(nil, ch, notifier, NewLogger(io.Discard, false))
+
+	// when: convergence arrives
+	ch <- &DMail{Name: "conv-late-001", Kind: DMailConvergence, Description: "Late convergence"}
+	close(ch)
+	time.Sleep(100 * time.Millisecond)
+
+	// then: convergence name recorded
+	names := collector.ConvergenceNames()
+	if len(names) != 1 {
+		t.Fatalf("expected 1 convergence name, got %d", len(names))
+	}
+	if names[0] != "conv-late-001" {
+		t.Errorf("expected conv-late-001, got %q", names[0])
+	}
+	// and: notifier was called
+	if !notifyCalled {
+		t.Error("expected notifier to be called for convergence d-mail")
+	}
+	// and: convergence also present in All()
+	all := collector.All()
+	if len(all) != 1 {
+		t.Fatalf("expected 1 item in All(), got %d", len(all))
+	}
+}
+
+func TestCollectFeedback_MixedFeedbackAndConvergence(t *testing.T) {
+	// given: initial feedback + channel with convergence
+	initial := []*DMail{
+		{Name: "fb-init", Kind: DMailFeedback, Description: "initial"},
+	}
+	ch := make(chan *DMail, 1)
+	collector := CollectFeedback(initial, ch, &NopNotifier{}, NewLogger(io.Discard, false))
+
+	ch <- &DMail{Name: "conv-mix-001", Kind: DMailConvergence, Description: "convergence"}
+	close(ch)
+	time.Sleep(100 * time.Millisecond)
+
+	// then: All() returns both
+	all := collector.All()
+	if len(all) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(all))
+	}
+	// convergence names only contains convergence
+	names := collector.ConvergenceNames()
+	if len(names) != 1 {
+		t.Fatalf("expected 1 convergence name, got %d", len(names))
+	}
+}
+
+// testNotifier captures Notify calls for testing.
+type testNotifier struct {
+	onNotify func(title, message string)
+}
+
+func (n *testNotifier) Notify(_ context.Context, title, message string) error {
+	if n.onNotify != nil {
+		n.onNotify(title, message)
+	}
+	return nil
+}
+
+func TestCollectFeedback_HangingNotifierDoesNotBlockDrain(t *testing.T) {
+	// given: a notifier that blocks for a long time + channel with convergence then feedback.
+	// The collector must drain both d-mails promptly even if the notifier hangs.
+	ch := make(chan *DMail, 2)
+	hangingNotifier := &testNotifier{onNotify: func(title, message string) {
+		time.Sleep(10 * time.Second) // simulate hung notifier
+	}}
+	collector := CollectFeedback(nil, ch, hangingNotifier, NewLogger(io.Discard, false))
+
+	// when: send convergence (triggers hanging notify) then feedback
+	ch <- &DMail{Name: "conv-hang", Kind: DMailConvergence, Description: "convergence"}
+	ch <- &DMail{Name: "fb-after", Kind: DMailFeedback, Description: "feedback after convergence"}
+	close(ch)
+
+	// then: both d-mails should be collected within a reasonable time,
+	// not blocked by the hanging notifier
+	deadline := time.After(2 * time.Second)
+	for {
+		all := collector.All()
+		if len(all) >= 2 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("collector blocked: only %d items collected, expected 2 (notifier hanging)", len(collector.All()))
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+}
+
+func TestMonitorInbox_DeliversConvergence(t *testing.T) {
+	// given: convergence d-mail in inbox
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	conv := &DMail{
+		Name:        "convergence-mon-001",
+		Kind:        DMailConvergence,
+		Description: "Convergence signal from phonewave",
+	}
+	data, _ := MarshalDMail(conv)
+	os.WriteFile(filepath.Join(MailDir(dir, "inbox"), conv.Filename()), data, 0644)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// then: convergence should be delivered through channel
+	select {
+	case mail, ok := <-ch:
+		if !ok {
+			t.Fatal("channel closed unexpectedly")
+		}
+		if mail.Name != "convergence-mon-001" {
+			t.Errorf("name: got %s, want convergence-mon-001", mail.Name)
+		}
+		if mail.Kind != DMailConvergence {
+			t.Errorf("kind: got %s, want convergence", mail.Kind)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for convergence d-mail")
+	}
+}
+
+func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
+	// given: both feedback and convergence d-mails in inbox
+	dir := t.TempDir()
+	EnsureMailDirs(dir)
+
+	mails := []*DMail{
+		{Name: "feedback-mix-conv-1", Kind: DMailFeedback, Description: "feedback"},
+		{Name: "convergence-mix-1", Kind: DMailConvergence, Description: "convergence"},
+		{Name: "spec-mix-conv-1", Kind: DMailSpecification, Description: "spec"},
+	}
+	for _, m := range mails {
+		data, _ := MarshalDMail(m)
+		os.WriteFile(filepath.Join(MailDir(dir, "inbox"), m.Filename()), data, 0644)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := MonitorInbox(ctx, dir, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// then: 2 d-mails delivered (feedback + convergence), spec excluded
+	drained := DrainInboxFeedback(ch, NewLogger(io.Discard, false))
+	if len(drained) != 2 {
+		t.Fatalf("expected 2 (feedback + convergence), got %d", len(drained))
+	}
+	names := make(map[string]bool)
+	for _, m := range drained {
+		names[m.Name] = true
+	}
+	if !names["feedback-mix-conv-1"] {
+		t.Error("expected feedback-mix-conv-1")
+	}
+	if !names["convergence-mix-1"] {
+		t.Error("expected convergence-mix-1")
+	}
+
+	// all 3 should be archived
+	archiveFiles, _ := ListDMail(dir, "archive")
+	if len(archiveFiles) != 3 {
+		t.Errorf("expected 3 archived, got %d", len(archiveFiles))
 	}
 }

@@ -29,6 +29,7 @@ SKILL.md routing tables ensure most prefixes are exclusive per tool.
 | sightjack | report | `report` | sanitized wave key | `report-auth-w1.md` |
 | paintress | report | `report` | lowercase issue ID | `report-my-42.md` |
 | amadeus | feedback | `feedback` | sequential number (zero-padded) | `feedback-001.md` |
+| amadeus | convergence | `conv` | sequential number (zero-padded) | `conv-001.md` |
 
 ### 2-bis. Shared Kind Prefix
 

@@ -87,6 +87,27 @@ After each wave completion, the AI generates follow-up waves based on what was l
   -> API W2 prerequisites updated (now depends on Auth W2)
 ```
 
+## D-Mail & Convergence Gate
+
+Sightjack communicates with downstream tools (amadeus, paintress) via D-Mail, a file-based message protocol. D-Mail kinds:
+
+| Kind | Direction | Description |
+|------|-----------|-------------|
+| `specification` | outbound | Wave specification sent to downstream tools |
+| `report` | outbound | Wave completion report |
+| `feedback` | inbound | Feedback from downstream tools (injected into nextgen prompts) |
+| `convergence` | inbound | Convergence signal — requires user approval before session proceeds |
+
+When a `convergence` D-Mail is detected at session startup, the **convergence gate** activates:
+
+1. **Notify** — desktop notification (fire-and-forget, non-blocking with 30s timeout)
+2. **Approve** — blocking prompt (stdin y/N, external command, or auto-approve)
+3. **Re-drain** — checks for late-arriving convergence and loops if found
+
+The gate runs before the interactive wave loop in all session modes (`run`, `resume`, `rescan`). Gate behavior is configurable via `gate:` config section or `--notify-cmd` / `--approve-cmd` / `--auto-approve` CLI flags.
+
+SKILL.md files in `.siren/skills/` declare produces/consumes routing for phonewave discovery using Agent Skills spec format with `dmail-schema-version: "1"`.
+
 ## Architecture
 
 ### Pipe Architecture (v0.0.12+)
@@ -234,6 +255,15 @@ sightjack run -l ja
 # Custom config path
 sightjack run -c .siren/config.yaml
 
+# Auto-approve convergence gate (CI mode)
+sightjack run --auto-approve
+
+# Custom notification command
+sightjack run --notify-cmd 'echo {title}: {message}'
+
+# Custom approval command (exit 0 = approve)
+sightjack run --approve-cmd 'my-approval-tool {message}'
+
 # Verbose logging
 sightjack run -v
 
@@ -287,6 +317,9 @@ cat wave.json | sightjack apply | sightjack nextgen
 
 | Subcommand | Flag | Short | Default | Description |
 |------------|------|-------|---------|-------------|
+| `run` | `--notify-cmd` | | `""` | Notification command ({title}, {message} placeholders) |
+| `run` | `--approve-cmd` | | `""` | Approval command ({message} placeholder, exit 0 = approve) |
+| `run` | `--auto-approve` | | `false` | Skip approval gate for convergence D-Mail |
 | `scan` | `--json` | `-j` | `false` | Output structured JSON |
 | `version` | `--json` | `-j` | `false` | Output version info as JSON |
 | `update` | `--check` | `-C` | `false` | Check for updates without installing |
@@ -328,6 +361,11 @@ labels:
   enabled: true          # Auto-label ready issues in Linear
   prefix: "sightjack"    # Label prefix (default: "sightjack")
   ready_label: "sightjack:ready"  # Ready-for-execution label name
+
+gate:
+  notify_cmd: ""         # Custom notification command ({title}, {message} placeholders)
+  approve_cmd: ""        # Custom approval command ({message} placeholder, exit 0 = approve)
+  auto_approve: false    # Skip approval gate for convergence D-Mail
 
 dod_templates:           # Custom DoD templates by issue type
   api_endpoint:
@@ -424,6 +462,9 @@ just jaeger-down    # Stop Jaeger
 +-- init.go                  Config scaffolding logic
 +-- doctor.go                Environment health check logic
 +-- dmail.go                 D-Mail protocol (inbox/outbox/archive, fsnotify monitor)
++-- notify.go                Notifier interface (LocalNotifier, CmdNotifier, NopNotifier)
++-- approve.go               Approver interface (StdinApprover, CmdApprover, AutoApprover)
++-- gate.go                  Convergence gate (FilterConvergence, RunConvergenceGate, RunConvergenceGateWithRedrain)
 +-- telemetry.go             OpenTelemetry tracing (OTLP export, noop fallback)
 +-- *_test.go                Tests
 +-- justfile                 Task runner

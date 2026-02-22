@@ -1406,7 +1406,7 @@ func TestCanResume_EmptyWaves(t *testing.T) {
 }
 
 func TestCanResume_EmptyPath(t *testing.T) {
-	// given: state with empty ScanResultPath (v0.4 upgrade)
+	// given: state with empty ScanResultPath (fallback to ScanDir)
 	state := &SessionState{ScanResultPath: ""}
 
 	// when / then
@@ -1427,7 +1427,7 @@ func TestPartialApplyDelta(t *testing.T) {
 		{"full success", 5, 5, 0.3, 0.6, 0.6},
 		{"partial 3/5", 3, 5, 0.3, 0.6, 0.48},
 		{"zero applied", 0, 5, 0.3, 0.6, 0.3},
-		{"zero total (legacy)", 0, 0, 0.3, 0.6, 0.6},
+		{"zero total", 0, 0, 0.3, 0.6, 0.6},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1621,40 +1621,6 @@ func TestTryRecoverState(t *testing.T) {
 	}
 }
 
-func TestTryRecoverState_LegacyScansDir(t *testing.T) {
-	// given: scan result under legacy .siren/scans/ path (pre-rename)
-	dir := t.TempDir()
-	sessionID := "legacy-session"
-	legacyScanDir := filepath.Join(dir, ".siren", "scans", sessionID)
-	os.MkdirAll(legacyScanDir, 0755)
-
-	scanResult := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "api", Completeness: 0.6}},
-		Completeness: 0.6,
-	}
-	legacyPath := filepath.Join(legacyScanDir, "scan_result.json")
-	if err := WriteScanResult(legacyPath, scanResult); err != nil {
-		t.Fatalf("WriteScanResult: %v", err)
-	}
-
-	// when: TryRecoverState should find it despite ScanDir() pointing to .run/
-	recovered, err := TryRecoverState(dir, sessionID, NewLogger(io.Discard, false))
-
-	// then
-	if err != nil {
-		t.Fatalf("TryRecoverState failed for legacy path: %v", err)
-	}
-	if recovered == nil {
-		t.Fatal("expected recovered state, got nil")
-	}
-	if recovered.Completeness != 0.6 {
-		t.Errorf("Completeness: expected 0.6, got %f", recovered.Completeness)
-	}
-	if recovered.ScanResultPath != legacyPath {
-		t.Errorf("ScanResultPath: expected %q, got %q", legacyPath, recovered.ScanResultPath)
-	}
-}
-
 func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
 	// given: saved state where auth-w1 is completed and auth-w2 is locked (depends on auth-w1)
 	// After restore + EvaluateUnlocks, auth-w2 should become available
@@ -1746,24 +1712,24 @@ func TestMergeCompletedStatus_AllCompleted(t *testing.T) {
 }
 
 func TestResumeScanDir_DerivedFromScanResultPath(t *testing.T) {
-	// given: state with ScanResultPath pointing to legacy .siren/scans/ directory
+	// given: state with ScanResultPath set
 	state := &SessionState{
 		SessionID:      "old-session",
-		ScanResultPath: "/project/.siren/scans/old-session/scan_result.json",
+		ScanResultPath: "/project/.siren/.run/old-session/scan_result.json",
 	}
 
 	// when
 	got := ResumeScanDir(state, "/project")
 
-	// then: should derive scanDir from ScanResultPath, not from ScanDir()
-	want := "/project/.siren/scans/old-session"
+	// then: should derive scanDir from ScanResultPath
+	want := "/project/.siren/.run/old-session"
 	if got != want {
 		t.Errorf("ResumeScanDir: expected %q, got %q", want, got)
 	}
 }
 
 func TestResumeScanDir_EmptyScanResultPath_FallsBack(t *testing.T) {
-	// given: state with empty ScanResultPath (v0.4 upgrade)
+	// given: state with empty ScanResultPath (fallback to ScanDir)
 	state := &SessionState{
 		SessionID:      "new-session",
 		ScanResultPath: "",
@@ -1796,47 +1762,20 @@ func TestResumeScanDir_CurrentPathFormat(t *testing.T) {
 	}
 }
 
-func TestRecoverLatestState_FromLegacyScansDir(t *testing.T) {
-	// given: scan result only in legacy .siren/scans/ (no .run/ exists)
-	dir := t.TempDir()
-	sessionID := "session-1000-1"
-	legacyDir := filepath.Join(dir, ".siren", "scans", sessionID)
-	os.MkdirAll(legacyDir, 0755)
-	scanResult := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "auth", Completeness: 0.5}},
-		Completeness: 0.5,
-	}
-	WriteScanResult(filepath.Join(legacyDir, "scan_result.json"), scanResult)
-
-	// when
-	recovered, err := RecoverLatestState(dir, NewLogger(io.Discard, false))
-
-	// then
-	if err != nil {
-		t.Fatalf("RecoverLatestState failed: %v", err)
-	}
-	if recovered == nil {
-		t.Fatal("expected recovered state, got nil")
-	}
-	if recovered.SessionID != sessionID {
-		t.Errorf("SessionID: expected %q, got %q", sessionID, recovered.SessionID)
-	}
-}
-
 func TestRecoverLatestState_PrefersNewest(t *testing.T) {
-	// given: sessions in both .run/ and legacy scans/
+	// given: two sessions in .run/, should pick the newest
 	dir := t.TempDir()
 
-	// Older session in legacy scans/
+	// Older session
 	oldID := "session-1000-1"
-	oldDir := filepath.Join(dir, ".siren", "scans", oldID)
+	oldDir := filepath.Join(dir, ".siren", ".run", oldID)
 	os.MkdirAll(oldDir, 0755)
 	WriteScanResult(filepath.Join(oldDir, "scan_result.json"), &ScanResult{
 		Clusters:     []ClusterScanResult{{Name: "old", Completeness: 0.3}},
 		Completeness: 0.3,
 	})
 
-	// Newer session in .run/
+	// Newer session
 	newID := "session-2000-1"
 	newDir := filepath.Join(dir, ".siren", ".run", newID)
 	os.MkdirAll(newDir, 0755)

@@ -34,6 +34,13 @@ type LabelsConfig struct {
 	ReadyLabel string `yaml:"ready_label"`
 }
 
+// GateConfig holds convergence gate notification and approval settings.
+type GateConfig struct {
+	NotifyCmd   string `yaml:"notify_cmd"`
+	ApproveCmd  string `yaml:"approve_cmd"`
+	AutoApprove bool   `yaml:"auto_approve"`
+}
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
 	Linear       LinearConfig           `yaml:"linear"`
@@ -43,6 +50,7 @@ type Config struct {
 	Strictness   StrictnessConfig       `yaml:"strictness"`
 	Retry        RetryConfig            `yaml:"retry"`
 	Labels       LabelsConfig           `yaml:"labels"`
+	Gate         GateConfig             `yaml:"gate"`
 	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates"`
 	Lang         string                 `yaml:"lang"`
 }
