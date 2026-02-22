@@ -49,16 +49,11 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 		fmt.Fprintf(a.out, "[CONVERGENCE] %s\nApprove? (y/N): ", message)
 	}
 
-	// On context cancellation, close the reader (if closable) to unblock
-	// the read goroutine. For stdin (*os.File) this is safe during shutdown.
-	// For readers without Close (e.g. strings.Reader), the goroutine stays
-	// blocked until Read returns; it exits via the buffered channel.
-	stop := context.AfterFunc(ctx, func() {
-		if c, ok := a.input.(io.Closer); ok {
-			c.Close()
-		}
-	})
-
+	// Read in a goroutine so we can select on ctx.Done().
+	// We intentionally do NOT close the reader on cancel — it may be
+	// os.Stdin, and closing FD 0 would break subsequent reads in the
+	// same process. The goroutine may leak until the read returns (e.g.
+	// on process exit), which is acceptable for a single approval prompt.
 	type result struct {
 		line string
 		err  error
@@ -73,7 +68,6 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 	case <-ctx.Done():
 		return false, ctx.Err()
 	case r := <-ch:
-		stop()
 		// Evaluate answer even on io.EOF — piped input may not end with newline.
 		// Only deny on error if no content was read.
 		answer := strings.TrimSpace(strings.ToLower(r.line))

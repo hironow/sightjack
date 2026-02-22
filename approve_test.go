@@ -149,9 +149,9 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 	}
 }
 
-func TestStdinApprover_ContextCancelUnblocksRead(t *testing.T) {
+func TestStdinApprover_ContextCancelDoesNotCloseReader(t *testing.T) {
 	// given: a closable reader that tracks Close calls.
-	// When context cancels, the reader should be closed to unblock Read.
+	// Context cancel should NOT close the reader (it may be os.Stdin).
 	cr := &trackingReadCloser{blocking: true}
 	ctx, cancel := context.WithCancel(context.Background())
 	a := &StdinApprover{input: cr}
@@ -176,18 +176,15 @@ func TestStdinApprover_ContextCancelUnblocksRead(t *testing.T) {
 		t.Fatal("RequestApproval did not return after context cancel")
 	}
 
-	// then: the reader was closed to unblock the read goroutine.
-	// context.AfterFunc fires in a separate goroutine, so allow a brief
-	// moment for it to execute after ctx.Done() resolves.
-	deadline := time.After(1 * time.Second)
-	for !cr.closed.Load() {
-		select {
-		case <-deadline:
-			t.Fatal("expected reader to be closed on context cancel to prevent goroutine leak")
-		default:
-			time.Sleep(5 * time.Millisecond)
-		}
+	// then: the reader must NOT be closed (shared stdin safety).
+	// Allow a brief moment for any async side effects to settle.
+	time.Sleep(100 * time.Millisecond)
+	if cr.closed.Load() {
+		t.Fatal("reader should NOT be closed on context cancel — closing os.Stdin would break the process")
 	}
+
+	// cleanup: unblock the leaked goroutine so it can exit
+	cr.Close()
 }
 
 // trackingReadCloser is a test helper that blocks on Read and tracks Close calls.
