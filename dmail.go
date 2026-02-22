@@ -186,10 +186,10 @@ func receiveDMailIfNew(baseDir, filename string, logger *Logger) *DMail {
 	return mail
 }
 
-// MonitorInbox starts monitoring the inbox directory for feedback d-mails.
+// MonitorInbox starts monitoring the inbox directory for feedback and convergence d-mails.
 // It first drains existing files (initial scan), then watches for new files via fsnotify.
-// Each d-mail is received (archived + removed from inbox). Only feedback d-mails
-// are sent to the returned channel. Consumer-side dedup is applied (MY-271).
+// Each d-mail is received (archived + removed from inbox). Only feedback and convergence
+// d-mails are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
 func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
@@ -258,8 +258,8 @@ func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *
 	return ch, nil
 }
 
-// DrainInboxFeedback reads all currently buffered feedback from the monitor channel
-// and displays them to the CLI. Returns the drained feedback messages for downstream use.
+// DrainInboxFeedback reads all currently buffered d-mails (feedback and convergence)
+// from the monitor channel and logs them. Returns the drained messages for downstream use.
 func DrainInboxFeedback(ch <-chan *DMail, logger *Logger) []*DMail {
 	if ch == nil {
 		return nil
@@ -280,13 +280,17 @@ loop:
 	if len(feedback) == 0 {
 		return nil
 	}
-	logger.Info("Received %d feedback d-mail(s):", len(feedback))
+	logger.Info("Received %d d-mail(s):", len(feedback))
 	for _, fb := range feedback {
+		prefix := "[D-Mail]"
+		if fb.Kind == DMailConvergence {
+			prefix = "[D-Mail] [CONVERGENCE]"
+		}
 		switch fb.Severity {
 		case "high":
-			logger.Warn("[%s] %s (severity: HIGH)", fb.Name, fb.Description)
+			logger.Warn("%s [%s] %s (severity: HIGH)", prefix, fb.Name, fb.Description)
 		default:
-			logger.Info("[%s] %s", fb.Name, fb.Description)
+			logger.Info("%s [%s] %s", prefix, fb.Name, fb.Description)
 		}
 	}
 	return feedback
