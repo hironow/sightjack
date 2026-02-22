@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -43,13 +44,17 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier Notifier,
 	}
 	summary := fmt.Sprintf("Convergence signal received: %s", strings.Join(names, ", "))
 
-	// Notify (fire-and-forget — log warning on failure).
+	// Notify (fire-and-forget — non-blocking with 30s timeout).
 	if notifier != nil {
-		_, notifySpan := tracer.Start(ctx, "notify.convergence")
-		if err := notifier.Notify(ctx, "Sightjack Convergence", summary); err != nil {
-			logger.Warn("Convergence notification failed (non-fatal): %v", err)
-		}
-		notifySpan.End()
+		go func(title, msg string) {
+			_, notifySpan := tracer.Start(ctx, "notify.convergence")
+			defer notifySpan.End()
+			notifyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := notifier.Notify(notifyCtx, title, msg); err != nil {
+				logger.Warn("Convergence notification failed (non-fatal): %v", err)
+			}
+		}("Sightjack Convergence", summary)
 	}
 
 	// Context check before approval — early exit if already cancelled.

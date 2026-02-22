@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 )
 
 func TestFilterConvergence_Empty(t *testing.T) {
@@ -216,7 +217,50 @@ func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T
 	}
 }
 
+func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
+	// given: a notifier that blocks indefinitely + convergence d-mail.
+	// Gate should not hang — notification must be non-blocking.
+	dmails := []*DMail{
+		{Name: "conv-1", Kind: DMailConvergence, Description: "convergence signal"},
+	}
+	notifier := &blockingNotifier{ch: make(chan struct{})}
+	approver := &AutoApprover{}
+	logger := NewLogger(io.Discard, false)
+
+	// when: run gate with a deadline
+	done := make(chan struct{})
+	var approved bool
+	var err error
+	go func() {
+		approved, err = RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+		close(done)
+	}()
+
+	// then: should complete within 2s (not block on notifier)
+	select {
+	case <-done:
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !approved {
+			t.Error("expected approval")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("RunConvergenceGate blocked on slow notifier")
+	}
+}
+
 // --- test helpers ---
+
+// blockingNotifier blocks forever on Notify — simulates a hung notify command.
+type blockingNotifier struct {
+	ch chan struct{}
+}
+
+func (n *blockingNotifier) Notify(_ context.Context, _, _ string) error {
+	<-n.ch // block forever
+	return nil
+}
 
 // injectingApprover injects a D-Mail into the channel on the first call,
 // then approves on subsequent calls.
