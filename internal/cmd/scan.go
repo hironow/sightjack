@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -46,7 +47,12 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			logger.Info("Starting sightjack scan...")
 			logger.Info("Team: %s | Project: %s | Lang: %s", cfg.Linear.Team, cfg.Linear.Project, cfg.Lang)
 
-			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, cmd.OutOrStdout(), logger)
+			// When --json is set, stream Claude output to stderr so stdout stays clean for pipe.
+			streamOut := cmd.OutOrStdout()
+			if jsonOutput {
+				streamOut = cmd.ErrOrStderr()
+			}
+			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, streamOut, logger)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}
@@ -86,6 +92,13 @@ Use --json to output structured JSON for piping into downstream commands.`,
 					IssueCount:   len(c.Issues),
 				})
 			}
+
+			// Cache scan result for pipe replay: cat .siren/.run/<id>/scan_result.json | sightjack waves
+			scanResultPath := filepath.Join(sightjack.ScanDir(baseDir, sessionID), "scan_result.json")
+			if err := sightjack.WriteScanResult(scanResultPath, result); err != nil {
+				logger.Warn("Failed to cache scan result: %v", err)
+			}
+			state.ScanResultPath = scanResultPath
 
 			if err := sightjack.WriteState(baseDir, state); err != nil {
 				logger.Warn("Failed to save state: %v", err)

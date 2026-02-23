@@ -2,6 +2,7 @@ package sightjack
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
@@ -306,6 +307,130 @@ func TestLifecycle_RunScan_SingleCluster(t *testing.T) {
 	// Verify classify.json was written
 	scanDir := ScanDir(baseDir, sessionID)
 	assertFileExists(t, filepath.Join(scanDir, "classify.json"))
+}
+
+func TestLifecycle_RunScan_StreamingGoesToOut(t *testing.T) {
+	// given: RunScan streams Claude output (from mock: "echo ok") to the `out` writer.
+	// When --json is used, cmd layer redirects `out` to stderr. This test verifies
+	// that streaming data actually arrives in `out`, not somewhere else.
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-scan-stream"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	cleanup := d.Install()
+	defer cleanup()
+
+	var streamBuf strings.Builder
+
+	// when: pass &streamBuf as the streaming output writer
+	result, err := RunScan(context.Background(), cfg, baseDir, sessionID, false, &streamBuf, NewLogger(io.Discard, false))
+
+	// then: streaming buffer must contain mock Claude output ("ok" from echo)
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if streamBuf.Len() == 0 {
+		t.Error("expected streaming output in out writer, got empty buffer")
+	}
+	// The streaming output must NOT be valid ScanResult JSON — it's raw Claude output.
+	var probe ScanResult
+	if json.Unmarshal([]byte(streamBuf.String()), &probe) == nil && len(probe.Clusters) > 0 {
+		t.Error("streaming output should be raw Claude output, not structured ScanResult JSON")
+	}
+}
+
+func TestLifecycle_RunScan_JsonPipeStdoutClean(t *testing.T) {
+	// given: simulate the --json pipe scenario.
+	// stdout = JSON result only, streaming goes to a separate writer (stderr in real usage).
+	// This verifies that separating `out` from the JSON writer produces clean pipe output.
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-scan-pipe"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	cleanup := d.Install()
+	defer cleanup()
+
+	var streamBuf strings.Builder // simulates stderr (streaming)
+
+	// when: streaming goes to streamBuf (stderr), NOT to stdout
+	result, err := RunScan(context.Background(), cfg, baseDir, sessionID, false, &streamBuf, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+
+	// Simulate what scan.go does for --json: marshal result to stdout
+	var stdoutBuf strings.Builder
+	data, jsonErr := json.MarshalIndent(result, "", "  ")
+	if jsonErr != nil {
+		t.Fatalf("JSON marshal failed: %v", jsonErr)
+	}
+	stdoutBuf.Write(data)
+	stdoutBuf.WriteByte('\n')
+
+	// then: stdout must be valid ScanResult JSON parseable by `waves`
+	var parsed ScanResult
+	if err := json.Unmarshal([]byte(stdoutBuf.String()), &parsed); err != nil {
+		t.Fatalf("stdout is not valid JSON (pipe would break): %v\nContent: %s", err, stdoutBuf.String())
+	}
+	if len(parsed.Clusters) != 1 {
+		t.Errorf("expected 1 cluster in parsed stdout, got %d", len(parsed.Clusters))
+	}
+
+	// streaming (stderr) must have content and NOT pollute stdout
+	if streamBuf.Len() == 0 {
+		t.Error("expected streaming output in stderr writer")
+	}
+	if strings.Contains(stdoutBuf.String(), streamBuf.String()) {
+		t.Error("streaming output leaked into stdout — pipe would receive non-JSON data")
+	}
+}
+
+func TestLifecycle_RunScan_SavesScanResultJson(t *testing.T) {
+	// given: scan command now saves scan_result.json for pipe replay
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-scan-cache"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	cleanup := d.Install()
+	defer cleanup()
+
+	// when
+	result, err := RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+
+	// Simulate what scan.go does: save scan_result.json
+	scanDir := ScanDir(baseDir, sessionID)
+	scanResultPath := filepath.Join(scanDir, "scan_result.json")
+	if err := WriteScanResult(scanResultPath, result); err != nil {
+		t.Fatalf("WriteScanResult failed: %v", err)
+	}
+
+	// then: scan_result.json exists and is loadable
+	assertFileExists(t, scanResultPath)
+	loaded, err := LoadScanResult(scanResultPath)
+	if err != nil {
+		t.Fatalf("LoadScanResult failed: %v", err)
+	}
+	if len(loaded.Clusters) != 1 {
+		t.Errorf("expected 1 cluster in cached result, got %d", len(loaded.Clusters))
+	}
+	if loaded.Clusters[0].Name != result.Clusters[0].Name {
+		t.Errorf("cached cluster name mismatch: %q vs %q", loaded.Clusters[0].Name, result.Clusters[0].Name)
+	}
 }
 
 func TestLifecycle_RunScan_MultiCluster(t *testing.T) {
