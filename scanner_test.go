@@ -1009,6 +1009,12 @@ func TestDetectFailedClusterNames(t *testing.T) {
 			successes: []WaveGenerateResult{},
 			want:      map[string]bool{},
 		},
+		{
+			name:      "empty cluster name in success is not counted",
+			clusters:  []ClusterScanResult{{Name: "Auth"}},
+			successes: []WaveGenerateResult{{ClusterName: ""}},
+			want:      map[string]bool{"Auth": true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1023,5 +1029,30 @@ func TestDetectFailedClusterNames(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGenerateWaveForCluster_DryRunPopulatesClusterName(t *testing.T) {
+	// given: a cluster with dryRun=true
+	scanDir := t.TempDir()
+	cfg := DefaultConfig()
+	cluster := ClusterScanResult{
+		Name:   "Auth",
+		Issues: []IssueDetail{{ID: "T-1"}},
+	}
+
+	// when: dry-run wave generation
+	result, err := generateWaveForCluster(
+		context.Background(), &cfg, scanDir, 0, cluster,
+		true, // dryRun
+		WithAllowedTools(), NewLogger(io.Discard, false),
+	)
+
+	// then: ClusterName is populated even on dry-run
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ClusterName != "Auth" {
+		t.Errorf("dry-run result should have ClusterName=%q, got %q", "Auth", result.ClusterName)
 	}
 }
