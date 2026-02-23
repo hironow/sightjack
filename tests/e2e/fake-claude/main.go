@@ -44,6 +44,16 @@ func main() {
 		return
 	}
 
+	// Simulated failure for partial-failure E2E testing.
+	// When FAKE_CLAUDE_FAIL_PATTERN is set and the output path contains the
+	// pattern, exit 1 without writing any file — mimicking a Claude CLI crash.
+	if failPattern := os.Getenv("FAKE_CLAUDE_FAIL_PATTERN"); failPattern != "" {
+		if strings.Contains(outputPath, failPattern) {
+			fmt.Fprintf(os.Stderr, "fake-claude: simulated failure (pattern %q matched %q)\n", failPattern, outputPath)
+			os.Exit(1)
+		}
+	}
+
 	filename := filepath.Base(outputPath)
 	matched := false
 	for _, f := range fixtures {
