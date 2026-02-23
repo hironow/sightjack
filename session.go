@@ -739,10 +739,14 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
 	}
-	for _, w := range rescanWarnings {
-		logger.Warn("%s", w)
-	}
-	oldCompleted := BuildCompletedWaveMap(RestoreWaves(oldState.Waves))
+	// rescanWarnings are already logged by RunParallel; just propagate.
+	_ = rescanWarnings
+
+	// Carry forward old waves whose clusters failed regeneration so that
+	// completed progress is never lost on transient partial failures.
+	oldWaves := RestoreWaves(oldState.Waves)
+	waves = mergeOldWaves(oldWaves, waves)
+	oldCompleted := BuildCompletedWaveMap(oldWaves)
 	waves = MergeCompletedStatus(oldCompleted, waves)
 	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
 	completed := BuildCompletedWaveMap(waves)
@@ -863,6 +867,27 @@ func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 		}
 	}
 	return completed
+}
+
+// mergeOldWaves carries forward waves from clusters that are absent in
+// newWaves so that partial wave-generation failures do not discard prior
+// progress. Waves whose cluster IS present in newWaves are replaced by the
+// fresh generation.
+func mergeOldWaves(oldWaves, newWaves []Wave) []Wave {
+	newClusters := make(map[string]bool, len(newWaves))
+	for _, w := range newWaves {
+		newClusters[w.ClusterName] = true
+	}
+	merged := make([]Wave, 0, len(newWaves)+len(oldWaves))
+	// Start with all freshly generated waves.
+	merged = append(merged, newWaves...)
+	// Append old waves whose cluster was not regenerated.
+	for _, w := range oldWaves {
+		if !newClusters[w.ClusterName] {
+			merged = append(merged, w)
+		}
+	}
+	return merged
 }
 
 // MergeCompletedStatus preserves completed status from a previous session

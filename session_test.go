@@ -1860,3 +1860,73 @@ func TestTryRecoverStateNoFiles(t *testing.T) {
 		t.Error("expected nil state")
 	}
 }
+
+func TestMergeOldWaves_CarriesForwardMissingClusters(t *testing.T) {
+	oldWaves := []Wave{
+		{ID: "1", ClusterName: "auth", Title: "Auth wave", Status: "completed"},
+		{ID: "2", ClusterName: "db", Title: "DB wave", Status: "pending"},
+		{ID: "3", ClusterName: "api", Title: "API wave", Status: "completed"},
+	}
+	// Only "auth" and "api" regenerated; "db" failed.
+	newWaves := []Wave{
+		{ID: "1", ClusterName: "auth", Title: "Auth wave v2"},
+		{ID: "3", ClusterName: "api", Title: "API wave v2"},
+	}
+
+	merged := mergeOldWaves(oldWaves, newWaves)
+
+	// Expect 3 waves: 2 new + 1 carried forward.
+	if len(merged) != 3 {
+		t.Fatalf("expected 3 waves, got %d: %v", len(merged), merged)
+	}
+	// First two are the new generations.
+	if merged[0].Title != "Auth wave v2" {
+		t.Errorf("merged[0] should be new auth wave, got %q", merged[0].Title)
+	}
+	if merged[1].Title != "API wave v2" {
+		t.Errorf("merged[1] should be new api wave, got %q", merged[1].Title)
+	}
+	// Third is the carried-forward old "db" wave.
+	if merged[2].ClusterName != "db" || merged[2].Title != "DB wave" {
+		t.Errorf("merged[2] should be old db wave, got cluster=%q title=%q", merged[2].ClusterName, merged[2].Title)
+	}
+	if merged[2].Status != "pending" {
+		t.Errorf("carried-forward wave should preserve original status, got %q", merged[2].Status)
+	}
+}
+
+func TestMergeOldWaves_AllClustersRegenerated(t *testing.T) {
+	oldWaves := []Wave{
+		{ID: "1", ClusterName: "auth", Title: "Auth old"},
+	}
+	newWaves := []Wave{
+		{ID: "1", ClusterName: "auth", Title: "Auth new"},
+	}
+
+	merged := mergeOldWaves(oldWaves, newWaves)
+
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(merged))
+	}
+	if merged[0].Title != "Auth new" {
+		t.Errorf("should use new wave, got %q", merged[0].Title)
+	}
+}
+
+func TestMergeOldWaves_NoClustersRegenerated(t *testing.T) {
+	oldWaves := []Wave{
+		{ID: "1", ClusterName: "auth", Title: "Auth old", Status: "completed"},
+		{ID: "2", ClusterName: "db", Title: "DB old", Status: "pending"},
+	}
+	// All clusters failed — empty newWaves.
+	var newWaves []Wave
+
+	merged := mergeOldWaves(oldWaves, newWaves)
+
+	if len(merged) != 2 {
+		t.Fatalf("expected 2 carried-forward waves, got %d", len(merged))
+	}
+	if merged[0].ClusterName != "auth" || merged[1].ClusterName != "db" {
+		t.Errorf("all old waves should be carried forward, got %v", merged)
+	}
+}
