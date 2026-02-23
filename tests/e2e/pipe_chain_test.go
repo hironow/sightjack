@@ -108,6 +108,7 @@ func TestE2E_Pipe_ScanJSON(t *testing.T) {
 	if _, ok := result["clusters"]; !ok {
 		t.Error("scan result missing 'clusters' key")
 	}
+	assertResultFileCached(t, dir, "scan_result.json")
 }
 
 func TestE2E_Pipe_WavesFromFixture(t *testing.T) {
@@ -134,6 +135,7 @@ func TestE2E_Pipe_WavesFromFixture(t *testing.T) {
 	if _, ok := plan["waves"]; !ok {
 		t.Error("wave plan missing 'waves' key")
 	}
+	assertResultFileCached(t, dir, "waves_result.json")
 }
 
 func TestE2E_Pipe_ApplyDryRun(t *testing.T) {
@@ -208,6 +210,51 @@ func TestE2E_Pipe_SelectInteractive(t *testing.T) {
 	}
 }
 
+// findResultFiles searches .siren/.run/<session>/ for files matching a glob pattern.
+// Returns all matching file paths, or nil if none found.
+func findResultFiles(t *testing.T, dir, pattern string) []string {
+	t.Helper()
+	runDir := filepath.Join(dir, ".siren", ".run")
+	sessions, err := os.ReadDir(runDir)
+	if err != nil {
+		return nil
+	}
+	var matches []string
+	for _, s := range sessions {
+		if !s.IsDir() {
+			continue
+		}
+		sessionDir := filepath.Join(runDir, s.Name())
+		entries, _ := os.ReadDir(sessionDir)
+		for _, e := range entries {
+			ok, _ := filepath.Match(pattern, e.Name())
+			if ok {
+				matches = append(matches, filepath.Join(sessionDir, e.Name()))
+			}
+		}
+	}
+	return matches
+}
+
+// assertResultFileCached verifies at least one file matching pattern exists in
+// .siren/.run/ and contains valid JSON with a non-zero size.
+func assertResultFileCached(t *testing.T, dir, pattern string) {
+	t.Helper()
+	files := findResultFiles(t, dir, pattern)
+	if len(files) == 0 {
+		t.Errorf("expected cached result file matching %q in .siren/.run/, found none", pattern)
+		return
+	}
+	data, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Errorf("read cached result %s: %v", files[0], err)
+		return
+	}
+	if len(data) == 0 {
+		t.Errorf("cached result file %s is empty", files[0])
+	}
+}
+
 // --- Show as pipe destination ---
 
 func TestE2E_Pipe_ShowFromStdin(t *testing.T) {
@@ -266,12 +313,13 @@ func TestE2E_Pipe_TwoStepChain(t *testing.T) {
 		stdin func(t *testing.T) string // stdin content; empty = use previous stdout
 	}
 	tests := []struct {
-		name       string
-		step1      step
-		step2      step
-		assertJSON bool   // true = parse step2 stdout as JSON and check for wantKey
-		wantKey    string // JSON top-level key expected in step2 stdout
-		wantStr    string // substring expected in step2 stdout (for non-JSON)
+		name            string
+		step1           step
+		step2           step
+		assertJSON      bool     // true = parse step2 stdout as JSON and check for wantKey
+		wantKey         string   // JSON top-level key expected in step2 stdout
+		wantStr         string   // substring expected in step2 stdout (for non-JSON)
+		wantResultFiles []string // glob patterns for cached result files in .siren/.run/
 	}{
 		{
 			name: "ScanToWaves",
@@ -281,8 +329,9 @@ func TestE2E_Pipe_TwoStepChain(t *testing.T) {
 			step2: step{
 				args: func(dir string) []string { return []string{"waves", dir} },
 			},
-			assertJSON: true,
-			wantKey:    "waves",
+			assertJSON:      true,
+			wantKey:         "waves",
+			wantResultFiles: []string{"scan_result.json", "waves_result.json"},
 		},
 		{
 			name: "ScanToShow",
@@ -292,7 +341,8 @@ func TestE2E_Pipe_TwoStepChain(t *testing.T) {
 			step2: step{
 				args: func(dir string) []string { return []string{"show"} },
 			},
-			wantStr: "Auth",
+			wantStr:         "Auth",
+			wantResultFiles: []string{"scan_result.json"},
 		},
 		{
 			name: "WavesToShow",
@@ -303,7 +353,8 @@ func TestE2E_Pipe_TwoStepChain(t *testing.T) {
 			step2: step{
 				args: func(dir string) []string { return []string{"show"} },
 			},
-			wantStr: "Auth",
+			wantStr:         "Auth",
+			wantResultFiles: []string{"waves_result.json"},
 		},
 		{
 			name: "ApplyToNextgen",
@@ -314,8 +365,9 @@ func TestE2E_Pipe_TwoStepChain(t *testing.T) {
 			step2: step{
 				args: func(dir string) []string { return []string{"nextgen", dir} },
 			},
-			assertJSON: true,
-			wantKey:    "waves",
+			assertJSON:      true,
+			wantKey:         "waves",
+			wantResultFiles: []string{"apply_result.json", "nextgen_result.json"},
 		},
 	}
 	for _, tt := range tests {
@@ -364,6 +416,9 @@ func TestE2E_Pipe_TwoStepChain(t *testing.T) {
 			}
 			if tt.wantStr != "" && !strings.Contains(out2.String(), tt.wantStr) {
 				t.Errorf("expected %q in step2 output, got:\n%s", tt.wantStr, out2.String())
+			}
+			for _, pattern := range tt.wantResultFiles {
+				assertResultFileCached(t, dir, pattern)
 			}
 		})
 	}
@@ -467,6 +522,11 @@ func TestE2E_Pipe_FullChainScanToNextgen(t *testing.T) {
 	if _, ok := nextgenPlan["waves"]; !ok {
 		t.Error("nextgen plan missing 'waves' key")
 	}
+
+	// Verify all intermediate result files were cached.
+	for _, pattern := range []string{"scan_result.json", "waves_result.json", "apply_result.json", "nextgen_result.json"} {
+		assertResultFileCached(t, dir, pattern)
+	}
 }
 
 // --- ADR from DiscussResult ---
@@ -544,6 +604,7 @@ func TestE2E_Pipe_DiscussInteractive(t *testing.T) {
 		}
 		t.Fatalf("discuss exited with error: %v", waitErr)
 	}
+	assertResultFileCached(t, dir, "discuss_result.json")
 }
 
 // --- Nextgen-to-select loop-back ---
