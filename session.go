@@ -116,7 +116,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			Issues:       []IssueDetail{{ID: "SAMPLE-1", Identifier: "SAMPLE-1", Title: "Sample issue", Completeness: 0.5}},
 			Observations: []string{"sample observation for dry-run"},
 		}}
-		if _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
+		if _, _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
 			return fmt.Errorf("wave generate dry-run: %w", err)
 		}
 		// Also generate architect discuss prompt for dry-run
@@ -163,9 +163,12 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	}
 
 	// --- Pass 3: Wave Generate ---
-	waves, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, waveWarnings, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
+	}
+	for _, w := range waveWarnings {
+		logger.Warn("%s", w)
 	}
 
 	logger.OK("%d clusters, %d waves generated", len(scanResult.Clusters), len(waves))
@@ -733,9 +736,12 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to cache scan result: %v", err)
 	}
-	waves, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, rescanWarnings, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
+	}
+	for _, w := range rescanWarnings {
+		logger.Warn("%s", w)
 	}
 	oldCompleted := BuildCompletedWaveMap(RestoreWaves(oldState.Waves))
 	waves = MergeCompletedStatus(oldCompleted, waves)

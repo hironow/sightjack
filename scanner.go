@@ -11,7 +11,6 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/sync/errgroup"
 )
 
 // ParseClassifyResult reads and parses the classify.json output file.
@@ -226,7 +225,10 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 }
 
 // RunWaveGenerate executes Pass 3: generate waves for each cluster in parallel.
-func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool, logger *Logger) ([]Wave, error) {
+// Failed clusters are skipped with warnings (partial success), matching the
+// fault-tolerance pattern of RunParallelDeepScan. Returns an error only when
+// ALL clusters fail.
+func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool, logger *Logger) ([]Wave, []string, error) {
 	ctx, waveGenSpan := tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
@@ -235,77 +237,133 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 	logger.Scan("Pass 3: Generating waves for %d clusters...", len(clusters))
 
 	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
-	waveResults := make([]WaveGenerateResult, len(clusters))
 
-	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(cfg.Scan.MaxConcurrency)
+	type waveResult struct {
+		index  int
+		result WaveGenerateResult
+		err    error
+	}
 
+	maxConcurrency := cfg.Scan.MaxConcurrency
+	if maxConcurrency < 1 {
+		maxConcurrency = 1
+	}
+	sem := make(chan struct{}, maxConcurrency)
+	results := make(chan waveResult, len(clusters))
+
+	launched := 0
 	for i, cluster := range clusters {
-		g.Go(func() error {
-			waveFile := filepath.Join(scanDir, fmt.Sprintf("wave_%02d_%s.json", i, sanitizeName(cluster.Name)))
-
-			issuesJSON, err := json.Marshal(cluster.Issues)
-			if err != nil {
-				return fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
+		if ctx.Err() != nil {
+			break
+		}
+		acquired := false
+		select {
+		case <-ctx.Done():
+		case sem <- struct{}{}:
+			acquired = true
+		}
+		if !acquired || ctx.Err() != nil {
+			if acquired {
+				<-sem
 			}
-
-			dodSection := ResolveDoDSection(cfg.DoDTemplates, cluster.Name)
-
-			prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
-				ClusterName:     cluster.Name,
-				Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
-				Issues:          string(issuesJSON),
-				Observations:    strings.Join(cluster.Observations, "\n"),
-				DoDSection:      dodSection,
-				OutputPath:      waveFile,
-				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, append([]string{cluster.Name}, cluster.Labels...))),
-			})
-			if err != nil {
-				return fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)
-			}
-
-			if dryRun {
-				dryRunName := fmt.Sprintf("wave_%02d_%s", i, sanitizeName(cluster.Name))
-				return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
-			}
-
-			// Save prompt + tee output for debugging (consistent with deep scan).
-			promptBase := fmt.Sprintf("wave_%02d_%s", i, sanitizeName(cluster.Name))
-			if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
-				logger.Warn("save wave prompt: %v", err)
-			}
-			waveLog, waveLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
-			waveOut := io.Writer(io.Discard)
-			if waveLogErr == nil {
-				defer waveLog.Close()
-				waveOut = waveLog
-			} else {
-				logger.Warn("create wave log: %v", waveLogErr)
-			}
-
-			logger.Scan("Generating waves: %s", cluster.Name)
-			if _, err := RunClaude(gCtx, cfg, prompt, waveOut, logger, linearTools); err != nil {
-				return fmt.Errorf("wave generate %s: %w", cluster.Name, err)
-			}
-
-			if normErr := normalizeJSONFile(waveFile); normErr != nil {
-				logger.Warn("normalize wave JSON: %v", normErr)
-			}
-			result, err := ParseWaveGenerateResult(waveFile)
-			if err != nil {
-				return fmt.Errorf("parse waves %s: %w", cluster.Name, err)
-			}
-			waveResults[i] = *result
-			logger.OK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
-			return nil
-		})
+			break
+		}
+		launched++
+		go func() {
+			defer func() { <-sem }()
+			res, err := generateWaveForCluster(ctx, cfg, scanDir, i, cluster, dryRun, linearTools, logger)
+			results <- waveResult{index: i, result: res, err: err}
+		}()
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
+	// Collect results in original order.
+	type indexedResult struct {
+		result WaveGenerateResult
+		err    error
+	}
+	ordered := make([]*indexedResult, len(clusters))
+	var warnings []string
+	for range launched {
+		r := <-results
+		ordered[r.index] = &indexedResult{result: r.result, err: r.err}
+		if r.err != nil {
+			msg := fmt.Sprintf("Cluster %q wave generation failed: %v", clusters[r.index].Name, r.err)
+			logger.Warn("%s", msg)
+			warnings = append(warnings, msg)
+		}
 	}
 
-	return MergeWaveResults(waveResults), nil
+	var successResults []WaveGenerateResult
+	for _, ir := range ordered {
+		if ir != nil && ir.err == nil {
+			successResults = append(successResults, ir.result)
+		}
+	}
+
+	if len(successResults) == 0 && len(clusters) > 0 {
+		return nil, warnings, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
+	}
+
+	return MergeWaveResults(successResults), warnings, nil
+}
+
+// generateWaveForCluster generates waves for a single cluster.
+func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult, dryRun bool, linearTools RunOption, logger *Logger) (WaveGenerateResult, error) {
+	waveFile := filepath.Join(scanDir, fmt.Sprintf("wave_%02d_%s.json", index, sanitizeName(cluster.Name)))
+
+	issuesJSON, err := json.Marshal(cluster.Issues)
+	if err != nil {
+		return WaveGenerateResult{}, fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
+	}
+
+	dodSection := ResolveDoDSection(cfg.DoDTemplates, cluster.Name)
+
+	prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
+		ClusterName:     cluster.Name,
+		Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
+		Issues:          string(issuesJSON),
+		Observations:    strings.Join(cluster.Observations, "\n"),
+		DoDSection:      dodSection,
+		OutputPath:      waveFile,
+		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, append([]string{cluster.Name}, cluster.Labels...))),
+	})
+	if err != nil {
+		return WaveGenerateResult{}, fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)
+	}
+
+	if dryRun {
+		dryRunName := fmt.Sprintf("wave_%02d_%s", index, sanitizeName(cluster.Name))
+		return WaveGenerateResult{}, RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
+	}
+
+	// Save prompt + tee output for debugging (consistent with deep scan).
+	promptBase := fmt.Sprintf("wave_%02d_%s", index, sanitizeName(cluster.Name))
+	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save wave prompt: %v", err)
+	}
+	waveLog, waveLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+	waveOut := io.Writer(io.Discard)
+	if waveLogErr == nil {
+		defer waveLog.Close()
+		waveOut = waveLog
+	} else {
+		logger.Warn("create wave log: %v", waveLogErr)
+	}
+
+	logger.Scan("Generating waves: %s", cluster.Name)
+	if _, err := RunClaude(ctx, cfg, prompt, waveOut, logger, linearTools); err != nil {
+		return WaveGenerateResult{}, fmt.Errorf("wave generate %s: %w", cluster.Name, err)
+	}
+
+	if normErr := normalizeJSONFile(waveFile); normErr != nil {
+		logger.Warn("normalize wave JSON: %v", normErr)
+	}
+	result, err := ParseWaveGenerateResult(waveFile)
+	if err != nil {
+		return WaveGenerateResult{}, fmt.Errorf("parse waves %s: %w", cluster.Name, err)
+	}
+	logger.OK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
+	return *result, nil
 }
 
 // DeepScanFunc is the function signature for scanning a single cluster.

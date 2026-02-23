@@ -845,3 +845,123 @@ func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
 		t.Errorf("expected 1 result, got %d", len(results))
 	}
 }
+
+func TestRunWaveGenerate_PartialFailure(t *testing.T) {
+	// given: 3 clusters where the second one fails (claude exits non-zero)
+	scanDir := t.TempDir()
+
+	authResult := `{"cluster_name":"Auth","waves":[{"id":"auth-w1","cluster_name":"Auth","title":"Login","actions":[],"prerequisites":[],"delta":{"before":0.25,"after":0.40},"status":"available"}]}`
+	apiResult := `{"cluster_name":"API","waves":[{"id":"api-w1","cluster_name":"API","title":"Endpoints","actions":[],"prerequisites":[],"delta":{"before":0.30,"after":0.50},"status":"available"}]}`
+
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		prompt := ""
+		for i, a := range args {
+			if a == "-p" && i+1 < len(args) {
+				prompt = args[i+1]
+				break
+			}
+		}
+
+		// Find the output JSON path embedded in the prompt.
+		findJSONPath := func(p string) string {
+			for _, line := range strings.Split(p, "\n") {
+				if idx := strings.Index(line, scanDir); idx >= 0 {
+					sub := line[idx:]
+					if end := strings.Index(sub, "**"); end > 0 {
+						return sub[:end]
+					}
+					return strings.TrimRight(strings.TrimSpace(sub), " *`\"")
+				}
+			}
+			return ""
+		}
+
+		// Cluster "Bad" → exit 1 (simulate signal:killed / OOM).
+		if strings.Contains(prompt, "Bad") {
+			return exec.Command("false")
+		}
+		// Other clusters → write wave result.
+		outPath := findJSONPath(prompt)
+		if outPath != "" {
+			var content string
+			if strings.Contains(prompt, "Auth") {
+				content = authResult
+			} else {
+				content = apiResult
+			}
+			return exec.Command("sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, content, outPath))
+		}
+		return exec.Command("echo", "ok")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	clusters := []ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: []IssueDetail{{ID: "T-1"}}},
+		{Name: "Bad", Completeness: 0.10, Issues: []IssueDetail{{ID: "T-2"}}},
+		{Name: "API", Completeness: 0.30, Issues: []IssueDetail{{ID: "T-3"}}},
+	}
+	cfg := DefaultConfig()
+	cfg.Claude.TimeoutSec = 10
+	cfg.Retry.MaxAttempts = 1
+	cfg.Retry.BaseDelaySec = 0
+	logger := NewLogger(io.Discard, false)
+
+	// when
+	waves, warnings, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+
+	// then: no fatal error
+	if err != nil {
+		t.Fatalf("expected no error for partial failure, got: %v", err)
+	}
+
+	// then: 2 waves from successful clusters
+	if len(waves) != 2 {
+		t.Fatalf("expected 2 waves from successful clusters, got %d", len(waves))
+	}
+
+	// then: 1 warning for the failed cluster
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d: %v", len(warnings), warnings)
+	}
+	if !strings.Contains(warnings[0], "Bad") {
+		t.Errorf("expected warning to mention 'Bad' cluster, got: %s", warnings[0])
+	}
+}
+
+func TestRunWaveGenerate_AllFail(t *testing.T) {
+	// given: all clusters fail
+	scanDir := t.TempDir()
+
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.Command("false")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	clusters := []ClusterScanResult{
+		{Name: "A", Completeness: 0.1, Issues: []IssueDetail{{ID: "T-1"}}},
+		{Name: "B", Completeness: 0.1, Issues: []IssueDetail{{ID: "T-2"}}},
+	}
+	cfg := DefaultConfig()
+	cfg.Claude.TimeoutSec = 10
+	cfg.Retry.MaxAttempts = 1
+	cfg.Retry.BaseDelaySec = 0
+	logger := NewLogger(io.Discard, false)
+
+	// when
+	waves, warnings, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+
+	// then: error because ALL clusters failed
+	if err == nil {
+		t.Fatal("expected error when all clusters fail")
+	}
+
+	// then: no waves returned
+	if len(waves) != 0 {
+		t.Errorf("expected 0 waves, got %d", len(waves))
+	}
+
+	// then: warnings for each failed cluster
+	if len(warnings) != 2 {
+		t.Errorf("expected 2 warnings, got %d: %v", len(warnings), warnings)
+	}
+}
