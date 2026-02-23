@@ -102,6 +102,7 @@ var fixtures = []fixture{
 	{pattern: "wave_*_*.json", content: waveGenAuth},
 	{pattern: "apply_*_*.json", content: waveApplySuccess},
 	{pattern: "nextgen_*_*.json", content: nextgenEmpty},
+	{pattern: "architect_*_*.json", content: architectDiscussApprove},
 }
 
 // --- Canned JSON responses (ported from lifecycle_test.go) ---
@@ -152,5 +153,14 @@ var nextgenEmpty = strings.TrimSpace(`
   "cluster_name": "Auth",
   "waves": [],
   "reasoning": "Cluster is sufficiently complete."
+}
+`)
+
+var architectDiscussApprove = strings.TrimSpace(`
+{
+  "analysis": "Auth module login flow lacks acceptance criteria",
+  "reasoning": "Adding DoD first establishes clear contract",
+  "decision": "approve",
+  "modified_wave": null
 }
 `)

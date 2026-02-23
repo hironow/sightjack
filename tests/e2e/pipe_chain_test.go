@@ -207,3 +207,387 @@ func TestE2E_Pipe_SelectInteractive(t *testing.T) {
 		t.Fatalf("select exited with error: %v", waitErr)
 	}
 }
+
+// --- Show as pipe destination ---
+
+func TestE2E_Pipe_ShowFromStdin(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   func(t *testing.T) string
+		wantStr string // substring expected in output; empty = just check non-empty
+	}{
+		{
+			name:    "ScanResult",
+			input:   func(t *testing.T) string { return string(fixtureBytes(t, "scan_result.json")) },
+			wantStr: "Auth",
+		},
+		{
+			name:    "WavePlan",
+			input:   func(t *testing.T) string { return string(fixtureBytes(t, "wave_plan.json")) },
+			wantStr: "Auth",
+		},
+		{
+			name:  "EmptyWavePlan",
+			input: func(t *testing.T) string { return `{"waves":[]}` },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given
+			input := tt.input(t)
+
+			// when
+			cmd := exec.Command(sightjackBin(), "show")
+			cmd.Stdin = strings.NewReader(input)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			err := cmd.Run()
+
+			// then
+			if err != nil {
+				t.Fatalf("show failed: %v\nstderr: %s\nstdout: %s", err, stderr.String(), stdout.String())
+			}
+			if stdout.Len() == 0 {
+				t.Error("show produced empty stdout")
+			}
+			if tt.wantStr != "" && !strings.Contains(stdout.String(), tt.wantStr) {
+				t.Errorf("expected %q in output, got:\n%s", tt.wantStr, stdout.String())
+			}
+		})
+	}
+}
+
+// --- Two-step pipe chains ---
+
+func TestE2E_Pipe_TwoStepChain(t *testing.T) {
+	type step struct {
+		args  func(dir string) []string // command args (dir substituted at runtime)
+		stdin func(t *testing.T) string // stdin content; empty = use previous stdout
+	}
+	tests := []struct {
+		name       string
+		step1      step
+		step2      step
+		assertJSON bool   // true = parse step2 stdout as JSON and check for wantKey
+		wantKey    string // JSON top-level key expected in step2 stdout
+		wantStr    string // substring expected in step2 stdout (for non-JSON)
+	}{
+		{
+			name: "ScanToWaves",
+			step1: step{
+				args: func(dir string) []string { return []string{"scan", "--json", dir} },
+			},
+			step2: step{
+				args: func(dir string) []string { return []string{"waves", dir} },
+			},
+			assertJSON: true,
+			wantKey:    "waves",
+		},
+		{
+			name: "ScanToShow",
+			step1: step{
+				args: func(dir string) []string { return []string{"scan", "--json", dir} },
+			},
+			step2: step{
+				args: func(dir string) []string { return []string{"show"} },
+			},
+			wantStr: "Auth",
+		},
+		{
+			name: "WavesToShow",
+			step1: step{
+				args:  func(dir string) []string { return []string{"waves", dir} },
+				stdin: func(t *testing.T) string { return string(fixtureBytes(t, "scan_result.json")) },
+			},
+			step2: step{
+				args: func(dir string) []string { return []string{"show"} },
+			},
+			wantStr: "Auth",
+		},
+		{
+			name: "ApplyToNextgen",
+			step1: step{
+				args:  func(dir string) []string { return []string{"apply", dir} },
+				stdin: func(t *testing.T) string { return string(fixtureBytes(t, "selected_wave.json")) },
+			},
+			step2: step{
+				args: func(dir string) []string { return []string{"nextgen", dir} },
+			},
+			assertJSON: true,
+			wantKey:    "waves",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given
+			dir := initDir(t)
+
+			// when: step 1
+			cmd1 := exec.Command(sightjackBin(), tt.step1.args(dir)...)
+			if tt.step1.stdin != nil {
+				cmd1.Stdin = strings.NewReader(tt.step1.stdin(t))
+			}
+			var out1, err1 bytes.Buffer
+			cmd1.Stdout = &out1
+			cmd1.Stderr = &err1
+			if runErr := cmd1.Run(); runErr != nil {
+				t.Fatalf("step1 failed: %v\nstderr: %s\nstdout: %s", runErr, err1.String(), out1.String())
+			}
+
+			// when: step 2 (stdin = step1 stdout)
+			cmd2 := exec.Command(sightjackBin(), tt.step2.args(dir)...)
+			if tt.step2.stdin != nil {
+				cmd2.Stdin = strings.NewReader(tt.step2.stdin(t))
+			} else {
+				cmd2.Stdin = strings.NewReader(out1.String())
+			}
+			var out2, err2 bytes.Buffer
+			cmd2.Stdout = &out2
+			cmd2.Stderr = &err2
+			if runErr := cmd2.Run(); runErr != nil {
+				t.Fatalf("step2 failed: %v\nstderr: %s\nstdout: %s", runErr, err2.String(), out2.String())
+			}
+
+			// then
+			if out2.Len() == 0 {
+				t.Fatal("step2 produced empty stdout")
+			}
+			if tt.assertJSON {
+				var parsed map[string]any
+				if jsonErr := json.Unmarshal(out2.Bytes(), &parsed); jsonErr != nil {
+					t.Fatalf("step2 stdout is not valid JSON: %v\nstdout: %s", jsonErr, out2.String())
+				}
+				if _, ok := parsed[tt.wantKey]; !ok {
+					t.Errorf("step2 JSON missing key %q", tt.wantKey)
+				}
+			}
+			if tt.wantStr != "" && !strings.Contains(out2.String(), tt.wantStr) {
+				t.Errorf("expected %q in step2 output, got:\n%s", tt.wantStr, out2.String())
+			}
+		})
+	}
+}
+
+// --- Full chain: scan → waves → (simulated select) → apply → nextgen ---
+
+// buildSelectOutput simulates the select command by extracting the first wave
+// from a WavePlan and attaching remaining waves in the format apply expects.
+func buildSelectOutput(t *testing.T, wavePlanJSON []byte) string {
+	t.Helper()
+	var plan struct {
+		Waves []json.RawMessage `json:"waves"`
+	}
+	if err := json.Unmarshal(wavePlanJSON, &plan); err != nil {
+		t.Fatalf("parse wave plan: %v", err)
+	}
+	if len(plan.Waves) == 0 {
+		t.Fatal("wave plan has no waves to select from")
+	}
+
+	// Merge first wave with remaining_waves.
+	var first map[string]json.RawMessage
+	if err := json.Unmarshal(plan.Waves[0], &first); err != nil {
+		t.Fatalf("parse first wave: %v", err)
+	}
+	if len(plan.Waves) > 1 {
+		remaining, _ := json.Marshal(plan.Waves[1:])
+		first["remaining_waves"] = remaining
+	}
+
+	out, err := json.MarshalIndent(first, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal select output: %v", err)
+	}
+	return string(out)
+}
+
+func TestE2E_Pipe_FullChainScanToNextgen(t *testing.T) {
+	// given
+	dir := initDir(t)
+
+	// step 1: scan --json
+	scanCmd := exec.Command(sightjackBin(), "scan", "--json", dir)
+	var scanOut, scanErr bytes.Buffer
+	scanCmd.Stdout = &scanOut
+	scanCmd.Stderr = &scanErr
+	if err := scanCmd.Run(); err != nil {
+		t.Fatalf("scan --json failed: %v\nstderr: %s", err, scanErr.String())
+	}
+
+	// step 2: waves
+	wavesCmd := exec.Command(sightjackBin(), "waves", dir)
+	wavesCmd.Stdin = strings.NewReader(scanOut.String())
+	var wavesOut, wavesErr bytes.Buffer
+	wavesCmd.Stdout = &wavesOut
+	wavesCmd.Stderr = &wavesErr
+	if err := wavesCmd.Run(); err != nil {
+		t.Fatalf("waves failed: %v\nstderr: %s", err, wavesErr.String())
+	}
+
+	// step 3: simulated select
+	selectOut := buildSelectOutput(t, wavesOut.Bytes())
+
+	// step 4: apply
+	applyCmd := exec.Command(sightjackBin(), "apply", dir)
+	applyCmd.Stdin = strings.NewReader(selectOut)
+	var applyOut, applyErr bytes.Buffer
+	applyCmd.Stdout = &applyOut
+	applyCmd.Stderr = &applyErr
+	if err := applyCmd.Run(); err != nil {
+		t.Fatalf("apply failed: %v\nstderr: %s\nstdout: %s", err, applyErr.String(), applyOut.String())
+	}
+
+	var applyResult map[string]any
+	if err := json.Unmarshal(applyOut.Bytes(), &applyResult); err != nil {
+		t.Fatalf("invalid apply JSON: %v\nstdout: %s", err, applyOut.String())
+	}
+	if _, ok := applyResult["wave_id"]; !ok {
+		t.Error("apply result missing 'wave_id'")
+	}
+	if _, ok := applyResult["completed_wave"]; !ok {
+		t.Error("apply result missing 'completed_wave'")
+	}
+
+	// step 5: nextgen
+	nextgenCmd := exec.Command(sightjackBin(), "nextgen", dir)
+	nextgenCmd.Stdin = strings.NewReader(applyOut.String())
+	var nextgenOut, nextgenErr bytes.Buffer
+	nextgenCmd.Stdout = &nextgenOut
+	nextgenCmd.Stderr = &nextgenErr
+	if err := nextgenCmd.Run(); err != nil {
+		t.Fatalf("nextgen failed: %v\nstderr: %s\nstdout: %s", err, nextgenErr.String(), nextgenOut.String())
+	}
+
+	// then: final output is valid WavePlan JSON
+	var nextgenPlan map[string]any
+	if err := json.Unmarshal(nextgenOut.Bytes(), &nextgenPlan); err != nil {
+		t.Fatalf("invalid nextgen JSON: %v\nstdout: %s", err, nextgenOut.String())
+	}
+	if _, ok := nextgenPlan["waves"]; !ok {
+		t.Error("nextgen plan missing 'waves' key")
+	}
+}
+
+// --- ADR from DiscussResult ---
+
+func TestE2E_Pipe_ADRFromDiscussResult(t *testing.T) {
+	// given
+	dir := initDir(t)
+	fixture := fixtureBytes(t, "discuss_result.json")
+
+	// when
+	cmd := exec.Command(sightjackBin(), "adr", dir)
+	cmd.Stdin = strings.NewReader(string(fixture))
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	// then
+	if err != nil {
+		t.Fatalf("adr failed: %v\nstderr: %s\nstdout: %s", err, stderr.String(), stdout.String())
+	}
+	output := stdout.String()
+	if len(output) == 0 {
+		t.Fatal("adr produced no output")
+	}
+	for _, want := range []string{"# 0001.", "## Context", "## Decision", "## Consequences", "Accepted"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("expected %q in ADR output, got:\n%s", want, output)
+		}
+	}
+}
+
+// --- Discuss interactive ---
+
+func TestE2E_Pipe_DiscussInteractive(t *testing.T) {
+	// given
+	dir := initDir(t)
+	fixture := fixtureBytes(t, "selected_wave.json")
+
+	c, err := expect.NewConsole(expect.WithDefaultTimeout(5 * time.Second))
+	if err != nil {
+		t.Fatalf("create console: %v", err)
+	}
+	defer c.Close()
+
+	cmd := exec.Command(sightjackBin(), "discuss", dir)
+	cmd.Stdin = strings.NewReader(string(fixture))
+	cmd.Stdout = c.Tty()
+	cmd.Stderr = c.Tty()
+
+	// when
+	if startErr := cmd.Start(); startErr != nil {
+		t.Fatalf("start discuss: %v", startErr)
+	}
+
+	if _, expErr := c.ExpectString("Topic"); expErr != nil {
+		c.Tty().Close()
+		if waitErr := cmd.Wait(); waitErr != nil {
+			t.Skipf("discuss requires controlling terminal: expect=%v, wait=%v", expErr, waitErr)
+		}
+		t.Skipf("discuss requires controlling terminal: %v", expErr)
+	}
+	if _, expErr := c.SendLine(""); expErr != nil {
+		t.Fatalf("failed to send topic: %v", expErr)
+	}
+
+	c.Tty().Close()
+	if _, eofErr := c.ExpectEOF(); eofErr != nil {
+		t.Logf("ExpectEOF: %v", eofErr)
+	}
+
+	if waitErr := cmd.Wait(); waitErr != nil {
+		if isTTYError(waitErr) {
+			t.Skipf("discuss requires controlling terminal: %v", waitErr)
+		}
+		t.Fatalf("discuss exited with error: %v", waitErr)
+	}
+}
+
+// --- Nextgen-to-select loop-back ---
+
+func TestE2E_Pipe_NextgenToSelect(t *testing.T) {
+	// given: wave_plan.json represents a WavePlan (same format nextgen produces)
+	fixture := fixtureBytes(t, "wave_plan.json")
+
+	c, err := expect.NewConsole(expect.WithDefaultTimeout(5 * time.Second))
+	if err != nil {
+		t.Fatalf("create console: %v", err)
+	}
+	defer c.Close()
+
+	cmd := exec.Command(sightjackBin(), "select")
+	cmd.Stdin = strings.NewReader(string(fixture))
+	cmd.Stdout = c.Tty()
+	cmd.Stderr = c.Tty()
+
+	// when
+	if startErr := cmd.Start(); startErr != nil {
+		t.Fatalf("start select: %v", startErr)
+	}
+
+	if _, expErr := c.ExpectString("1"); expErr != nil {
+		c.Tty().Close()
+		if waitErr := cmd.Wait(); waitErr != nil {
+			t.Skipf("select requires controlling terminal: expect=%v, wait=%v", expErr, waitErr)
+		}
+		t.Skipf("select requires controlling terminal: %v", expErr)
+	}
+	if _, expErr := c.SendLine("1"); expErr != nil {
+		t.Fatalf("failed to send '1': %v", expErr)
+	}
+
+	c.Tty().Close()
+	if _, eofErr := c.ExpectEOF(); eofErr != nil {
+		t.Logf("ExpectEOF: %v", eofErr)
+	}
+
+	if waitErr := cmd.Wait(); waitErr != nil {
+		if isTTYError(waitErr) {
+			t.Skipf("select requires controlling terminal: %v", waitErr)
+		}
+		t.Fatalf("select exited with error: %v", waitErr)
+	}
+}
