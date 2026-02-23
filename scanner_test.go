@@ -153,7 +153,7 @@ func TestChunkSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sightjack.ExportChunkSlice(tt.items, tt.size)
+			got := sightjack.ChunkSlice(tt.items, tt.size)
 			if len(got) != tt.expected {
 				t.Fatalf("expected %d chunks, got %d", tt.expected, len(got))
 			}
@@ -190,7 +190,7 @@ func TestMergeClusterChunks(t *testing.T) {
 	}
 
 	// when
-	merged := sightjack.ExportMergeClusterChunks("Auth", chunks)
+	merged := sightjack.MergeClusterChunks("Auth", chunks)
 
 	// then
 	if merged.Name != "Auth" {
@@ -223,7 +223,7 @@ func TestMergeClusterChunks_SingleChunk(t *testing.T) {
 	}
 
 	// when
-	merged := sightjack.ExportMergeClusterChunks("API", chunks)
+	merged := sightjack.MergeClusterChunks("API", chunks)
 
 	// then: completeness must be recomputed from issues, not Claude's top-level value
 	expectedCompleteness := 0.75 // (0.5 + 1.0) / 2
@@ -242,7 +242,7 @@ func TestMergeClusterChunks_SingleChunk_CanonicalName(t *testing.T) {
 	}
 
 	// when: canonical name from pass-1 is "Auth"
-	merged := sightjack.ExportMergeClusterChunks("Auth", chunks)
+	merged := sightjack.MergeClusterChunks("Auth", chunks)
 
 	// then: canonical name must win
 	if merged.Name != "Auth" {
@@ -1002,7 +1002,7 @@ func TestDetectFailedClusterNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sightjack.ExportDetectFailedClusterNames(tt.clusters, tt.successes)
+			got := sightjack.DetectFailedClusterNames(tt.clusters, tt.successes)
 			if len(got) != len(tt.want) {
 				t.Fatalf("expected %d failed names, got %d: %v", len(tt.want), len(got), got)
 			}
@@ -1015,27 +1015,29 @@ func TestDetectFailedClusterNames(t *testing.T) {
 	}
 }
 
-func TestGenerateWaveForCluster_DryRunPopulatesClusterName(t *testing.T) {
-	// given: a cluster with dryRun=true
+func TestRunWaveGenerate_DryRunPopulatesClusterName(t *testing.T) {
+	// given: two clusters in dry-run mode
 	scanDir := t.TempDir()
 	cfg := sightjack.DefaultConfig()
-	cluster := sightjack.ClusterScanResult{
-		Name:   "Auth",
-		Issues: []sightjack.IssueDetail{{ID: "T-1"}},
+	clusters := []sightjack.ClusterScanResult{
+		{Name: "Auth", Issues: []sightjack.IssueDetail{{ID: "T-1"}}},
+		{Name: "API", Issues: []sightjack.IssueDetail{{ID: "T-2"}}},
 	}
 
-	// when: dry-run wave generation
-	result, err := sightjack.ExportGenerateWaveForCluster(
-		context.Background(), &cfg, scanDir, 0, cluster,
+	// when: dry-run wave generation via exported API
+	_, _, failedNames, err := sightjack.RunWaveGenerate(
+		context.Background(), &cfg, scanDir, clusters,
 		true, // dryRun
-		sightjack.WithAllowedTools(), sightjack.NewLogger(io.Discard, false),
+		sightjack.NewLogger(io.Discard, false),
 	)
 
-	// then: ClusterName is populated even on dry-run
+	// then: no error
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.ClusterName != "Auth" {
-		t.Errorf("dry-run result should have ClusterName=%q, got %q", "Auth", result.ClusterName)
+	// then: no failed clusters — proves ClusterName was correctly populated
+	// (if ClusterName were empty, DetectFailedClusterNames would mark all clusters as failed)
+	if len(failedNames) != 0 {
+		t.Errorf("expected 0 failed clusters in dry-run, got %d: %v", len(failedNames), failedNames)
 	}
 }

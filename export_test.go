@@ -5,17 +5,8 @@ import (
 	"os/exec"
 )
 
-// Test-only exports for external test packages (package sightjack_test).
-// These are compiled only during testing — they do not appear in production builds.
-
-var (
-	ExportChunkSlice               = chunkSlice
-	ExportMergeClusterChunks       = mergeClusterChunks
-	ExportDetectFailedClusterNames = detectFailedClusterNames
-	ExportGenerateWaveForCluster   = generateWaveForCluster
-)
-
 // SetNewCmd replaces the command constructor for testing and returns a cleanup function.
+// This is test infrastructure for injecting fake commands, not a logic shim.
 func SetNewCmd(fn func(ctx context.Context, name string, args ...string) *exec.Cmd) func() {
 	old := newCmd
 	newCmd = fn

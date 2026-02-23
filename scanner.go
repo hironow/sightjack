@@ -158,7 +158,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		defer clusterSpan.End()
 
 		cc := classify.Clusters[index]
-		chunks := chunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
+		chunks := ChunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
 		var chunkResults []ClusterScanResult
 
 		for j, chunk := range chunks {
@@ -193,7 +193,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 			chunkResults = append(chunkResults, *result)
 		}
 
-		merged := mergeClusterChunks(cc.Name, chunkResults)
+		merged := MergeClusterChunks(cc.Name, chunkResults)
 		merged.Labels = cc.Labels
 		logger.OK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
 		return merged, nil
@@ -239,7 +239,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 		return nil, warnings, nil, ctx.Err()
 	}
 
-	failedNames := detectFailedClusterNames(clusters, successResults)
+	failedNames := DetectFailedClusterNames(clusters, successResults)
 
 	if len(successResults) == 0 && len(clusters) > 0 {
 		return nil, warnings, failedNames, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
@@ -248,11 +248,11 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 	return MergeWaveResults(successResults), warnings, failedNames, nil
 }
 
-// detectFailedClusterNames compares input cluster counts to success counts
+// DetectFailedClusterNames compares input cluster counts to success counts
 // and returns names where at least one instance failed wave generation.
 // With duplicate cluster names, a name is marked failed if fewer instances
 // succeeded than existed in the input.
-func detectFailedClusterNames(clusters []ClusterScanResult, successes []WaveGenerateResult) map[string]bool {
+func DetectFailedClusterNames(clusters []ClusterScanResult, successes []WaveGenerateResult) map[string]bool {
 	inputCount := make(map[string]int, len(clusters))
 	for _, c := range clusters {
 		inputCount[c.Name]++
@@ -365,8 +365,8 @@ func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 		logger)
 }
 
-// chunkSlice splits items into sub-slices of at most size elements.
-func chunkSlice(items []string, size int) [][]string {
+// ChunkSlice splits items into sub-slices of at most size elements.
+func ChunkSlice(items []string, size int) [][]string {
 	if len(items) == 0 {
 		return nil
 	}
@@ -384,9 +384,9 @@ func chunkSlice(items []string, size int) [][]string {
 	return chunks
 }
 
-// mergeClusterChunks combines multiple chunk results from the same cluster
+// MergeClusterChunks combines multiple chunk results from the same cluster
 // into a single ClusterScanResult, recalculating completeness from individual issues.
-func mergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResult {
+func MergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResult {
 	merged := ClusterScanResult{Name: name}
 	for _, c := range chunks {
 		merged.Issues = append(merged.Issues, c.Issues...)
