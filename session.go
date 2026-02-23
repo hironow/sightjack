@@ -167,9 +167,8 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
 	}
-	for _, w := range waveWarnings {
-		logger.Warn("%s", w)
-	}
+	// waveWarnings are already logged by RunParallel; just propagate.
+	_ = waveWarnings
 
 	logger.OK("%d clusters, %d waves generated", len(scanResult.Clusters), len(waves))
 

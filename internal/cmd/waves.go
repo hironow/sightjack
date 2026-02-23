@@ -62,9 +62,8 @@ for piping into 'select' or 'show'.`,
 			if err != nil {
 				return fmt.Errorf("wave generation failed: %w", err)
 			}
-			for _, w := range waveWarnings {
-				logger.Warn("%s", w)
-			}
+			// waveWarnings are already logged by RunParallel; just propagate.
+			_ = waveWarnings
 
 			if dryRun {
 				logger.OK("Dry-run complete. Check %s for generated prompts.", scanDir)
