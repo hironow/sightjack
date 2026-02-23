@@ -190,7 +190,9 @@ func runFullSession(t *testing.T, dir string, opts ...sessionOption) {
 	}
 	defer c.Close()
 
-	cmd := exec.Command(sightjackBin(), "run", dir)
+	args := append([]string{"run"}, so.flags...)
+	args = append(args, dir)
+	cmd := exec.Command(sightjackBin(), args...)
 	cmd.Stdin = c.Tty()
 	cmd.Stdout = c.Tty()
 	cmd.Stderr = c.Tty()
@@ -261,6 +263,7 @@ type sessionOption func(*sessionOpts)
 
 type sessionOpts struct {
 	env              []string
+	flags            []string
 	afterFirstSelect func()
 }
 
@@ -268,6 +271,13 @@ type sessionOpts struct {
 func withEnv(env ...string) sessionOption {
 	return func(o *sessionOpts) {
 		o.env = append(o.env, env...)
+	}
+}
+
+// withFlags adds extra CLI flags before the directory argument in the run command.
+func withFlags(flags ...string) sessionOption {
+	return func(o *sessionOpts) {
+		o.flags = append(o.flags, flags...)
 	}
 }
 
