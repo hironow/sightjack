@@ -159,6 +159,8 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 	if discussLogErr == nil {
 		defer discussLog.Close()
 		discussOut = io.MultiWriter(out, discussLog)
+	} else {
+		logger.Warn("create architect log: %v", discussLogErr)
 	}
 
 	logger.Scan("Architect discussing: %s - %s", wave.ClusterName, topic)

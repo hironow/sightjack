@@ -194,6 +194,8 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 	if applyLogErr == nil {
 		defer applyLog.Close()
 		applyOut = io.MultiWriter(out, applyLog)
+	} else {
+		logger.Warn("create apply log: %v", applyLogErr)
 	}
 
 	linearTools := WithAllowedTools(LinearMCPAllowedTools...)

@@ -179,7 +179,20 @@ func runWithPTYRaw(t *testing.T, stdinData string, interact func(*expect.Console
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = c.Tty()
-	cmd.Env = append(os.Environ(), "SIGHTJACK_TTY="+c.Tty().Name())
+	env := os.Environ()
+	ttyVal := "SIGHTJACK_TTY=" + c.Tty().Name()
+	replaced := false
+	for i, e := range env {
+		if strings.HasPrefix(e, "SIGHTJACK_TTY=") {
+			env[i] = ttyVal
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		env = append(env, ttyVal)
+	}
+	cmd.Env = env
 
 	if startErr := cmd.Start(); startErr != nil {
 		t.Fatalf("start %v: %v", args, startErr)
@@ -310,7 +323,7 @@ func findResultFiles(t *testing.T, dir, pattern string) []string {
 }
 
 // assertResultFileCached verifies at least one file matching pattern exists in
-// .siren/.run/ and contains valid JSON with a non-zero size.
+// .siren/.run/ and contains valid JSON.
 func assertResultFileCached(t *testing.T, dir, pattern string) {
 	t.Helper()
 	files := findResultFiles(t, dir, pattern)
@@ -323,8 +336,8 @@ func assertResultFileCached(t *testing.T, dir, pattern string) {
 		t.Errorf("read cached result %s: %v", files[0], err)
 		return
 	}
-	if len(data) == 0 {
-		t.Errorf("cached result file %s is empty", files[0])
+	if !json.Valid(data) {
+		t.Errorf("cached result file %s does not contain valid JSON (size=%d)", files[0], len(data))
 	}
 }
 

@@ -105,6 +105,8 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	if logErr == nil {
 		defer logFile.Close()
 		claudeOut = io.MultiWriter(out, logFile)
+	} else {
+		logger.Warn("create classify log: %v", logErr)
 	}
 
 	// Use RunClaudeOnce when labels are enabled because classify applies
@@ -181,6 +183,8 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 			chunkOut := io.Writer(io.Discard)
 			if chunkLogErr == nil {
 				chunkOut = chunkLog
+			} else {
+				logger.Warn("create deepscan log: %v", chunkLogErr)
 			}
 
 			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
@@ -275,6 +279,8 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 			if waveLogErr == nil {
 				defer waveLog.Close()
 				waveOut = waveLog
+			} else {
+				logger.Warn("create wave log: %v", waveLogErr)
 			}
 
 			logger.Scan("Generating waves: %s", cluster.Name)

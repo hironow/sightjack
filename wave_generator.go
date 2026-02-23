@@ -107,6 +107,8 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 	if nextgenLogErr == nil {
 		defer nextgenLog.Close()
 		nextgenOut = nextgenLog
+	} else {
+		logger.Warn("create nextgen log: %v", nextgenLogErr)
 	}
 
 	logger.Scan("Generating next waves: %s", completedWave.ClusterName)

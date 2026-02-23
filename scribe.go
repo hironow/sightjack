@@ -264,6 +264,8 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 	if scribeLogErr == nil {
 		defer scribeLog.Close()
 		scribeOut = io.MultiWriter(out, scribeLog)
+	} else {
+		logger.Warn("create scribe log: %v", scribeLogErr)
 	}
 
 	logger.Scan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
