@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestParseClassifyResult(t *testing.T) {
@@ -28,7 +30,7 @@ func TestParseClassifyResult(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseClassifyResult(path)
+	result, err := sightjack.ParseClassifyResult(path)
 
 	// then
 	if err != nil {
@@ -58,7 +60,7 @@ func TestParseClassifyResult_WithLabels(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseClassifyResult(path)
+	result, err := sightjack.ParseClassifyResult(path)
 
 	// then
 	if err != nil {
@@ -98,7 +100,7 @@ func TestParseClusterScanResult(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseClusterScanResult(path)
+	result, err := sightjack.ParseClusterScanResult(path)
 
 	// then
 	if err != nil {
@@ -127,7 +129,7 @@ func TestSanitizeName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := sanitizeName(tt.input)
+			got := sightjack.ExportSanitizeName(tt.input)
 			if got != tt.expected {
 				t.Errorf("sanitizeName(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
@@ -137,8 +139,8 @@ func TestSanitizeName(t *testing.T) {
 
 func TestClusterFileName_UniqueForCollisions(t *testing.T) {
 	// given: two names that sanitize to the same string
-	name1 := clusterFileName(0, "API Backend")
-	name2 := clusterFileName(1, "API/Backend")
+	name1 := sightjack.ExportClusterFileName(0, "API Backend")
+	name2 := sightjack.ExportClusterFileName(1, "API/Backend")
 
 	// then: filenames must differ despite identical sanitized names
 	if name1 == name2 {
@@ -170,7 +172,7 @@ func TestChunkSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := chunkSlice(tt.items, tt.size)
+			got := sightjack.ExportChunkSlice(tt.items, tt.size)
 			if len(got) != tt.expected {
 				t.Fatalf("expected %d chunks, got %d", tt.expected, len(got))
 			}
@@ -186,11 +188,11 @@ func TestChunkSlice(t *testing.T) {
 
 func TestMergeClusterChunks(t *testing.T) {
 	// given: two chunks from the same cluster
-	chunks := []ClusterScanResult{
+	chunks := []sightjack.ClusterScanResult{
 		{
 			Name:         "Auth",
 			Completeness: 0.4,
-			Issues: []IssueDetail{
+			Issues: []sightjack.IssueDetail{
 				{ID: "1", Completeness: 0.3},
 				{ID: "2", Completeness: 0.5},
 			},
@@ -199,7 +201,7 @@ func TestMergeClusterChunks(t *testing.T) {
 		{
 			Name:         "Auth",
 			Completeness: 0.6,
-			Issues: []IssueDetail{
+			Issues: []sightjack.IssueDetail{
 				{ID: "3", Completeness: 0.7},
 			},
 			Observations: []string{"obs2"},
@@ -207,7 +209,7 @@ func TestMergeClusterChunks(t *testing.T) {
 	}
 
 	// when
-	merged := mergeClusterChunks("Auth", chunks)
+	merged := sightjack.ExportMergeClusterChunks("Auth", chunks)
 
 	// then
 	if merged.Name != "Auth" {
@@ -228,11 +230,11 @@ func TestMergeClusterChunks(t *testing.T) {
 func TestMergeClusterChunks_SingleChunk(t *testing.T) {
 	// given: single chunk where Claude's top-level completeness differs from per-issue average
 	// Claude returned 0.80 (rounded) but individual issues average to 0.75
-	chunks := []ClusterScanResult{
+	chunks := []sightjack.ClusterScanResult{
 		{
 			Name:         "API",
 			Completeness: 0.80,
-			Issues: []IssueDetail{
+			Issues: []sightjack.IssueDetail{
 				{ID: "1", Completeness: 0.5},
 				{ID: "2", Completeness: 1.0},
 			},
@@ -240,7 +242,7 @@ func TestMergeClusterChunks_SingleChunk(t *testing.T) {
 	}
 
 	// when
-	merged := mergeClusterChunks("API", chunks)
+	merged := sightjack.ExportMergeClusterChunks("API", chunks)
 
 	// then: completeness must be recomputed from issues, not Claude's top-level value
 	expectedCompleteness := 0.75 // (0.5 + 1.0) / 2
@@ -254,12 +256,12 @@ func TestMergeClusterChunks_SingleChunk(t *testing.T) {
 
 func TestMergeClusterChunks_SingleChunk_CanonicalName(t *testing.T) {
 	// given: Claude returned a slightly different name than pass-1 classification
-	chunks := []ClusterScanResult{
-		{Name: "auth & login", Completeness: 0.5, Issues: make([]IssueDetail, 3)},
+	chunks := []sightjack.ClusterScanResult{
+		{Name: "auth & login", Completeness: 0.5, Issues: make([]sightjack.IssueDetail, 3)},
 	}
 
 	// when: canonical name from pass-1 is "Auth"
-	merged := mergeClusterChunks("Auth", chunks)
+	merged := sightjack.ExportMergeClusterChunks("Auth", chunks)
 
 	// then: canonical name must win
 	if merged.Name != "Auth" {
@@ -287,17 +289,17 @@ func TestRunWaveGenerate_ParsesResults(t *testing.T) {
 	}`), 0644)
 
 	// when: parse both files
-	result0, err := ParseWaveGenerateResult(wave0)
+	result0, err := sightjack.ParseWaveGenerateResult(wave0)
 	if err != nil {
 		t.Fatalf("parse wave 0: %v", err)
 	}
-	result1, err := ParseWaveGenerateResult(wave1)
+	result1, err := sightjack.ParseWaveGenerateResult(wave1)
 	if err != nil {
 		t.Fatalf("parse wave 1: %v", err)
 	}
 
 	// then: merge waves
-	allWaves := MergeWaveResults([]WaveGenerateResult{*result0, *result1})
+	allWaves := sightjack.MergeWaveResults([]sightjack.WaveGenerateResult{*result0, *result1})
 	if len(allWaves) != 2 {
 		t.Fatalf("expected 2 waves, got %d", len(allWaves))
 	}
@@ -326,7 +328,7 @@ func TestParseClassifyResult_WithShibitoWarnings(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseClassifyResult(path)
+	result, err := sightjack.ParseClassifyResult(path)
 
 	// then
 	if err != nil {
@@ -345,15 +347,15 @@ func TestParseClassifyResult_WithShibitoWarnings(t *testing.T) {
 
 func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
 	// given
-	clusters := []ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: make([]IssueDetail, 3)},
+	clusters := []sightjack.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: make([]sightjack.IssueDetail, 3)},
 	}
-	warnings := []ShibitoWarning{
+	warnings := []sightjack.ShibitoWarning{
 		{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-120", Description: "pattern", RiskLevel: "high"},
 	}
 
 	// when
-	result := MergeScanResults(clusters, warnings, nil)
+	result := sightjack.MergeScanResults(clusters, warnings, nil)
 
 	// then
 	if len(result.ShibitoWarnings) != 1 {
@@ -366,13 +368,13 @@ func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
 
 func TestMergeScanResults(t *testing.T) {
 	// given
-	clusters := []ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: make([]IssueDetail, 3)},
-		{Name: "API", Completeness: 0.50, Issues: make([]IssueDetail, 7)},
+	clusters := []sightjack.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: make([]sightjack.IssueDetail, 3)},
+		{Name: "API", Completeness: 0.50, Issues: make([]sightjack.IssueDetail, 7)},
 	}
 
 	// when
-	result := MergeScanResults(clusters, nil, nil)
+	result := sightjack.MergeScanResults(clusters, nil, nil)
 
 	// then
 	if result.TotalIssues != 10 {
@@ -388,13 +390,13 @@ func TestMergeScanResults(t *testing.T) {
 
 func TestMergeScanResults_WithScanWarnings(t *testing.T) {
 	// given: partial scan success — some clusters failed
-	clusters := []ClusterScanResult{
-		{Name: "Auth", Completeness: 0.5, Issues: make([]IssueDetail, 3)},
+	clusters := []sightjack.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.5, Issues: make([]sightjack.IssueDetail, 3)},
 	}
 	scanWarnings := []string{`Cluster "Infra" scan failed: timeout`}
 
 	// when
-	result := MergeScanResults(clusters, nil, scanWarnings)
+	result := sightjack.MergeScanResults(clusters, nil, scanWarnings)
 
 	// then
 	if len(result.ScanWarnings) != 1 {
@@ -407,21 +409,21 @@ func TestMergeScanResults_WithScanWarnings(t *testing.T) {
 
 func TestRunParallelDeepScan(t *testing.T) {
 	// given
-	clusters := []ClusterScanResult{
-		{Name: "auth", Issues: []IssueDetail{{ID: "A-1"}}},
-		{Name: "infra", Issues: []IssueDetail{{ID: "I-1"}}},
-		{Name: "frontend", Issues: []IssueDetail{{ID: "F-1"}}},
+	clusters := []sightjack.ClusterScanResult{
+		{Name: "auth", Issues: []sightjack.IssueDetail{{ID: "A-1"}}},
+		{Name: "infra", Issues: []sightjack.IssueDetail{{ID: "I-1"}}},
+		{Name: "frontend", Issues: []sightjack.IssueDetail{{ID: "F-1"}}},
 	}
 
 	dir := t.TempDir()
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 2
 
 	// when
-	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
-			return ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
-		}, NewLogger(io.Discard, false))
+	results, warnings := sightjack.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
+			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
+		}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 3 {
@@ -434,24 +436,24 @@ func TestRunParallelDeepScan(t *testing.T) {
 
 func TestRunParallelDeepScanWithFailure(t *testing.T) {
 	// given
-	clusters := []ClusterScanResult{
+	clusters := []sightjack.ClusterScanResult{
 		{Name: "auth"},
 		{Name: "infra"},
 	}
 
 	dir := t.TempDir()
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	var callCount atomic.Int32
 
 	// when
-	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+	results, warnings := sightjack.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			callCount.Add(1)
 			if cluster.Name == "auth" {
-				return ClusterScanResult{}, fmt.Errorf("auth scan failed")
+				return sightjack.ClusterScanResult{}, fmt.Errorf("auth scan failed")
 			}
-			return ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
-		}, NewLogger(io.Discard, false))
+			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
+		}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 1 {
@@ -470,15 +472,15 @@ func TestRunParallelDeepScanWithFailure(t *testing.T) {
 
 func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 	// given
-	clusters := []ClusterScanResult{{Name: "only"}}
+	clusters := []sightjack.ClusterScanResult{{Name: "only"}}
 	dir := t.TempDir()
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 
 	// when
-	results, _ := RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
-			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		}, NewLogger(io.Discard, false))
+	results, _ := sightjack.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
+		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
+			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+		}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 1 {
@@ -488,30 +490,30 @@ func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 
 func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
 	// given: classify result with cluster names and issue IDs (simulates Pass 1 output)
-	classifyClusters := []ClusterClassification{
+	classifyClusters := []sightjack.ClusterClassification{
 		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
 		{Name: "Infra", IssueIDs: []string{"I-1"}},
 	}
 
-	scanClusters := make([]ClusterScanResult, len(classifyClusters))
+	scanClusters := make([]sightjack.ClusterScanResult, len(classifyClusters))
 	for i, cc := range classifyClusters {
-		scanClusters[i] = ClusterScanResult{Name: cc.Name}
+		scanClusters[i] = sightjack.ClusterScanResult{Name: cc.Name}
 	}
 
 	dir := t.TempDir()
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 2
 
 	// when: use index-based lookup (same pattern as wired in RunScan)
-	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
-		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+	results, warnings := sightjack.RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
+		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			cc := classifyClusters[index]
-			return ClusterScanResult{
+			return sightjack.ClusterScanResult{
 				Name:         cc.Name,
 				Completeness: 0.5,
-				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
+				Issues:       make([]sightjack.IssueDetail, len(cc.IssueIDs)),
 			}, nil
-		}, NewLogger(io.Discard, false))
+		}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if len(warnings) != 0 {
@@ -534,29 +536,29 @@ func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
 
 func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
 	// given: classifier returns duplicate cluster names with different issue IDs
-	classifyClusters := []ClusterClassification{
+	classifyClusters := []sightjack.ClusterClassification{
 		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
 		{Name: "Auth", IssueIDs: []string{"A-3"}},
 	}
 
-	scanClusters := make([]ClusterScanResult, len(classifyClusters))
+	scanClusters := make([]sightjack.ClusterScanResult, len(classifyClusters))
 	for i, cc := range classifyClusters {
-		scanClusters[i] = ClusterScanResult{Name: cc.Name}
+		scanClusters[i] = sightjack.ClusterScanResult{Name: cc.Name}
 	}
 
 	dir := t.TempDir()
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 
 	// when: index-based lookup ensures each duplicate gets its own issue IDs
-	results, warnings := RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
-		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+	results, warnings := sightjack.RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
+		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			cc := classifyClusters[index]
-			return ClusterScanResult{
+			return sightjack.ClusterScanResult{
 				Name:         cc.Name,
 				Completeness: float64(len(cc.IssueIDs)) * 0.25,
-				Issues:       make([]IssueDetail, len(cc.IssueIDs)),
+				Issues:       make([]sightjack.IssueDetail, len(cc.IssueIDs)),
 			}, nil
-		}, NewLogger(io.Discard, false))
+		}, sightjack.NewLogger(io.Discard, false))
 
 	// then: both clusters scanned with correct issue counts (order is non-deterministic)
 	if len(warnings) != 0 {
@@ -589,13 +591,13 @@ func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
 
 func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 	// given: 5 clusters but context is already cancelled
-	clusters := make([]ClusterScanResult, 5)
+	clusters := make([]sightjack.ClusterScanResult, 5)
 	for i := range clusters {
-		clusters[i] = ClusterScanResult{Name: fmt.Sprintf("c%d", i)}
+		clusters[i] = sightjack.ClusterScanResult{Name: fmt.Sprintf("c%d", i)}
 	}
 
 	dir := t.TempDir()
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 1
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -604,11 +606,11 @@ func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 	var callCount atomic.Int32
 
 	// when
-	results, _ := RunParallelDeepScan(ctx, &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+	results, _ := sightjack.RunParallelDeepScan(ctx, &cfg, dir, clusters,
+		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			callCount.Add(1)
-			return ClusterScanResult{Name: cluster.Name}, nil
-		}, NewLogger(io.Discard, false))
+			return sightjack.ClusterScanResult{Name: cluster.Name}, nil
+		}, sightjack.NewLogger(io.Discard, false))
 
 	// then: no goroutines should have been launched
 	if callCount.Load() != 0 {
@@ -623,13 +625,13 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 	// given: fake claude that outputs chunks incrementally and writes classify.json
 	baseDir := t.TempDir()
 	sessionID := "test-stream"
-	scanDir := ScanDir(baseDir, sessionID)
+	scanDir := sightjack.ScanDir(baseDir, sessionID)
 
 	classifyResult := `{"clusters":[{"name":"Auth","issue_ids":["T-1"]}],"total_issues":1}`
 	deepScanResult := `{"name":"Auth","completeness":0.8,"issues":[{"id":"T-1","title":"test","completeness":0.8}],"observations":["ok"]}`
 
 	callCount := 0
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
 		// Extract the prompt from -p argument.
 		prompt := ""
@@ -670,10 +672,10 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 			return exec.Command("sh", "-c", script)
 		}
 		return exec.Command("echo", "ok")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Linear.Team = "TEST"
 	cfg.Linear.Project = "test-project"
 	cfg.Claude.TimeoutSec = 30
@@ -682,7 +684,7 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 	cfg.Labels.Enabled = false // avoid RunClaudeOnce label path complexity
 
 	// when
-	result, err := RunScan(context.Background(), &cfg, baseDir, sessionID, false, io.Discard, NewLogger(io.Discard, false))
+	result, err := sightjack.RunScan(context.Background(), &cfg, baseDir, sessionID, false, io.Discard, sightjack.NewLogger(io.Discard, false))
 
 	// then: scan should succeed
 	if err != nil {
@@ -736,13 +738,13 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 	// deterministically proves incremental streaming.
 	baseDir := t.TempDir()
 	sessionID := "test-incremental"
-	scanDir := ScanDir(baseDir, sessionID)
+	scanDir := sightjack.ScanDir(baseDir, sessionID)
 
 	classifyResult := `{"clusters":[{"name":"X","issue_ids":["T-1"]}],"total_issues":1}`
 	deepScanResult := `{"name":"X","completeness":1.0,"issues":[{"id":"T-1","title":"t","completeness":1.0}],"observations":[]}`
 
 	callCount := 0
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
 		prompt := ""
 		for i, a := range args {
@@ -777,10 +779,10 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 			return exec.Command("sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, deepScanResult, outPath))
 		}
 		return exec.Command("echo", "ok")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Linear.Team = "T"
 	cfg.Linear.Project = "p"
 	cfg.Claude.TimeoutSec = 30
@@ -791,7 +793,7 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 	var recorder writeRecorder
 
 	// when
-	_, err := RunScan(context.Background(), &cfg, baseDir, sessionID, false, &recorder, NewLogger(io.Discard, false))
+	_, err := sightjack.RunScan(context.Background(), &cfg, baseDir, sessionID, false, &recorder, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -815,27 +817,27 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 
 func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
 	// given: concurrency=1, cancel while second cluster waits for semaphore
-	clusters := []ClusterScanResult{
+	clusters := []sightjack.ClusterScanResult{
 		{Name: "slow"},
 		{Name: "should-not-run"},
 	}
 
 	dir := t.TempDir()
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 1
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var callCount atomic.Int32
 
 	// when: first scan runs, cancels ctx during execution; second should not start
-	results, _ := RunParallelDeepScan(ctx, &cfg, dir, clusters,
-		func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+	results, _ := sightjack.RunParallelDeepScan(ctx, &cfg, dir, clusters,
+		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			callCount.Add(1)
 			if index == 0 {
 				cancel() // cancel while second cluster waits for semaphore
 			}
-			return ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		}, NewLogger(io.Discard, false))
+			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+		}, sightjack.NewLogger(io.Discard, false))
 
 	// then: only the first cluster should have been scanned
 	if callCount.Load() != 1 {
@@ -853,7 +855,7 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 	authResult := `{"cluster_name":"Auth","waves":[{"id":"auth-w1","cluster_name":"Auth","title":"Login","actions":[],"prerequisites":[],"delta":{"before":0.25,"after":0.40},"status":"available"}]}`
 	apiResult := `{"cluster_name":"API","waves":[{"id":"api-w1","cluster_name":"API","title":"Endpoints","actions":[],"prerequisites":[],"delta":{"before":0.30,"after":0.50},"status":"available"}]}`
 
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		prompt := ""
 		for i, a := range args {
 			if a == "-p" && i+1 < len(args) {
@@ -892,22 +894,22 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 			return exec.Command("sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, content, outPath))
 		}
 		return exec.Command("echo", "ok")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	clusters := []ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: []IssueDetail{{ID: "T-1"}}},
-		{Name: "Bad", Completeness: 0.10, Issues: []IssueDetail{{ID: "T-2"}}},
-		{Name: "API", Completeness: 0.30, Issues: []IssueDetail{{ID: "T-3"}}},
+	clusters := []sightjack.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: []sightjack.IssueDetail{{ID: "T-1"}}},
+		{Name: "Bad", Completeness: 0.10, Issues: []sightjack.IssueDetail{{ID: "T-2"}}},
+		{Name: "API", Completeness: 0.30, Issues: []sightjack.IssueDetail{{ID: "T-3"}}},
 	}
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Claude.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	waves, warnings, _, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+	waves, warnings, _, err := sightjack.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
 
 	// then: no fatal error
 	if err != nil {
@@ -932,23 +934,23 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 	// given: all clusters fail
 	scanDir := t.TempDir()
 
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("false")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	clusters := []ClusterScanResult{
-		{Name: "A", Completeness: 0.1, Issues: []IssueDetail{{ID: "T-1"}}},
-		{Name: "B", Completeness: 0.1, Issues: []IssueDetail{{ID: "T-2"}}},
+	clusters := []sightjack.ClusterScanResult{
+		{Name: "A", Completeness: 0.1, Issues: []sightjack.IssueDetail{{ID: "T-1"}}},
+		{Name: "B", Completeness: 0.1, Issues: []sightjack.IssueDetail{{ID: "T-2"}}},
 	}
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	cfg.Claude.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	waves, warnings, _, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+	waves, warnings, _, err := sightjack.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
 
 	// then: error because ALL clusters failed
 	if err == nil {
@@ -969,57 +971,57 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 func TestDetectFailedClusterNames(t *testing.T) {
 	tests := []struct {
 		name      string
-		clusters  []ClusterScanResult
-		successes []WaveGenerateResult
+		clusters  []sightjack.ClusterScanResult
+		successes []sightjack.WaveGenerateResult
 		want      map[string]bool
 	}{
 		{
 			name:      "all succeed no duplicates",
-			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
-			successes: []WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
+			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
 			want:      map[string]bool{},
 		},
 		{
 			name:      "one fails no duplicates",
-			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
-			successes: []WaveGenerateResult{{ClusterName: "Auth"}},
+			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}},
 			want:      map[string]bool{"DB": true},
 		},
 		{
 			name:      "duplicates all succeed",
-			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
-			successes: []WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "Auth"}, {ClusterName: "DB"}},
+			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
+			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "Auth"}, {ClusterName: "DB"}},
 			want:      map[string]bool{},
 		},
 		{
 			name:      "duplicates partial failure",
-			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
-			successes: []WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
+			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
+			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
 			want:      map[string]bool{"Auth": true},
 		},
 		{
 			name:      "all fail",
-			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
-			successes: []WaveGenerateResult{},
+			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []sightjack.WaveGenerateResult{},
 			want:      map[string]bool{"Auth": true, "DB": true},
 		},
 		{
 			name:      "empty input",
-			clusters:  []ClusterScanResult{},
-			successes: []WaveGenerateResult{},
+			clusters:  []sightjack.ClusterScanResult{},
+			successes: []sightjack.WaveGenerateResult{},
 			want:      map[string]bool{},
 		},
 		{
 			name:      "empty cluster name in success is not counted",
-			clusters:  []ClusterScanResult{{Name: "Auth"}},
-			successes: []WaveGenerateResult{{ClusterName: ""}},
+			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}},
+			successes: []sightjack.WaveGenerateResult{{ClusterName: ""}},
 			want:      map[string]bool{"Auth": true},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := detectFailedClusterNames(tt.clusters, tt.successes)
+			got := sightjack.ExportDetectFailedClusterNames(tt.clusters, tt.successes)
 			if len(got) != len(tt.want) {
 				t.Fatalf("expected %d failed names, got %d: %v", len(tt.want), len(got), got)
 			}
@@ -1035,17 +1037,17 @@ func TestDetectFailedClusterNames(t *testing.T) {
 func TestGenerateWaveForCluster_DryRunPopulatesClusterName(t *testing.T) {
 	// given: a cluster with dryRun=true
 	scanDir := t.TempDir()
-	cfg := DefaultConfig()
-	cluster := ClusterScanResult{
+	cfg := sightjack.DefaultConfig()
+	cluster := sightjack.ClusterScanResult{
 		Name:   "Auth",
-		Issues: []IssueDetail{{ID: "T-1"}},
+		Issues: []sightjack.IssueDetail{{ID: "T-1"}},
 	}
 
 	// when: dry-run wave generation
-	result, err := generateWaveForCluster(
+	result, err := sightjack.ExportGenerateWaveForCluster(
 		context.Background(), &cfg, scanDir, 0, cluster,
 		true, // dryRun
-		WithAllowedTools(), NewLogger(io.Discard, false),
+		sightjack.WithAllowedTools(), sightjack.NewLogger(io.Discard, false),
 	)
 
 	// then: ClusterName is populated even on dry-run
