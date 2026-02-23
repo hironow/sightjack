@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -151,6 +152,8 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			if jsonErr != nil {
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
 			}
+			// Cache result for pipe replay: cat .siren/.run/<id>/nextgen_result.json | sightjack select
+			os.WriteFile(filepath.Join(scanDir, "nextgen_result.json"), out, 0644)
 			fmt.Fprintln(w, string(out))
 			return nil
 		},
