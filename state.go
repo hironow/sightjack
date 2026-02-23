@@ -1,6 +1,7 @@
 package sightjack
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -42,13 +43,16 @@ func WriteState(baseDir string, state *SessionState) error {
 		return fmt.Errorf("create state dir: %w", err)
 	}
 
-	data, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(state); err != nil {
 		return fmt.Errorf("marshal state: %w", err)
 	}
 
 	path := StatePath(baseDir)
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write state: %w", err)
 	}
 	return nil
