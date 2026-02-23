@@ -317,7 +317,7 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error)
 
 // RunParallelDeepScan executes deep scan across clusters with bounded concurrency.
-// Delegates to RunParallel for goroutine+semaphore orchestration.
+// Delegates to RunParallel for pond-based parallel orchestration.
 // Failed clusters produce warnings and are skipped; successful results preserve order.
 func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 	clusters []ClusterScanResult, scanFn DeepScanFunc, logger *Logger) ([]ClusterScanResult, []string) {
