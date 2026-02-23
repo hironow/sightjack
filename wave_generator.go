@@ -99,7 +99,9 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 
 	// Save prompt + tee output for debugging.
 	promptBase := strings.TrimSuffix(nextgenFileName(completedWave), ".json")
-	os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save nextgen prompt: %v", err)
+	}
 	nextgenLog, nextgenLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
 	nextgenOut := io.Writer(io.Discard)
 	if nextgenLogErr == nil {

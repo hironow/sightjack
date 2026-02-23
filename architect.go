@@ -151,7 +151,9 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 	// Save prompt + tee output for debugging.
 	promptBase := architectDiscussFileName(wave)
 	promptBase = strings.TrimSuffix(promptBase, ".json")
-	os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save architect prompt: %v", err)
+	}
 	discussLog, discussLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
 	discussOut := out
 	if discussLogErr == nil {

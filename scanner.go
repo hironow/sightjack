@@ -95,7 +95,9 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 	// Save prompt for debugging (survives signal:killed).
 	promptFile := filepath.Join(scanDir, "classify_prompt.md")
-	os.WriteFile(promptFile, []byte(classifyPrompt), 0644)
+	if err := os.WriteFile(promptFile, []byte(classifyPrompt), 0644); err != nil {
+		logger.Warn("save classify prompt: %v", err)
+	}
 
 	// Tee claude output to a log file for incremental visibility.
 	logFile, logErr := os.Create(filepath.Join(scanDir, "classify_output.log"))
@@ -172,7 +174,9 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 			// Save prompt + tee output for debugging.
 			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, sanitizeName(cc.Name), j)
-			os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+			if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+				logger.Warn("save deepscan prompt: %v", err)
+			}
 			chunkLog, chunkLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
 			chunkOut := io.Writer(io.Discard)
 			if chunkLogErr == nil {
@@ -263,7 +267,9 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 
 			// Save prompt + tee output for debugging (consistent with deep scan).
 			promptBase := fmt.Sprintf("wave_%02d_%s", i, sanitizeName(cluster.Name))
-			os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+			if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+				logger.Warn("save wave prompt: %v", err)
+			}
 			waveLog, waveLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
 			waveOut := io.Writer(io.Discard)
 			if waveLogErr == nil {

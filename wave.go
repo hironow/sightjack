@@ -186,7 +186,9 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 
 	// Save prompt + tee output for debugging.
 	promptBase := strings.TrimSuffix(waveApplyFileName(wave), ".json")
-	os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save apply prompt: %v", err)
+	}
 	applyLog, applyLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
 	applyOut := out
 	if applyLogErr == nil {
