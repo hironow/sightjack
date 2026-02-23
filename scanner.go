@@ -308,7 +308,7 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 
 	if dryRun {
 		dryRunName := fmt.Sprintf("wave_%02d_%s", index, sanitizeName(cluster.Name))
-		return WaveGenerateResult{}, RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
+		return WaveGenerateResult{ClusterName: cluster.Name}, RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 	}
 
 	// Save prompt + tee output for debugging (consistent with deep scan).
