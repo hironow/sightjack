@@ -152,7 +152,7 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 func TestStdinApprover_ContextCancelDoesNotCloseReader(t *testing.T) {
 	// given: a closable reader that tracks Close calls.
 	// Context cancel should NOT close the reader (it may be os.Stdin).
-	cr := &trackingReadCloser{blocking: true}
+	cr := &trackingReadCloser{blocking: true, ch: make(chan struct{})}
 	ctx, cancel := context.WithCancel(context.Background())
 	a := &StdinApprover{input: cr}
 
@@ -196,9 +196,6 @@ type trackingReadCloser struct {
 
 func (r *trackingReadCloser) Read(p []byte) (int, error) {
 	if r.blocking && !r.closed.Load() {
-		if r.ch == nil {
-			r.ch = make(chan struct{})
-		}
 		<-r.ch // block until closed
 	}
 	return 0, io.EOF

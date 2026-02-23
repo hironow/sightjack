@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1735,9 +1736,9 @@ func TestDMailName_TrailingSpecialChars(t *testing.T) {
 func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 	// given: channel that will receive a convergence d-mail
 	ch := make(chan *DMail, 1)
-	notifyCalled := false
+	var notifyCalled atomic.Bool
 	notifier := &testNotifier{onNotify: func(title, message string) {
-		notifyCalled = true
+		notifyCalled.Store(true)
 	}}
 	collector := CollectFeedback(nil, ch, notifier, NewLogger(io.Discard, false))
 
@@ -1755,7 +1756,7 @@ func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 		t.Errorf("expected conv-late-001, got %q", names[0])
 	}
 	// and: notifier was called
-	if !notifyCalled {
+	if !notifyCalled.Load() {
 		t.Error("expected notifier to be called for convergence d-mail")
 	}
 	// and: convergence also present in All()
