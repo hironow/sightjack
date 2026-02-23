@@ -60,7 +60,7 @@ func NextADRNumber(adrDir string) (int, error) {
 // Prevents path traversal by stripping everything except [a-z0-9-_].
 // Returns "untitled" for empty input.
 func sanitizeADRTitle(title string) string {
-	s := sanitizeName(title)
+	s := SanitizeName(title)
 	if s == "" {
 		return "untitled"
 	}
@@ -145,7 +145,7 @@ func ReadExistingADRs(adrDir string) ([]ExistingADR, error) {
 
 // scribeFileName returns the output filename for a scribe run.
 func scribeFileName(wave Wave) string {
-	return fmt.Sprintf("scribe_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
+	return fmt.Sprintf("scribe_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 }
 
 // clearScribeOutput removes any existing scribe output file to prevent
@@ -189,7 +189,7 @@ func RunScribeADRDryRun(cfg *Config, scanDir string, wave Wave, architectResp *A
 		return fmt.Errorf("render scribe prompt: %w", err)
 	}
 
-	dryRunName := fmt.Sprintf("scribe_%s_%s", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
+	dryRunName := fmt.Sprintf("scribe_%s_%s", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 

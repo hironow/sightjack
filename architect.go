@@ -83,7 +83,7 @@ func ParseArchitectResult(path string) (*ArchitectResponse, error) {
 
 // architectDiscussFileName returns the output filename for an architect discussion.
 func architectDiscussFileName(wave Wave) string {
-	return fmt.Sprintf("architect_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
+	return fmt.Sprintf("architect_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 }
 
 // RunArchitectDiscussDryRun saves the architect prompt to a file instead of executing Claude.
@@ -106,7 +106,7 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 		return fmt.Errorf("render architect prompt: %w", err)
 	}
 
-	dryRunName := fmt.Sprintf("architect_%s_%s", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
+	dryRunName := fmt.Sprintf("architect_%s_%s", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 

@@ -48,7 +48,7 @@ func NeedsMoreWaves(cluster ClusterScanResult, waves []Wave) bool {
 
 // nextgenFileName returns the output filename for a nextgen wave generation run.
 func nextgenFileName(wave Wave) string {
-	return fmt.Sprintf("nextgen_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
+	return fmt.Sprintf("nextgen_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 }
 
 // clearNextgenOutput removes any existing nextgen output file.
@@ -76,7 +76,7 @@ func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cl
 	if err != nil {
 		return err
 	}
-	dryRunName := fmt.Sprintf("nextgen_%s_%s", sanitizeName(completedWave.ClusterName), sanitizeName(completedWave.ID))
+	dryRunName := fmt.Sprintf("nextgen_%s_%s", SanitizeName(completedWave.ClusterName), SanitizeName(completedWave.ID))
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 

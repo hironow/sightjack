@@ -9,8 +9,6 @@ import (
 // These are compiled only during testing — they do not appear in production builds.
 
 var (
-	ExportSanitizeName             = sanitizeName
-	ExportClusterFileName          = clusterFileName
 	ExportChunkSlice               = chunkSlice
 	ExportMergeClusterChunks       = mergeClusterChunks
 	ExportDetectFailedClusterNames = detectFailedClusterNames

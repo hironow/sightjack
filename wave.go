@@ -145,7 +145,7 @@ func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
 // waveApplyFileName returns the output filename for a wave apply result.
 // Includes cluster name to avoid collisions when wave IDs are duplicated across clusters.
 func waveApplyFileName(wave Wave) string {
-	return fmt.Sprintf("apply_%s_%s.json", sanitizeName(wave.ClusterName), sanitizeName(wave.ID))
+	return fmt.Sprintf("apply_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 }
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.

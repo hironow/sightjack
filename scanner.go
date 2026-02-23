@@ -162,7 +162,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		var chunkResults []ClusterScanResult
 
 		for j, chunk := range chunks {
-			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, sanitizeName(cc.Name), j))
+			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, SanitizeName(cc.Name), j))
 			prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
@@ -173,24 +173,12 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
 			}
 
-			// Save prompt + tee output for debugging.
-			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, sanitizeName(cc.Name), j)
-			if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
-				logger.Warn("save deepscan prompt: %v", err)
-			}
-			chunkLog, chunkLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
-			chunkOut := io.Writer(io.Discard)
-			if chunkLogErr == nil {
-				chunkOut = chunkLog
-			} else {
-				logger.Warn("create deepscan log: %v", chunkLogErr)
-			}
+			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, SanitizeName(cc.Name), j)
+			chunkOut, closeChunkLog := savePromptAndCreateLog(scanDir, promptBase, prompt, logger)
 
 			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
 			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools)
-			if chunkLog != nil {
-				chunkLog.Close()
-			}
+			closeChunkLog()
 			if runErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
 			}
@@ -282,23 +270,52 @@ func detectFailedClusterNames(clusters []ClusterScanResult, successes []WaveGene
 	return failed
 }
 
+// waveFileBase returns the base name for wave-related files (prompt, log, output).
+func waveFileBase(index int, clusterName string) string {
+	return fmt.Sprintf("wave_%02d_%s", index, SanitizeName(clusterName))
+}
+
+// savePromptAndCreateLog writes the prompt file and creates a log writer.
+// Returns the log writer and a cleanup function for the log file.
+func savePromptAndCreateLog(scanDir, base, prompt string, logger *Logger) (io.Writer, func()) {
+	if err := os.WriteFile(filepath.Join(scanDir, base+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save prompt: %v", err)
+	}
+	logFile, err := os.Create(filepath.Join(scanDir, base+"_output.log"))
+	if err != nil {
+		logger.Warn("create log: %v", err)
+		return io.Discard, func() {}
+	}
+	return logFile, func() { logFile.Close() }
+}
+
+// parseAndNormalizeWaveResult parses the wave JSON and overrides ClusterName
+// to the canonical input name — model output may omit or mislabel it.
+func parseAndNormalizeWaveResult(path, clusterName string) (*WaveGenerateResult, error) {
+	result, err := ParseWaveGenerateResult(path)
+	if err != nil {
+		return nil, err
+	}
+	result.ClusterName = clusterName
+	return result, nil
+}
+
 // generateWaveForCluster generates waves for a single cluster.
 func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult, dryRun bool, linearTools RunOption, logger *Logger) (WaveGenerateResult, error) {
-	waveFile := filepath.Join(scanDir, fmt.Sprintf("wave_%02d_%s.json", index, sanitizeName(cluster.Name)))
+	base := waveFileBase(index, cluster.Name)
+	waveFile := filepath.Join(scanDir, base+".json")
 
 	issuesJSON, err := json.Marshal(cluster.Issues)
 	if err != nil {
 		return WaveGenerateResult{}, fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
 	}
 
-	dodSection := ResolveDoDSection(cfg.DoDTemplates, cluster.Name)
-
 	prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
 		ClusterName:     cluster.Name,
 		Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
 		Issues:          string(issuesJSON),
 		Observations:    strings.Join(cluster.Observations, "\n"),
-		DoDSection:      dodSection,
+		DoDSection:      ResolveDoDSection(cfg.DoDTemplates, cluster.Name),
 		OutputPath:      waveFile,
 		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, append([]string{cluster.Name}, cluster.Labels...))),
 	})
@@ -307,38 +324,24 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 	}
 
 	if dryRun {
-		dryRunName := fmt.Sprintf("wave_%02d_%s", index, sanitizeName(cluster.Name))
-		return WaveGenerateResult{ClusterName: cluster.Name}, RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
+		return WaveGenerateResult{ClusterName: cluster.Name}, RunClaudeDryRun(cfg, prompt, scanDir, base, logger)
 	}
 
-	// Save prompt + tee output for debugging (consistent with deep scan).
-	promptBase := fmt.Sprintf("wave_%02d_%s", index, sanitizeName(cluster.Name))
-	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
-		logger.Warn("save wave prompt: %v", err)
-	}
-	waveLog, waveLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
-	waveOut := io.Writer(io.Discard)
-	if waveLogErr == nil {
-		defer waveLog.Close()
-		waveOut = waveLog
-	} else {
-		logger.Warn("create wave log: %v", waveLogErr)
-	}
+	logOut, closeLog := savePromptAndCreateLog(scanDir, base, prompt, logger)
+	defer closeLog()
 
 	logger.Scan("Generating waves: %s", cluster.Name)
-	if _, err := RunClaude(ctx, cfg, prompt, waveOut, logger, linearTools); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, logOut, logger, linearTools); err != nil {
 		return WaveGenerateResult{}, fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 	}
 
 	if normErr := normalizeJSONFile(waveFile); normErr != nil {
 		logger.Warn("normalize wave JSON: %v", normErr)
 	}
-	result, err := ParseWaveGenerateResult(waveFile)
+	result, err := parseAndNormalizeWaveResult(waveFile, cluster.Name)
 	if err != nil {
 		return WaveGenerateResult{}, fmt.Errorf("parse waves %s: %w", cluster.Name, err)
 	}
-	// Normalize to input cluster name — model output may omit or mislabel it.
-	result.ClusterName = cluster.Name
 	logger.OK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
 	return *result, nil
 }
@@ -399,15 +402,9 @@ func mergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResu
 	return merged
 }
 
-// clusterFileName returns a collision-safe filename for a cluster scan result.
-// The index prefix ensures uniqueness even when distinct names sanitize to the same string.
-func clusterFileName(index int, name string) string {
-	return fmt.Sprintf("cluster_%02d_%s.json", index, sanitizeName(name))
-}
-
-// sanitizeName converts a cluster name to a safe filename component.
+// SanitizeName converts a cluster name to a safe filename component.
 // Only ASCII alphanumeric, hyphen, and underscore are kept; everything else becomes underscore.
-func sanitizeName(name string) string {
+func SanitizeName(name string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(name) {
 		switch {

@@ -129,30 +129,11 @@ func TestSanitizeName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := sightjack.ExportSanitizeName(tt.input)
+			got := sightjack.SanitizeName(tt.input)
 			if got != tt.expected {
 				t.Errorf("sanitizeName(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
-	}
-}
-
-func TestClusterFileName_UniqueForCollisions(t *testing.T) {
-	// given: two names that sanitize to the same string
-	name1 := sightjack.ExportClusterFileName(0, "API Backend")
-	name2 := sightjack.ExportClusterFileName(1, "API/Backend")
-
-	// then: filenames must differ despite identical sanitized names
-	if name1 == name2 {
-		t.Errorf("expected unique filenames, both got %q", name1)
-	}
-
-	// and: filenames contain the sanitized name for readability
-	if name1 != "cluster_00_api_backend.json" {
-		t.Errorf("unexpected filename format: %s", name1)
-	}
-	if name2 != "cluster_01_api_backend.json" {
-		t.Errorf("unexpected filename format: %s", name2)
 	}
 }
 
