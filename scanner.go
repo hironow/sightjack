@@ -120,6 +120,9 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		}
 	}
 
+	if normErr := normalizeJSONFile(classifyOutput); normErr != nil {
+		logger.Warn("normalize classify JSON: %v", normErr)
+	}
 	classify, err := ParseClassifyResult(classifyOutput)
 	if err != nil {
 		classifySpan.End()
@@ -182,6 +185,9 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
 			}
 
+			if normErr := normalizeJSONFile(chunkFile); normErr != nil {
+				logger.Warn("normalize cluster JSON: %v", normErr)
+			}
 			result, parseErr := ParseClusterScanResult(chunkFile)
 			if parseErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
@@ -257,6 +263,9 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				return fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 			}
 
+			if normErr := normalizeJSONFile(waveFile); normErr != nil {
+				logger.Warn("normalize wave JSON: %v", normErr)
+			}
 			result, err := ParseWaveGenerateResult(waveFile)
 			if err != nil {
 				return fmt.Errorf("parse waves %s: %w", cluster.Name, err)

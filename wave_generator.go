@@ -101,6 +101,9 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}
 
+	if normErr := normalizeJSONFile(outputFile); normErr != nil {
+		logger.Warn("normalize nextgen JSON: %v", normErr)
+	}
 	result, err := ParseNextGenResult(outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("parse nextgen %s: %w", completedWave.ClusterName, err)

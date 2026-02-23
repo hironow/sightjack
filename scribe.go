@@ -259,6 +259,9 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 
+	if normErr := normalizeJSONFile(outputFile); normErr != nil {
+		logger.Warn("normalize scribe JSON: %v", normErr)
+	}
 	result, err := ParseScribeResult(outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("parse scribe result %s: %w", wave.ID, err)

@@ -152,6 +152,9 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}
 
+	if normErr := normalizeJSONFile(outputFile); normErr != nil {
+		logger.Warn("normalize architect JSON: %v", normErr)
+	}
 	result, err := ParseArchitectResult(outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("parse architect result %s: %w", wave.ID, err)

@@ -190,6 +190,9 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
 
+	if normErr := normalizeJSONFile(applyFile); normErr != nil {
+		logger.Warn("normalize wave apply JSON: %v", normErr)
+	}
 	result, err := ParseWaveApplyResult(applyFile)
 	if err != nil {
 		return nil, fmt.Errorf("parse apply result %s: %w", wave.ID, err)
