@@ -238,67 +238,12 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 
 	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
 
-	type waveResult struct {
-		index  int
-		result WaveGenerateResult
-		err    error
-	}
-
-	maxConcurrency := cfg.Scan.MaxConcurrency
-	if maxConcurrency < 1 {
-		maxConcurrency = 1
-	}
-	sem := make(chan struct{}, maxConcurrency)
-	results := make(chan waveResult, len(clusters))
-
-	launched := 0
-	for i, cluster := range clusters {
-		if ctx.Err() != nil {
-			break
-		}
-		acquired := false
-		select {
-		case <-ctx.Done():
-		case sem <- struct{}{}:
-			acquired = true
-		}
-		if !acquired || ctx.Err() != nil {
-			if acquired {
-				<-sem
-			}
-			break
-		}
-		launched++
-		go func() {
-			defer func() { <-sem }()
-			res, err := generateWaveForCluster(ctx, cfg, scanDir, i, cluster, dryRun, linearTools, logger)
-			results <- waveResult{index: i, result: res, err: err}
-		}()
-	}
-
-	// Collect results in original order.
-	type indexedResult struct {
-		result WaveGenerateResult
-		err    error
-	}
-	ordered := make([]*indexedResult, len(clusters))
-	var warnings []string
-	for range launched {
-		r := <-results
-		ordered[r.index] = &indexedResult{result: r.result, err: r.err}
-		if r.err != nil {
-			msg := fmt.Sprintf("Cluster %q wave generation failed: %v", clusters[r.index].Name, r.err)
-			logger.Warn("%s", msg)
-			warnings = append(warnings, msg)
-		}
-	}
-
-	var successResults []WaveGenerateResult
-	for _, ir := range ordered {
-		if ir != nil && ir.err == nil {
-			successResults = append(successResults, ir.result)
-		}
-	}
+	successResults, warnings := RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
+		func(ctx context.Context, index int, cluster ClusterScanResult) (WaveGenerateResult, error) {
+			return generateWaveForCluster(ctx, cfg, scanDir, index, cluster, dryRun, linearTools, logger)
+		},
+		func(c ClusterScanResult) string { return c.Name },
+		logger)
 
 	if len(successResults) == 0 && len(clusters) > 0 {
 		return nil, warnings, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
@@ -371,81 +316,18 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 // enabling safe lookup even when duplicate cluster names exist.
 type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error)
 
-// RunParallelDeepScan executes deep scan across clusters using goroutines with
-// semaphore-based concurrency control. Failed clusters get LogWarn and are skipped;
-// remaining clusters continue. Returns successful results and warning messages.
+// RunParallelDeepScan executes deep scan across clusters with bounded concurrency.
+// Delegates to RunParallel for goroutine+semaphore orchestration.
+// Failed clusters produce warnings and are skipped; successful results preserve order.
 func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
 	clusters []ClusterScanResult, scanFn DeepScanFunc, logger *Logger) ([]ClusterScanResult, []string) {
 
-	maxConcurrency := cfg.Scan.MaxConcurrency
-	if maxConcurrency < 1 {
-		maxConcurrency = 1
-	}
-
-	type scanResult struct {
-		index   int
-		cluster ClusterScanResult
-		err     error
-	}
-
-	sem := make(chan struct{}, maxConcurrency)
-	results := make(chan scanResult, len(clusters))
-
-	// NOTE: i and cluster are safe to capture in the goroutine closure.
-	// Go 1.22+ scopes loop variables per iteration (go.mod requires go 1.25.0).
-	launched := 0
-	for i, cluster := range clusters {
-		if ctx.Err() != nil {
-			break
-		}
-		// Use select to respect cancellation while waiting for semaphore.
-		acquired := false
-		select {
-		case <-ctx.Done():
-		case sem <- struct{}{}:
-			acquired = true
-		}
-		if !acquired || ctx.Err() != nil {
-			if acquired {
-				<-sem // release the slot we just took
-			}
-			break
-		}
-		launched++
-		go func() {
-			defer func() { <-sem }()
-			result, err := scanFn(ctx, cfg, scanDir, i, cluster)
-			results <- scanResult{index: i, cluster: result, err: err}
-		}()
-	}
-
-	// Collect results indexed by original position to preserve deterministic ordering.
-	type indexedResult struct {
-		cluster ClusterScanResult
-		err     error
-	}
-	ordered := make([]*indexedResult, len(clusters))
-	var warnings []string
-	// NOTE: "for range integer" is valid Go 1.22+ syntax (go.mod requires go 1.25.0).
-	for range launched {
-		r := <-results
-		ordered[r.index] = &indexedResult{cluster: r.cluster, err: r.err}
-		if r.err != nil {
-			msg := fmt.Sprintf("Cluster %q scan failed: %v", clusters[r.index].Name, r.err)
-			logger.Warn("%s", msg)
-			warnings = append(warnings, msg)
-		}
-	}
-
-	// Build successful slice in original cluster order.
-	var successful []ClusterScanResult
-	for _, ir := range ordered {
-		if ir != nil && ir.err == nil {
-			successful = append(successful, ir.cluster)
-		}
-	}
-
-	return successful, warnings
+	return RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
+		func(ctx context.Context, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+			return scanFn(ctx, cfg, scanDir, index, cluster)
+		},
+		func(c ClusterScanResult) string { return c.Name },
+		logger)
 }
 
 // chunkSlice splits items into sub-slices of at most size elements.
