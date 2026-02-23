@@ -1,5 +1,5 @@
-# build files
-/sightjack
+# build artifacts
+dist/
 # test
 coverage.out
 # sightjack runtime state on target repository

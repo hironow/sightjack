@@ -39,11 +39,12 @@ lint-md:
 
 # Build the binary with version info
 build:
-    go build -ldflags "{{LDFLAGS}}" -o {{TOOL}} ./cmd/{{TOOL}}/
+    @mkdir -p dist
+    go build -ldflags "{{LDFLAGS}}" -o dist/{{TOOL}} ./cmd/{{TOOL}}/
 
 # Build and install to /usr/local/bin
 install: build
-    mv {{TOOL}} /usr/local/bin/
+    mv dist/{{TOOL}} /usr/local/bin/
 
 # Run all tests
 test:
@@ -120,5 +121,5 @@ test-e2e-down:
 
 # Clean build artifacts
 clean:
-    rm -f {{TOOL}} coverage.out
+    rm -rf dist/ coverage.out
     go clean
