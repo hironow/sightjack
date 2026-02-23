@@ -744,8 +744,14 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 
 	// Carry forward old waves whose clusters failed regeneration so that
 	// completed progress is never lost on transient partial failures.
+	// Only carry forward clusters still present in the current scan;
+	// clusters removed by the scan are intentionally dropped.
+	scannedClusters := make(map[string]bool, len(scanResult.Clusters))
+	for _, c := range scanResult.Clusters {
+		scannedClusters[c.Name] = true
+	}
 	oldWaves := RestoreWaves(oldState.Waves)
-	waves = mergeOldWaves(oldWaves, waves)
+	waves = mergeOldWaves(oldWaves, waves, scannedClusters)
 	oldCompleted := BuildCompletedWaveMap(oldWaves)
 	waves = MergeCompletedStatus(oldCompleted, waves)
 	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
@@ -869,21 +875,21 @@ func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 	return completed
 }
 
-// mergeOldWaves carries forward waves from clusters that are absent in
-// newWaves so that partial wave-generation failures do not discard prior
-// progress. Waves whose cluster IS present in newWaves are replaced by the
-// fresh generation.
-func mergeOldWaves(oldWaves, newWaves []Wave) []Wave {
-	newClusters := make(map[string]bool, len(newWaves))
+// mergeOldWaves carries forward waves from clusters that failed wave
+// generation but are still present in the current scan. Old waves whose
+// cluster was removed from the scan (resolved issues, reorganized clusters)
+// are dropped so stale work items do not persist.
+func mergeOldWaves(oldWaves, newWaves []Wave, scannedClusters map[string]bool) []Wave {
+	regenerated := make(map[string]bool, len(newWaves))
 	for _, w := range newWaves {
-		newClusters[w.ClusterName] = true
+		regenerated[w.ClusterName] = true
 	}
 	merged := make([]Wave, 0, len(newWaves)+len(oldWaves))
-	// Start with all freshly generated waves.
 	merged = append(merged, newWaves...)
-	// Append old waves whose cluster was not regenerated.
 	for _, w := range oldWaves {
-		if !newClusters[w.ClusterName] {
+		// Carry forward only if the cluster still exists in the scan
+		// but failed wave generation (not in regenerated set).
+		if scannedClusters[w.ClusterName] && !regenerated[w.ClusterName] {
 			merged = append(merged, w)
 		}
 	}
