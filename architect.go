@@ -148,7 +148,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 	}
 
 	logger.Scan("Architect discussing: %s - %s", wave.ClusterName, topic)
-	if _, err := RunClaude(ctx, cfg, prompt, out, logger); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, out, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}
 

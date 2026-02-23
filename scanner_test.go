@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -614,6 +616,200 @@ func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 	}
 	if len(results) != 0 {
 		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
+	// given: fake claude that outputs chunks incrementally and writes classify.json
+	baseDir := t.TempDir()
+	sessionID := "test-stream"
+	scanDir := ScanDir(baseDir, sessionID)
+
+	classifyResult := `{"clusters":[{"name":"Auth","issue_ids":["T-1"]}],"total_issues":1}`
+	deepScanResult := `{"name":"Auth","completeness":0.8,"issues":[{"id":"T-1","title":"test","completeness":0.8}],"observations":["ok"]}`
+
+	callCount := 0
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		// Extract the prompt from -p argument.
+		prompt := ""
+		for i, a := range args {
+			if a == "-p" && i+1 < len(args) {
+				prompt = args[i+1]
+				break
+			}
+		}
+
+		// Helper: find a .json path embedded in the prompt (inside **bold**).
+		findJSONPath := func(p string) string {
+			for _, line := range strings.Split(p, "\n") {
+				if idx := strings.Index(line, scanDir); idx >= 0 {
+					sub := line[idx:]
+					if end := strings.Index(sub, "**"); end > 0 {
+						return sub[:end]
+					}
+					return strings.TrimRight(strings.TrimSpace(sub), " *`\"")
+				}
+			}
+			return ""
+		}
+
+		if callCount == 1 {
+			// Classify: stream chunks with delays, then write classify.json.
+			classifyJSON := filepath.Join(scanDir, "classify.json")
+			script := fmt.Sprintf(
+				`printf "chunk1\n" && sleep 0.05 && printf "chunk2\n" && sleep 0.05 && printf '%s' > '%s' && printf "chunk3\n"`,
+				classifyResult, classifyJSON,
+			)
+			_ = prompt
+			return exec.Command("sh", "-c", script)
+		}
+		// Deep scan / wave: write result to the output path found in prompt.
+		if outPath := findJSONPath(prompt); outPath != "" {
+			script := fmt.Sprintf(`printf '%s' > '%s' && echo "done"`, deepScanResult, outPath)
+			return exec.Command("sh", "-c", script)
+		}
+		return exec.Command("echo", "ok")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := DefaultConfig()
+	cfg.Linear.Team = "TEST"
+	cfg.Linear.Project = "test-project"
+	cfg.Claude.TimeoutSec = 30
+	cfg.Retry.MaxAttempts = 1
+	cfg.Retry.BaseDelaySec = 0
+	cfg.Labels.Enabled = false // avoid RunClaudeOnce label path complexity
+
+	// when
+	result, err := RunScan(context.Background(), &cfg, baseDir, sessionID, false, io.Discard, NewLogger(io.Discard, false))
+
+	// then: scan should succeed
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	// then: classify_prompt.md saved before execution
+	promptData, err := os.ReadFile(filepath.Join(scanDir, "classify_prompt.md"))
+	if err != nil {
+		t.Fatalf("classify_prompt.md not found: %v", err)
+	}
+	if len(promptData) == 0 {
+		t.Error("classify_prompt.md is empty")
+	}
+	if !strings.Contains(string(promptData), "TEST") {
+		t.Error("classify_prompt.md does not contain team filter")
+	}
+
+	// then: classify_output.log contains streamed chunks
+	logData, err := os.ReadFile(filepath.Join(scanDir, "classify_output.log"))
+	if err != nil {
+		t.Fatalf("classify_output.log not found: %v", err)
+	}
+	logStr := string(logData)
+	for _, chunk := range []string{"chunk1", "chunk2", "chunk3"} {
+		if !strings.Contains(logStr, chunk) {
+			t.Errorf("classify_output.log missing %q, got: %q", chunk, logStr)
+		}
+	}
+}
+
+// writeRecorder counts individual Write calls to verify incremental streaming.
+type writeRecorder struct {
+	buf   strings.Builder
+	calls int
+}
+
+func (w *writeRecorder) Write(p []byte) (int, error) {
+	w.calls++
+	return w.buf.Write(p)
+}
+
+func TestRunScan_StreamsIncrementally(t *testing.T) {
+	// given: fake claude that outputs chunks with a deliberate delay between them.
+	// Instead of polling file sizes (timing-dependent), we pass a writeRecorder
+	// as the out writer. io.MultiWriter(out, logFile) calls out.Write for each
+	// chunk that arrives from the subprocess pipe, so recording Write calls
+	// deterministically proves incremental streaming.
+	baseDir := t.TempDir()
+	sessionID := "test-incremental"
+	scanDir := ScanDir(baseDir, sessionID)
+
+	classifyResult := `{"clusters":[{"name":"X","issue_ids":["T-1"]}],"total_issues":1}`
+	deepScanResult := `{"name":"X","completeness":1.0,"issues":[{"id":"T-1","title":"t","completeness":1.0}],"observations":[]}`
+
+	callCount := 0
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		prompt := ""
+		for i, a := range args {
+			if a == "-p" && i+1 < len(args) {
+				prompt = args[i+1]
+				break
+			}
+		}
+		findJSONPath := func(p string) string {
+			for _, line := range strings.Split(p, "\n") {
+				if idx := strings.Index(line, scanDir); idx >= 0 {
+					sub := line[idx:]
+					if end := strings.Index(sub, "**"); end > 0 {
+						return sub[:end]
+					}
+					return strings.TrimRight(strings.TrimSpace(sub), " *`\"")
+				}
+			}
+			return ""
+		}
+		if callCount == 1 {
+			// Classify: emit two chunks separated by sleep to force separate Read calls on the pipe.
+			classifyJSON := filepath.Join(scanDir, "classify.json")
+			script := fmt.Sprintf(
+				`printf "MARKER_A\n" && sleep 0.1 && printf "MARKER_B\n" && printf '%s' > '%s'`,
+				classifyResult, classifyJSON,
+			)
+			_ = prompt
+			return exec.Command("sh", "-c", script)
+		}
+		if outPath := findJSONPath(prompt); outPath != "" {
+			return exec.Command("sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, deepScanResult, outPath))
+		}
+		return exec.Command("echo", "ok")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := DefaultConfig()
+	cfg.Linear.Team = "T"
+	cfg.Linear.Project = "p"
+	cfg.Claude.TimeoutSec = 30
+	cfg.Retry.MaxAttempts = 1
+	cfg.Retry.BaseDelaySec = 0
+	cfg.Labels.Enabled = false
+
+	var recorder writeRecorder
+
+	// when
+	_, err := RunScan(context.Background(), &cfg, baseDir, sessionID, false, &recorder, NewLogger(io.Discard, false))
+
+	// then
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+
+	// Multiple Write calls prove the output was streamed incrementally, not buffered.
+	if recorder.calls < 2 {
+		t.Errorf("expected at least 2 Write calls (incremental streaming), got %d", recorder.calls)
+	}
+
+	// Verify content completeness — both markers arrived.
+	output := recorder.buf.String()
+	if !strings.Contains(output, "MARKER_A") {
+		t.Errorf("missing MARKER_A in output: %q", output)
+	}
+	if !strings.Contains(output, "MARKER_B") {
+		t.Errorf("missing MARKER_B in output: %q", output)
 	}
 }
 

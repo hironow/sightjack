@@ -97,7 +97,7 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 	}
 
 	logger.Scan("Generating next waves: %s", completedWave.ClusterName)
-	if _, err := RunClaude(ctx, cfg, prompt, io.Discard, logger); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, io.Discard, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}
 

@@ -93,15 +93,28 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify", logger)
 	}
 
+	// Save prompt for debugging (survives signal:killed).
+	promptFile := filepath.Join(scanDir, "classify_prompt.md")
+	os.WriteFile(promptFile, []byte(classifyPrompt), 0644)
+
+	// Tee claude output to a log file for incremental visibility.
+	logFile, logErr := os.Create(filepath.Join(scanDir, "classify_output.log"))
+	claudeOut := out
+	if logErr == nil {
+		defer logFile.Close()
+		claudeOut = io.MultiWriter(out, logFile)
+	}
+
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
+	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
 	if cfg.Labels.Enabled {
-		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, out, logger); err != nil {
+		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
-		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, out, logger); err != nil {
+		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
@@ -154,8 +167,18 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
 			}
 
+			// Save prompt + tee output for debugging.
+			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, sanitizeName(cc.Name), j)
+			os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+			chunkLog, chunkLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+			chunkOut := io.Writer(io.Discard)
+			if chunkLogErr == nil {
+				defer chunkLog.Close()
+				chunkOut = chunkLog
+			}
+
 			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-			if _, runErr := RunClaude(ctx, cfg, prompt, io.Discard, logger); runErr != nil {
+			if _, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools); runErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
 			}
 
@@ -194,6 +217,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 
 	logger.Scan("Pass 3: Generating waves for %d clusters...", len(clusters))
 
+	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
 	waveResults := make([]WaveGenerateResult, len(clusters))
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -229,7 +253,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 			}
 
 			logger.Scan("Generating waves: %s", cluster.Name)
-			if _, err := RunClaude(gCtx, cfg, prompt, io.Discard, logger); err != nil {
+			if _, err := RunClaude(gCtx, cfg, prompt, io.Discard, logger, linearTools); err != nil {
 				return fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 			}
 

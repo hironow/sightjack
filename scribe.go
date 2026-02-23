@@ -255,7 +255,7 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 	}
 
 	logger.Scan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, out, logger); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, out, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 

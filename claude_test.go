@@ -195,6 +195,75 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 	}
 }
 
+func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
+	// given: config with model and allowed tools option
+	var capturedArgs []string
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = args
+		return exec.Command("echo", "ok")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	}
+
+	// when
+	RunClaudeOnce(context.Background(), cfg, "test", io.Discard, NewLogger(io.Discard, false),
+		WithAllowedTools("mcp__linear__list_issues", "mcp__linear__get_issue", "Write"))
+
+	// then: --allowedTools flag present with comma-separated tools
+	found := false
+	for i, arg := range capturedArgs {
+		if arg == "--allowedTools" && i+1 < len(capturedArgs) {
+			expected := "mcp__linear__list_issues,mcp__linear__get_issue,Write"
+			if capturedArgs[i+1] != expected {
+				t.Errorf("--allowedTools value: expected %q, got %q", expected, capturedArgs[i+1])
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("--allowedTools flag not found in args: %v", capturedArgs)
+	}
+}
+
+func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
+	// given: RunClaude with allowed tools option
+	var capturedArgs []string
+	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = args
+		return exec.Command("echo", "ok")
+	}
+	defer func() { newCmd = defaultNewCmd }()
+
+	cfg := &Config{
+		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	}
+
+	// when
+	RunClaude(context.Background(), cfg, "test", io.Discard, NewLogger(io.Discard, false),
+		WithAllowedTools("mcp__linear__list_issues"))
+
+	// then: --allowedTools forwarded to RunClaudeOnce
+	found := false
+	for i, arg := range capturedArgs {
+		if arg == "--allowedTools" && i+1 < len(capturedArgs) {
+			if capturedArgs[i+1] != "mcp__linear__list_issues" {
+				t.Errorf("--allowedTools value: expected %q, got %q", "mcp__linear__list_issues", capturedArgs[i+1])
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("--allowedTools flag not found in RunClaude args: %v", capturedArgs)
+	}
+}
+
 func TestRunClaudeExhaustsRetries(t *testing.T) {
 	callCount := 0
 	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
