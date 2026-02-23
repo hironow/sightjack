@@ -465,6 +465,7 @@ just jaeger-down    # Stop Jaeger
 +-- notify.go                Notifier interface (LocalNotifier, CmdNotifier, NopNotifier)
 +-- approve.go               Approver interface (StdinApprover, CmdApprover, AutoApprover)
 +-- gate.go                  Convergence gate (FilterConvergence, RunConvergenceGate, RunConvergenceGateWithRedrain)
++-- archive.go               Archive pruning (ListExpiredArchive, PruneArchive)
 +-- telemetry.go             OpenTelemetry tracing (OTLP export, noop fallback)
 +-- *_test.go                Tests
 +-- justfile                 Task runner
