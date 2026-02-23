@@ -97,8 +97,9 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			scanResultPath := filepath.Join(sightjack.ScanDir(baseDir, sessionID), "scan_result.json")
 			if err := sightjack.WriteScanResult(scanResultPath, result); err != nil {
 				logger.Warn("Failed to cache scan result: %v", err)
+			} else {
+				state.ScanResultPath = scanResultPath
 			}
-			state.ScanResultPath = scanResultPath
 
 			if err := sightjack.WriteState(baseDir, state); err != nil {
 				logger.Warn("Failed to save state: %v", err)

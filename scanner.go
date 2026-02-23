@@ -176,12 +176,15 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 			chunkLog, chunkLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
 			chunkOut := io.Writer(io.Discard)
 			if chunkLogErr == nil {
-				defer chunkLog.Close()
 				chunkOut = chunkLog
 			}
 
 			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-			if _, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools); runErr != nil {
+			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools)
+			if chunkLog != nil {
+				chunkLog.Close()
+			}
+			if runErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
 			}
 
