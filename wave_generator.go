@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -96,11 +97,28 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 		return nil, err
 	}
 
+	// Save prompt + tee output for debugging.
+	promptBase := strings.TrimSuffix(nextgenFileName(completedWave), ".json")
+	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save nextgen prompt: %v", err)
+	}
+	nextgenLog, nextgenLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+	nextgenOut := io.Writer(io.Discard)
+	if nextgenLogErr == nil {
+		defer nextgenLog.Close()
+		nextgenOut = nextgenLog
+	} else {
+		logger.Warn("create nextgen log: %v", nextgenLogErr)
+	}
+
 	logger.Scan("Generating next waves: %s", completedWave.ClusterName)
-	if _, err := RunClaude(ctx, cfg, prompt, io.Discard, logger); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, nextgenOut, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}
 
+	if normErr := normalizeJSONFile(outputFile); normErr != nil {
+		logger.Warn("normalize nextgen JSON: %v", normErr)
+	}
 	result, err := ParseNextGenResult(outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("parse nextgen %s: %w", completedWave.ClusterName, err)

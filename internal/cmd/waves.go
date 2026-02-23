@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -74,6 +75,10 @@ for piping into 'select' or 'show'.`,
 			out, jsonErr := json.MarshalIndent(plan, "", "  ")
 			if jsonErr != nil {
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
+			}
+			// Cache result for pipe replay: cat .siren/.run/<id>/waves_result.json | sightjack select
+			if err := os.WriteFile(filepath.Join(scanDir, "waves_result.json"), out, 0644); err != nil {
+				logger.Warn("Failed to cache waves result: %v", err)
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			return nil

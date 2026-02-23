@@ -21,11 +21,27 @@ func defaultNewCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
 }
 
+// RunOption configures optional behavior for RunClaudeOnce / RunClaude.
+type RunOption func(*runOpts)
+
+type runOpts struct {
+	allowedTools []string
+}
+
+// WithAllowedTools restricts the tools available to the Claude model via
+// the --allowedTools CLI flag. This prevents context explosion when many
+// plugins/MCP servers are loaded (see anthropics/claude-code#25857).
+func WithAllowedTools(tools ...string) RunOption {
+	return func(o *runOpts) {
+		o.allowedTools = tools
+	}
+}
+
 // RunClaudeOnce executes the Claude CLI as a subprocess once without retry.
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
-func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger) (string, error) {
+func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger, opts ...RunOption) (string, error) {
 	ctx, span := tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("claude.model", cfg.Claude.Model),
@@ -44,9 +60,17 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer,
 		defer cancel()
 	}
 
+	var o runOpts
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	var args []string
 	if cfg.Claude.Model != "" {
 		args = append(args, "--model", cfg.Claude.Model)
+	}
+	if len(o.allowedTools) > 0 {
+		args = append(args, "--allowedTools", strings.Join(o.allowedTools, ","))
 	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, cfg.Claude.Command, args...)
@@ -105,7 +129,7 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer,
 // complete.
 // Pass os.Stdout for interactive single-process usage, or io.Discard for
 // parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger) (string, error) {
+func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger, opts ...RunOption) (string, error) {
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
@@ -136,7 +160,7 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer, log
 			case <-time.After(delay):
 			}
 		}
-		output, err := RunClaudeOnce(ctx, cfg, prompt, w, logger)
+		output, err := RunClaudeOnce(ctx, cfg, prompt, w, logger, opts...)
 		if err == nil {
 			return output, nil
 		}

@@ -188,7 +188,14 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 // openTTY opens the platform-appropriate controlling terminal for interactive
 // input. On Unix this is /dev/tty; on Windows it is CONIN$. Returns an error
 // if neither device is available (e.g., in a non-interactive container).
+//
+// If SIGHTJACK_TTY is set, opens that path instead. This allows E2E tests
+// to inject a go-expect PTY device (c.Tty().Name()) so interactive commands
+// work in Docker containers without a controlling terminal.
 func openTTY() (*os.File, error) {
+	if path := os.Getenv("SIGHTJACK_TTY"); path != "" {
+		return os.Open(path)
+	}
 	// Try Unix first, then Windows.
 	tty, err := os.Open("/dev/tty")
 	if err == nil {

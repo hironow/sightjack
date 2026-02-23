@@ -455,6 +455,8 @@ just jaeger-down    # Stop Jaeger
 +-- cli.go                   Interactive prompts (selection, approval, discuss)
 +-- claude.go                Claude Code subprocess runner (--dangerously-skip-permissions)
 +-- config.go                Config parser + defaults (.siren/config.yaml)
++-- json_normalize.go        JSON UTF-8 normalization for Claude output
++-- linear_tools.go          Linear MCP allowed tools list
 +-- model.go                 Core types + JSON wire format (ScanResult, WavePlan, Wave, etc.)
 +-- state.go                 State persistence + path helpers (.siren/)
 +-- prompt.go                Go template renderer for AI prompts

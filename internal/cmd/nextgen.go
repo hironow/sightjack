@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -51,14 +52,31 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			}
 
 			logger := loggerFrom(cmd)
+			w := cmd.OutOrStdout()
+
+			sessionID := fmt.Sprintf("nextgen-%d-%d", time.Now().UnixMilli(), os.Getpid())
+			scanDir := sightjack.ScanDir(baseDir, sessionID)
+			if err := os.MkdirAll(scanDir, 0755); err != nil {
+				return fmt.Errorf("failed to create scan dir: %w", err)
+			}
+
+			// cacheAndPrint marshals a WavePlan, caches it for pipe replay, and prints to stdout.
+			cacheAndPrint := func(plan sightjack.WavePlan) error {
+				out, jsonErr := json.MarshalIndent(plan, "", "  ")
+				if jsonErr != nil {
+					return fmt.Errorf("JSON marshal failed: %w", jsonErr)
+				}
+				if err := os.WriteFile(filepath.Join(scanDir, "nextgen_result.json"), out, 0644); err != nil {
+					logger.Warn("Failed to cache nextgen result: %v", err)
+				}
+				fmt.Fprintln(w, string(out))
+				return nil
+			}
 
 			// If completeness target reached, output empty plan.
-			w := cmd.OutOrStdout()
 			if applyResult.NewCompleteness >= 0.95 {
 				logger.OK("Completeness %.0f%% — no follow-up waves needed.", applyResult.NewCompleteness*100)
-				emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
-				fmt.Fprintln(w, string(emptyPlan))
-				return nil
+				return cacheAndPrint(sightjack.WavePlan{Waves: []sightjack.Wave{}})
 			}
 
 			// Resolve wave and cluster context — prefer embedded CompletedWave (pipe),
@@ -117,15 +135,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 
 			if !sightjack.NeedsMoreWaves(cluster, allWaves) {
 				logger.OK("No more waves needed for %s.", cluster.Name)
-				emptyPlan, _ := json.MarshalIndent(sightjack.WavePlan{Waves: []sightjack.Wave{}}, "", "  ")
-				fmt.Fprintln(w, string(emptyPlan))
-				return nil
-			}
-
-			sessionID := fmt.Sprintf("nextgen-%d-%d", time.Now().UnixMilli(), os.Getpid())
-			scanDir := sightjack.ScanDir(baseDir, sessionID)
-			if err := os.MkdirAll(scanDir, 0755); err != nil {
-				return fmt.Errorf("failed to create scan dir: %w", err)
+				return cacheAndPrint(sightjack.WavePlan{Waves: []sightjack.Wave{}})
 			}
 
 			adrDir := sightjack.ADRDir(baseDir)
@@ -146,13 +156,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				return fmt.Errorf("nextgen failed: %w", err)
 			}
 
-			plan := sightjack.WavePlan{Waves: newWaves}
-			out, jsonErr := json.MarshalIndent(plan, "", "  ")
-			if jsonErr != nil {
-				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
-			}
-			fmt.Fprintln(w, string(out))
-			return nil
+			return cacheAndPrint(sightjack.WavePlan{Waves: newWaves})
 		},
 	}
 }

@@ -24,6 +24,7 @@ type CheckResult struct {
 	Name    string
 	Status  CheckStatus
 	Message string
+	Hint    string // optional remediation hint shown on failure
 }
 
 // StatusLabel returns a display string for the check status.
@@ -86,8 +87,45 @@ func checkTool(ctx context.Context, name string) CheckResult {
 	}
 }
 
-// checkLinearMCP verifies Linear MCP connectivity by sending a lightweight
-// prompt to Claude and checking if it responds without error.
+// checkClaudeAuth verifies that Claude Code is authenticated by sending a
+// simple prompt that does not require any MCP server.
+// Returns CheckSkip if cfg is nil (config loading failed).
+func checkClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
+	if cfg == nil {
+		return CheckResult{
+			Name:    "Claude Auth",
+			Status:  CheckSkip,
+			Message: "skipped (config not available)",
+		}
+	}
+
+	output, err := RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger, WithAllowedTools("Write"))
+	if err != nil {
+		hint := fmt.Sprintf("claude execution failed: %v", err)
+		if strings.Contains(output, "Not logged in") {
+			return CheckResult{
+				Name:    "Claude Auth",
+				Status:  CheckFail,
+				Message: "not logged in",
+				Hint:    `run "claude login" then "/login" inside the session`,
+			}
+		}
+		return CheckResult{
+			Name:    "Claude Auth",
+			Status:  CheckFail,
+			Message: hint,
+		}
+	}
+
+	return CheckResult{
+		Name:    "Claude Auth",
+		Status:  CheckOK,
+		Message: "authenticated",
+	}
+}
+
+// checkLinearMCP verifies Linear MCP connectivity by sending a prompt that
+// references the configured Linear team.
 // Returns CheckSkip if cfg is nil (config loading failed).
 func checkLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
 	if cfg == nil {
@@ -99,12 +137,13 @@ func checkLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResul
 	}
 
 	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Linear.Team)
-	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger)
+	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, WithAllowedTools(LinearMCPAllowedTools...))
 	if err != nil {
 		return CheckResult{
 			Name:    "Linear MCP",
 			Status:  CheckFail,
 			Message: fmt.Sprintf("claude execution failed: %v", err),
+			Hint:    `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`,
 		}
 	}
 
@@ -212,8 +251,24 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *L
 	// 5. Skills check
 	results = append(results, checkSkills(baseDir))
 
-	// 6. Linear MCP connectivity (skip if claude unavailable)
-	if claudeResult.Status != CheckOK {
+	// 6. Claude Auth check (skip if claude binary unavailable)
+	skipClaude := claudeResult.Status != CheckOK
+	if skipClaude {
+		results = append(results, CheckResult{
+			Name:    "Claude Auth",
+			Status:  CheckSkip,
+			Message: "skipped (claude not available)",
+		})
+	} else {
+		authResult := checkClaudeAuth(ctx, cfg, logger)
+		results = append(results, authResult)
+		if authResult.Status != CheckOK {
+			skipClaude = true
+		}
+	}
+
+	// 7. Linear MCP connectivity (skip if claude binary or auth unavailable)
+	if skipClaude {
 		results = append(results, CheckResult{
 			Name:    "Linear MCP",
 			Status:  CheckSkip,

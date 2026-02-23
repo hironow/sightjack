@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -100,6 +101,10 @@ suitable for piping into 'adr' for ADR generation.`,
 			out, jsonErr := json.MarshalIndent(result, "", "  ")
 			if jsonErr != nil {
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
+			}
+			// Cache result for pipe replay: cat .siren/.run/<id>/discuss_result.json | sightjack adr
+			if err := os.WriteFile(filepath.Join(scanDir, "discuss_result.json"), out, 0644); err != nil {
+				logger.Warn("Failed to cache discuss result: %v", err)
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			return nil

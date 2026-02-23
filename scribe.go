@@ -254,11 +254,28 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		return nil, fmt.Errorf("render scribe prompt: %w", err)
 	}
 
+	// Save prompt + tee output for debugging.
+	promptBase := strings.TrimSuffix(scribeFileName(wave), ".json")
+	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save scribe prompt: %v", err)
+	}
+	scribeLog, scribeLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+	scribeOut := out
+	if scribeLogErr == nil {
+		defer scribeLog.Close()
+		scribeOut = io.MultiWriter(out, scribeLog)
+	} else {
+		logger.Warn("create scribe log: %v", scribeLogErr)
+	}
+
 	logger.Scan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, out, logger); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 
+	if normErr := normalizeJSONFile(outputFile); normErr != nil {
+		logger.Warn("normalize scribe JSON: %v", normErr)
+	}
 	result, err := ParseScribeResult(outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("parse scribe result %s: %w", wave.ID, err)

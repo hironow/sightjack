@@ -1,0 +1,9 @@
+{
+  "wave_id": "auth-w1",
+  "analysis": "Auth module login flow lacks acceptance criteria.",
+  "reasoning": "Adding DoD first establishes clear contract.",
+  "decision": "approve",
+  "modifications": [],
+  "adr_worthy": true,
+  "adr_title": "Prioritize DoD Before Implementation"
+}

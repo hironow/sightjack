@@ -93,20 +93,40 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 		return nil, RunClaudeDryRun(cfg, classifyPrompt, scanDir, "classify", logger)
 	}
 
+	// Save prompt for debugging (survives signal:killed).
+	promptFile := filepath.Join(scanDir, "classify_prompt.md")
+	if err := os.WriteFile(promptFile, []byte(classifyPrompt), 0644); err != nil {
+		logger.Warn("save classify prompt: %v", err)
+	}
+
+	// Tee claude output to a log file for incremental visibility.
+	logFile, logErr := os.Create(filepath.Join(scanDir, "classify_output.log"))
+	claudeOut := out
+	if logErr == nil {
+		defer logFile.Close()
+		claudeOut = io.MultiWriter(out, logFile)
+	} else {
+		logger.Warn("create classify log: %v", logErr)
+	}
+
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
+	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
 	if cfg.Labels.Enabled {
-		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, out, logger); err != nil {
+		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
-		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, out, logger); err != nil {
+		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	}
 
+	if normErr := normalizeJSONFile(classifyOutput); normErr != nil {
+		logger.Warn("normalize classify JSON: %v", normErr)
+	}
 	classify, err := ParseClassifyResult(classifyOutput)
 	if err != nil {
 		classifySpan.End()
@@ -154,11 +174,31 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
 			}
 
+			// Save prompt + tee output for debugging.
+			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, sanitizeName(cc.Name), j)
+			if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+				logger.Warn("save deepscan prompt: %v", err)
+			}
+			chunkLog, chunkLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+			chunkOut := io.Writer(io.Discard)
+			if chunkLogErr == nil {
+				chunkOut = chunkLog
+			} else {
+				logger.Warn("create deepscan log: %v", chunkLogErr)
+			}
+
 			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-			if _, runErr := RunClaude(ctx, cfg, prompt, io.Discard, logger); runErr != nil {
+			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools)
+			if chunkLog != nil {
+				chunkLog.Close()
+			}
+			if runErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
 			}
 
+			if normErr := normalizeJSONFile(chunkFile); normErr != nil {
+				logger.Warn("normalize cluster JSON: %v", normErr)
+			}
 			result, parseErr := ParseClusterScanResult(chunkFile)
 			if parseErr != nil {
 				return ClusterScanResult{}, fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
@@ -194,6 +234,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 
 	logger.Scan("Pass 3: Generating waves for %d clusters...", len(clusters))
 
+	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
 	waveResults := make([]WaveGenerateResult, len(clusters))
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -228,11 +269,28 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 			}
 
+			// Save prompt + tee output for debugging (consistent with deep scan).
+			promptBase := fmt.Sprintf("wave_%02d_%s", i, sanitizeName(cluster.Name))
+			if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+				logger.Warn("save wave prompt: %v", err)
+			}
+			waveLog, waveLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+			waveOut := io.Writer(io.Discard)
+			if waveLogErr == nil {
+				defer waveLog.Close()
+				waveOut = waveLog
+			} else {
+				logger.Warn("create wave log: %v", waveLogErr)
+			}
+
 			logger.Scan("Generating waves: %s", cluster.Name)
-			if _, err := RunClaude(gCtx, cfg, prompt, io.Discard, logger); err != nil {
+			if _, err := RunClaude(gCtx, cfg, prompt, waveOut, logger, linearTools); err != nil {
 				return fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 			}
 
+			if normErr := normalizeJSONFile(waveFile); normErr != nil {
+				logger.Warn("normalize wave JSON: %v", normErr)
+			}
 			result, err := ParseWaveGenerateResult(waveFile)
 			if err != nil {
 				return fmt.Errorf("parse waves %s: %w", cluster.Name, err)

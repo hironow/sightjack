@@ -23,14 +23,18 @@ This document describes what each directory/file does, who creates it, and how i
     *.md
   .run/                   # ephemeral runtime data (per-session)
     {sessionID}/
-      scan_result.json
-      classify.json
-      cluster_*.json
-      wave_*.json
-      architect_*.json
-      apply_*.json
-      scribe_*.json
-      nextgen_*.json
+      scan_result.json    # cached ScanResult (WriteScanResult / scan --json)
+      classify.json       # Claude Pass 1 output
+      cluster_*.json      # Claude Pass 2 deep-scan per cluster
+      wave_*.json         # Claude Pass 3 wave generation per cluster
+      waves_result.json   # cached WavePlan (waves subcommand)
+      architect_*.json    # Architect discussion response per wave
+      discuss_result.json # cached DiscussResult (discuss subcommand)
+      apply_*.json        # Wave apply response per wave
+      apply_result.json   # cached ApplyResult (apply subcommand)
+      scribe_*.json       # Scribe ADR generation per wave
+      nextgen_*.json      # Follow-up wave response per wave
+      nextgen_result.json # cached WavePlan (nextgen subcommand)
       *_prompt.md         # dry-run mode only
 ```
 
@@ -71,14 +75,18 @@ Each session creates a unique directory under `.run/` containing all Claude subp
 
 | File Pattern | Claude Pass | Created By | Purpose |
 |---|---|---|---|
-| `scan_result.json` | — | `WriteScanResult()` | Cached scan results for session resume |
+| `scan_result.json` | — | `WriteScanResult()` | Cached ScanResult for session resume |
 | `classify.json` | Pass 1 | Claude subprocess | Cluster classification and issue grouping |
 | `cluster_{NN}_{name}_c{NN}.json` | Pass 2 | Claude subprocess | Deep scan results per cluster (chunked) |
 | `wave_{NN}_{name}.json` | Pass 3 | Claude subprocess | Generated waves per cluster |
+| `waves_result.json` | — | `waves` subcommand | Cached aggregated WavePlan for pipe replay |
 | `architect_{name}_{waveID}.json` | — | `RunArchitectDiscuss()` | Architect discussion response |
+| `discuss_result.json` | — | `discuss` subcommand | Cached DiscussResult for pipe replay |
 | `apply_{name}_{waveID}.json` | — | `RunWaveApply()` | Wave apply results (applied count, errors, ripples) |
+| `apply_result.json` | — | `apply` subcommand | Cached ApplyResult for pipe replay |
 | `scribe_{name}_{waveID}.json` | — | `RunScribeADR()` | Scribe ADR generation response |
 | `nextgen_{name}_{waveID}.json` | — | `GenerateNextWaves()` | Follow-up waves after completion |
+| `nextgen_result.json` | — | `nextgen` subcommand | Cached WavePlan for pipe replay |
 | `*_prompt.md` | — | `RunClaudeDryRun()` | Prompt files saved in `--dry-run` mode |
 
 All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent path traversal.

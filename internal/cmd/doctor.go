@@ -41,6 +41,9 @@ is working. Reports pass/fail/skip for each check.`,
 			var fails, skips int
 			for _, r := range results {
 				fmt.Fprintf(w, "[%s] %s: %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+				if r.Hint != "" {
+					fmt.Fprintf(w, "  hint: %s\n", r.Hint)
+				}
 				switch r.Status {
 				case sightjack.CheckFail:
 					fails++

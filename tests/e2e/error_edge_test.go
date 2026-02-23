@@ -12,6 +12,39 @@ import (
 	"time"
 )
 
+func TestE2E_EmptyStdin(t *testing.T) {
+	tests := []struct {
+		name string
+		args func(dir string) []string
+	}{
+		{name: "waves", args: func(dir string) []string { return []string{"waves", dir} }},
+		{name: "select", args: func(dir string) []string { return []string{"select"} }},
+		{name: "apply", args: func(dir string) []string { return []string{"apply", dir} }},
+		{name: "discuss", args: func(dir string) []string { return []string{"discuss", dir} }},
+		{name: "nextgen", args: func(dir string) []string { return []string{"nextgen", dir} }},
+		{name: "adr", args: func(dir string) []string { return []string{"adr", dir} }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given: a configured directory with empty stdin
+			dir := initDir(t)
+
+			// when
+			cmd := exec.Command(sightjackBin(), tt.args(dir)...)
+			cmd.Stdin = strings.NewReader("")
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			err := cmd.Run()
+
+			// then: should fail with "no input" error
+			if err == nil {
+				t.Fatalf("expected error for empty stdin on %s", tt.name)
+			}
+		})
+	}
+}
+
 func TestE2E_Scan_NoConfig(t *testing.T) {
 	// given: a directory with no .siren/config.yaml
 	dir := t.TempDir()
@@ -66,6 +99,61 @@ func TestE2E_Waves_InvalidJSON(t *testing.T) {
 	// then: should fail with error, not panic
 	if err == nil {
 		t.Fatal("expected error for invalid JSON input to waves")
+	}
+}
+
+func TestE2E_Select_EmptyWaves(t *testing.T) {
+	// given: valid WavePlan with empty waves array
+	input := `{"waves": []}`
+
+	// when
+	cmd := exec.Command(sightjackBin(), "select")
+	cmd.Stdin = strings.NewReader(input)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	// then: should fail with "no waves in plan"
+	if err == nil {
+		t.Fatal("expected error for empty waves")
+	}
+}
+
+func TestE2E_Show_UnrecognizedJSON(t *testing.T) {
+	// given: valid JSON but neither ScanResult nor WavePlan
+	input := `{"foo": "bar"}`
+
+	// when
+	cmd := exec.Command(sightjackBin(), "show")
+	cmd.Stdin = strings.NewReader(input)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	// then: should fail — DetectPipeType returns Unknown
+	if err == nil {
+		t.Fatal("expected error for unrecognized JSON")
+	}
+}
+
+func TestE2E_Nextgen_NoWaveContext(t *testing.T) {
+	// given: valid JSON ApplyResult with no CompletedWave + no state.json
+	dir := initDir(t)
+	input := `{"wave_id": "x", "applied": 0, "total_count": 0, "errors": []}`
+
+	// when
+	cmd := exec.Command(sightjackBin(), "nextgen", dir)
+	cmd.Stdin = strings.NewReader(input)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	// then: should fail — no CompletedWave and no state file
+	if err == nil {
+		t.Fatal("expected error for nextgen without wave context")
 	}
 }
 

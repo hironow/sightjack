@@ -184,11 +184,29 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 		return nil, fmt.Errorf("render apply prompt: %w", err)
 	}
 
+	// Save prompt + tee output for debugging.
+	promptBase := strings.TrimSuffix(waveApplyFileName(wave), ".json")
+	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
+		logger.Warn("save apply prompt: %v", err)
+	}
+	applyLog, applyLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+	applyOut := out
+	if applyLogErr == nil {
+		defer applyLog.Close()
+		applyOut = io.MultiWriter(out, applyLog)
+	} else {
+		logger.Warn("create apply log: %v", applyLogErr)
+	}
+
+	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
 	logger.Scan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
-	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger); err != nil {
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, applyOut, logger, linearTools); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
 
+	if normErr := normalizeJSONFile(applyFile); normErr != nil {
+		logger.Warn("normalize wave apply JSON: %v", normErr)
+	}
 	result, err := ParseWaveApplyResult(applyFile)
 	if err != nil {
 		return nil, fmt.Errorf("parse apply result %s: %w", wave.ID, err)
@@ -210,7 +228,7 @@ func RunReadyLabel(ctx context.Context, cfg *Config, readyIssueIDs string, out i
 	}
 
 	logger.Scan("Applying ready labels to: %s", readyIssueIDs)
-	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger); err != nil {
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return fmt.Errorf("ready label: %w", err)
 	}
 	return nil
