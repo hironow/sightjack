@@ -99,7 +99,7 @@ func checkClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResu
 		}
 	}
 
-	output, err := RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger)
+	output, err := RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger, WithAllowedTools("Write"))
 	if err != nil {
 		hint := fmt.Sprintf("claude execution failed: %v", err)
 		if strings.Contains(output, "Not logged in") {
@@ -137,7 +137,7 @@ func checkLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResul
 	}
 
 	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Linear.Team)
-	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger)
+	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, WithAllowedTools(LinearMCPAllowedTools...))
 	if err != nil {
 		return CheckResult{
 			Name:    "Linear MCP",
