@@ -13,9 +13,6 @@
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
 - Release: `.goreleaser.yaml`
-- E2E: `tests/e2e/compose-e2e.yaml`
-- E2E fake-Claude: `tests/e2e/fake-claude/` (fixture-based Claude test double)
-- E2E fixtures: `tests/e2e/fixtures/` (canned JSON for pipe tests)
 
 ## CLI Design
 
@@ -27,6 +24,18 @@
 - `run` subcommand: `--notify-cmd`, `--approve-cmd`, `--auto-approve` local flags (convergence gate)
 - `SIGHTJACK_TTY` env var: overrides `/dev/tty` in `openTTY()` for go-expect PTY injection in E2E tests
 - Interactive input (`select`, `discuss`): reads from `openTTY()`, prompts to `cmd.ErrOrStderr()`
+
+## Test Layout
+
+- Unit tests: `*_test.go` colocated with source (Go convention)
+  - Prefer `package sightjack_test` (external test package) — test exported API, not implementation details
+  - `package sightjack` (in-package) only for test infrastructure (`newCmd` variable injection, etc.)
+  - If an unexported function is worth testing individually, export it
+- Integration tests: `internal/cmd/cobra_integration_test.go` (CLI integration)
+- E2E tests: `tests/e2e/` (Docker-based, real Claude binary via fake-claude fixture)
+  - `tests/e2e/compose-e2e.yaml` — Docker Compose for E2E environment
+  - `tests/e2e/fake-claude/` — fixture-based Claude test double
+  - `tests/e2e/fixtures/` — canned JSON for pipe tests
 
 ## Build & Test
 
