@@ -152,7 +152,7 @@ func scribeFileName(wave Wave) string {
 // stale results from a prior run being parsed if Claude fails to write a new file.
 func clearScribeOutput(scanDir string, wave Wave) {
 	path := filepath.Join(scanDir, scribeFileName(wave))
-	os.Remove(path)
+	_ = os.Remove(path)
 }
 
 // RunScribeADRDryRun saves the scribe prompt to a file instead of executing Claude.

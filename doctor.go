@@ -173,7 +173,7 @@ func checkStateDir(baseDir string) CheckResult {
 			Message: fmt.Sprintf("%s is not writable: %v", dir, err),
 		}
 	}
-	os.Remove(probe)
+	_ = os.Remove(probe)
 	return CheckResult{
 		Name:    "State Dir",
 		Status:  CheckOK,

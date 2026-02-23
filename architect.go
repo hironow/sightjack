@@ -115,7 +115,7 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 // write a new file.
 func clearArchitectOutput(scanDir string, wave Wave) {
 	path := filepath.Join(scanDir, architectDiscussFileName(wave))
-	os.Remove(path)
+	_ = os.Remove(path)
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.

@@ -174,7 +174,9 @@ func receiveDMailIfNew(baseDir, filename string, logger *Logger) *DMail {
 	// for the same wave must use a distinct filename (e.g. append a sequence number).
 	archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
 	if _, err := os.Stat(archivePath); err == nil {
-		os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename))
+		if rmErr := os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename)); rmErr != nil && !os.IsNotExist(rmErr) {
+			logger.Warn("dedup remove %s: %v", filename, rmErr)
+		}
 		return nil
 	}
 

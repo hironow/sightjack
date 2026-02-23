@@ -54,7 +54,7 @@ func nextgenFileName(wave Wave) string {
 // clearNextgenOutput removes any existing nextgen output file.
 func clearNextgenOutput(scanDir string, wave Wave) {
 	path := filepath.Join(scanDir, nextgenFileName(wave))
-	os.Remove(path)
+	_ = os.Remove(path)
 }
 
 // ParseNextGenResult reads and parses a nextgen wave generation result JSON file.
