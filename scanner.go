@@ -337,6 +337,8 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 	if err != nil {
 		return WaveGenerateResult{}, fmt.Errorf("parse waves %s: %w", cluster.Name, err)
 	}
+	// Normalize to input cluster name — model output may omit or mislabel it.
+	result.ClusterName = cluster.Name
 	logger.OK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
 	return *result, nil
 }
