@@ -38,7 +38,7 @@ func TestCobraRouting_Init(t *testing.T) {
 }
 
 func TestCobraRouting_Doctor(t *testing.T) {
-	// given: a temp directory (no config — doctor prints to os.Stdout directly)
+	// given: a temp directory (no config — doctor prints diagnostics to stderr)
 	dir := t.TempDir()
 
 	rootCmd := NewRootCommand()

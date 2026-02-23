@@ -145,16 +145,24 @@ func TestValidateDMail_MissingName(t *testing.T) {
 }
 
 func TestValidateDMail_MissingKind(t *testing.T) {
-	mail := &DMail{Name: "test", Description: "desc"}
-	if err := ValidateDMail(mail); err == nil {
+	mail := &DMail{Name: "test", Description: "desc", SchemaVersion: "1"}
+	err := ValidateDMail(mail)
+	if err == nil {
 		t.Error("expected error for missing kind")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid kind") {
+		t.Errorf("expected kind validation error, got: %v", err)
 	}
 }
 
 func TestValidateDMail_InvalidKind(t *testing.T) {
-	mail := &DMail{Name: "test", Kind: "invalid", Description: "desc"}
-	if err := ValidateDMail(mail); err == nil {
+	mail := &DMail{Name: "test", Kind: "invalid", Description: "desc", SchemaVersion: "1"}
+	err := ValidateDMail(mail)
+	if err == nil {
 		t.Error("expected error for invalid kind")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid kind") {
+		t.Errorf("expected kind validation error, got: %v", err)
 	}
 }
 
