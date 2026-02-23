@@ -1,4 +1,5 @@
 ---
+dmail-schema-version: "1"
 kind: convergence
 name: convergence-arch-review
 description: "Architecture review gate triggered"

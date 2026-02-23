@@ -1,4 +1,5 @@
 ---
+dmail-schema-version: "1"
 kind: feedback
 name: feedback-review-001
 description: "Architecture drift in auth module"
