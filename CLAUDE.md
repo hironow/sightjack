@@ -14,6 +14,8 @@
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
 - Release: `.goreleaser.yaml`
 - E2E: `tests/e2e/compose-e2e.yaml`
+- E2E fake-Claude: `tests/e2e/fake-claude/` (fixture-based Claude test double)
+- E2E fixtures: `tests/e2e/fixtures/` (canned JSON for pipe tests)
 
 ## CLI Design
 
@@ -23,6 +25,8 @@
 - Default subcommand: `sightjack [flags] <repo>` → prepends `scan` via `DefaultToScan`
 - OTel tracer shutdown: `cobra.OnFinalize` + `sync.Once`
 - `run` subcommand: `--notify-cmd`, `--approve-cmd`, `--auto-approve` local flags (convergence gate)
+- `SIGHTJACK_TTY` env var: overrides `/dev/tty` in `openTTY()` for go-expect PTY injection in E2E tests
+- Interactive input (`select`, `discuss`): reads from `openTTY()`, prompts to `cmd.ErrOrStderr()`
 
 ## Build & Test
 
