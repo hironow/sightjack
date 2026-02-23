@@ -1261,7 +1261,7 @@ func TestResultCache_WavesPlan(t *testing.T) {
 	}
 
 	scanDir := ScanDir(baseDir, sessionID)
-	waves, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	waves, _, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
@@ -1320,7 +1320,7 @@ func TestResultCache_ApplyResult(t *testing.T) {
 	}
 
 	scanDir := ScanDir(baseDir, sessionID)
-	waves, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	waves, _, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
@@ -1383,7 +1383,7 @@ func TestResultCache_DiscussResult(t *testing.T) {
 	}
 
 	scanDir := ScanDir(baseDir, sessionID)
-	waves, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	waves, _, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
@@ -1450,7 +1450,7 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 	}
 
 	scanDir := ScanDir(baseDir, sessionID)
-	waves, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	waves, _, _, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}

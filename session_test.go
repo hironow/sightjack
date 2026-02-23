@@ -1872,10 +1872,10 @@ func TestMergeOldWaves_CarriesForwardFailedClusters(t *testing.T) {
 		{ID: "1", ClusterName: "auth", Title: "Auth wave v2"},
 		{ID: "3", ClusterName: "api", Title: "API wave v2"},
 	}
-	// All three clusters are still in the current scan.
 	scannedClusters := map[string]bool{"auth": true, "db": true, "api": true}
+	failedNames := map[string]bool{"db": true}
 
-	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters)
+	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	// Expect 3 waves: 2 new + 1 carried forward (db failed but still scanned).
 	if len(merged) != 3 {
@@ -1904,10 +1904,10 @@ func TestMergeOldWaves_DropsRemovedClusters(t *testing.T) {
 	newWaves := []Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth wave v2"},
 	}
-	// Only "auth" is in the current scan — "obsolete" was removed.
 	scannedClusters := map[string]bool{"auth": true}
+	failedNames := map[string]bool{} // no failures
 
-	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters)
+	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	if len(merged) != 1 {
 		t.Fatalf("expected 1 wave (obsolete dropped), got %d: %v", len(merged), merged)
@@ -1925,8 +1925,9 @@ func TestMergeOldWaves_AllClustersRegenerated(t *testing.T) {
 		{ID: "1", ClusterName: "auth", Title: "Auth new"},
 	}
 	scannedClusters := map[string]bool{"auth": true}
+	failedNames := map[string]bool{} // no failures
 
-	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters)
+	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	if len(merged) != 1 {
 		t.Fatalf("expected 1 wave, got %d", len(merged))
@@ -1941,16 +1942,64 @@ func TestMergeOldWaves_NoClustersRegenerated(t *testing.T) {
 		{ID: "1", ClusterName: "auth", Title: "Auth old", Status: "completed"},
 		{ID: "2", ClusterName: "db", Title: "DB old", Status: "pending"},
 	}
-	// All clusters failed — empty newWaves, but both still in scan.
 	var newWaves []Wave
 	scannedClusters := map[string]bool{"auth": true, "db": true}
+	failedNames := map[string]bool{"auth": true, "db": true}
 
-	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters)
+	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	if len(merged) != 2 {
 		t.Fatalf("expected 2 carried-forward waves, got %d", len(merged))
 	}
 	if merged[0].ClusterName != "auth" || merged[1].ClusterName != "db" {
 		t.Errorf("all old waves should be carried forward, got %v", merged)
+	}
+}
+
+func TestMergeOldWaves_DuplicateName_PartialFailure(t *testing.T) {
+	// Two "Auth" clusters existed; one regenerated, one failed.
+	oldWaves := []Wave{
+		{ID: "1", ClusterName: "Auth", Title: "Auth instance 1", Status: "completed"},
+		{ID: "2", ClusterName: "Auth", Title: "Auth instance 2", Status: "completed"},
+	}
+	newWaves := []Wave{
+		{ID: "10", ClusterName: "Auth", Title: "Auth new"},
+	}
+	scannedClusters := map[string]bool{"Auth": true}
+	// detectFailedClusterNames: 2 input "Auth", 1 success → failed
+	failedNames := map[string]bool{"Auth": true}
+
+	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+
+	// 1 new + 2 old carried forward (safe over-inclusion for duplicates)
+	if len(merged) != 3 {
+		t.Fatalf("expected 3 waves (1 new + 2 old), got %d: %v", len(merged), merged)
+	}
+	if merged[0].Title != "Auth new" {
+		t.Errorf("merged[0] should be new wave, got %q", merged[0].Title)
+	}
+}
+
+func TestMergeOldWaves_DuplicateName_AllSucceeded(t *testing.T) {
+	// Two "Auth" clusters, both regenerated successfully.
+	oldWaves := []Wave{
+		{ID: "1", ClusterName: "Auth", Title: "Auth old 1"},
+		{ID: "2", ClusterName: "Auth", Title: "Auth old 2"},
+	}
+	newWaves := []Wave{
+		{ID: "10", ClusterName: "Auth", Title: "Auth new 1"},
+		{ID: "20", ClusterName: "Auth", Title: "Auth new 2"},
+	}
+	scannedClusters := map[string]bool{"Auth": true}
+	failedNames := map[string]bool{} // both succeeded
+
+	merged := mergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+
+	// Only new waves, no carry-forward.
+	if len(merged) != 2 {
+		t.Fatalf("expected 2 new waves, got %d: %v", len(merged), merged)
+	}
+	if merged[0].Title != "Auth new 1" || merged[1].Title != "Auth new 2" {
+		t.Errorf("should only have new waves, got %v", merged)
 	}
 }

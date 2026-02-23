@@ -228,7 +228,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 // Failed clusters are skipped with warnings (partial success), matching the
 // fault-tolerance pattern of RunParallelDeepScan. Returns an error only when
 // ALL clusters fail.
-func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool, logger *Logger) ([]Wave, []string, error) {
+func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool, logger *Logger) ([]Wave, []string, map[string]bool, error) {
 	ctx, waveGenSpan := tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
@@ -248,14 +248,38 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 	// Context cancellation must be surfaced even when some clusters
 	// succeeded, so interrupted runs are never treated as complete.
 	if ctx.Err() != nil {
-		return nil, warnings, ctx.Err()
+		return nil, warnings, nil, ctx.Err()
 	}
+
+	failedNames := detectFailedClusterNames(clusters, successResults)
 
 	if len(successResults) == 0 && len(clusters) > 0 {
-		return nil, warnings, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
+		return nil, warnings, failedNames, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
 	}
 
-	return MergeWaveResults(successResults), warnings, nil
+	return MergeWaveResults(successResults), warnings, failedNames, nil
+}
+
+// detectFailedClusterNames compares input cluster counts to success counts
+// and returns names where at least one instance failed wave generation.
+// With duplicate cluster names, a name is marked failed if fewer instances
+// succeeded than existed in the input.
+func detectFailedClusterNames(clusters []ClusterScanResult, successes []WaveGenerateResult) map[string]bool {
+	inputCount := make(map[string]int, len(clusters))
+	for _, c := range clusters {
+		inputCount[c.Name]++
+	}
+	successCount := make(map[string]int, len(successes))
+	for _, r := range successes {
+		successCount[r.ClusterName]++
+	}
+	failed := make(map[string]bool)
+	for name, total := range inputCount {
+		if successCount[name] < total {
+			failed[name] = true
+		}
+	}
+	return failed
 }
 
 // generateWaveForCluster generates waves for a single cluster.

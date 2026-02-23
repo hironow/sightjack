@@ -907,7 +907,7 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 	logger := NewLogger(io.Discard, false)
 
 	// when
-	waves, warnings, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+	waves, warnings, _, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
 
 	// then: no fatal error
 	if err != nil {
@@ -948,7 +948,7 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 	logger := NewLogger(io.Discard, false)
 
 	// when
-	waves, warnings, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+	waves, warnings, _, err := RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
 
 	// then: error because ALL clusters failed
 	if err == nil {
@@ -963,5 +963,65 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 	// then: warnings for each failed cluster
 	if len(warnings) != 2 {
 		t.Errorf("expected 2 warnings, got %d: %v", len(warnings), warnings)
+	}
+}
+
+func TestDetectFailedClusterNames(t *testing.T) {
+	tests := []struct {
+		name      string
+		clusters  []ClusterScanResult
+		successes []WaveGenerateResult
+		want      map[string]bool
+	}{
+		{
+			name:      "all succeed no duplicates",
+			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
+			want:      map[string]bool{},
+		},
+		{
+			name:      "one fails no duplicates",
+			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []WaveGenerateResult{{ClusterName: "Auth"}},
+			want:      map[string]bool{"DB": true},
+		},
+		{
+			name:      "duplicates all succeed",
+			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
+			successes: []WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "Auth"}, {ClusterName: "DB"}},
+			want:      map[string]bool{},
+		},
+		{
+			name:      "duplicates partial failure",
+			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
+			successes: []WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
+			want:      map[string]bool{"Auth": true},
+		},
+		{
+			name:      "all fail",
+			clusters:  []ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []WaveGenerateResult{},
+			want:      map[string]bool{"Auth": true, "DB": true},
+		},
+		{
+			name:      "empty input",
+			clusters:  []ClusterScanResult{},
+			successes: []WaveGenerateResult{},
+			want:      map[string]bool{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := detectFailedClusterNames(tt.clusters, tt.successes)
+			if len(got) != len(tt.want) {
+				t.Fatalf("expected %d failed names, got %d: %v", len(tt.want), len(got), got)
+			}
+			for name := range tt.want {
+				if !got[name] {
+					t.Errorf("expected %q in failed names", name)
+				}
+			}
+		})
 	}
 }

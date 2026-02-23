@@ -58,7 +58,7 @@ for piping into 'select' or 'show'.`,
 
 			logger := loggerFrom(cmd)
 
-			waves, waveWarnings, err := sightjack.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun, logger)
+			waves, waveWarnings, _, err := sightjack.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun, logger)
 			if err != nil {
 				return fmt.Errorf("wave generation failed: %w", err)
 			}
