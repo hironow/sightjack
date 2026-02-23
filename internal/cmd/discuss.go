@@ -103,7 +103,9 @@ suitable for piping into 'adr' for ADR generation.`,
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
 			}
 			// Cache result for pipe replay: cat .siren/.run/<id>/discuss_result.json | sightjack adr
-			os.WriteFile(filepath.Join(scanDir, "discuss_result.json"), out, 0644)
+			if err := os.WriteFile(filepath.Join(scanDir, "discuss_result.json"), out, 0644); err != nil {
+				logger.Warn("Failed to cache discuss result: %v", err)
+			}
 			fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			return nil
 		},

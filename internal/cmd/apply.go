@@ -83,7 +83,9 @@ suitable for piping into 'nextgen' for follow-up wave generation.`,
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
 			}
 			// Cache result for pipe replay: cat .siren/.run/<id>/apply_result.json | sightjack nextgen
-			os.WriteFile(filepath.Join(scanDir, "apply_result.json"), out, 0644)
+			if err := os.WriteFile(filepath.Join(scanDir, "apply_result.json"), out, 0644); err != nil {
+				logger.Warn("Failed to cache apply result: %v", err)
+			}
 			fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			return nil
 		},

@@ -153,7 +153,9 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)
 			}
 			// Cache result for pipe replay: cat .siren/.run/<id>/nextgen_result.json | sightjack select
-			os.WriteFile(filepath.Join(scanDir, "nextgen_result.json"), out, 0644)
+			if err := os.WriteFile(filepath.Join(scanDir, "nextgen_result.json"), out, 0644); err != nil {
+				logger.Warn("Failed to cache nextgen result: %v", err)
+			}
 			fmt.Fprintln(w, string(out))
 			return nil
 		},
