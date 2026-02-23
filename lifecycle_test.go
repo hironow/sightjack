@@ -227,6 +227,14 @@ func waveApplyPartialFailure(waveID string) string {
 }`
 }
 
+func nextgenEmpty() string {
+	return `{
+	"cluster_name": "Auth",
+	"waves": [],
+	"reasoning": "Cluster is sufficiently complete."
+}`
+}
+
 // --- Tests for mock helpers ---
 
 func TestExtractPromptFromArgs(t *testing.T) {
@@ -1217,5 +1225,274 @@ func TestLifecycle_DMailNoFeedback_StillGeneratesSpecAndReport(t *testing.T) {
 	inboxFiles, _ := ListDMail(baseDir, inboxDir)
 	if len(inboxFiles) != 0 {
 		t.Errorf("expected empty inbox, got %d files", len(inboxFiles))
+	}
+}
+
+// --- Phase 7: Result Cache Round-Trip Tests ---
+//
+// Each pipe command caches its final result as {cmd}_result.json.
+// These tests verify the full round-trip: produce → marshal → write → read → unmarshal → verify.
+
+func architectDiscussFixture() string {
+	return `{
+	"analysis": "Auth module has tight coupling between login and token refresh",
+	"reasoning": "Separating concerns will improve testability and maintainability",
+	"decision": "approve",
+	"modified_wave": null
+}`
+}
+
+func TestResultCache_WavesPlan(t *testing.T) {
+	// given: run scan + wave generation to get a WavePlan
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-cache-waves"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	d.Register("wave_*_*.json", waveGenAuth())
+	cleanup := d.Install()
+	defer cleanup()
+
+	scanResult, err := RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+
+	scanDir := ScanDir(baseDir, sessionID)
+	waves, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunWaveGenerate failed: %v", err)
+	}
+
+	plan := WavePlan{Waves: waves, ScanResult: scanResult}
+
+	// when: marshal and write (same as cmd/waves.go)
+	data, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	resultPath := filepath.Join(scanDir, "waves_result.json")
+	if err := os.WriteFile(resultPath, data, 0644); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	// then: round-trip read and verify
+	assertFileExists(t, resultPath)
+	loaded, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+
+	var parsed WavePlan
+	if err := json.Unmarshal(loaded, &parsed); err != nil {
+		t.Fatalf("unmarshal as WavePlan failed (select would break): %v", err)
+	}
+	if len(parsed.Waves) != len(plan.Waves) {
+		t.Errorf("expected %d waves, got %d", len(plan.Waves), len(parsed.Waves))
+	}
+	if parsed.ScanResult == nil {
+		t.Error("expected ScanResult to be preserved in cached WavePlan")
+	}
+	if parsed.Waves[0].ClusterName != "Auth" {
+		t.Errorf("expected cluster Auth, got %q", parsed.Waves[0].ClusterName)
+	}
+}
+
+func TestResultCache_ApplyResult(t *testing.T) {
+	// given: run scan + wave gen + wave apply to get an ApplyResult
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-cache-apply"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	d.Register("wave_*_*.json", waveGenAuth())
+	d.Register("apply_*_*.json", waveApplySuccess("auth-w1"))
+	cleanup := d.Install()
+	defer cleanup()
+
+	scanResult, err := RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+
+	scanDir := ScanDir(baseDir, sessionID)
+	waves, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunWaveGenerate failed: %v", err)
+	}
+
+	wave := waves[0]
+	strictness := string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	internal, err := RunWaveApply(context.Background(), cfg, scanDir, wave, strictness, io.Discard, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunWaveApply failed: %v", err)
+	}
+
+	result := ToApplyResult(wave, internal)
+
+	// when: marshal and write (same as cmd/apply.go)
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	resultPath := filepath.Join(scanDir, "apply_result.json")
+	if err := os.WriteFile(resultPath, data, 0644); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	// then: round-trip read and verify parseable by nextgen
+	assertFileExists(t, resultPath)
+	loaded, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+
+	var parsed ApplyResult
+	if err := json.Unmarshal(loaded, &parsed); err != nil {
+		t.Fatalf("unmarshal as ApplyResult failed (nextgen would break): %v", err)
+	}
+	if parsed.WaveID != "auth-w1" {
+		t.Errorf("expected wave ID auth-w1, got %q", parsed.WaveID)
+	}
+	if len(parsed.AppliedActions) != 1 {
+		t.Errorf("expected 1 applied action, got %d", len(parsed.AppliedActions))
+	}
+}
+
+func TestResultCache_DiscussResult(t *testing.T) {
+	// given: run scan + wave gen + architect discuss to get a DiscussResult
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-cache-discuss"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	d.Register("wave_*_*.json", waveGenAuth())
+	d.Register("architect_*_*.json", architectDiscussFixture())
+	cleanup := d.Install()
+	defer cleanup()
+
+	scanResult, err := RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+
+	scanDir := ScanDir(baseDir, sessionID)
+	waves, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunWaveGenerate failed: %v", err)
+	}
+
+	wave := waves[0]
+	strictness := string(ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	resp, err := RunArchitectDiscuss(context.Background(), cfg, scanDir, wave, "review coupling", strictness, io.Discard, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunArchitectDiscuss failed: %v", err)
+	}
+
+	result := ToDiscussResult(wave, resp, "review coupling")
+
+	// when: marshal and write (same as cmd/discuss.go)
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	resultPath := filepath.Join(scanDir, "discuss_result.json")
+	if err := os.WriteFile(resultPath, data, 0644); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	// then: round-trip read and verify parseable by adr
+	assertFileExists(t, resultPath)
+	loaded, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+
+	var parsed DiscussResult
+	if err := json.Unmarshal(loaded, &parsed); err != nil {
+		t.Fatalf("unmarshal as DiscussResult failed (adr would break): %v", err)
+	}
+	if parsed.WaveID != wave.ID {
+		t.Errorf("expected wave ID %q, got %q", wave.ID, parsed.WaveID)
+	}
+	if parsed.Analysis == "" {
+		t.Error("expected non-empty analysis")
+	}
+	if parsed.Decision != "approve" {
+		t.Errorf("expected decision 'approve', got %q", parsed.Decision)
+	}
+}
+
+func TestResultCache_NextgenPlan(t *testing.T) {
+	// given: run scan + wave gen + apply + nextgen to get a WavePlan
+	baseDir := t.TempDir()
+	cfg := testConfig()
+	sessionID := "test-cache-nextgen"
+
+	d := newMockDispatcher(t)
+	d.Register("classify.json", classifySingleCluster())
+	d.Register("cluster_*_c*.json", deepScanAuth())
+	d.Register("wave_*_*.json", waveGenAuth())
+	d.Register("apply_*_*.json", waveApplySuccess("auth-w1"))
+	d.Register("nextgen_*_*.json", nextgenEmpty())
+	cleanup := d.Install()
+	defer cleanup()
+
+	scanResult, err := RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunScan failed: %v", err)
+	}
+
+	scanDir := ScanDir(baseDir, sessionID)
+	waves, err := RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("RunWaveGenerate failed: %v", err)
+	}
+
+	wave := waves[0]
+	cluster := scanResult.Clusters[0]
+	cluster.Completeness = 0.65 // post-apply completeness
+
+	existingADRs, _ := ReadExistingADRs(ADRDir(baseDir))
+	completedWaves := CompletedWavesForCluster(waves, cluster.Name)
+	strictness := string(ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
+
+	newWaves, err := GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("GenerateNextWaves failed: %v", err)
+	}
+
+	plan := WavePlan{Waves: newWaves}
+
+	// when: marshal and write (same as cmd/nextgen.go)
+	data, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	resultPath := filepath.Join(scanDir, "nextgen_result.json")
+	if err := os.WriteFile(resultPath, data, 0644); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	// then: round-trip read and verify parseable by select
+	assertFileExists(t, resultPath)
+	loaded, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+
+	var parsed WavePlan
+	if err := json.Unmarshal(loaded, &parsed); err != nil {
+		t.Fatalf("unmarshal as WavePlan failed (select would break): %v", err)
+	}
+	// nextgenEmpty returns no new waves (cluster complete)
+	if len(parsed.Waves) != 0 {
+		t.Errorf("expected 0 waves from nextgen (cluster complete), got %d", len(parsed.Waves))
 	}
 }
