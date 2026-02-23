@@ -258,8 +258,18 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 				return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 			}
 
+			// Save prompt + tee output for debugging (consistent with deep scan).
+			promptBase := fmt.Sprintf("wave_%02d_%s", i, sanitizeName(cluster.Name))
+			os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+			waveLog, waveLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+			waveOut := io.Writer(io.Discard)
+			if waveLogErr == nil {
+				defer waveLog.Close()
+				waveOut = waveLog
+			}
+
 			logger.Scan("Generating waves: %s", cluster.Name)
-			if _, err := RunClaude(gCtx, cfg, prompt, io.Discard, logger, linearTools); err != nil {
+			if _, err := RunClaude(gCtx, cfg, prompt, waveOut, logger, linearTools); err != nil {
 				return fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 			}
 

@@ -254,8 +254,18 @@ func RunScribeADR(ctx context.Context, cfg *Config, scanDir string, wave Wave, a
 		return nil, fmt.Errorf("render scribe prompt: %w", err)
 	}
 
+	// Save prompt + tee output for debugging.
+	promptBase := strings.TrimSuffix(scribeFileName(wave), ".json")
+	os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+	scribeLog, scribeLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+	scribeOut := out
+	if scribeLogErr == nil {
+		defer scribeLog.Close()
+		scribeOut = io.MultiWriter(out, scribeLog)
+	}
+
 	logger.Scan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, out, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 

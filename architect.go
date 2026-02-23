@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -147,8 +148,19 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 		return nil, fmt.Errorf("render architect prompt: %w", err)
 	}
 
+	// Save prompt + tee output for debugging.
+	promptBase := architectDiscussFileName(wave)
+	promptBase = strings.TrimSuffix(promptBase, ".json")
+	os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+	discussLog, discussLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+	discussOut := out
+	if discussLogErr == nil {
+		defer discussLog.Close()
+		discussOut = io.MultiWriter(out, discussLog)
+	}
+
 	logger.Scan("Architect discussing: %s - %s", wave.ClusterName, topic)
-	if _, err := RunClaude(ctx, cfg, prompt, out, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, discussOut, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}
 

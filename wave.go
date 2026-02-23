@@ -184,9 +184,19 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 		return nil, fmt.Errorf("render apply prompt: %w", err)
 	}
 
+	// Save prompt + tee output for debugging.
+	promptBase := strings.TrimSuffix(waveApplyFileName(wave), ".json")
+	os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644)
+	applyLog, applyLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
+	applyOut := out
+	if applyLogErr == nil {
+		defer applyLog.Close()
+		applyOut = io.MultiWriter(out, applyLog)
+	}
+
 	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
 	logger.Scan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
-	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger, linearTools); err != nil {
+	if _, err := RunClaudeOnce(ctx, cfg, prompt, applyOut, logger, linearTools); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
 
