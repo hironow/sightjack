@@ -801,7 +801,7 @@ func TestE2E_Pipe_WaveGenPartialFailure(t *testing.T) {
 	}{
 		{
 			name:        "OneClusterFails",
-			failPattern: "Unstable",
+			failPattern: "unstable",
 			wantWarning: "Unstable",
 		},
 		{

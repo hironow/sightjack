@@ -40,6 +40,11 @@ func RunParallel[I, R any](
 	group := pool.NewGroupContext(ctx)
 
 	for i, item := range items {
+		// Stop enqueuing once context is canceled so remaining items
+		// are left unstarted and the pool drains promptly.
+		if ctx.Err() != nil {
+			break
+		}
 		group.Submit(func() {
 			// Inner panic recovery captures the error before pond's outer
 			// recovery fires, preserving which task panicked and why.
