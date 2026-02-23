@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"context"
@@ -6,11 +6,13 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestFilterConvergence_Empty(t *testing.T) {
 	// given: empty slice
-	result := FilterConvergence(nil)
+	result := sightjack.FilterConvergence(nil)
 
 	// then
 	if len(result) != 0 {
@@ -20,15 +22,15 @@ func TestFilterConvergence_Empty(t *testing.T) {
 
 func TestFilterConvergence_MixedKinds(t *testing.T) {
 	// given: mixed d-mails
-	dmails := []*DMail{
-		{Name: "fb-1", Kind: DMailFeedback, Description: "feedback"},
-		{Name: "conv-1", Kind: DMailConvergence, Description: "convergence 1"},
-		{Name: "spec-1", Kind: DMailSpecification, Description: "spec"},
-		{Name: "conv-2", Kind: DMailConvergence, Description: "convergence 2"},
+	dmails := []*sightjack.DMail{
+		{Name: "fb-1", Kind: sightjack.DMailFeedback, Description: "feedback"},
+		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "convergence 1"},
+		{Name: "spec-1", Kind: sightjack.DMailSpecification, Description: "spec"},
+		{Name: "conv-2", Kind: sightjack.DMailConvergence, Description: "convergence 2"},
 	}
 
 	// when
-	result := FilterConvergence(dmails)
+	result := sightjack.FilterConvergence(dmails)
 
 	// then
 	if len(result) != 2 {
@@ -44,15 +46,15 @@ func TestFilterConvergence_MixedKinds(t *testing.T) {
 
 func TestConvergenceGate_NoConvergence(t *testing.T) {
 	// given: no convergence d-mails
-	dmails := []*DMail{
-		{Name: "fb-1", Kind: DMailFeedback, Description: "feedback only"},
+	dmails := []*sightjack.DMail{
+		{Name: "fb-1", Kind: sightjack.DMailFeedback, Description: "feedback only"},
 	}
-	notifier := &NopNotifier{}
-	approver := &AutoApprover{}
-	logger := NewLogger(io.Discard, false)
+	notifier := &sightjack.NopNotifier{}
+	approver := &sightjack.AutoApprover{}
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then: pass through (no gate)
 	if err != nil {
@@ -65,15 +67,15 @@ func TestConvergenceGate_NoConvergence(t *testing.T) {
 
 func TestConvergenceGate_Approved(t *testing.T) {
 	// given: convergence d-mail + auto-approve
-	dmails := []*DMail{
-		{Name: "conv-1", Kind: DMailConvergence, Description: "convergence signal"},
+	dmails := []*sightjack.DMail{
+		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "convergence signal"},
 	}
-	notifier := &NopNotifier{}
-	approver := &AutoApprover{}
-	logger := NewLogger(io.Discard, false)
+	notifier := &sightjack.NopNotifier{}
+	approver := &sightjack.AutoApprover{}
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then
 	if err != nil {
@@ -86,15 +88,15 @@ func TestConvergenceGate_Approved(t *testing.T) {
 
 func TestConvergenceGate_Denied(t *testing.T) {
 	// given: convergence d-mail + denying approver
-	dmails := []*DMail{
-		{Name: "conv-1", Kind: DMailConvergence, Description: "convergence signal"},
+	dmails := []*sightjack.DMail{
+		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "convergence signal"},
 	}
-	notifier := &NopNotifier{}
+	notifier := &sightjack.NopNotifier{}
 	approver := &denyApprover{}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then
 	if err != nil {
@@ -107,15 +109,15 @@ func TestConvergenceGate_Denied(t *testing.T) {
 
 func TestConvergenceGate_FailClosed(t *testing.T) {
 	// given: convergence d-mail + failing approver
-	dmails := []*DMail{
-		{Name: "conv-1", Kind: DMailConvergence, Description: "convergence signal"},
+	dmails := []*sightjack.DMail{
+		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "convergence signal"},
 	}
-	notifier := &NopNotifier{}
+	notifier := &sightjack.NopNotifier{}
 	approver := &errorApprover{err: fmt.Errorf("approval service down")}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then: fail-closed
 	if err == nil {
@@ -129,17 +131,17 @@ func TestConvergenceGate_FailClosed(t *testing.T) {
 func TestConvergenceGate_ContextCancel(t *testing.T) {
 	// given: convergence d-mail + cancelled context.
 	// Gate should return ctx.Err(), not (false, nil).
-	dmails := []*DMail{
-		{Name: "conv-1", Kind: DMailConvergence, Description: "convergence signal"},
+	dmails := []*sightjack.DMail{
+		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "convergence signal"},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	notifier := &NopNotifier{}
-	approver := &AutoApprover{}
-	logger := NewLogger(io.Discard, false)
+	notifier := &sightjack.NopNotifier{}
+	approver := &sightjack.AutoApprover{}
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := RunConvergenceGate(ctx, dmails, notifier, approver, logger)
+	approved, err := sightjack.RunConvergenceGate(ctx, dmails, notifier, approver, logger)
 
 	// then: should propagate cancellation error
 	if err == nil {
@@ -153,15 +155,15 @@ func TestConvergenceGate_ContextCancel(t *testing.T) {
 func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 	// given: initial drain was empty, but convergence arrived in channel
 	// between the caller's drain and this gate call (simulated by pre-loading channel).
-	ch := make(chan *DMail, 2)
-	ch <- &DMail{Name: "late-conv", Kind: DMailConvergence, Description: "late convergence"}
-	notifier := &NopNotifier{}
-	approver := &AutoApprover{}
-	logger := NewLogger(io.Discard, false)
+	ch := make(chan *sightjack.DMail, 2)
+	ch <- &sightjack.DMail{Name: "late-conv", Kind: sightjack.DMailConvergence, Description: "late convergence"}
+	notifier := &sightjack.NopNotifier{}
+	approver := &sightjack.AutoApprover{}
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when: initial is empty, gate passes through, but re-drain catches late convergence
-	var initial []*DMail
-	allDmails, approved, err := RunConvergenceGateWithRedrain(
+	var initial []*sightjack.DMail
+	allDmails, approved, err := sightjack.RunConvergenceGateWithRedrain(
 		context.Background(), initial, ch, notifier, approver, logger,
 	)
 
@@ -184,19 +186,19 @@ func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T) {
 	// given: initial has convergence, and more convergence arrives mid-approval.
 	// injectingApprover injects a D-Mail into the channel on first call.
-	ch := make(chan *DMail, 2)
+	ch := make(chan *sightjack.DMail, 2)
 	injectApprover := &injectingApprover{
 		ch:     ch,
-		inject: &DMail{Name: "late-conv", Kind: DMailConvergence, Description: "late convergence"},
+		inject: &sightjack.DMail{Name: "late-conv", Kind: sightjack.DMailConvergence, Description: "late convergence"},
 	}
-	notifier := &NopNotifier{}
-	logger := NewLogger(io.Discard, false)
+	notifier := &sightjack.NopNotifier{}
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when: initial has convergence, approval triggers inject, re-drain catches it
-	initial := []*DMail{
-		{Name: "conv-1", Kind: DMailConvergence, Description: "initial convergence"},
+	initial := []*sightjack.DMail{
+		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "initial convergence"},
 	}
-	allDmails, approved, err := RunConvergenceGateWithRedrain(
+	allDmails, approved, err := sightjack.RunConvergenceGateWithRedrain(
 		context.Background(), initial, ch, notifier, injectApprover, logger,
 	)
 
@@ -220,19 +222,19 @@ func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T
 func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 	// given: a notifier that blocks indefinitely + convergence d-mail.
 	// Gate should not hang — notification must be non-blocking.
-	dmails := []*DMail{
-		{Name: "conv-1", Kind: DMailConvergence, Description: "convergence signal"},
+	dmails := []*sightjack.DMail{
+		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "convergence signal"},
 	}
 	notifier := &blockingNotifier{ch: make(chan struct{})}
-	approver := &AutoApprover{}
-	logger := NewLogger(io.Discard, false)
+	approver := &sightjack.AutoApprover{}
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when: run gate with a deadline
 	done := make(chan struct{})
 	var approved bool
 	var err error
 	go func() {
-		approved, err = RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+		approved, err = sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 		close(done)
 	}()
 
@@ -265,8 +267,8 @@ func (n *blockingNotifier) Notify(_ context.Context, _, _ string) error {
 // injectingApprover injects a D-Mail into the channel on the first call,
 // then approves on subsequent calls.
 type injectingApprover struct {
-	ch        chan *DMail
-	inject    *DMail
+	ch        chan *sightjack.DMail
+	inject    *sightjack.DMail
 	callCount int
 }
 

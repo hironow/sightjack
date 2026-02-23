@@ -1,9 +1,11 @@
-package sightjack
+package sightjack_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestLoadConfig_Defaults(t *testing.T) {
@@ -18,7 +20,7 @@ linear:
 		t.Fatal(err)
 	}
 
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -67,7 +69,7 @@ lang: "en"
 		t.Fatal(err)
 	}
 
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -96,7 +98,7 @@ scan:
 	}
 
 	// when
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	// then
 	if err != nil {
@@ -120,7 +122,7 @@ scan:
 	}
 
 	// when
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	// then
 	if err != nil {
@@ -144,7 +146,7 @@ claude:
 	}
 
 	// when
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	// then
 	if err != nil {
@@ -168,7 +170,7 @@ claude:
 	}
 
 	// when
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	// then
 	if err != nil {
@@ -180,7 +182,7 @@ claude:
 }
 
 func TestLoadConfig_FileNotFound(t *testing.T) {
-	_, err := LoadConfig("/nonexistent/path.yaml")
+	_, err := sightjack.LoadConfig("/nonexistent/path.yaml")
 	if err == nil {
 		t.Error("expected error for missing config file")
 	}
@@ -188,7 +190,7 @@ func TestLoadConfig_FileNotFound(t *testing.T) {
 
 func TestDefaultConfig_ScribeEnabled(t *testing.T) {
 	// given/when
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 
 	// then
 	if !cfg.Scribe.Enabled {
@@ -209,7 +211,7 @@ scribe:
 	}
 
 	// when
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	// then
 	if err != nil {
@@ -222,10 +224,10 @@ scribe:
 
 func TestDefaultConfig_StrictnessFog(t *testing.T) {
 	// when
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 
 	// then
-	if cfg.Strictness.Default != StrictnessFog {
+	if cfg.Strictness.Default != sightjack.StrictnessFog {
 		t.Errorf("expected fog, got %s", cfg.Strictness.Default)
 	}
 }
@@ -243,13 +245,13 @@ strictness:
 `), 0644)
 
 	// when
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != StrictnessAlert {
+	if cfg.Strictness.Default != sightjack.StrictnessAlert {
 		t.Errorf("expected alert, got %s", cfg.Strictness.Default)
 	}
 }
@@ -265,13 +267,13 @@ linear:
 `), 0644)
 
 	// when
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != StrictnessFog {
+	if cfg.Strictness.Default != sightjack.StrictnessFog {
 		t.Errorf("expected fog default, got %s", cfg.Strictness.Default)
 	}
 }
@@ -289,13 +291,13 @@ strictness:
 `), 0644)
 
 	// when
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != StrictnessFog {
+	if cfg.Strictness.Default != sightjack.StrictnessFog {
 		t.Errorf("expected fog fallback for invalid value, got %s", cfg.Strictness.Default)
 	}
 }
@@ -312,19 +314,19 @@ strictness:
 `), 0644)
 
 	// when
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != StrictnessFog {
+	if cfg.Strictness.Default != sightjack.StrictnessFog {
 		t.Errorf("expected fog fallback for empty strictness, got %s", cfg.Strictness.Default)
 	}
 }
 
 func TestDoDTemplatesInDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	if cfg.DoDTemplates != nil {
 		t.Fatalf("expected nil DoDTemplates in default config, got %v", cfg.DoDTemplates)
 	}
@@ -350,7 +352,7 @@ dod_templates:
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(content), 0644)
 
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -371,7 +373,7 @@ dod_templates:
 }
 
 func TestRetryConfigDefaults(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	if cfg.Retry.MaxAttempts != 3 {
 		t.Errorf("expected MaxAttempts=3, got %d", cfg.Retry.MaxAttempts)
 	}
@@ -393,7 +395,7 @@ retry:
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(content), 0644)
 
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -418,7 +420,7 @@ retry:
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(content), 0644)
 
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -431,7 +433,7 @@ retry:
 }
 
 func TestLabelsConfigDefaults(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := sightjack.DefaultConfig()
 	if !cfg.Labels.Enabled {
 		t.Error("expected Labels.Enabled=true by default")
 	}
@@ -457,7 +459,7 @@ labels:
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(content), 0644)
 
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -488,7 +490,7 @@ labels:
 	os.WriteFile(path, []byte(content), 0644)
 
 	// when
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then
 	if err != nil {
@@ -504,160 +506,160 @@ labels:
 
 func TestResolveStrictness_DefaultWhenNoOverrides(t *testing.T) {
 	// given: config with no overrides
-	cfg := StrictnessConfig{Default: StrictnessFog}
+	cfg := sightjack.StrictnessConfig{Default: sightjack.StrictnessFog}
 
 	// when
-	result := ResolveStrictness(cfg, []string{"feature", "bug"})
+	result := sightjack.ResolveStrictness(cfg, []string{"feature", "bug"})
 
 	// then
-	if result != StrictnessFog {
+	if result != sightjack.StrictnessFog {
 		t.Errorf("expected fog, got %s", result)
 	}
 }
 
 func TestResolveStrictness_SingleLabelMatch(t *testing.T) {
 	// given: override for "security" label
-	cfg := StrictnessConfig{
-		Default:   StrictnessFog,
-		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	cfg := sightjack.StrictnessConfig{
+		Default:   sightjack.StrictnessFog,
+		Overrides: map[string]sightjack.StrictnessLevel{"security": sightjack.StrictnessLockdown},
 	}
 
 	// when
-	result := ResolveStrictness(cfg, []string{"feature", "security"})
+	result := sightjack.ResolveStrictness(cfg, []string{"feature", "security"})
 
 	// then
-	if result != StrictnessLockdown {
+	if result != sightjack.StrictnessLockdown {
 		t.Errorf("expected lockdown, got %s", result)
 	}
 }
 
 func TestResolveStrictness_StrictestWins(t *testing.T) {
 	// given: multiple matching overrides with different levels
-	cfg := StrictnessConfig{
-		Default: StrictnessFog,
-		Overrides: map[string]StrictnessLevel{
-			"enhancement": StrictnessAlert,
-			"security":    StrictnessLockdown,
+	cfg := sightjack.StrictnessConfig{
+		Default: sightjack.StrictnessFog,
+		Overrides: map[string]sightjack.StrictnessLevel{
+			"enhancement": sightjack.StrictnessAlert,
+			"security":    sightjack.StrictnessLockdown,
 		},
 	}
 
 	// when: both labels match
-	result := ResolveStrictness(cfg, []string{"enhancement", "security"})
+	result := sightjack.ResolveStrictness(cfg, []string{"enhancement", "security"})
 
 	// then: lockdown > alert, so lockdown wins
-	if result != StrictnessLockdown {
+	if result != sightjack.StrictnessLockdown {
 		t.Errorf("expected lockdown (strictest), got %s", result)
 	}
 }
 
 func TestResolveStrictness_NilOverrides(t *testing.T) {
 	// given: nil overrides map
-	cfg := StrictnessConfig{Default: StrictnessAlert}
+	cfg := sightjack.StrictnessConfig{Default: sightjack.StrictnessAlert}
 
 	// when
-	result := ResolveStrictness(cfg, []string{"anything"})
+	result := sightjack.ResolveStrictness(cfg, []string{"anything"})
 
 	// then
-	if result != StrictnessAlert {
+	if result != sightjack.StrictnessAlert {
 		t.Errorf("expected alert default, got %s", result)
 	}
 }
 
 func TestResolveStrictness_EmptyLabels(t *testing.T) {
 	// given: overrides exist but no labels provided
-	cfg := StrictnessConfig{
-		Default:   StrictnessFog,
-		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	cfg := sightjack.StrictnessConfig{
+		Default:   sightjack.StrictnessFog,
+		Overrides: map[string]sightjack.StrictnessLevel{"security": sightjack.StrictnessLockdown},
 	}
 
 	// when
-	result := ResolveStrictness(cfg, nil)
+	result := sightjack.ResolveStrictness(cfg, nil)
 
 	// then
-	if result != StrictnessFog {
+	if result != sightjack.StrictnessFog {
 		t.Errorf("expected fog default, got %s", result)
 	}
 }
 
 func TestResolveStrictness_NoMatchingLabels(t *testing.T) {
 	// given: overrides exist but labels don't match
-	cfg := StrictnessConfig{
-		Default:   StrictnessFog,
-		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	cfg := sightjack.StrictnessConfig{
+		Default:   sightjack.StrictnessFog,
+		Overrides: map[string]sightjack.StrictnessLevel{"security": sightjack.StrictnessLockdown},
 	}
 
 	// when
-	result := ResolveStrictness(cfg, []string{"feature", "backend"})
+	result := sightjack.ResolveStrictness(cfg, []string{"feature", "backend"})
 
 	// then
-	if result != StrictnessFog {
+	if result != sightjack.StrictnessFog {
 		t.Errorf("expected fog default, got %s", result)
 	}
 }
 
 func TestResolveStrictness_OverrideCanLowerStrictness(t *testing.T) {
 	// given: default is lockdown, but override lowers "Docs" to fog
-	cfg := StrictnessConfig{
-		Default:   StrictnessLockdown,
-		Overrides: map[string]StrictnessLevel{"Docs": StrictnessFog},
+	cfg := sightjack.StrictnessConfig{
+		Default:   sightjack.StrictnessLockdown,
+		Overrides: map[string]sightjack.StrictnessLevel{"Docs": sightjack.StrictnessFog},
 	}
 
 	// when: label matches the lower override
-	result := ResolveStrictness(cfg, []string{"Docs"})
+	result := sightjack.ResolveStrictness(cfg, []string{"Docs"})
 
 	// then: override wins even though it's less strict than default
-	if result != StrictnessFog {
+	if result != sightjack.StrictnessFog {
 		t.Errorf("expected fog override to win over lockdown default, got %s", result)
 	}
 }
 
 func TestResolveStrictness_MultipleMatchesPickStrictest(t *testing.T) {
 	// given: default lockdown, two matching overrides at different levels
-	cfg := StrictnessConfig{
-		Default: StrictnessLockdown,
-		Overrides: map[string]StrictnessLevel{
-			"Docs":     StrictnessFog,
-			"Security": StrictnessAlert,
+	cfg := sightjack.StrictnessConfig{
+		Default: sightjack.StrictnessLockdown,
+		Overrides: map[string]sightjack.StrictnessLevel{
+			"Docs":     sightjack.StrictnessFog,
+			"Security": sightjack.StrictnessAlert,
 		},
 	}
 
 	// when: both labels match
-	result := ResolveStrictness(cfg, []string{"Docs", "Security"})
+	result := sightjack.ResolveStrictness(cfg, []string{"Docs", "Security"})
 
 	// then: strictest among matched overrides (alert > fog), not default
-	if result != StrictnessAlert {
+	if result != sightjack.StrictnessAlert {
 		t.Errorf("expected alert (strictest matched override), got %s", result)
 	}
 }
 
 func TestResolveStrictness_ClusterNameAsLabel(t *testing.T) {
 	// given: overrides keyed by cluster name
-	cfg := StrictnessConfig{
-		Default:   StrictnessFog,
-		Overrides: map[string]StrictnessLevel{"Security": StrictnessLockdown},
+	cfg := sightjack.StrictnessConfig{
+		Default:   sightjack.StrictnessFog,
+		Overrides: map[string]sightjack.StrictnessLevel{"Security": sightjack.StrictnessLockdown},
 	}
 
 	// when: cluster name passed as label
-	result := ResolveStrictness(cfg, []string{"Security"})
+	result := sightjack.ResolveStrictness(cfg, []string{"Security"})
 
 	// then: override should match the cluster name
-	if result != StrictnessLockdown {
+	if result != sightjack.StrictnessLockdown {
 		t.Errorf("expected lockdown for Security cluster, got %s", result)
 	}
 }
 
 func TestResolveStrictness_CaseInsensitiveMatch(t *testing.T) {
 	// given: override key in lowercase, label in mixed case
-	cfg := StrictnessConfig{
-		Default:   StrictnessFog,
-		Overrides: map[string]StrictnessLevel{"security": StrictnessLockdown},
+	cfg := sightjack.StrictnessConfig{
+		Default:   sightjack.StrictnessFog,
+		Overrides: map[string]sightjack.StrictnessLevel{"security": sightjack.StrictnessLockdown},
 	}
 
 	// when: label has different casing
-	result := ResolveStrictness(cfg, []string{"Security"})
+	result := sightjack.ResolveStrictness(cfg, []string{"Security"})
 
 	// then: should match case-insensitively
-	if result != StrictnessLockdown {
+	if result != sightjack.StrictnessLockdown {
 		t.Errorf("expected lockdown (case-insensitive match), got %s", result)
 	}
 }
@@ -679,7 +681,7 @@ strictness:
 	os.WriteFile(path, []byte(content), 0644)
 
 	// when
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then
 	if err != nil {
@@ -688,10 +690,10 @@ strictness:
 	if len(cfg.Strictness.Overrides) != 2 {
 		t.Fatalf("expected 2 overrides, got %d", len(cfg.Strictness.Overrides))
 	}
-	if cfg.Strictness.Overrides["security"] != StrictnessLockdown {
+	if cfg.Strictness.Overrides["security"] != sightjack.StrictnessLockdown {
 		t.Errorf("security: expected lockdown, got %s", cfg.Strictness.Overrides["security"])
 	}
-	if cfg.Strictness.Overrides["performance"] != StrictnessAlert {
+	if cfg.Strictness.Overrides["performance"] != sightjack.StrictnessAlert {
 		t.Errorf("performance: expected alert, got %s", cfg.Strictness.Overrides["performance"])
 	}
 }
@@ -712,7 +714,7 @@ strictness:
 	os.WriteFile(path, []byte(content), 0644)
 
 	// when
-	_, err := LoadConfig(path)
+	_, err := sightjack.LoadConfig(path)
 
 	// then: should return an error for the invalid override value
 	if err == nil {
@@ -722,7 +724,7 @@ strictness:
 
 func TestValidLang_AcceptsJaAndEn(t *testing.T) {
 	for _, lang := range []string{"ja", "en"} {
-		if !ValidLang(lang) {
+		if !sightjack.ValidLang(lang) {
 			t.Errorf("expected ValidLang(%q) = true", lang)
 		}
 	}
@@ -730,7 +732,7 @@ func TestValidLang_AcceptsJaAndEn(t *testing.T) {
 
 func TestValidLang_RejectsInvalid(t *testing.T) {
 	for _, lang := range []string{"jp", "EN", "english", "fr", ""} {
-		if ValidLang(lang) {
+		if sightjack.ValidLang(lang) {
 			t.Errorf("expected ValidLang(%q) = false", lang)
 		}
 	}
@@ -749,7 +751,7 @@ linear:
 	}
 
 	// when
-	cfg, err := LoadConfig(cfgPath)
+	cfg, err := sightjack.LoadConfig(cfgPath)
 
 	// then
 	if err != nil {

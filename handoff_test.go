@@ -1,12 +1,14 @@
-package sightjack
+package sightjack_test
 
 import (
 	"context"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 // Compile-time check: Handoff interface exists and has expected methods.
-var _ Handoff = (*handoffChecker)(nil)
+var _ sightjack.Handoff = (*handoffChecker)(nil)
 
 type handoffChecker struct{}
 
@@ -15,7 +17,7 @@ func (p *handoffChecker) ReportIssue(_ context.Context, _ string, _ string) erro
 
 func TestHandoff_InterfaceCompiles(t *testing.T) {
 	// given: a type that implements Handoff
-	var h Handoff = &handoffChecker{}
+	var h sightjack.Handoff = &handoffChecker{}
 
 	// when / then: calling methods should not panic
 	if err := h.HandoffReady(context.Background(), []string{"ENG-101"}); err != nil {
@@ -28,7 +30,7 @@ func TestHandoff_InterfaceCompiles(t *testing.T) {
 
 func TestHandoffResult_ZeroValue(t *testing.T) {
 	// given: zero-value HandoffResult
-	var result HandoffResult
+	var result sightjack.HandoffResult
 
 	// then: fields should have zero values
 	if result.IssueID != "" {
@@ -40,19 +42,19 @@ func TestHandoffResult_ZeroValue(t *testing.T) {
 }
 
 func TestReadyIssueIDs(t *testing.T) {
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "completed",
-			Actions: []WaveAction{
+			Actions: []sightjack.WaveAction{
 				{IssueID: "AUTH-1"},
 				{IssueID: "AUTH-2"},
 			}},
 		{ID: "w2", ClusterName: "auth", Status: "completed",
-			Actions: []WaveAction{
+			Actions: []sightjack.WaveAction{
 				{IssueID: "AUTH-2"},
 				{IssueID: "AUTH-3"},
 			}},
 		{ID: "w3", ClusterName: "auth", Status: "available",
-			Actions: []WaveAction{
+			Actions: []sightjack.WaveAction{
 				{IssueID: "AUTH-3"},
 			}},
 	}
@@ -60,7 +62,7 @@ func TestReadyIssueIDs(t *testing.T) {
 	// AUTH-1 is only in w1 (completed) -> ready
 	// AUTH-2 is in w1 (completed) and w2 (completed) -> ready
 	// AUTH-3 is in w2 (completed) and w3 (available) -> NOT ready
-	ready := ReadyIssueIDs(waves)
+	ready := sightjack.ReadyIssueIDs(waves)
 
 	if len(ready) != 2 {
 		t.Fatalf("expected 2 ready issues, got %d: %v", len(ready), ready)
@@ -81,21 +83,21 @@ func TestReadyIssueIDs(t *testing.T) {
 }
 
 func TestReadyIssueIDsNoCompleted(t *testing.T) {
-	waves := []Wave{
-		{ID: "w1", Status: "available", Actions: []WaveAction{{IssueID: "A-1"}}},
+	waves := []sightjack.Wave{
+		{ID: "w1", Status: "available", Actions: []sightjack.WaveAction{{IssueID: "A-1"}}},
 	}
-	ready := ReadyIssueIDs(waves)
+	ready := sightjack.ReadyIssueIDs(waves)
 	if len(ready) != 0 {
 		t.Errorf("expected 0 ready issues, got %d", len(ready))
 	}
 }
 
 func TestReadyIssueIDsAllCompleted(t *testing.T) {
-	waves := []Wave{
-		{ID: "w1", Status: "completed", Actions: []WaveAction{{IssueID: "A-1"}}},
-		{ID: "w2", Status: "completed", Actions: []WaveAction{{IssueID: "A-1"}, {IssueID: "A-2"}}},
+	waves := []sightjack.Wave{
+		{ID: "w1", Status: "completed", Actions: []sightjack.WaveAction{{IssueID: "A-1"}}},
+		{ID: "w2", Status: "completed", Actions: []sightjack.WaveAction{{IssueID: "A-1"}, {IssueID: "A-2"}}},
 	}
-	ready := ReadyIssueIDs(waves)
+	ready := sightjack.ReadyIssueIDs(waves)
 	if len(ready) != 2 {
 		t.Errorf("expected 2 ready issues, got %d", len(ready))
 	}
@@ -103,8 +105,8 @@ func TestReadyIssueIDsAllCompleted(t *testing.T) {
 
 func TestReadyIssueIDs_Sorted(t *testing.T) {
 	// given: multiple completed issues that would be returned in random map order
-	waves := []Wave{
-		{ID: "w1", Status: "completed", Actions: []WaveAction{
+	waves := []sightjack.Wave{
+		{ID: "w1", Status: "completed", Actions: []sightjack.WaveAction{
 			{IssueID: "Z-1"},
 			{IssueID: "A-1"},
 			{IssueID: "M-1"},
@@ -112,7 +114,7 @@ func TestReadyIssueIDs_Sorted(t *testing.T) {
 	}
 
 	// when
-	ready := ReadyIssueIDs(waves)
+	ready := sightjack.ReadyIssueIDs(waves)
 
 	// then: results are sorted
 	if len(ready) != 3 {
