@@ -30,7 +30,7 @@ is working. Reports pass/fail/skip for each check.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 			resolved := resolveConfigPath(cmd, baseDir)
-			w := cmd.OutOrStdout()
+			w := cmd.ErrOrStderr()
 
 			fmt.Fprintln(w, "sightjack doctor — environment health check")
 			fmt.Fprintln(w)
