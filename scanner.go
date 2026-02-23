@@ -245,6 +245,12 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 		func(c ClusterScanResult) string { return c.Name },
 		logger)
 
+	// Context cancellation must be surfaced even when some clusters
+	// succeeded, so interrupted runs are never treated as complete.
+	if ctx.Err() != nil {
+		return nil, warnings, ctx.Err()
+	}
+
 	if len(successResults) == 0 && len(clusters) > 0 {
 		return nil, warnings, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
 	}
