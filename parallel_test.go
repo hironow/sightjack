@@ -178,6 +178,35 @@ func TestRunParallel_ConcurrencyBound(t *testing.T) {
 	}
 }
 
+func TestRunParallel_PanicRecovery(t *testing.T) {
+	// given: 3 items, "B" panics
+	items := []string{"A", "B", "C"}
+	work := func(_ context.Context, _ int, item string) (string, error) {
+		if item == "B" {
+			panic("B exploded")
+		}
+		return fmt.Sprintf("result-%s", item), nil
+	}
+	logger := NewLogger(io.Discard, false)
+
+	// when
+	results, warnings := RunParallel(context.Background(), items, 2, work, itemName, logger)
+
+	// then: A and C succeed, B panics → warning
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0] != "result-A" || results[1] != "result-C" {
+		t.Errorf("unexpected results: %v", results)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(warnings))
+	}
+	if !strings.Contains(warnings[0], "panic") {
+		t.Errorf("warning should mention panic: %s", warnings[0])
+	}
+}
+
 func TestRunParallel_CancelWhileWaitingSemaphore(t *testing.T) {
 	// given: concurrency=1, cancel while second item waits for semaphore
 	ctx, cancel := context.WithCancel(context.Background())

@@ -3,25 +3,15 @@ package sightjack
 import (
 	"context"
 	"fmt"
+
+	pond "github.com/alitto/pond/v2"
 )
 
-// parallelEvent represents the outcome of a single work item.
-// Goroutines send events through eventCh once work completes (success or failure).
-type parallelEvent[R any] struct {
-	index  int
-	result R
-	err    error
-}
-
-// RunParallel executes work for each item with semaphore-bounded concurrency.
+// RunParallel executes work for each item with bounded concurrency using a
+// pond worker pool. Failed items produce warnings and are skipped; successful
+// results are returned in the original item order.
 //
-// Flow (Command/Event):
-//
-//	Command phase (will-do):  dispatch goroutines for each item, gated by semaphore
-//	Event phase   (did-do):   collect parallelEvent from eventCh, preserving order
-//
-// Failed items produce warnings and are skipped. Successful results are
-// returned in the original item order.
+// Panics inside work are recovered and converted to warnings (no deadlock).
 func RunParallel[I, R any](
 	ctx context.Context,
 	items []I,
@@ -30,59 +20,57 @@ func RunParallel[I, R any](
 	itemName func(I) string,
 	logger *Logger,
 ) ([]R, []string) {
+	if len(items) == 0 {
+		return nil, nil
+	}
 	if concurrency < 1 {
 		concurrency = 1
 	}
 
-	sem := make(chan struct{}, concurrency)
-	eventCh := make(chan parallelEvent[R], len(items))
-
-	// --- Command phase: dispatch work to goroutine pool ---
-	launched := 0
-	for i, item := range items {
-		if ctx.Err() != nil {
-			break
-		}
-		acquired := false
-		select {
-		case <-ctx.Done():
-		case sem <- struct{}{}:
-			acquired = true
-		}
-		if !acquired || ctx.Err() != nil {
-			if acquired {
-				<-sem
-			}
-			break
-		}
-		launched++
-		go func() {
-			defer func() { <-sem }()
-			result, err := work(ctx, i, item)
-			eventCh <- parallelEvent[R]{index: i, result: result, err: err}
-		}()
+	// slot holds the outcome of a single work item.
+	// Each goroutine writes to a unique index — no synchronization needed.
+	type slot struct {
+		result R
+		err    error
+		done   bool // distinguishes completed tasks from cancelled/unstarted
 	}
+	slots := make([]slot, len(items))
 
-	// --- Event phase: collect outcomes preserving order ---
-	events := make([]*parallelEvent[R], len(items))
+	pool := pond.NewPool(concurrency)
+	group := pool.NewGroupContext(ctx)
+
+	for i, item := range items {
+		group.Submit(func() {
+			// Inner panic recovery captures the error before pond's outer
+			// recovery fires, preserving which task panicked and why.
+			defer func() {
+				if r := recover(); r != nil {
+					slots[i] = slot{err: fmt.Errorf("panic: %v", r), done: true}
+				}
+			}()
+			result, err := work(ctx, i, item)
+			slots[i] = slot{result: result, err: err, done: true}
+		})
+	}
+	_ = group.Wait()
+
+	// Stop pool workers to prevent goroutine leaks.
+	pool.StopAndWait()
+
+	// Collect results in submission order, skipping failures and unstarted tasks.
+	var results []R
 	var warnings []string
-	for range launched {
-		ev := <-eventCh
-		events[ev.index] = &ev
-		if ev.err != nil {
-			msg := fmt.Sprintf("%q failed: %v", itemName(items[ev.index]), ev.err)
+	for idx, s := range slots {
+		if !s.done {
+			continue
+		}
+		if s.err != nil {
+			msg := fmt.Sprintf("%q failed: %v", itemName(items[idx]), s.err)
 			logger.Warn("%s", msg)
 			warnings = append(warnings, msg)
+		} else {
+			results = append(results, s.result)
 		}
 	}
-
-	// --- Result: filter successes in original order ---
-	var results []R
-	for _, ev := range events {
-		if ev != nil && ev.err == nil {
-			results = append(results, ev.result)
-		}
-	}
-
 	return results, warnings
 }
