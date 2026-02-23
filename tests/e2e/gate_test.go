@@ -99,7 +99,7 @@ func TestE2E_Gate_NotifyCmdInvoked(t *testing.T) {
 	writeDMailToDir(t, dir, "inbox", "convergence-arch-review.md", convergenceContent)
 
 	notifyFile := filepath.Join(dir, "notify_output.txt")
-	notifyCmd := "echo {title} {message} > " + notifyFile
+	notifyCmd := "echo {title} {message} > '" + notifyFile + "'"
 
 	// when: run with --auto-approve + --notify-cmd
 	runFullSession(t, dir, withFlags("--auto-approve", "--notify-cmd", notifyCmd))
