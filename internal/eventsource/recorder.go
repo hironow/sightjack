@@ -1,21 +1,23 @@
-package sightjack
+package eventsource
 
 import (
 	"fmt"
 	"sync"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // SessionRecorder wraps an EventStore with automatic sequencing.
 // It is safe for concurrent use within a single process.
 type SessionRecorder struct {
-	store     EventStore
+	store     sightjack.EventStore
 	sessionID string
 	seq       int64
 	mu        sync.Mutex
 }
 
 // NewSessionRecorder creates a SessionRecorder that resumes from the store's last sequence.
-func NewSessionRecorder(store EventStore, sessionID string) *SessionRecorder {
+func NewSessionRecorder(store sightjack.EventStore, sessionID string) *SessionRecorder {
 	lastSeq, _ := store.LastSequence()
 	return &SessionRecorder{
 		store:     store,
@@ -25,16 +27,12 @@ func NewSessionRecorder(store EventStore, sessionID string) *SessionRecorder {
 }
 
 // Record creates and appends an event with the next sequence number.
-// If the receiver is nil, Record is a no-op (returns nil).
-func (r *SessionRecorder) Record(eventType EventType, payload any) error {
-	if r == nil {
-		return nil
-	}
+func (r *SessionRecorder) Record(eventType sightjack.EventType, payload any) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.seq++
-	event, err := NewEvent(eventType, r.sessionID, r.seq, payload)
+	event, err := sightjack.NewEvent(eventType, r.sessionID, r.seq, payload)
 	if err != nil {
 		return fmt.Errorf("recorder new event: %w", err)
 	}

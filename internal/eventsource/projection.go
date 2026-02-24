@@ -1,4 +1,4 @@
-package sightjack
+package eventsource
 
 import (
 	"fmt"
@@ -6,13 +6,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // ProjectState replays a sequence of events to produce a SessionState.
 // Unknown event types are silently skipped.
 // Returns a zero-value SessionState for nil/empty input.
-func ProjectState(events []Event) *SessionState {
-	state := &SessionState{}
+func ProjectState(events []sightjack.Event) *sightjack.SessionState {
+	state := &sightjack.SessionState{}
 	for _, e := range events {
 		applyEvent(state, e)
 	}
@@ -21,7 +23,7 @@ func ProjectState(events []Event) *SessionState {
 
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
-func LoadState(store EventStore) (*SessionState, error) {
+func LoadState(store sightjack.EventStore) (*sightjack.SessionState, error) {
 	events, err := store.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)
@@ -33,19 +35,19 @@ func LoadState(store EventStore) (*SessionState, error) {
 }
 
 // applyEvent mutates state according to the event type.
-func applyEvent(state *SessionState, e Event) {
+func applyEvent(state *sightjack.SessionState, e sightjack.Event) {
 	switch e.Type {
-	case EventSessionStarted:
-		var p SessionStartedPayload
+	case sightjack.EventSessionStarted:
+		var p sightjack.SessionStartedPayload
 		if unmarshalPayload(e, &p) {
-			state.Version = StateFormatVersion
+			state.Version = sightjack.StateFormatVersion
 			state.SessionID = e.SessionID
 			state.Project = p.Project
 			state.StrictnessLevel = p.StrictnessLevel
 		}
 
-	case EventScanCompleted:
-		var p ScanCompletedPayload
+	case sightjack.EventScanCompleted:
+		var p sightjack.ScanCompletedPayload
 		if unmarshalPayload(e, &p) {
 			state.Clusters = p.Clusters
 			state.Completeness = p.Completeness
@@ -54,14 +56,14 @@ func applyEvent(state *SessionState, e Event) {
 			state.LastScanned = p.LastScanned
 		}
 
-	case EventWavesGenerated:
-		var p WavesGeneratedPayload
+	case sightjack.EventWavesGenerated:
+		var p sightjack.WavesGeneratedPayload
 		if unmarshalPayload(e, &p) {
 			state.Waves = append(state.Waves, p.Waves...)
 		}
 
-	case EventWaveCompleted:
-		var p WaveCompletedPayload
+	case sightjack.EventWaveCompleted:
+		var p sightjack.WaveCompletedPayload
 		if unmarshalPayload(e, &p) {
 			key := p.ClusterName + ":" + p.WaveID
 			for i, w := range state.Waves {
@@ -72,8 +74,8 @@ func applyEvent(state *SessionState, e Event) {
 			}
 		}
 
-	case EventCompletenessUpdated:
-		var p CompletenessUpdatedPayload
+	case sightjack.EventCompletenessUpdated:
+		var p sightjack.CompletenessUpdatedPayload
 		if unmarshalPayload(e, &p) {
 			state.Completeness = p.OverallCompleteness
 			for i, c := range state.Clusters {
@@ -84,8 +86,8 @@ func applyEvent(state *SessionState, e Event) {
 			}
 		}
 
-	case EventWavesUnlocked:
-		var p WavesUnlockedPayload
+	case sightjack.EventWavesUnlocked:
+		var p sightjack.WavesUnlockedPayload
 		if unmarshalPayload(e, &p) {
 			unlocked := make(map[string]bool, len(p.UnlockedWaveIDs))
 			for _, id := range p.UnlockedWaveIDs {
@@ -99,14 +101,14 @@ func applyEvent(state *SessionState, e Event) {
 			}
 		}
 
-	case EventNextGenWavesAdded:
-		var p NextGenWavesAddedPayload
+	case sightjack.EventNextGenWavesAdded:
+		var p sightjack.NextGenWavesAddedPayload
 		if unmarshalPayload(e, &p) {
 			state.Waves = append(state.Waves, p.Waves...)
 		}
 
-	case EventWaveModified:
-		var p WaveModifiedPayload
+	case sightjack.EventWaveModified:
+		var p sightjack.WaveModifiedPayload
 		if unmarshalPayload(e, &p) {
 			key := p.ClusterName + ":" + p.WaveID
 			for i, w := range state.Waves {
@@ -117,12 +119,12 @@ func applyEvent(state *SessionState, e Event) {
 			}
 		}
 
-	case EventADRGenerated:
+	case sightjack.EventADRGenerated:
 		state.ADRCount++
 
-	case EventWaveApproved, EventWaveRejected, EventWaveApplied,
-		EventSpecificationSent, EventReportSent,
-		EventReadyLabelsApplied, EventSessionResumed, EventSessionRescanned:
+	case sightjack.EventWaveApproved, sightjack.EventWaveRejected, sightjack.EventWaveApplied,
+		sightjack.EventSpecificationSent, sightjack.EventReportSent,
+		sightjack.EventReadyLabelsApplied, sightjack.EventSessionResumed, sightjack.EventSessionRescanned:
 		// Audit-only events: no state mutation needed.
 
 	default:
@@ -133,7 +135,7 @@ func applyEvent(state *SessionState, e Event) {
 // LoadLatestState finds the most recent event store in .siren/events/ and
 // replays its events to produce a SessionState.
 // Returns the state, the sessionID, and any error.
-func LoadLatestState(baseDir string) (*SessionState, string, error) {
+func LoadLatestState(baseDir string) (*sightjack.SessionState, string, error) {
 	eventsDir := EventsDir(baseDir)
 	entries, err := os.ReadDir(eventsDir)
 	if err != nil {
@@ -179,6 +181,6 @@ func eventFileTimestamp(name string) int64 {
 }
 
 // unmarshalPayload is a helper that returns false on unmarshal failure.
-func unmarshalPayload(e Event, target any) bool {
-	return UnmarshalEventPayload(e, target) == nil
+func unmarshalPayload(e sightjack.Event, target any) bool {
+	return sightjack.UnmarshalEventPayload(e, target) == nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 func newScanCmd() *cobra.Command {
@@ -90,8 +91,8 @@ Use --json to output structured JSON for piping into downstream commands.`,
 					IssueCount:   len(c.Issues),
 				})
 			}
-			store := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
-			recorder := sightjack.NewSessionRecorder(store, sessionID)
+			store := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
+			recorder := eventsource.NewSessionRecorder(store, sessionID)
 			if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
 				Project:         cfg.Linear.Project,
 				StrictnessLevel: string(cfg.Strictness.Default),
@@ -107,7 +108,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			}); err != nil {
 				logger.Warn("Failed to record scan completed: %v", err)
 			} else {
-				logger.OK("Events saved to %s", sightjack.EventStorePath(baseDir, sessionID))
+				logger.OK("Events saved to %s", eventsource.EventStorePath(baseDir, sessionID))
 			}
 
 			logger.OK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)

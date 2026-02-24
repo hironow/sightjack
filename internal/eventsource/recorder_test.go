@@ -1,17 +1,18 @@
-package sightjack_test
+package eventsource_test
 
 import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 func TestSessionRecorder_Record_AutoSequence(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
-	recorder := sightjack.NewSessionRecorder(store, "session-1")
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	recorder := eventsource.NewSessionRecorder(store, "session-1")
 
 	// when
 	if err := recorder.Record(sightjack.EventSessionStarted, nil); err != nil {
@@ -40,8 +41,8 @@ func TestSessionRecorder_Record_AutoSequence(t *testing.T) {
 func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
-	recorder := sightjack.NewSessionRecorder(store, "session-1")
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	recorder := eventsource.NewSessionRecorder(store, "session-1")
 
 	payload := sightjack.SessionStartedPayload{
 		Project:         "my-project",
@@ -69,7 +70,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	// given: store with 3 existing events
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.jsonl")
-	store := sightjack.NewFileEventStore(path)
+	store := eventsource.NewFileEventStore(path)
 
 	for i := int64(1); i <= 3; i++ {
 		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "session-1", i, nil)
@@ -77,7 +78,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	}
 
 	// when: create new recorder from same store
-	recorder := sightjack.NewSessionRecorder(store, "session-1")
+	recorder := eventsource.NewSessionRecorder(store, "session-1")
 	if err := recorder.Record(sightjack.EventWavesGenerated, nil); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
@@ -89,16 +90,5 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	}
 	if events[3].Sequence != 4 {
 		t.Errorf("expected seq 4 (resume from 3), got %d", events[3].Sequence)
-	}
-}
-
-func TestSessionRecorder_NilRecorder_NoOp(t *testing.T) {
-	// given: nil recorder (used when recorder is optional)
-	var recorder *sightjack.SessionRecorder
-
-	// when/then: should not panic
-	err := recorder.Record(sightjack.EventSessionStarted, nil)
-	if err != nil {
-		t.Errorf("expected nil error from nil recorder, got: %v", err)
 	}
 }

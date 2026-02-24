@@ -1,4 +1,4 @@
-package sightjack_test
+package eventsource_test
 
 import (
 	"os"
@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 func TestProjectState_SessionStarted(t *testing.T) {
@@ -15,7 +16,7 @@ func TestProjectState_SessionStarted(t *testing.T) {
 		sightjack.SessionStartedPayload{Project: "my-project", StrictnessLevel: "fog"})
 
 	// when
-	state := sightjack.ProjectState([]sightjack.Event{event})
+	state := eventsource.ProjectState([]sightjack.Event{event})
 
 	// then
 	if state.Version != sightjack.StateFormatVersion {
@@ -48,7 +49,7 @@ func TestProjectState_ScanCompleted(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if state.Completeness != 0.5 {
@@ -79,7 +80,7 @@ func TestProjectState_WavesGenerated(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if len(state.Waves) != 2 {
@@ -105,7 +106,7 @@ func TestProjectState_WaveCompleted(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if len(state.Waves) != 1 {
@@ -130,7 +131,7 @@ func TestProjectState_CompletenessUpdated(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if state.Completeness != 0.7 {
@@ -157,7 +158,7 @@ func TestProjectState_WavesUnlocked(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if state.Waves[1].Status != "available" {
@@ -181,7 +182,7 @@ func TestProjectState_NextGenWavesAdded(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if len(state.Waves) != 2 {
@@ -205,7 +206,7 @@ func TestProjectState_WaveModified(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if state.Waves[0].Title != "Modified" {
@@ -224,7 +225,7 @@ func TestProjectState_ADRGenerated(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if state.ADRCount != 2 {
@@ -265,7 +266,7 @@ func TestProjectState_FullLifecycle(t *testing.T) {
 	}
 
 	// when
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if state.Project != "test-project" {
@@ -307,8 +308,8 @@ func TestProjectState_Idempotent(t *testing.T) {
 	}
 
 	// when: replay twice
-	state1 := sightjack.ProjectState(events)
-	state2 := sightjack.ProjectState(events)
+	state1 := eventsource.ProjectState(events)
+	state2 := eventsource.ProjectState(events)
 
 	// then
 	if state1.Completeness != state2.Completeness {
@@ -328,7 +329,7 @@ func TestProjectState_UnknownEventType_Skipped(t *testing.T) {
 	}
 
 	// when: should not panic
-	state := sightjack.ProjectState(events)
+	state := eventsource.ProjectState(events)
 
 	// then
 	if state.Project != "p1" {
@@ -338,7 +339,7 @@ func TestProjectState_UnknownEventType_Skipped(t *testing.T) {
 
 func TestProjectState_EmptyEvents(t *testing.T) {
 	// when
-	state := sightjack.ProjectState(nil)
+	state := eventsource.ProjectState(nil)
 
 	// then: should return zero-value state
 	if state.SessionID != "" {
@@ -350,8 +351,8 @@ func TestLoadState_RoundTrip(t *testing.T) {
 	// given: store with events
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "events", "s1.jsonl")
-	store := sightjack.NewFileEventStore(storePath)
-	recorder := sightjack.NewSessionRecorder(store, "s1")
+	store := eventsource.NewFileEventStore(storePath)
+	recorder := eventsource.NewSessionRecorder(store, "s1")
 
 	recorder.Record(sightjack.EventSessionStarted,
 		sightjack.SessionStartedPayload{Project: "test"})
@@ -359,7 +360,7 @@ func TestLoadState_RoundTrip(t *testing.T) {
 		sightjack.ScanCompletedPayload{Completeness: 0.4})
 
 	// when
-	state, err := sightjack.LoadState(store)
+	state, err := eventsource.LoadState(store)
 
 	// then
 	if err != nil {
@@ -376,10 +377,10 @@ func TestLoadState_RoundTrip(t *testing.T) {
 func TestLoadState_EmptyStore_ReturnsError(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
 
 	// when
-	_, err := sightjack.LoadState(store)
+	_, err := eventsource.LoadState(store)
 
 	// then
 	if err == nil {
@@ -390,23 +391,23 @@ func TestLoadState_EmptyStore_ReturnsError(t *testing.T) {
 func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	// given: two event files, older and newer
 	baseDir := t.TempDir()
-	eventsDir := sightjack.EventsDir(baseDir)
+	eventsDir := eventsource.EventsDir(baseDir)
 	os.MkdirAll(eventsDir, 0755)
 
 	// Older session
-	store1 := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, "session-1000-1"))
-	rec1 := sightjack.NewSessionRecorder(store1, "session-1000-1")
+	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-1000-1"))
+	rec1 := eventsource.NewSessionRecorder(store1, "session-1000-1")
 	rec1.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{Project: "old-project"})
 	rec1.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.3})
 
 	// Newer session
-	store2 := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, "session-2000-2"))
-	rec2 := sightjack.NewSessionRecorder(store2, "session-2000-2")
+	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-2000-2"))
+	rec2 := eventsource.NewSessionRecorder(store2, "session-2000-2")
 	rec2.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{Project: "new-project"})
 	rec2.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.7})
 
 	// when
-	state, sessionID, err := sightjack.LoadLatestState(baseDir)
+	state, sessionID, err := eventsource.LoadLatestState(baseDir)
 
 	// then
 	if err != nil {
@@ -428,7 +429,7 @@ func TestLoadLatestState_NoEventsDir(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	_, _, err := sightjack.LoadLatestState(baseDir)
+	_, _, err := eventsource.LoadLatestState(baseDir)
 
 	// then
 	if err == nil {
@@ -439,10 +440,10 @@ func TestLoadLatestState_NoEventsDir(t *testing.T) {
 func TestLoadLatestState_EmptyEventsDir(t *testing.T) {
 	// given: events directory with no files
 	baseDir := t.TempDir()
-	os.MkdirAll(sightjack.EventsDir(baseDir), 0755)
+	os.MkdirAll(eventsource.EventsDir(baseDir), 0755)
 
 	// when
-	_, _, err := sightjack.LoadLatestState(baseDir)
+	_, _, err := eventsource.LoadLatestState(baseDir)
 
 	// then
 	if err == nil {

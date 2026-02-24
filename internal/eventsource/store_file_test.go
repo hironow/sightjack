@@ -1,4 +1,4 @@
-package sightjack_test
+package eventsource_test
 
 import (
 	"os"
@@ -6,13 +6,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 func TestFileEventStore_AppendAndReadAll_RoundTrip(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
 
 	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
 	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, "s1", 2, nil)
@@ -41,7 +42,7 @@ func TestFileEventStore_AppendAndReadAll_RoundTrip(t *testing.T) {
 func TestFileEventStore_ReadSince_FiltersCorrectly(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
 
 	for i := int64(1); i <= 5; i++ {
 		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", i, nil)
@@ -69,7 +70,7 @@ func TestFileEventStore_ReadSince_FiltersCorrectly(t *testing.T) {
 func TestFileEventStore_ReadAll_EmptyFile(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
 
 	// when
 	events, err := store.ReadAll()
@@ -86,7 +87,7 @@ func TestFileEventStore_ReadAll_EmptyFile(t *testing.T) {
 func TestFileEventStore_LastSequence(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
 
 	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
 	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, "s1", 2, nil)
@@ -108,7 +109,7 @@ func TestFileEventStore_LastSequence(t *testing.T) {
 func TestFileEventStore_LastSequence_EmptyFile(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
 
 	// when
 	seq, err := store.LastSequence()
@@ -125,7 +126,7 @@ func TestFileEventStore_LastSequence_EmptyFile(t *testing.T) {
 func TestFileEventStore_ConcurrentAppend(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "concurrent.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "concurrent.jsonl"))
 	count := 50
 
 	// when: append concurrently
@@ -165,7 +166,7 @@ func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
 	content := string(data1) + "\n" + "THIS IS NOT JSON\n" + string(data2) + "\n"
 	os.WriteFile(path, []byte(content), 0644)
 
-	store := sightjack.NewFileEventStore(path)
+	store := eventsource.NewFileEventStore(path)
 
 	// when
 	events, err := store.ReadAll()
@@ -183,7 +184,7 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 	// given: path with non-existent parent directory
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sub", "dir", "events.jsonl")
-	store := sightjack.NewFileEventStore(path)
+	store := eventsource.NewFileEventStore(path)
 
 	e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
 
@@ -203,7 +204,7 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := sightjack.NewFileEventStore(filepath.Join(dir, "multi.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "multi.jsonl"))
 
 	// when: append in separate calls
 	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
@@ -219,7 +220,7 @@ func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 }
 
 func TestEventsDir(t *testing.T) {
-	got := sightjack.EventsDir("/project")
+	got := eventsource.EventsDir("/project")
 	expected := filepath.Join("/project", ".siren", "events")
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
@@ -227,7 +228,7 @@ func TestEventsDir(t *testing.T) {
 }
 
 func TestEventStorePath(t *testing.T) {
-	got := sightjack.EventStorePath("/project", "session-123")
+	got := eventsource.EventStorePath("/project", "session-123")
 	expected := filepath.Join("/project", ".siren", "events", "session-123.jsonl")
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)

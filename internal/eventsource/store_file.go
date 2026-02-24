@@ -1,4 +1,4 @@
-package sightjack
+package eventsource
 
 import (
 	"bufio"
@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // FileEventStore is a JSONL-based append-only event store.
@@ -24,7 +26,7 @@ func NewFileEventStore(path string) *FileEventStore {
 // Append writes one or more events to the JSONL file.
 // Events are serialized as compact JSON, one per line.
 // The parent directory is created if it does not exist.
-func (s *FileEventStore) Append(events ...Event) error {
+func (s *FileEventStore) Append(events ...sightjack.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -39,7 +41,7 @@ func (s *FileEventStore) Append(events ...Event) error {
 	defer f.Close()
 
 	for _, e := range events {
-		data, marshalErr := MarshalEvent(e)
+		data, marshalErr := sightjack.MarshalEvent(e)
 		if marshalErr != nil {
 			return fmt.Errorf("event store marshal: %w", marshalErr)
 		}
@@ -55,7 +57,7 @@ func (s *FileEventStore) Append(events ...Event) error {
 // ReadAll reads all events from the JSONL file.
 // Invalid lines are silently skipped.
 // Returns an empty slice (not error) for a non-existent file.
-func (s *FileEventStore) ReadAll() ([]Event, error) {
+func (s *FileEventStore) ReadAll() ([]sightjack.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -63,7 +65,7 @@ func (s *FileEventStore) ReadAll() ([]Event, error) {
 }
 
 // readAllUnlocked reads all events without locking (caller must hold mu).
-func (s *FileEventStore) readAllUnlocked() ([]Event, error) {
+func (s *FileEventStore) readAllUnlocked() ([]sightjack.Event, error) {
 	f, err := os.Open(s.path)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -73,14 +75,14 @@ func (s *FileEventStore) readAllUnlocked() ([]Event, error) {
 	}
 	defer f.Close()
 
-	var events []Event
+	var events []sightjack.Event
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}
-		var e Event
+		var e sightjack.Event
 		if err := json.Unmarshal(line, &e); err != nil {
 			// Skip corrupt lines
 			continue
@@ -94,7 +96,7 @@ func (s *FileEventStore) readAllUnlocked() ([]Event, error) {
 }
 
 // ReadSince reads events with sequence number strictly greater than afterSeq.
-func (s *FileEventStore) ReadSince(afterSeq int64) ([]Event, error) {
+func (s *FileEventStore) ReadSince(afterSeq int64) ([]sightjack.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -103,7 +105,7 @@ func (s *FileEventStore) ReadSince(afterSeq int64) ([]Event, error) {
 		return nil, err
 	}
 
-	var filtered []Event
+	var filtered []sightjack.Event
 	for _, e := range all {
 		if e.Sequence > afterSeq {
 			filtered = append(filtered, e)

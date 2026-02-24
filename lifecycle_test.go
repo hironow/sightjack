@@ -13,12 +13,13 @@ import (
 	"testing"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 // loadTestState loads the latest state from events for test verification.
 func loadTestState(t *testing.T, baseDir string) *sightjack.SessionState {
 	t.Helper()
-	state, _, err := sightjack.LoadLatestState(baseDir)
+	state, _, err := eventsource.LoadLatestState(baseDir)
 	if err != nil {
 		t.Fatalf("LoadLatestState: %v", err)
 	}
@@ -28,8 +29,8 @@ func loadTestState(t *testing.T, baseDir string) *sightjack.SessionState {
 // writeTestEvents creates an event store to simulate a pre-existing session state.
 func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.SessionState) {
 	t.Helper()
-	store := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
-	recorder := sightjack.NewSessionRecorder(store, sessionID)
+	store := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
+	recorder := eventsource.NewSessionRecorder(store, sessionID)
 	if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
 		Project:         state.Project,
 		StrictnessLevel: state.StrictnessLevel,
@@ -67,8 +68,8 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.S
 
 // testRecorder creates a real Recorder backed by the event store for lifecycle tests.
 func testRecorder(baseDir, sessionID string) sightjack.Recorder {
-	store := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
-	return sightjack.NewSessionRecorder(store, sessionID)
+	store := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
+	return eventsource.NewSessionRecorder(store, sessionID)
 }
 
 // testConfig returns a minimal Config for lifecycle tests.

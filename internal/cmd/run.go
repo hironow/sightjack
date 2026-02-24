@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 func newRunCmd() *cobra.Command {
@@ -58,7 +59,7 @@ if event data is found in .siren/events/.`,
 			}
 			// Check for existing state (resume detection)
 			if !dryRun {
-				existingState, _, stateErr := sightjack.LoadLatestState(baseDir)
+				existingState, _, stateErr := eventsource.LoadLatestState(baseDir)
 				if stateErr == nil {
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
@@ -76,13 +77,13 @@ if event data is found in .siren/events/.`,
 								logger.Warn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}
-							resumeStore := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, existingState.SessionID))
-							resumeRecorder := sightjack.NewSessionRecorder(resumeStore, existingState.SessionID)
+							resumeStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, existingState.SessionID))
+							resumeRecorder := eventsource.NewSessionRecorder(resumeStore, existingState.SessionID)
 							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
-							rescanStore := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, rescanID))
-							rescanRecorder := sightjack.NewSessionRecorder(rescanStore, rescanID)
+							rescanStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, rescanID))
+							rescanRecorder := eventsource.NewSessionRecorder(rescanStore, rescanID)
 							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
@@ -97,8 +98,8 @@ if event data is found in .siren/events/.`,
 			var recorder sightjack.Recorder = sightjack.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
-				sessionStore := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
-				recorder = sightjack.NewSessionRecorder(sessionStore, sessionID)
+				sessionStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
+				recorder = eventsource.NewSessionRecorder(sessionStore, sessionID)
 			}
 			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
 		},
