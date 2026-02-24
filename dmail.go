@@ -324,27 +324,27 @@ func FormatFeedbackForPrompt(feedback []*DMail) string {
 	return b.String()
 }
 
-// feedbackCollector accumulates feedback d-mails from both the initial
+// FeedbackCollector accumulates feedback d-mails from both the initial
 // drain and late-arriving items on the monitor channel. It replaces
 // LogInboxFeedbackAsync by both displaying AND storing late arrivals,
 // so they can be included in nextgen prompts.
 // Convergence d-mails are tracked separately for journaling.
-type feedbackCollector struct {
+type FeedbackCollector struct {
 	mu               sync.Mutex
 	items            []*DMail
 	convergenceNames []string
 	notifier         Notifier
 }
 
-// CollectFeedback creates a feedbackCollector seeded with initial feedback
+// CollectFeedback creates a FeedbackCollector seeded with initial feedback
 // and starts a background goroutine to accumulate late-arriving items
 // from the channel. Convergence d-mails trigger a notification via notifier.
 // Safe to call with nil initial, nil channel, or nil notifier.
-func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier Notifier, logger *Logger) *feedbackCollector {
+func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier Notifier, logger *Logger) *FeedbackCollector {
 	if notifier == nil {
 		notifier = &NopNotifier{}
 	}
-	c := &feedbackCollector{notifier: notifier}
+	c := &FeedbackCollector{notifier: notifier}
 	if len(initial) > 0 {
 		c.items = make([]*DMail, len(initial))
 		copy(c.items, initial)
@@ -385,7 +385,7 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier Notifier, logg
 
 // ConvergenceNames returns a copy of convergence d-mail names received
 // mid-session. Used for journaling/state persistence.
-func (c *feedbackCollector) ConvergenceNames() []string {
+func (c *FeedbackCollector) ConvergenceNames() []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.convergenceNames) == 0 {
@@ -399,7 +399,7 @@ func (c *feedbackCollector) ConvergenceNames() []string {
 // FeedbackOnly returns a copy of accumulated d-mails filtered to feedback kind
 // only (excludes convergence). Use this for nextgen prompt injection where only
 // feedback d-mails are relevant.
-func (c *feedbackCollector) FeedbackOnly() []*DMail {
+func (c *FeedbackCollector) FeedbackOnly() []*DMail {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var result []*DMail
@@ -413,7 +413,7 @@ func (c *feedbackCollector) FeedbackOnly() []*DMail {
 
 // All returns a copy of all accumulated feedback (initial + late arrivals).
 // Non-destructive: repeated calls return the same data plus any new arrivals.
-func (c *feedbackCollector) All() []*DMail {
+func (c *FeedbackCollector) All() []*DMail {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.items) == 0 {

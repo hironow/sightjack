@@ -32,7 +32,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	// Start inbox monitor (fsnotify-based) for feedback d-mails.
 	// CollectFeedback accumulates initial + late-arriving feedback so
 	// all feedback is available for nextgen prompt injection.
-	var fbCollector *feedbackCollector
+	var fbCollector *FeedbackCollector
 	if !dryRun {
 		monitorCtx, monitorCancel := context.WithCancel(ctx)
 		defer monitorCancel()
@@ -382,7 +382,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 	waves *[]Wave, completed map[string]bool,
 	scanResult *ScanResult, sessionRejected map[string][]WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *feedbackCollector, recorder Recorder, out io.Writer, loopSpan trace.Span, logger *Logger) {
+	fbCollector *FeedbackCollector, recorder Recorder, out io.Writer, loopSpan trace.Span, logger *Logger) {
 
 	// --- Pass 4: Wave Apply ---
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
@@ -569,7 +569,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
 func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
-	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *feedbackCollector, recorder Recorder, out io.Writer, logger *Logger) error {
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector, recorder Recorder, out io.Writer, logger *Logger) error {
 
 	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
