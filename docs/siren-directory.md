@@ -9,7 +9,8 @@ This document describes what each directory/file does, who creates it, and how i
 .siren/
   .gitignore              # auto-managed by WriteGitIgnore / EnsureScanDir
   config.yaml             # project-scoped settings (Linear team/project, strictness, lang)
-  state.json              # current session state (waves, completeness, ADR count)
+  events/                 # append-only event logs (JSONL, one file per session)
+    {sessionID}.jsonl     # immutable event stream for a session
   skills/
     dmail-sendable/
       SKILL.md            # agent skill manifest (produces: specification, report)
@@ -51,7 +52,7 @@ docs/
 `.siren/.gitignore` (auto-managed by `WriteGitIgnore`):
 
 ```
-state.json
+events/
 .run/
 inbox/
 outbox/
@@ -63,11 +64,23 @@ outbox/
 | `skills/` | Tracked | Agent capability manifests for tool discovery |
 | `archive/` | Tracked | Audit trail of all d-mail activity |
 | `.gitignore` | Tracked | Self-managed ignore rules |
-| `state.json` | Ignored | Session-specific mutable state |
+| `events/` | Ignored | Session-specific event logs (source of truth for state) |
 | `.run/` | Ignored | Ephemeral scan cache and Claude subprocess outputs |
 | `inbox/` | Ignored | Transient; consumed and archived by MonitorInbox |
 | `outbox/` | Ignored | Transient; courier (phonewave) picks up and delivers |
 | `docs/adr/` | Tracked | Immutable decision records |
+
+## Event Sourcing
+
+Session state is derived from append-only event logs stored in `.siren/events/{sessionID}.jsonl`.
+Each line is a JSON-encoded event with `type`, `timestamp`, `session_id`, `sequence`, and `payload`.
+
+State is reconstructed by replaying all events via `ProjectState()`. There is no snapshot file;
+the event log is the single source of truth. See ADR 0008 for design rationale.
+
+Key functions:
+- `LoadState(store)` — replay events from a specific EventStore
+- `LoadLatestState(baseDir)` — find newest `.jsonl` in events/, replay to get current state
 
 ## Session Scan Cache: `.run/{sessionID}/`
 
@@ -138,7 +151,7 @@ All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent p
 | `.siren/` dirs | `EnsureScanDir()` | Session startup |
 | `.gitignore` | `WriteGitIgnore()` | Session startup (via `EnsureScanDir`, idempotent) |
 | `config.yaml` | `runInit()` | `sightjack init` command |
-| `state.json` | `WriteState()` | After each wave select/approve/apply cycle |
+| `events/{sessionID}.jsonl` | `SessionRecorder.Record()` | Each state-changing action during a session |
 | `skills/*/SKILL.md` | `InstallSkills()` | `sightjack init` command (overwrites existing) |
 | `inbox/*.md` | External tool (phonewave) | Before/during session |
 | `outbox/*.md` | `ComposeDMail()` | After wave approval or completion |

@@ -75,36 +75,39 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				fmt.Fprint(w, nav)
 			}
 
-			// Save state
-			state := &sightjack.SessionState{
-				Version:         sightjack.StateFormatVersion,
-				SessionID:       sessionID,
-				Project:         cfg.Linear.Project,
-				LastScanned:     time.Now(),
-				Completeness:    result.Completeness,
-				StrictnessLevel: string(cfg.Strictness.Default),
-				ShibitoCount:    len(result.ShibitoWarnings),
+			// Cache scan result for pipe replay: cat .siren/.run/<id>/scan_result.json | sightjack waves
+			scanResultPath := filepath.Join(sightjack.ScanDir(baseDir, sessionID), "scan_result.json")
+			if err := sightjack.WriteScanResult(scanResultPath, result); err != nil {
+				logger.Warn("Failed to cache scan result: %v", err)
 			}
+
+			// Record events for state reconstruction
+			var clusters []sightjack.ClusterState
 			for _, c := range result.Clusters {
-				state.Clusters = append(state.Clusters, sightjack.ClusterState{
+				clusters = append(clusters, sightjack.ClusterState{
 					Name:         c.Name,
 					Completeness: c.Completeness,
 					IssueCount:   len(c.Issues),
 				})
 			}
-
-			// Cache scan result for pipe replay: cat .siren/.run/<id>/scan_result.json | sightjack waves
-			scanResultPath := filepath.Join(sightjack.ScanDir(baseDir, sessionID), "scan_result.json")
-			if err := sightjack.WriteScanResult(scanResultPath, result); err != nil {
-				logger.Warn("Failed to cache scan result: %v", err)
-			} else {
-				state.ScanResultPath = scanResultPath
+			store := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
+			recorder := sightjack.NewSessionRecorder(store, sessionID)
+			if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
+				Project:         cfg.Linear.Project,
+				StrictnessLevel: string(cfg.Strictness.Default),
+			}); err != nil {
+				logger.Warn("Failed to record session start: %v", err)
 			}
-
-			if err := sightjack.WriteState(baseDir, state); err != nil {
-				logger.Warn("Failed to save state: %v", err)
+			if err := recorder.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{
+				Clusters:       clusters,
+				Completeness:   result.Completeness,
+				ShibitoCount:   len(result.ShibitoWarnings),
+				ScanResultPath: scanResultPath,
+				LastScanned:    time.Now(),
+			}); err != nil {
+				logger.Warn("Failed to record scan completed: %v", err)
 			} else {
-				logger.OK("State saved to %s", sightjack.StatePath(baseDir))
+				logger.OK("Events saved to %s", sightjack.EventStorePath(baseDir, sessionID))
 			}
 
 			logger.OK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)

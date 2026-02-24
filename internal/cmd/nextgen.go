@@ -80,7 +80,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			}
 
 			// Resolve wave and cluster context — prefer embedded CompletedWave (pipe),
-			// fall back to .siren/state.json (interactive session).
+			// fall back to event replay (interactive session).
 			var completedWave sightjack.Wave
 			var cluster sightjack.ClusterScanResult
 			var allWaves []sightjack.Wave
@@ -95,9 +95,9 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				cluster.Completeness = applyResult.NewCompleteness
 				allWaves = append([]sightjack.Wave{completedWave}, applyResult.RemainingWaves...)
 			} else {
-				state, stateErr := sightjack.ReadState(baseDir)
+				state, _, stateErr := sightjack.LoadLatestState(baseDir)
 				if stateErr != nil {
-					return fmt.Errorf("cannot resolve wave context: no CompletedWave in ApplyResult and no state file.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first")
+					return fmt.Errorf("cannot resolve wave context: no CompletedWave in ApplyResult and no event data.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first")
 				}
 
 				allWaves = sightjack.RestoreWaves(state.Waves)

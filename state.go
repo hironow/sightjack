@@ -1,7 +1,6 @@
 package sightjack
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,13 +8,7 @@ import (
 )
 
 const StateDir = ".siren"
-const stateFile = "state.json"
 const configFile = "config.yaml"
-
-// StatePath returns the path to the state file within the given base directory.
-func StatePath(baseDir string) string {
-	return filepath.Join(baseDir, StateDir, stateFile)
-}
 
 // ConfigPath returns the path to the config file within .siren/.
 func ConfigPath(baseDir string) string {
@@ -23,10 +16,10 @@ func ConfigPath(baseDir string) string {
 }
 
 // WriteGitIgnore writes a .gitignore inside .siren/ that excludes ephemeral
-// files (state.json and .run/) from version control.
+// files (events/ and .run/) from version control.
 // The write is idempotent — the file is always overwritten with the canonical content.
 func WriteGitIgnore(baseDir string) error {
-	content := "state.json\n.run/\ninbox/\noutbox/\n"
+	content := "events/\n.run/\ninbox/\noutbox/\n"
 	path := filepath.Join(baseDir, StateDir, ".gitignore")
 	return os.WriteFile(path, []byte(content), 0644)
 }
@@ -34,42 +27,6 @@ func WriteGitIgnore(baseDir string) error {
 // ScanDir returns the path to the scan directory for a given session.
 func ScanDir(baseDir, sessionID string) string {
 	return filepath.Join(baseDir, StateDir, ".run", sessionID)
-}
-
-// WriteState persists the session state as JSON to .siren/state.json.
-func WriteState(baseDir string, state *SessionState) error {
-	dir := filepath.Join(baseDir, StateDir)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("create state dir: %w", err)
-	}
-
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(state); err != nil {
-		return fmt.Errorf("marshal state: %w", err)
-	}
-
-	path := StatePath(baseDir)
-	if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
-		return fmt.Errorf("write state: %w", err)
-	}
-	return nil
-}
-
-// ReadState loads the session state from .siren/state.json.
-func ReadState(baseDir string) (*SessionState, error) {
-	data, err := os.ReadFile(StatePath(baseDir))
-	if err != nil {
-		return nil, fmt.Errorf("read state: %w", err)
-	}
-
-	var state SessionState
-	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, fmt.Errorf("parse state: %w", err)
-	}
-	return &state, nil
 }
 
 // EnsureScanDir creates the scan directory for a session and returns its path.

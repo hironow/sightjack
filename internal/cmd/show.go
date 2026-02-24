@@ -20,7 +20,7 @@ func newShowCmd() *cobra.Command {
 
 When stdin is a pipe, auto-detects ScanResult or WavePlan JSON
 and renders the appropriate navigator view. When run without pipe,
-reads from .siren/state.json and displays the matrix navigator.`,
+replays events from .siren/events/ and displays the matrix navigator.`,
 		Example: `  # Show from saved state
   sightjack show
 
@@ -91,7 +91,7 @@ func runShowFromStdin(w io.Writer) error {
 }
 
 func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) error {
-	state, err := sightjack.ReadState(baseDir)
+	state, _, err := sightjack.LoadLatestState(baseDir)
 	if err != nil {
 		logger.Info("Run 'sightjack scan' first.")
 		return fmt.Errorf("no previous scan found: %w", err)

@@ -20,7 +20,7 @@ func newRunCmd() *cobra.Command {
 
 Combines scan → waves → select → apply → nextgen in a single
 interactive session. Supports resume from a previous session
-if state is found in .siren/state.json.`,
+if event data is found in .siren/events/.`,
 		Example: `  # Start a new interactive session
   sightjack run
 
@@ -58,14 +58,7 @@ if state is found in .siren/state.json.`,
 			}
 			// Check for existing state (resume detection)
 			if !dryRun {
-				existingState, stateErr := sightjack.ReadState(baseDir)
-				if stateErr != nil {
-					recovered, recErr := sightjack.RecoverLatestState(baseDir, logger)
-					if recErr == nil {
-						existingState = recovered
-						stateErr = nil
-					}
-				}
+				existingState, _, stateErr := sightjack.LoadLatestState(baseDir)
 				if stateErr == nil {
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {

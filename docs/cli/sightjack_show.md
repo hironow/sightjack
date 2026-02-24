@@ -8,7 +8,7 @@ Display scan results or wave plans.
 
 When stdin is a pipe, auto-detects ScanResult or WavePlan JSON
 and renders the appropriate navigator view. When run without pipe,
-reads from .siren/state.json and displays the matrix navigator.
+replays event history from .siren/events/ and displays the matrix navigator.
 
 ```
 sightjack show [path] [flags]

@@ -102,7 +102,7 @@ func (r *ScanResult) CalculateCompleteness() {
 	r.TotalIssues = total
 }
 
-// SessionState is the thin state file persisted to .siren/state.json.
+// SessionState is the materialized view projected from event replay.
 type SessionState struct {
 	Version         string         `json:"version"`
 	SessionID       string         `json:"session_id"`
@@ -320,7 +320,7 @@ type WaveModification struct {
 // ApplyResult is the output of `apply` subcommand.
 // Reports per-action outcomes and downstream effects.
 // CompletedWave carries the wave context so downstream pipe commands
-// (e.g. nextgen) can operate without reading .siren/state.json.
+// (e.g. nextgen) can operate without replaying event history.
 // RemainingWaves carries sibling waves from the original plan so that
 // nextgen can accurately determine whether follow-up generation is needed.
 type ApplyResult struct {

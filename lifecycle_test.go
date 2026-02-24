@@ -15,6 +15,56 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
+// loadTestState loads the latest state from events for test verification.
+func loadTestState(t *testing.T, baseDir string) *sightjack.SessionState {
+	t.Helper()
+	state, _, err := sightjack.LoadLatestState(baseDir)
+	if err != nil {
+		t.Fatalf("LoadLatestState: %v", err)
+	}
+	return state
+}
+
+// writeTestEvents creates an event store to simulate a pre-existing session state.
+func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.SessionState) {
+	t.Helper()
+	store := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
+	recorder := sightjack.NewSessionRecorder(store, sessionID)
+	if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
+		Project:         state.Project,
+		StrictnessLevel: state.StrictnessLevel,
+	}); err != nil {
+		t.Fatalf("record SessionStarted: %v", err)
+	}
+	if err := recorder.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{
+		Clusters:       state.Clusters,
+		Completeness:   state.Completeness,
+		ShibitoCount:   state.ShibitoCount,
+		ScanResultPath: state.ScanResultPath,
+		LastScanned:    state.LastScanned,
+	}); err != nil {
+		t.Fatalf("record ScanCompleted: %v", err)
+	}
+	if len(state.Waves) > 0 {
+		if err := recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{
+			Waves: state.Waves,
+		}); err != nil {
+			t.Fatalf("record WavesGenerated: %v", err)
+		}
+	}
+	// Mark completed waves via separate events
+	for _, w := range state.Waves {
+		if w.Status == "completed" {
+			if err := recorder.Record(sightjack.EventWaveCompleted, sightjack.WaveCompletedPayload{
+				WaveID:      w.ID,
+				ClusterName: w.ClusterName,
+			}); err != nil {
+				t.Fatalf("record WaveCompleted: %v", err)
+			}
+		}
+	}
+}
+
 // testConfig returns a minimal Config for lifecycle tests.
 // Labels and Scribe disabled to avoid extra Claude calls.
 func testConfig() *sightjack.Config {
@@ -504,11 +554,8 @@ func TestLifecycle_HappyPath(t *testing.T) {
 		t.Fatalf("RunSession failed: %v", err)
 	}
 
-	// state.json should exist
-	state, err := sightjack.ReadState(baseDir)
-	if err != nil {
-		t.Fatalf("ReadState failed: %v", err)
-	}
+	// events should produce reconstructable state
+	state := loadTestState(t, baseDir)
 
 	// wave should be completed
 	if len(state.Waves) != 1 {
@@ -563,10 +610,7 @@ func TestLifecycle_RejectThenApprove(t *testing.T) {
 		t.Fatalf("RunSession failed: %v", err)
 	}
 
-	state, err := sightjack.ReadState(baseDir)
-	if err != nil {
-		t.Fatalf("ReadState failed: %v", err)
-	}
+	state := loadTestState(t, baseDir)
 
 	// Only auth-w1 should be completed (approved on second attempt)
 	completedCount := 0
@@ -606,10 +650,7 @@ func TestLifecycle_PartialApplyNotCompleted(t *testing.T) {
 		t.Fatalf("RunSession failed: %v", err)
 	}
 
-	state, err := sightjack.ReadState(baseDir)
-	if err != nil {
-		t.Fatalf("ReadState failed: %v", err)
-	}
+	state := loadTestState(t, baseDir)
 
 	// wave should still be available (not completed due to errors)
 	for _, w := range state.Waves {
@@ -686,9 +727,7 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 		},
 		ScanResultPath: scanResultPath,
 	}
-	if err := sightjack.WriteState(baseDir, state); err != nil {
-		t.Fatalf("WriteState: %v", err)
-	}
+	writeTestEvents(t, baseDir, sessionID, state)
 
 	// Register mock for apply only (scan/wavegen already done)
 	d := newMockDispatcher(t)
@@ -708,10 +747,7 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 		t.Fatalf("RunResumeSession failed: %v", err)
 	}
 
-	updated, err := sightjack.ReadState(baseDir)
-	if err != nil {
-		t.Fatalf("ReadState: %v", err)
-	}
+	updated := loadTestState(t, baseDir)
 
 	// Both waves should be completed
 	completedCount := 0
@@ -754,10 +790,7 @@ func TestLifecycle_QuitAndResume(t *testing.T) {
 	}
 
 	// Verify: state persisted with wave 1 completed
-	state, err := sightjack.ReadState(baseDir)
-	if err != nil {
-		t.Fatalf("Phase 1 ReadState: %v", err)
-	}
+	state := loadTestState(t, baseDir)
 	completedPhase1 := 0
 	for _, w := range state.Waves {
 		if w.Status == "completed" {
@@ -781,10 +814,7 @@ func TestLifecycle_QuitAndResume(t *testing.T) {
 	}
 
 	// Verify: both waves completed
-	finalState, err := sightjack.ReadState(baseDir)
-	if err != nil {
-		t.Fatalf("Phase 2 ReadState: %v", err)
-	}
+	finalState := loadTestState(t, baseDir)
 	completedPhase2 := 0
 	for _, w := range finalState.Waves {
 		if w.Status == "completed" {
@@ -832,10 +862,7 @@ func TestLifecycle_MultiCluster(t *testing.T) {
 		t.Fatalf("RunSession failed: %v", err)
 	}
 
-	state, err := sightjack.ReadState(baseDir)
-	if err != nil {
-		t.Fatalf("ReadState: %v", err)
-	}
+	state := loadTestState(t, baseDir)
 
 	// Both waves should be completed
 	completedCount := 0
@@ -1076,9 +1103,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 		},
 		ScanResultPath: scanResultPath,
 	}
-	if err := sightjack.WriteState(baseDir, state); err != nil {
-		t.Fatalf("WriteState: %v", err)
-	}
+	writeTestEvents(t, baseDir, sessionID, state)
 
 	// Set up mail directories and pre-place feedback
 	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
@@ -1160,10 +1185,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	}
 
 	// Final state should have both waves completed
-	finalState, stateErr := sightjack.ReadState(baseDir)
-	if stateErr != nil {
-		t.Fatalf("ReadState: %v", stateErr)
-	}
+	finalState := loadTestState(t, baseDir)
 	completedCount := 0
 	for _, w := range finalState.Waves {
 		if w.Status == "completed" {
