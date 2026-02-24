@@ -8,7 +8,7 @@ Run an interactive session with wave approval and apply loop.
 
 Combines scan → waves → select → apply → nextgen in a single
 interactive session. Supports resume from a previous session
-if event history is found in .siren/events/.
+if event data is found in .siren/events/.
 
 ```
 sightjack run [path] [flags]

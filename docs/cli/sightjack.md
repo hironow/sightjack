@@ -24,7 +24,7 @@ Use DefaultToScan() to preprocess args before Execute.
 
 * [sightjack adr](sightjack_adr.md)	 - Generate ADR Markdown from stdin DiscussResult
 * [sightjack apply](sightjack_apply.md)	 - Apply a wave to Linear from stdin Wave JSON
-* [sightjack archive-prune](sightjack_archive-prune.md)	 - Prune expired d-mails from archive
+* [sightjack archive-prune](sightjack_archive-prune.md)	 - Prune expired d-mails and event files
 * [sightjack discuss](sightjack_discuss.md)	 - Architect discussion from stdin Wave JSON
 * [sightjack doctor](sightjack_doctor.md)	 - Check environment and tool availability
 * [sightjack init](sightjack_init.md)	 - Create .siren/config.yaml interactively
