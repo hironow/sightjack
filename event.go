@@ -62,6 +62,30 @@ func NewEvent(eventType EventType, sessionID string, seq int64, payload any) (Ev
 	}, nil
 }
 
+// ValidateEvent checks structural validity of an Event before persistence.
+// It returns an error if any required field is missing or invalid.
+func ValidateEvent(e Event) error {
+	if e.Type == "" {
+		return fmt.Errorf("validate event: type is empty")
+	}
+	if e.SessionID == "" {
+		return fmt.Errorf("validate event: session_id is empty")
+	}
+	if e.Sequence < 1 {
+		return fmt.Errorf("validate event: sequence must be >= 1, got %d", e.Sequence)
+	}
+	if e.SchemaVersion == "" {
+		return fmt.Errorf("validate event: schema_version is empty")
+	}
+	if e.Timestamp.IsZero() {
+		return fmt.Errorf("validate event: timestamp is zero")
+	}
+	if len(e.PayloadRaw) == 0 {
+		return fmt.Errorf("validate event: payload is empty")
+	}
+	return nil
+}
+
 // MarshalEvent serializes an Event to compact JSON (no trailing newline).
 func MarshalEvent(e Event) ([]byte, error) {
 	return json.Marshal(e)

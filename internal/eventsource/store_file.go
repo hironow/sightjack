@@ -14,8 +14,10 @@ import (
 // FileEventStore is a JSONL-based append-only event store.
 // Each event occupies one line (compact JSON + newline).
 type FileEventStore struct {
-	path string
-	mu   sync.Mutex
+	path           string
+	mu             sync.Mutex
+	lastWrittenSeq int64
+	seqInitialized bool
 }
 
 // NewFileEventStore creates a FileEventStore at the given path.
@@ -30,6 +32,50 @@ func (s *FileEventStore) Append(events ...sightjack.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Lazy init: read last sequence from file on first append
+	if !s.seqInitialized {
+		all, err := s.readAllUnlocked()
+		if err != nil {
+			return err
+		}
+		for _, e := range all {
+			if e.Sequence > s.lastWrittenSeq {
+				s.lastWrittenSeq = e.Sequence
+			}
+		}
+		s.seqInitialized = true
+	}
+
+	// Validate all events before any I/O
+	for _, e := range events {
+		if err := sightjack.ValidateEvent(e); err != nil {
+			return fmt.Errorf("event store: %w", err)
+		}
+	}
+
+	// Sequence monotonicity check
+	expectedSeq := s.lastWrittenSeq
+	for _, e := range events {
+		expectedSeq++
+		if e.Sequence != expectedSeq {
+			return fmt.Errorf("event store: sequence gap: expected %d, got %d", expectedSeq, e.Sequence)
+		}
+	}
+
+	if err := s.appendUnlocked(events); err != nil {
+		return err
+	}
+
+	// Update tracked sequence after successful write
+	if len(events) > 0 {
+		s.lastWrittenSeq = events[len(events)-1].Sequence
+	}
+
+	return nil
+}
+
+// appendUnlocked writes events to the JSONL file (caller must hold mu).
+func (s *FileEventStore) appendUnlocked(events []sightjack.Event) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0755); err != nil {
 		return fmt.Errorf("event store mkdir: %w", err)
 	}
@@ -53,7 +99,6 @@ func (s *FileEventStore) Append(events ...sightjack.Event) error {
 			return fmt.Errorf("event store sync: %w", syncErr)
 		}
 	}
-
 	return nil
 }
 

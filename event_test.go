@@ -175,6 +175,89 @@ func TestEvent_TimestampPreservedInJSON(t *testing.T) {
 	}
 }
 
+func TestValidateEvent_Valid(t *testing.T) {
+	// given
+	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, map[string]string{"k": "v"})
+
+	// when
+	err := sightjack.ValidateEvent(event)
+
+	// then
+	if err != nil {
+		t.Errorf("expected nil error for valid event, got: %v", err)
+	}
+}
+
+func TestValidateEvent_EmptyType(t *testing.T) {
+	// given
+	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, "data")
+	event.Type = ""
+
+	// when
+	err := sightjack.ValidateEvent(event)
+
+	// then
+	if err == nil {
+		t.Error("expected error for empty type")
+	}
+}
+
+func TestValidateEvent_EmptySessionID(t *testing.T) {
+	// given
+	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, "data")
+	event.SessionID = ""
+
+	// when
+	err := sightjack.ValidateEvent(event)
+
+	// then
+	if err == nil {
+		t.Error("expected error for empty session_id")
+	}
+}
+
+func TestValidateEvent_ZeroSequence(t *testing.T) {
+	// given
+	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, "data")
+	event.Sequence = 0
+
+	// when
+	err := sightjack.ValidateEvent(event)
+
+	// then
+	if err == nil {
+		t.Error("expected error for zero sequence")
+	}
+}
+
+func TestValidateEvent_ZeroTimestamp(t *testing.T) {
+	// given
+	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, "data")
+	event.Timestamp = time.Time{}
+
+	// when
+	err := sightjack.ValidateEvent(event)
+
+	// then
+	if err == nil {
+		t.Error("expected error for zero timestamp")
+	}
+}
+
+func TestValidateEvent_EmptyPayload(t *testing.T) {
+	// given
+	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, "data")
+	event.PayloadRaw = nil
+
+	// when
+	err := sightjack.ValidateEvent(event)
+
+	// then
+	if err == nil {
+		t.Error("expected error for empty payload")
+	}
+}
+
 func TestEvent_UnknownType_Tolerance(t *testing.T) {
 	// given: JSON with an unknown event type should still unmarshal
 	raw := `{"schema_version":"1","type":"future_event","timestamp":"2026-01-01T00:00:00Z","session_id":"s1","sequence":1,"payload":{"foo":"bar"}}`

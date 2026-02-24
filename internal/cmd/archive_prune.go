@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 func newArchivePruneCmd() *cobra.Command {
@@ -16,10 +17,11 @@ func newArchivePruneCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "archive-prune [path]",
-		Short: "Prune expired d-mails from archive",
-		Long: `Prune expired d-mails from the archive directory.
+		Short: "Prune expired d-mails and event files",
+		Long: `Prune expired d-mails from the archive directory and
+expired event files from the events directory.
 
-Lists archived d-mail files older than the retention threshold.
+Lists archived d-mail files and event files older than the retention threshold.
 By default, runs in dry-run mode showing what would be deleted.
 Pass --execute to actually remove the files.`,
 		Example: `  # Dry-run: list expired files (default 30 days)
@@ -42,28 +44,60 @@ Pass --execute to actually remove the files.`,
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
 
+			w := cmd.OutOrStdout()
 			errW := cmd.ErrOrStderr()
+
+			// --- Archive (d-mail) pruning ---
 			if len(files) == 0 {
-				fmt.Fprintf(errW, "No expired files in archive (threshold: %d days).\n", days)
-				return nil
+				fmt.Fprintf(errW, "No expired d-mail files (threshold: %d days).\n", days)
+			} else {
+				fmt.Fprintln(errW, "Expired d-mail files:")
+				for _, f := range files {
+					fmt.Fprintln(w, f)
+				}
+				fmt.Fprintf(errW, "%d d-mail file(s) older than %d days.\n", len(files), days)
 			}
 
-			w := cmd.OutOrStdout()
-			for _, f := range files {
-				fmt.Fprintln(w, f)
+			// --- Event file pruning ---
+			eventFiles, eventErr := eventsource.ListExpiredEventFiles(baseDir, days)
+			if eventErr != nil {
+				logger.Warn("Failed to list expired events: %v", eventErr)
 			}
-			fmt.Fprintf(errW, "\n%d file(s) older than %d days.\n", len(files), days)
+			if len(eventFiles) == 0 {
+				fmt.Fprintf(errW, "No expired event files (threshold: %d days).\n", days)
+			} else {
+				fmt.Fprintln(errW, "Expired event files:")
+				for _, f := range eventFiles {
+					fmt.Fprintln(w, f)
+				}
+				fmt.Fprintf(errW, "%d event file(s) older than %d days.\n", len(eventFiles), days)
+			}
+
+			if len(files) == 0 && len(eventFiles) == 0 {
+				return nil
+			}
 
 			if !execute {
 				fmt.Fprintln(errW, "(dry-run — pass --execute to delete)")
 				return nil
 			}
 
-			deleted, err := sightjack.DeleteArchiveFiles(baseDir, files)
-			if err != nil {
-				return fmt.Errorf("prune failed: %w", err)
+			if len(files) > 0 {
+				deleted, delErr := sightjack.DeleteArchiveFiles(baseDir, files)
+				if delErr != nil {
+					return fmt.Errorf("archive prune failed: %w", delErr)
+				}
+				fmt.Fprintf(errW, "Pruned %d d-mail file(s).\n", len(deleted))
 			}
-			fmt.Fprintf(errW, "Pruned %d file(s).\n", len(deleted))
+
+			if len(eventFiles) > 0 {
+				deleted, delErr := eventsource.PruneEventFiles(baseDir, eventFiles)
+				if delErr != nil {
+					return fmt.Errorf("event prune failed: %w", delErr)
+				}
+				fmt.Fprintf(errW, "Pruned %d event file(s).\n", len(deleted))
+			}
+
 			return nil
 		},
 	}

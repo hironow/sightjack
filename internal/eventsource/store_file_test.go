@@ -3,7 +3,6 @@ package eventsource_test
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	sightjack "github.com/hironow/sightjack"
@@ -123,25 +122,19 @@ func TestFileEventStore_LastSequence_EmptyFile(t *testing.T) {
 	}
 }
 
-func TestFileEventStore_ConcurrentAppend(t *testing.T) {
-	// given
+func TestFileEventStore_SequentialAppend_ManyEvents(t *testing.T) {
+	// given: monotonicity check enforces strictly increasing sequences
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "concurrent.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "sequential.jsonl"))
 	count := 50
 
-	// when: append concurrently
-	var wg sync.WaitGroup
-	for i := 0; i < count; i++ {
-		wg.Add(1)
-		go func(seq int64) {
-			defer wg.Done()
-			e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", seq, nil)
-			if err := store.Append(e); err != nil {
-				t.Errorf("concurrent append seq %d: %v", seq, err)
-			}
-		}(int64(i + 1))
+	// when: append in sequential order
+	for i := int64(1); i <= int64(count); i++ {
+		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", i, nil)
+		if err := store.Append(e); err != nil {
+			t.Fatalf("append seq %d: %v", i, err)
+		}
 	}
-	wg.Wait()
 
 	// then
 	events, err := store.ReadAll()
@@ -216,6 +209,114 @@ func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 	events, _ := store.ReadAll()
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+}
+
+func TestFileEventStore_Append_SequenceMonotonicity_Success(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "mono.jsonl"))
+
+	// when: append in strictly increasing order
+	for i := int64(1); i <= 3; i++ {
+		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", i, nil)
+		if err := store.Append(e); err != nil {
+			t.Fatalf("append seq %d: %v", i, err)
+		}
+	}
+
+	// then
+	events, _ := store.ReadAll()
+	if len(events) != 3 {
+		t.Errorf("expected 3 events, got %d", len(events))
+	}
+}
+
+func TestFileEventStore_Append_SequenceGap_Rejected(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "gap.jsonl"))
+
+	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
+	store.Append(e1)
+
+	// when: skip sequence 2, append sequence 3
+	e3, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 3, nil)
+	err := store.Append(e3)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for sequence gap")
+	}
+	events, _ := store.ReadAll()
+	if len(events) != 1 {
+		t.Errorf("expected 1 event (only seq 1), got %d", len(events))
+	}
+}
+
+func TestFileEventStore_Append_SequenceDuplicate_Rejected(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "dup.jsonl"))
+
+	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
+	e2, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 2, nil)
+	store.Append(e1)
+	store.Append(e2)
+
+	// when: re-append sequence 2
+	dup, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 2, nil)
+	err := store.Append(dup)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for duplicate sequence")
+	}
+	events, _ := store.ReadAll()
+	if len(events) != 2 {
+		t.Errorf("expected 2 events (seq 1,2 only), got %d", len(events))
+	}
+}
+
+func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	path := filepath.Join(dir, "events", "test.jsonl")
+	store := eventsource.NewFileEventStore(path)
+
+	invalid := sightjack.Event{} // all fields empty
+
+	// when
+	err := store.Append(invalid)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for invalid event")
+	}
+	// File should not have been created
+	if _, statErr := os.Stat(path); statErr == nil {
+		t.Error("expected file not to be created for rejected event")
+	}
+}
+
+func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
+	// given: a valid event followed by an invalid event
+	dir := t.TempDir()
+	path := filepath.Join(dir, "events", "atomic.jsonl")
+	store := eventsource.NewFileEventStore(path)
+
+	valid, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, "data")
+	invalid := sightjack.Event{SessionID: "s1"} // missing Type, Sequence, etc.
+
+	// when: batch append [valid, invalid]
+	err := store.Append(valid, invalid)
+
+	// then: entire batch rejected, valid event NOT written
+	if err == nil {
+		t.Fatal("expected error for batch with invalid event")
+	}
+	if _, statErr := os.Stat(path); statErr == nil {
+		t.Error("expected file not to be created: valid event should not be written when batch fails")
 	}
 }
 
