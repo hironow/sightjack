@@ -1,4 +1,4 @@
-package sightjack_test
+package session_test
 
 import (
 	"context"
@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestFilterConvergence_Empty(t *testing.T) {
 	// given: empty slice
-	result := sightjack.FilterConvergence(nil)
+	result := session.FilterConvergence(nil)
 
 	// then
 	if len(result) != 0 {
@@ -30,7 +31,7 @@ func TestFilterConvergence_MixedKinds(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.FilterConvergence(dmails)
+	result := session.FilterConvergence(dmails)
 
 	// then
 	if len(result) != 2 {
@@ -54,7 +55,7 @@ func TestConvergenceGate_NoConvergence(t *testing.T) {
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then: pass through (no gate)
 	if err != nil {
@@ -75,7 +76,7 @@ func TestConvergenceGate_Approved(t *testing.T) {
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then
 	if err != nil {
@@ -96,7 +97,7 @@ func TestConvergenceGate_Denied(t *testing.T) {
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then
 	if err != nil {
@@ -117,7 +118,7 @@ func TestConvergenceGate_FailClosed(t *testing.T) {
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 
 	// then: fail-closed
 	if err == nil {
@@ -141,7 +142,7 @@ func TestConvergenceGate_ContextCancel(t *testing.T) {
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	approved, err := sightjack.RunConvergenceGate(ctx, dmails, notifier, approver, logger)
+	approved, err := session.RunConvergenceGate(ctx, dmails, notifier, approver, logger)
 
 	// then: should propagate cancellation error
 	if err == nil {
@@ -163,7 +164,7 @@ func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 
 	// when: initial is empty, gate passes through, but re-drain catches late convergence
 	var initial []*sightjack.DMail
-	allDmails, approved, err := sightjack.RunConvergenceGateWithRedrain(
+	allDmails, approved, err := session.RunConvergenceGateWithRedrain(
 		context.Background(), initial, ch, notifier, approver, logger,
 	)
 
@@ -198,7 +199,7 @@ func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T
 	initial := []*sightjack.DMail{
 		{Name: "conv-1", Kind: sightjack.DMailConvergence, Description: "initial convergence"},
 	}
-	allDmails, approved, err := sightjack.RunConvergenceGateWithRedrain(
+	allDmails, approved, err := session.RunConvergenceGateWithRedrain(
 		context.Background(), initial, ch, notifier, injectApprover, logger,
 	)
 
@@ -234,7 +235,7 @@ func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 	var approved bool
 	var err error
 	go func() {
-		approved, err = sightjack.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
+		approved, err = session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
 		close(done)
 	}()
 

@@ -48,9 +48,9 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		initial := sightjack.DrainInboxFeedback(inboxCh, logger)
 
 		// Convergence gate with re-drain: catches late-arriving convergence
-		notifier := sightjack.BuildNotifier(cfg)
-		approver := sightjack.BuildApprover(cfg, input, out)
-		allDmails, approved, gateErr := sightjack.RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
+		notifier := BuildNotifier(cfg)
+		approver := BuildApprover(cfg, input, out)
+		allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 		if gateErr != nil {
 			return fmt.Errorf("convergence gate: %w", gateErr)
 		}
@@ -692,9 +692,9 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	initial := sightjack.DrainInboxFeedback(inboxCh, logger)
 
 	// Convergence gate with re-drain: catches late-arriving convergence
-	notifier := sightjack.BuildNotifier(cfg)
-	approver := sightjack.BuildApprover(cfg, input, out)
-	allDmails, approved, gateErr := sightjack.RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
+	notifier := BuildNotifier(cfg)
+	approver := BuildApprover(cfg, input, out)
+	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 	if gateErr != nil {
 		return fmt.Errorf("convergence gate: %w", gateErr)
 	}
@@ -752,9 +752,9 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	initial := sightjack.DrainInboxFeedback(inboxCh, logger)
 
 	// Convergence gate with re-drain: catches late-arriving convergence
-	notifier := sightjack.BuildNotifier(cfg)
-	approver := sightjack.BuildApprover(cfg, input, out)
-	allDmails, approved, gateErr := sightjack.RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
+	notifier := BuildNotifier(cfg)
+	approver := BuildApprover(cfg, input, out)
+	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 	if gateErr != nil {
 		return fmt.Errorf("convergence gate: %w", gateErr)
 	}

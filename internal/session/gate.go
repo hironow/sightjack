@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"context"
@@ -9,13 +9,15 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // FilterConvergence returns convergence-kind D-Mails from the slice.
-func FilterConvergence(dmails []*DMail) []*DMail {
-	var result []*DMail
+func FilterConvergence(dmails []*sightjack.DMail) []*sightjack.DMail {
+	var result []*sightjack.DMail
 	for _, m := range dmails {
-		if m.Kind == DMailConvergence {
+		if m.Kind == sightjack.DMailConvergence {
 			result = append(result, m)
 		}
 	}
@@ -25,7 +27,7 @@ func FilterConvergence(dmails []*DMail) []*DMail {
 // RunConvergenceGate checks for convergence D-Mails and runs the
 // notify + approve flow. Returns true if approved or no convergence found.
 // Returns false if denied. Returns error on failure (fail-closed).
-func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier Notifier, approver Approver, logger *Logger) (bool, error) {
+func RunConvergenceGate(ctx context.Context, dmails []*sightjack.DMail, notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (bool, error) {
 	convergence := FilterConvergence(dmails)
 	if len(convergence) == 0 {
 		return true, nil
@@ -88,9 +90,9 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier Notifier,
 // convergence D-Mails. Returns the accumulated D-Mails, approval status,
 // and any error. The loop exits when no new convergence D-Mails arrived
 // during the approval prompt.
-func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
-	notifier Notifier, approver Approver, logger *Logger) (dmails []*DMail, approved bool, err error) {
-	all := append([]*DMail{}, initial...)
+func RunConvergenceGateWithRedrain(ctx context.Context, initial []*sightjack.DMail, inboxCh <-chan *sightjack.DMail,
+	notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (dmails []*sightjack.DMail, approved bool, err error) {
+	all := append([]*sightjack.DMail{}, initial...)
 	for {
 		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)
 		if gateErr != nil {
@@ -99,7 +101,7 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 		if !ok {
 			return nil, false, nil
 		}
-		late := DrainInboxFeedback(inboxCh, logger)
+		late := sightjack.DrainInboxFeedback(inboxCh, logger)
 		all = append(all, late...)
 		if len(FilterConvergence(late)) == 0 {
 			return all, true, nil
@@ -110,21 +112,21 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 
 // BuildNotifier creates the appropriate Notifier based on config.
 // If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
-func BuildNotifier(cfg *Config) Notifier {
+func BuildNotifier(cfg *sightjack.Config) sightjack.Notifier {
 	if cfg.Gate.NotifyCmd != "" {
-		return NewCmdNotifier(cfg.Gate.NotifyCmd)
+		return sightjack.NewCmdNotifier(cfg.Gate.NotifyCmd)
 	}
-	return &LocalNotifier{}
+	return &sightjack.LocalNotifier{}
 }
 
 // BuildApprover creates the appropriate Approver based on config.
 // Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(cfg *Config, input io.Reader, out io.Writer) Approver {
+func BuildApprover(cfg *sightjack.Config, input io.Reader, out io.Writer) sightjack.Approver {
 	if cfg.Gate.AutoApprove {
-		return &AutoApprover{}
+		return &sightjack.AutoApprover{}
 	}
 	if cfg.Gate.ApproveCmd != "" {
-		return NewCmdApprover(cfg.Gate.ApproveCmd)
+		return sightjack.NewCmdApprover(cfg.Gate.ApproveCmd)
 	}
-	return NewStdinApprover(input, out)
+	return sightjack.NewStdinApprover(input, out)
 }
