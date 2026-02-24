@@ -28,9 +28,8 @@ func TestE2E_Gate_AutoApproveWithConvergence(t *testing.T) {
 	assertFileNotExists(t, inboxPath)
 	assertFileExists(t, archivePath)
 
-	// and: session proceeded (state.json exists)
-	stateFile := filepath.Join(dir, ".siren", "state.json")
-	assertFileExists(t, stateFile)
+	// and: session proceeded (events exist)
+	assertEventsExist(t, dir)
 
 	// and: archived convergence d-mail is parseable with correct kind
 	dm := parseDMailFile(t, archivePath)
@@ -53,8 +52,8 @@ func TestE2E_Gate_ApproveCmdApproves(t *testing.T) {
 	assertFileNotExists(t, filepath.Join(dir, ".siren", "inbox", "convergence-arch-review.md"))
 	assertFileExists(t, filepath.Join(dir, ".siren", "archive", "convergence-arch-review.md"))
 
-	// and: session proceeded (state.json exists)
-	assertFileExists(t, filepath.Join(dir, ".siren", "state.json"))
+	// and: session proceeded (events exist)
+	assertEventsExist(t, dir)
 }
 
 func TestE2E_Gate_ApproveCmdDenies(t *testing.T) {
@@ -81,8 +80,8 @@ func TestE2E_Gate_ApproveCmdDenies(t *testing.T) {
 	assertFileNotExists(t, filepath.Join(dir, ".siren", "inbox", "convergence-arch-review.md"))
 	assertFileExists(t, filepath.Join(dir, ".siren", "archive", "convergence-arch-review.md"))
 
-	// and: session aborted (no state.json, no scan artifacts)
-	assertFileNotExists(t, filepath.Join(dir, ".siren", "state.json"))
+	// and: session aborted (no events, no scan artifacts)
+	assertNoEvents(t, dir)
 
 	// and: no outbox d-mails generated (session never reached wave phase)
 	outboxFiles := listMailDir(t, dir, "outbox")
