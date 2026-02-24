@@ -343,5 +343,5 @@ func DisplayWaveCompletion(w io.Writer, wave Wave, ripples []Ripple, overallComp
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
-	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", adrSubdir, resp.ADRID, sanitizeADRTitle(resp.Title))
+	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", adrSubdir, resp.ADRID, SanitizeADRTitle(resp.Title))
 }

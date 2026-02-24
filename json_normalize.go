@@ -7,11 +7,11 @@ import (
 	"os"
 )
 
-// normalizeJSONFile reads a JSON file, re-encodes it with raw UTF-8
+// NormalizeJSONFile reads a JSON file, re-encodes it with raw UTF-8
 // (no \uXXXX for non-ASCII characters), and writes it back.
 // This normalizes Claude's output so that human-readable characters
 // (e.g. Japanese) appear as raw UTF-8 instead of escape sequences.
-func normalizeJSONFile(path string) error {
+func NormalizeJSONFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("normalize read: %w", err)

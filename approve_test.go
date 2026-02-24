@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"context"
@@ -8,11 +8,13 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 func TestAutoApprover_AlwaysApproves(t *testing.T) {
 	// given
-	a := &AutoApprover{}
+	a := &sightjack.AutoApprover{}
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "deploy?")
@@ -29,7 +31,7 @@ func TestAutoApprover_AlwaysApproves(t *testing.T) {
 func TestStdinApprover_Yes(t *testing.T) {
 	// given: input reader with "y\n"
 	input := strings.NewReader("y\n")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -46,7 +48,7 @@ func TestStdinApprover_Yes(t *testing.T) {
 func TestStdinApprover_YesUppercase(t *testing.T) {
 	// given: input reader with "Y\n"
 	input := strings.NewReader("Y\n")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -63,7 +65,7 @@ func TestStdinApprover_YesUppercase(t *testing.T) {
 func TestStdinApprover_No(t *testing.T) {
 	// given: input reader with "n\n"
 	input := strings.NewReader("n\n")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -80,7 +82,7 @@ func TestStdinApprover_No(t *testing.T) {
 func TestStdinApprover_EmptyInput(t *testing.T) {
 	// given: empty input (safe default = deny)
 	input := strings.NewReader("\n")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -98,7 +100,7 @@ func TestStdinApprover_EOFTerminatedYes(t *testing.T) {
 	// given: piped input "y" without trailing newline (echo -n "y" | sightjack run).
 	// readLine returns ("y", io.EOF). Should still approve.
 	input := strings.NewReader("y")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -115,7 +117,7 @@ func TestStdinApprover_EOFTerminatedYes(t *testing.T) {
 func TestStdinApprover_EOFTerminatedNo(t *testing.T) {
 	// given: piped "n" without trailing newline — should still deny (not error)
 	input := strings.NewReader("n")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -135,7 +137,7 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 	cancel()
 	// Use a reader that never returns data (pipe, but we close it)
 	input := strings.NewReader("")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(ctx, "proceed?")
@@ -152,9 +154,9 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 func TestStdinApprover_ContextCancelDoesNotCloseReader(t *testing.T) {
 	// given: a closable reader that tracks Close calls.
 	// Context cancel should NOT close the reader (it may be os.Stdin).
-	cr := &trackingReadCloser{blocking: true}
+	cr := &trackingReadCloser{blocking: true, ch: make(chan struct{})}
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &StdinApprover{input: cr}
+	a := sightjack.NewStdinApprover(cr, nil)
 
 	// when: cancel context after a short delay
 	go func() {
@@ -196,9 +198,6 @@ type trackingReadCloser struct {
 
 func (r *trackingReadCloser) Read(p []byte) (int, error) {
 	if r.blocking && !r.closed.Load() {
-		if r.ch == nil {
-			r.ch = make(chan struct{})
-		}
 		<-r.ch // block until closed
 	}
 	return 0, io.EOF
@@ -218,7 +217,7 @@ func (r *trackingReadCloser) Close() error {
 
 func TestStdinApprover_NilInput(t *testing.T) {
 	// given: StdinApprover with nil input (library/non-interactive usage)
-	a := &StdinApprover{input: nil}
+	a := sightjack.NewStdinApprover(nil, nil)
 
 	// when: should not panic
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -237,7 +236,7 @@ func TestStdinApprover_SharedReader(t *testing.T) {
 	// After RequestApproval consumes "y\n", the remaining "next-line\n"
 	// must still be readable from the same reader.
 	input := strings.NewReader("y\nnext-line\n")
-	a := &StdinApprover{input: input}
+	a := sightjack.NewStdinApprover(input, nil)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -261,12 +260,11 @@ func TestStdinApprover_SharedReader(t *testing.T) {
 
 func TestCmdApprover_Approve(t *testing.T) {
 	// given: command that exits 0
-	a := &CmdApprover{
-		template: "true",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	a := sightjack.NewCmdApproverForTest("true",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "deploy?")
@@ -282,12 +280,11 @@ func TestCmdApprover_Approve(t *testing.T) {
 
 func TestCmdApprover_Deny(t *testing.T) {
 	// given: command that exits 1
-	a := &CmdApprover{
-		template: "false",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	a := sightjack.NewCmdApproverForTest("false",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			return exec.Command("false")
 		},
-	}
+	)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "deploy?")
@@ -303,7 +300,7 @@ func TestCmdApprover_Deny(t *testing.T) {
 
 func TestCmdApprover_EmptyTemplate(t *testing.T) {
 	// given: empty template
-	a := &CmdApprover{template: ""}
+	a := sightjack.NewCmdApproverForTest("", nil)
 
 	// when
 	_, err := a.RequestApproval(context.Background(), "msg")

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	navigatorWidth = 60
+	NavigatorWidth = 60
 	maxClusterName = 20
 	waveColumns    = 4
 
@@ -24,40 +24,40 @@ func RenderNavigator(result *ScanResult, projectName string) string {
 
 	completePct := int(result.Completeness * 100)
 
-	border := strings.Repeat("=", navigatorWidth)
+	border := strings.Repeat("=", NavigatorWidth)
 	b.WriteString(fmt.Sprintf("+%s+\n", border))
-	b.WriteString(fmt.Sprintf("|%s|\n", center("SIGHTJACK - Link Navigator", navigatorWidth)))
-	projName := padRight(truncate(projectName, 20), 20)
+	b.WriteString(fmt.Sprintf("|%s|\n", Center("SIGHTJACK - Link Navigator", NavigatorWidth)))
+	projName := PadRight(Truncate(projectName, 20), 20)
 	projRow := "  Project: " + projName + "  |  Completeness: " + fmt.Sprintf("%3d%%", completePct)
-	b.WriteString("|" + padRight(projRow, navigatorWidth) + "|\n")
+	b.WriteString("|" + PadRight(projRow, NavigatorWidth) + "|\n")
 	b.WriteString(fmt.Sprintf("+%s+\n", border))
 
-	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))
+	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", NavigatorWidth)))
 	header := fmt.Sprintf("  %-*s", maxClusterName, "Cluster")
 	for i := 1; i <= waveColumns; i++ {
 		header += fmt.Sprintf("  W%d  ", i)
 	}
 	header += "  Comp."
-	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, header))
+	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, header))
 
-	separator := "  " + strings.Repeat("-", navigatorWidth-4)
-	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, separator))
+	separator := "  " + strings.Repeat("-", NavigatorWidth-4)
+	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, separator))
 
 	for _, cluster := range result.Clusters {
 		pct := int(cluster.Completeness * 100)
-		name := padRight(truncate(cluster.Name, maxClusterName), maxClusterName)
+		name := PadRight(Truncate(cluster.Name, maxClusterName), maxClusterName)
 		row := "  " + name
 		for range waveColumns {
 			row += "  []  "
 		}
 		row += fmt.Sprintf("  %3d%%", pct)
-		b.WriteString("|" + padRight(" "+row, navigatorWidth) + "|\n")
+		b.WriteString("|" + PadRight(" "+row, NavigatorWidth) + "|\n")
 	}
 
-	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", navigatorWidth)))
+	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", NavigatorWidth)))
 	b.WriteString(fmt.Sprintf("+%s+\n", border))
-	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, " [] not generated  [=] available  [#] complete"))
-	b.WriteString(fmt.Sprintf("| %-*s|\n", navigatorWidth-1, " [x] locked (dependency)"))
+	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, " [] not generated  [=] available  [#] complete"))
+	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, " [x] locked (dependency)"))
 	b.WriteString(fmt.Sprintf("+%s+\n", border))
 
 	return b.String()
@@ -97,11 +97,11 @@ func RenderMatrixNavigator(result *ScanResult, projectName string, waves []Wave,
 	b.WriteString("+" + compDash + "+\n")
 
 	// Header row
-	b.WriteString("| " + padRight("Cluster", matrixClusterCol-2) + " ")
+	b.WriteString("| " + PadRight("Cluster", matrixClusterCol-2) + " ")
 	for i := 1; i <= waveColumns; i++ {
-		b.WriteString("| " + padRight(fmt.Sprintf("W%d", i), matrixWaveCol-2) + " ")
+		b.WriteString("| " + PadRight(fmt.Sprintf("W%d", i), matrixWaveCol-2) + " ")
 	}
-	b.WriteString("| " + padRight("Comp", matrixCompCol-2) + " ")
+	b.WriteString("| " + PadRight("Comp", matrixCompCol-2) + " ")
 	b.WriteString("|\n")
 
 	// Separator
@@ -114,26 +114,26 @@ func RenderMatrixNavigator(result *ScanResult, projectName string, waves []Wave,
 	// Data rows
 	for _, cluster := range result.Clusters {
 		pct := int(cluster.Completeness * 100)
-		name := truncate(cluster.Name, matrixClusterCol-2)
+		name := Truncate(cluster.Name, matrixClusterCol-2)
 		issueCount := cluster.NumIssues()
 		label := fmt.Sprintf("%s (%d)", name, issueCount)
-		if displayWidth(label) > matrixClusterCol-2 {
-			label = truncate(label, matrixClusterCol-2)
+		if DisplayWidth(label) > matrixClusterCol-2 {
+			label = Truncate(label, matrixClusterCol-2)
 		}
-		b.WriteString("| " + padRight(label, matrixClusterCol-2) + " ")
+		b.WriteString("| " + PadRight(label, matrixClusterCol-2) + " ")
 
 		clusterWaves := wavesByCluster[cluster.Name]
 		for i := 0; i < waveColumns; i++ {
 			if i < len(clusterWaves) {
 				sym := waveStatusSymbol3(clusterWaves[i].Status)
-				b.WriteString("| " + center(sym, matrixWaveCol-2) + " ")
+				b.WriteString("| " + Center(sym, matrixWaveCol-2) + " ")
 			} else {
 				b.WriteString("| " + strings.Repeat(" ", matrixWaveCol-2) + " ")
 			}
 		}
 
 		compStr := fmt.Sprintf("%d%%", pct)
-		b.WriteString("| " + padRight(compStr, matrixCompCol-2) + " ")
+		b.WriteString("| " + PadRight(compStr, matrixCompCol-2) + " ")
 		b.WriteString("|\n")
 	}
 
@@ -236,7 +236,7 @@ func runeWidth(r rune) int {
 	return 1
 }
 
-func displayWidth(s string) int {
+func DisplayWidth(s string) int {
 	w := 0
 	for _, r := range s {
 		w += runeWidth(r)
@@ -244,25 +244,25 @@ func displayWidth(s string) int {
 	return w
 }
 
-func padRight(s string, width int) string {
-	dw := displayWidth(s)
+func PadRight(s string, width int) string {
+	dw := DisplayWidth(s)
 	if dw >= width {
 		return s
 	}
 	return s + strings.Repeat(" ", width-dw)
 }
 
-func center(s string, width int) string {
-	dw := displayWidth(s)
+func Center(s string, width int) string {
+	dw := DisplayWidth(s)
 	if dw >= width {
-		return truncate(s, width)
+		return Truncate(s, width)
 	}
 	pad := (width - dw) / 2
 	return strings.Repeat(" ", pad) + s + strings.Repeat(" ", width-dw-pad)
 }
 
-func truncate(s string, maxWidth int) string {
-	if displayWidth(s) <= maxWidth {
+func Truncate(s string, maxWidth int) string {
+	if DisplayWidth(s) <= maxWidth {
 		return s
 	}
 	w := 0

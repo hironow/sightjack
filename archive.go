@@ -16,7 +16,7 @@ func ListExpiredArchive(baseDir string, days int, logger *Logger) ([]string, err
 	if days < 0 {
 		return nil, fmt.Errorf("days must be non-negative, got %d", days)
 	}
-	dir := MailDir(baseDir, archiveDir)
+	dir := MailDir(baseDir, ArchiveDir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -47,7 +47,7 @@ func ListExpiredArchive(baseDir string, days int, logger *Logger) ([]string, err
 // Files that no longer exist are silently skipped (ErrNotExist is not an error).
 // Returns the list of filenames that were processed.
 func DeleteArchiveFiles(baseDir string, files []string) ([]string, error) {
-	dir := MailDir(baseDir, archiveDir)
+	dir := MailDir(baseDir, ArchiveDir)
 	var deleted []string
 	for _, name := range files {
 		path := filepath.Join(dir, name)

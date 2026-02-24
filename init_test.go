@@ -1,10 +1,12 @@
-package sightjack
+package sightjack_test
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestRenderInitConfig_BasicOutput(t *testing.T) {
@@ -15,7 +17,7 @@ func TestRenderInitConfig_BasicOutput(t *testing.T) {
 	strictness := "alert"
 
 	// when
-	output := RenderInitConfig(team, project, lang, strictness)
+	output := sightjack.RenderInitConfig(team, project, lang, strictness)
 
 	// then
 	if !strings.Contains(output, `team: "Engineering"`) {
@@ -34,7 +36,7 @@ func TestRenderInitConfig_BasicOutput(t *testing.T) {
 
 func TestRenderInitConfig_LoadableByLoadConfig(t *testing.T) {
 	// given: rendered config written to temp file
-	output := RenderInitConfig("TestTeam", "Test Project", "en", "fog")
+	output := sightjack.RenderInitConfig("TestTeam", "Test Project", "en", "fog")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	if err := os.WriteFile(path, []byte(output), 0644); err != nil {
@@ -42,7 +44,7 @@ func TestRenderInitConfig_LoadableByLoadConfig(t *testing.T) {
 	}
 
 	// when: LoadConfig reads it
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then: values match
 	if err != nil {
@@ -57,14 +59,14 @@ func TestRenderInitConfig_LoadableByLoadConfig(t *testing.T) {
 	if cfg.Lang != "en" {
 		t.Errorf("lang: expected en, got %s", cfg.Lang)
 	}
-	if cfg.Strictness.Default != StrictnessFog {
+	if cfg.Strictness.Default != sightjack.StrictnessFog {
 		t.Errorf("strictness: expected fog, got %s", cfg.Strictness.Default)
 	}
 }
 
 func TestRenderInitConfig_DefaultStrictness(t *testing.T) {
 	// given: fog strictness (default)
-	output := RenderInitConfig("Team", "Project", "ja", "fog")
+	output := sightjack.RenderInitConfig("Team", "Project", "ja", "fog")
 
 	// when/then: strictness section present with fog
 	if !strings.Contains(output, "default: fog") {
@@ -77,7 +79,7 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	err := InstallSkills(baseDir)
+	err := sightjack.InstallSkills(baseDir)
 
 	// then: no error
 	if err != nil {
@@ -127,12 +129,12 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 func TestInstallSkills_Idempotent(t *testing.T) {
 	// given: install once
 	baseDir := t.TempDir()
-	if err := InstallSkills(baseDir); err != nil {
+	if err := sightjack.InstallSkills(baseDir); err != nil {
 		t.Fatalf("first install: %v", err)
 	}
 
 	// when: install again
-	err := InstallSkills(baseDir)
+	err := sightjack.InstallSkills(baseDir)
 
 	// then: no error, files still correct
 	if err != nil {
@@ -146,13 +148,13 @@ func TestInstallSkills_Idempotent(t *testing.T) {
 
 func TestRenderInitConfig_DefaultsApplied(t *testing.T) {
 	// given: rendered config with minimal values
-	output := RenderInitConfig("Team", "Project", "ja", "fog")
+	output := sightjack.RenderInitConfig("Team", "Project", "ja", "fog")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(output), 0644)
 
 	// when
-	cfg, err := LoadConfig(path)
+	cfg, err := sightjack.LoadConfig(path)
 
 	// then: DefaultConfig values are applied for unspecified fields
 	if err != nil {

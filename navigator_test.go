@@ -1,22 +1,24 @@
-package sightjack
+package sightjack_test
 
 import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestRenderNavigator_Basic(t *testing.T) {
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
-			{Name: "Auth", Completeness: 0.25, Issues: make([]IssueDetail, 5)},
-			{Name: "API", Completeness: 0.40, Issues: make([]IssueDetail, 8)},
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25, Issues: make([]sightjack.IssueDetail, 5)},
+			{Name: "API", Completeness: 0.40, Issues: make([]sightjack.IssueDetail, 8)},
 		},
 		TotalIssues:  13,
 		Completeness: 0.325,
 	}
 
-	output := RenderNavigator(result, "My Project")
+	output := sightjack.RenderNavigator(result, "My Project")
 
 	if !strings.Contains(output, "SIGHTJACK") {
 		t.Error("expected SIGHTJACK header")
@@ -42,9 +44,9 @@ func TestRenderNavigator_Basic(t *testing.T) {
 }
 
 func TestRenderNavigator_Empty(t *testing.T) {
-	result := &ScanResult{}
+	result := &sightjack.ScanResult{}
 
-	output := RenderNavigator(result, "Empty Project")
+	output := sightjack.RenderNavigator(result, "Empty Project")
 
 	if !strings.Contains(output, "SIGHTJACK") {
 		t.Error("expected SIGHTJACK header even with no clusters")
@@ -67,9 +69,9 @@ func TestDisplayWidth(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := displayWidth(tt.input)
+			got := sightjack.DisplayWidth(tt.input)
 			if got != tt.expected {
-				t.Errorf("displayWidth(%q) = %d, want %d", tt.input, got, tt.expected)
+				t.Errorf("DisplayWidth(%q) = %d, want %d", tt.input, got, tt.expected)
 			}
 		})
 	}
@@ -77,15 +79,14 @@ func TestDisplayWidth(t *testing.T) {
 
 func TestTruncate_Japanese(t *testing.T) {
 	// given: Japanese text longer than maxWidth in display columns
-	// Each CJK char is 2 display columns, so 5 cols fits 2 chars (4 cols) + "~" (1 col) = 5
 	input := "認証とアクセス制御"
 
 	// when
-	result := truncate(input, 5)
+	result := sightjack.Truncate(input, 5)
 
 	// then: should truncate at display width boundary
 	if result != "認証~" {
-		t.Errorf("truncate(%q, 5) = %q, want %q", input, result, "認証~")
+		t.Errorf("Truncate(%q, 5) = %q, want %q", input, result, "認証~")
 	}
 }
 
@@ -94,11 +95,11 @@ func TestTruncate_ASCII(t *testing.T) {
 	input := "Authentication"
 
 	// when
-	result := truncate(input, 8)
+	result := sightjack.Truncate(input, 8)
 
 	// then
 	if result != "Authent~" {
-		t.Errorf("truncate(%q, 8) = %q, want %q", input, result, "Authent~")
+		t.Errorf("Truncate(%q, 8) = %q, want %q", input, result, "Authent~")
 	}
 }
 
@@ -107,52 +108,52 @@ func TestTruncate_Short(t *testing.T) {
 	input := "Auth"
 
 	// when
-	result := truncate(input, 10)
+	result := sightjack.Truncate(input, 10)
 
 	// then: should return original
 	if result != "Auth" {
-		t.Errorf("truncate(%q, 10) = %q, want %q", input, result, "Auth")
+		t.Errorf("Truncate(%q, 10) = %q, want %q", input, result, "Auth")
 	}
 }
 
 func TestCenter_Japanese(t *testing.T) {
-	// given: Japanese text to center (displayWidth "認証" = 4)
+	// given: Japanese text to center (DisplayWidth "認証" = 4)
 	input := "認証"
 
 	// when: center in 10 display columns
-	result := center(input, 10)
+	result := sightjack.Center(input, 10)
 
 	// then: should pad correctly based on display width
 	// pad = (10-4)/2 = 3 on each side
-	if displayWidth(result) != 10 {
-		t.Errorf("center(%q, 10) display width = %d, want 10", input, displayWidth(result))
+	if sightjack.DisplayWidth(result) != 10 {
+		t.Errorf("Center(%q, 10) display width = %d, want 10", input, sightjack.DisplayWidth(result))
 	}
 	if result != "   認証   " {
-		t.Errorf("center(%q, 10) = %q, want %q", input, result, "   認証   ")
+		t.Errorf("Center(%q, 10) = %q, want %q", input, result, "   認証   ")
 	}
 }
 
 func TestRenderNavigator_ConsistentLineWidth(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
-			{Name: "Auth", Completeness: 0.25, Issues: make([]IssueDetail, 3)},
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25, Issues: make([]sightjack.IssueDetail, 3)},
 		},
 		TotalIssues:  3,
 		Completeness: 0.25,
 	}
 
 	// when
-	output := RenderNavigator(result, "My Project")
+	output := sightjack.RenderNavigator(result, "My Project")
 
 	// then: every non-empty line must have the same display width
 	lines := strings.Split(output, "\n")
-	expectedWidth := 2 + navigatorWidth // "|" or "+" on each side
+	expectedWidth := 2 + sightjack.NavigatorWidth // "|" or "+" on each side
 	for i, line := range lines {
 		if line == "" {
 			continue
 		}
-		dw := displayWidth(line)
+		dw := sightjack.DisplayWidth(line)
 		if dw != expectedWidth {
 			t.Errorf("line %d: display width %d, want %d: %q", i+1, dw, expectedWidth, line)
 		}
@@ -161,25 +162,25 @@ func TestRenderNavigator_ConsistentLineWidth(t *testing.T) {
 
 func TestRenderNavigator_JapaneseName(t *testing.T) {
 	// given: Japanese project and cluster names
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
-			{Name: "認証", Completeness: 0.5, Issues: make([]IssueDetail, 3)},
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
+			{Name: "認証", Completeness: 0.5, Issues: make([]sightjack.IssueDetail, 3)},
 		},
 		TotalIssues:  3,
 		Completeness: 0.5,
 	}
 
 	// when
-	output := RenderNavigator(result, "テストプロジェクト")
+	output := sightjack.RenderNavigator(result, "テストプロジェクト")
 
 	// then: every non-empty line must have consistent display width
 	lines := strings.Split(output, "\n")
-	expectedWidth := 2 + navigatorWidth
+	expectedWidth := 2 + sightjack.NavigatorWidth
 	for i, line := range lines {
 		if line == "" {
 			continue
 		}
-		dw := displayWidth(line)
+		dw := sightjack.DisplayWidth(line)
 		if dw != expectedWidth {
 			t.Errorf("line %d: display width %d, want %d: %q", i+1, dw, expectedWidth, line)
 		}
@@ -187,14 +188,14 @@ func TestRenderNavigator_JapaneseName(t *testing.T) {
 }
 
 func TestRenderNavigator_LongClusterName(t *testing.T) {
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
 			{Name: "Authentication & Authorization", Completeness: 0.5},
 		},
 		Completeness: 0.5,
 	}
 
-	output := RenderNavigator(result, "Test")
+	output := sightjack.RenderNavigator(result, "Test")
 
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
@@ -206,22 +207,22 @@ func TestRenderNavigator_LongClusterName(t *testing.T) {
 
 func TestRenderMatrixNavigator_Basic(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
 			{Name: "Auth", Completeness: 0.25},
 			{Name: "API", Completeness: 0.30},
 		},
 		TotalIssues:  10,
 		Completeness: 0.275,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
 		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "locked"},
 		{ID: "api-w1", ClusterName: "API", Title: "Split", Status: "available"},
 	}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "[ ]") {
@@ -237,18 +238,18 @@ func TestRenderMatrixNavigator_Basic(t *testing.T) {
 
 func TestRenderMatrixNavigator_CompletedWave(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.40}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.40}},
 		TotalIssues:  4,
 		Completeness: 0.40,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
 		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
 	}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "[=]") {
@@ -258,17 +259,17 @@ func TestRenderMatrixNavigator_CompletedWave(t *testing.T) {
 
 func TestRenderMatrixNavigator_ADRCountZero(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
 		TotalIssues:  3,
 		Completeness: 0.25,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
 	}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "ADR: 0") {
@@ -278,17 +279,17 @@ func TestRenderMatrixNavigator_ADRCountZero(t *testing.T) {
 
 func TestRenderMatrixNavigator_ADRCountPositive(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.50}},
 		TotalIssues:  5,
 		Completeness: 0.50,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
 	}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 5, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 5, nil, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "ADR: 5") {
@@ -298,18 +299,18 @@ func TestRenderMatrixNavigator_ADRCountPositive(t *testing.T) {
 
 func TestRenderMatrixNavigator_ResumeInfo(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.62}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.62}},
 		TotalIssues:  5,
 		Completeness: 0.62,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
 	}
 	lastScanned := time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC)
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 3, &lastScanned, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 3, &lastScanned, "fog", 0)
 
 	// then
 	if !strings.Contains(nav, "Session: resumed") {
@@ -322,17 +323,17 @@ func TestRenderMatrixNavigator_ResumeInfo(t *testing.T) {
 
 func TestRenderMatrixNavigator_NoResumeInfo(t *testing.T) {
 	// given: nil lastScanned means fresh session
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
 		TotalIssues:  3,
 		Completeness: 0.25,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
 	}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then: no resume line
 	if strings.Contains(nav, "Session:") {
@@ -342,15 +343,15 @@ func TestRenderMatrixNavigator_NoResumeInfo(t *testing.T) {
 
 func TestRenderMatrixNavigator_StrictnessBadge(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
 		TotalIssues:  3,
 		Completeness: 0.25,
 	}
-	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
+	waves := []sightjack.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "alert", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "alert", 0)
 
 	// then
 	if !strings.Contains(nav, "Strictness: alert") {
@@ -360,15 +361,15 @@ func TestRenderMatrixNavigator_StrictnessBadge(t *testing.T) {
 
 func TestRenderMatrixNavigator_ShibitoCount(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
 		TotalIssues:  3,
 		Completeness: 0.25,
 	}
-	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
+	waves := []sightjack.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 3)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 3)
 
 	// then
 	if !strings.Contains(nav, "Shibito: 3") {
@@ -381,7 +382,7 @@ func TestRenderProgressBar_Half(t *testing.T) {
 	current := 0.50
 
 	// when
-	result := RenderProgressBar(current, 20)
+	result := sightjack.RenderProgressBar(current, 20)
 
 	// then
 	expected := "[==========..........] 50%"
@@ -392,7 +393,7 @@ func TestRenderProgressBar_Half(t *testing.T) {
 
 func TestRenderProgressBar_Zero(t *testing.T) {
 	// given / when
-	result := RenderProgressBar(0.0, 20)
+	result := sightjack.RenderProgressBar(0.0, 20)
 
 	// then
 	expected := "[....................] 0%"
@@ -403,7 +404,7 @@ func TestRenderProgressBar_Zero(t *testing.T) {
 
 func TestRenderProgressBar_Full(t *testing.T) {
 	// given / when
-	result := RenderProgressBar(1.0, 20)
+	result := sightjack.RenderProgressBar(1.0, 20)
 
 	// then
 	expected := "[====================] 100%"
@@ -414,7 +415,7 @@ func TestRenderProgressBar_Full(t *testing.T) {
 
 func TestRenderProgressBar_Partial(t *testing.T) {
 	// given: 62% with width 20 -> 12.4 -> 12 filled
-	result := RenderProgressBar(0.62, 20)
+	result := sightjack.RenderProgressBar(0.62, 20)
 
 	// then
 	expected := "[============........] 62%"
@@ -425,7 +426,7 @@ func TestRenderProgressBar_Partial(t *testing.T) {
 
 func TestRenderProgressBar_Overflow(t *testing.T) {
 	// given: current > 1.0 should clamp to 100%
-	result := RenderProgressBar(1.5, 20)
+	result := sightjack.RenderProgressBar(1.5, 20)
 
 	// then
 	expected := "[====================] 100%"
@@ -436,7 +437,7 @@ func TestRenderProgressBar_Overflow(t *testing.T) {
 
 func TestRenderProgressBar_Underflow(t *testing.T) {
 	// given: negative current should clamp to 0%
-	result := RenderProgressBar(-0.25, 20)
+	result := sightjack.RenderProgressBar(-0.25, 20)
 
 	// then
 	expected := "[....................] 0%"
@@ -447,15 +448,15 @@ func TestRenderProgressBar_Underflow(t *testing.T) {
 
 func TestRenderMatrixNavigator_ShibitoZero_Hidden(t *testing.T) {
 	// given
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.25}},
 		TotalIssues:  3,
 		Completeness: 0.25,
 	}
-	waves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
+	waves := []sightjack.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"}}
 
 	// when
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 0, nil, "fog", 0)
 
 	// then: shibito count should not appear when 0
 	if strings.Contains(nav, "Shibito") {
@@ -465,17 +466,17 @@ func TestRenderMatrixNavigator_ShibitoZero_Hidden(t *testing.T) {
 
 func TestRenderMatrixNavigator_IssueCountWithoutSlice(t *testing.T) {
 	// given: cluster with IssueCount but no Issues slice (show command path)
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
 			{Name: "Auth", Completeness: 0.50, IssueCount: 7},
 		},
 		TotalIssues:  7,
 		Completeness: 0.50,
 	}
-	waves := []Wave{{ID: "w1", ClusterName: "Auth", Title: "T", Status: "available"}}
+	waves := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "T", Status: "available"}}
 
 	// when
-	nav := RenderMatrixNavigator(result, "P", waves, 0, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "P", waves, 0, nil, "fog", 0)
 
 	// then: should display "(7)" for the issue count
 	if !strings.Contains(nav, "(7)") {
@@ -484,20 +485,20 @@ func TestRenderMatrixNavigator_IssueCountWithoutSlice(t *testing.T) {
 }
 
 func TestRenderMatrixNavigator_GridBorders(t *testing.T) {
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
-			{Name: "Auth", Completeness: 0.65, Issues: make([]IssueDetail, 4)},
-			{Name: "API", Completeness: 0.58, Issues: make([]IssueDetail, 6)},
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
+			{Name: "Auth", Completeness: 0.65, Issues: make([]sightjack.IssueDetail, 4)},
+			{Name: "API", Completeness: 0.58, Issues: make([]sightjack.IssueDetail, 6)},
 		},
 		TotalIssues:  10,
 		Completeness: 0.615,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
 		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
 		{ID: "api-w1", ClusterName: "API", Title: "Split", Status: "completed"},
 	}
-	nav := RenderMatrixNavigator(result, "TestProject", waves, 4, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "TestProject", waves, 4, nil, "fog", 0)
 	if !strings.Contains(nav, "+--") {
 		t.Error("expected '+--' grid border")
 	}
@@ -520,21 +521,21 @@ func TestRenderMatrixNavigator_GridBorders(t *testing.T) {
 
 func TestRenderMatrixNavigator_JapaneseClusterAlignment(t *testing.T) {
 	// given: Japanese cluster name (wide characters) should not break grid alignment
-	result := &ScanResult{
-		Clusters: []ClusterScanResult{
-			{Name: "認証", Completeness: 0.50, Issues: make([]IssueDetail, 3)},
-			{Name: "API", Completeness: 0.40, Issues: make([]IssueDetail, 2)},
+	result := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
+			{Name: "認証", Completeness: 0.50, Issues: make([]sightjack.IssueDetail, 3)},
+			{Name: "API", Completeness: 0.40, Issues: make([]sightjack.IssueDetail, 2)},
 		},
 		TotalIssues:  5,
 		Completeness: 0.45,
 	}
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "w1", ClusterName: "認証", Title: "Deps", Status: "available"},
 		{ID: "w2", ClusterName: "API", Title: "Split", Status: "completed"},
 	}
 
 	// when
-	nav := RenderMatrixNavigator(result, "テストプロジェクト", waves, 0, nil, "fog", 0)
+	nav := sightjack.RenderMatrixNavigator(result, "テストプロジェクト", waves, 0, nil, "fog", 0)
 
 	// then: all grid lines (starting with + or |) must have the same display width
 	lines := strings.Split(nav, "\n")
@@ -546,7 +547,7 @@ func TestRenderMatrixNavigator_JapaneseClusterAlignment(t *testing.T) {
 		if line[0] != '+' && line[0] != '|' {
 			continue
 		}
-		dw := displayWidth(line)
+		dw := sightjack.DisplayWidth(line)
 		if gridWidth == 0 {
 			gridWidth = dw
 		}
@@ -557,12 +558,12 @@ func TestRenderMatrixNavigator_JapaneseClusterAlignment(t *testing.T) {
 }
 
 func TestRenderMatrixNavigator_ProgressBarInFooter(t *testing.T) {
-	result := &ScanResult{
-		Clusters:     []ClusterScanResult{{Name: "Auth", Completeness: 0.50}},
+	result := &sightjack.ScanResult{
+		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.50}},
 		Completeness: 0.50,
 	}
-	waves := []Wave{{ID: "w1", ClusterName: "Auth", Title: "T", Status: "available"}}
-	nav := RenderMatrixNavigator(result, "P", waves, 2, nil, "alert", 0)
+	waves := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "T", Status: "available"}}
+	nav := sightjack.RenderMatrixNavigator(result, "P", waves, 2, nil, "alert", 0)
 	if !strings.Contains(nav, "ADR: 2") {
 		t.Error("expected ADR count in footer")
 	}

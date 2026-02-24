@@ -30,7 +30,7 @@ lang: %q
 // Existing files are overwritten (idempotent). Directories are created as needed.
 func InstallSkills(baseDir string) error {
 	const srcPrefix = "templates/skills"
-	destRoot := filepath.Join(baseDir, stateDir, "skills")
+	destRoot := filepath.Join(baseDir, StateDir, "skills")
 
 	return fs.WalkDir(skillsFS, srcPrefix, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

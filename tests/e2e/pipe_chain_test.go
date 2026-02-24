@@ -789,3 +789,73 @@ func TestE2E_Pipe_FullChainWithSelect(t *testing.T) {
 		t.Error("nextgen plan missing 'waves' key")
 	}
 }
+
+// --- Wave generation partial failure ---
+
+func TestE2E_Pipe_WaveGenPartialFailure(t *testing.T) {
+	tests := []struct {
+		name        string
+		failPattern string // FAKE_CLAUDE_FAIL_PATTERN value
+		wantErr     bool   // true = expect non-zero exit from waves
+		wantWarning string // substring expected in stderr (checked on success)
+	}{
+		{
+			name:        "OneClusterFails",
+			failPattern: "unstable",
+			wantWarning: "Unstable",
+		},
+		{
+			name:        "AllClustersFail",
+			failPattern: "wave_",
+			wantErr:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given: multi-cluster ScanResult + FAKE_CLAUDE_FAIL_PATTERN
+			dir := initDir(t)
+			fixture := fixtureBytes(t, "scan_result_multi.json")
+
+			// when: pipe into waves with failure pattern
+			cmd := exec.Command(sightjackBin(), "waves", dir)
+			cmd.Stdin = strings.NewReader(string(fixture))
+			env := os.Environ()
+			env = append(env, "FAKE_CLAUDE_FAIL_PATTERN="+tt.failPattern)
+			cmd.Env = env
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			err := cmd.Run()
+
+			// then
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected non-zero exit when all clusters fail")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("waves should partially succeed: %v\nstderr: %s\nstdout: %s",
+					err, stderr.String(), stdout.String())
+			}
+
+			// Valid WavePlan JSON with waves
+			var plan map[string]any
+			if jsonErr := json.Unmarshal(stdout.Bytes(), &plan); jsonErr != nil {
+				t.Fatalf("invalid WavePlan JSON: %v\nstdout: %s", jsonErr, stdout.String())
+			}
+			if _, ok := plan["waves"]; !ok {
+				t.Error("wave plan missing 'waves' key")
+			}
+
+			// Warning about failed cluster in stderr
+			if tt.wantWarning != "" && !strings.Contains(stderr.String(), tt.wantWarning) {
+				t.Errorf("expected warning containing %q in stderr, got:\n%s",
+					tt.wantWarning, stderr.String())
+			}
+
+			// Cache file created for partial results
+			assertResultFileCached(t, dir, "waves_result.json")
+		})
+	}
+}

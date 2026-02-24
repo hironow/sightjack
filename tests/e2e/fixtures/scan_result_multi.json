@@ -1,0 +1,26 @@
+{
+  "clusters": [
+    {
+      "name": "Auth",
+      "completeness": 0.35,
+      "issues": [
+        {"id": "AUTH-1", "identifier": "AUTH-1", "title": "Login flow", "completeness": 0.3, "gaps": ["DoD missing"]},
+        {"id": "AUTH-2", "identifier": "AUTH-2", "title": "Token refresh", "completeness": 0.4, "gaps": ["Tests missing"]}
+      ],
+      "observations": ["Auth depends on API"],
+      "labels": ["security"]
+    },
+    {
+      "name": "Unstable",
+      "completeness": 0.50,
+      "issues": [
+        {"id": "UNS-1", "identifier": "UNS-1", "title": "Flaky service", "completeness": 0.5, "gaps": ["Retry logic missing"]}
+      ],
+      "observations": ["Service intermittently fails"],
+      "labels": ["infrastructure"]
+    }
+  ],
+  "total_issues": 3,
+  "completeness": 0.42,
+  "observations": ["Auth depends on API", "Service intermittently fails"]
+}

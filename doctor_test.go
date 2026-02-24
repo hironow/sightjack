@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 func TestCheckConfig_ValidConfig(t *testing.T) {
@@ -21,10 +23,10 @@ linear:
 `), 0644)
 
 	// when
-	result := checkConfig(path)
+	result := sightjack.CheckConfig(path)
 
 	// then
-	if result.Status != CheckOK {
+	if result.Status != sightjack.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "Config" {
@@ -34,10 +36,10 @@ linear:
 
 func TestCheckConfig_MissingFile(t *testing.T) {
 	// given: nonexistent path
-	result := checkConfig("/nonexistent/sightjack.yaml")
+	result := sightjack.CheckConfig("/nonexistent/sightjack.yaml")
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -49,10 +51,10 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 	os.WriteFile(path, []byte(`{{{invalid yaml`), 0644)
 
 	// when
-	result := checkConfig(path)
+	result := sightjack.CheckConfig(path)
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail for invalid YAML, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -62,10 +64,10 @@ func TestCheckTool_Exists(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkTool(ctx, "git")
+	result := sightjack.CheckTool(ctx, "git")
 
 	// then
-	if result.Status != CheckOK {
+	if result.Status != sightjack.CheckOK {
 		t.Errorf("expected CheckOK for 'git', got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Message, "git") {
@@ -78,22 +80,22 @@ func TestCheckTool_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkTool(ctx, "nonexistent-tool-xyz-12345")
+	result := sightjack.CheckTool(ctx, "nonexistent-tool-xyz-12345")
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckStatusLabel(t *testing.T) {
 	tests := []struct {
-		status CheckStatus
+		status sightjack.CheckStatus
 		want   string
 	}{
-		{CheckOK, "OK"},
-		{CheckFail, "FAIL"},
-		{CheckSkip, "SKIP"},
+		{sightjack.CheckOK, "OK"},
+		{sightjack.CheckFail, "FAIL"},
+		{sightjack.CheckSkip, "SKIP"},
 	}
 	for _, tt := range tests {
 		if got := tt.status.StatusLabel(); got != tt.want {
@@ -102,26 +104,26 @@ func TestCheckStatusLabel(t *testing.T) {
 	}
 }
 
-// --- checkClaudeAuth tests ---
+// --- CheckClaudeAuth tests ---
 
 func TestCheckClaudeAuth_Success(t *testing.T) {
 	// given: mock claude that responds OK
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "OK")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	cfg := &Config{
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &sightjack.Config{
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
 	// when
-	result := checkClaudeAuth(ctx, cfg, NewLogger(io.Discard, false))
+	result := sightjack.CheckClaudeAuth(ctx, cfg, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != CheckOK {
+	if result.Status != sightjack.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "Claude Auth" {
@@ -131,22 +133,22 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 
 func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 	// given: mock claude that outputs "Not logged in" and exits 1
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("sh", "-c", `echo "Not logged in · Please run /login"; exit 1`)
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	cfg := &Config{
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &sightjack.Config{
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
 	// when
-	result := checkClaudeAuth(ctx, cfg, NewLogger(io.Discard, false))
+	result := sightjack.CheckClaudeAuth(ctx, cfg, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Hint, "claude login") {
@@ -156,22 +158,22 @@ func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 
 func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
 	// given: mock claude that fails with unknown error
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("false")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	cfg := &Config{
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &sightjack.Config{
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
 	// when
-	result := checkClaudeAuth(ctx, cfg, NewLogger(io.Discard, false))
+	result := sightjack.CheckClaudeAuth(ctx, cfg, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -181,58 +183,58 @@ func TestCheckClaudeAuth_NilConfig_Skips(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkClaudeAuth(ctx, nil, NewLogger(io.Discard, false))
+	result := sightjack.CheckClaudeAuth(ctx, nil, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != CheckSkip {
+	if result.Status != sightjack.CheckSkip {
 		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
 	}
 }
 
-// --- checkLinearMCP tests ---
+// --- CheckLinearMCP tests ---
 
 func TestCheckLinearMCP_Success(t *testing.T) {
 	// given: mock claude that returns team info
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", `{"teams": [{"name": "Engineering"}]}`)
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	cfg := &Config{
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Linear: LinearConfig{Team: "Engineering"},
-		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &sightjack.Config{
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Linear: sightjack.LinearConfig{Team: "Engineering"},
+		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
 	// when
-	result := checkLinearMCP(ctx, cfg, NewLogger(io.Discard, false))
+	result := sightjack.CheckLinearMCP(ctx, cfg, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != CheckOK {
+	if result.Status != sightjack.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckLinearMCP_Failure(t *testing.T) {
 	// given: mock claude that fails (auth is OK but MCP fails)
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("false")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
-	cfg := &Config{
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Linear: LinearConfig{Team: "Engineering"},
-		Retry:  RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &sightjack.Config{
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Linear: sightjack.LinearConfig{Team: "Engineering"},
+		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
 	// when
-	result := checkLinearMCP(ctx, cfg, NewLogger(io.Discard, false))
+	result := sightjack.CheckLinearMCP(ctx, cfg, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Hint, "claude mcp add") {
@@ -245,10 +247,10 @@ func TestCheckLinearMCP_NilConfig_Skips(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := checkLinearMCP(ctx, nil, NewLogger(io.Discard, false))
+	result := sightjack.CheckLinearMCP(ctx, nil, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != CheckSkip {
+	if result.Status != sightjack.CheckSkip {
 		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -258,10 +260,10 @@ func TestCheckStateDir_Writable(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := checkStateDir(dir)
+	result := sightjack.CheckStateDir(dir)
 
 	// then
-	if result.Status != CheckOK {
+	if result.Status != sightjack.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "State Dir" {
@@ -276,10 +278,10 @@ func TestCheckStateDir_NotWritable(t *testing.T) {
 	defer os.Chmod(dir, 0755) // cleanup
 
 	// when
-	result := checkStateDir(dir)
+	result := sightjack.CheckStateDir(dir)
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail for read-only dir, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -290,10 +292,10 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 
 	// when
-	result := checkStateDir(dir)
+	result := sightjack.CheckStateDir(dir)
 
 	// then
-	if result.Status != CheckOK {
+	if result.Status != sightjack.CheckOK {
 		t.Errorf("expected CheckOK for existing .siren/, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -301,15 +303,15 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 func TestCheckSkills_OK(t *testing.T) {
 	// given: valid SKILL.md files installed
 	baseDir := t.TempDir()
-	if err := InstallSkills(baseDir); err != nil {
+	if err := sightjack.InstallSkills(baseDir); err != nil {
 		t.Fatalf("InstallSkills: %v", err)
 	}
 
 	// when
-	result := checkSkills(baseDir)
+	result := sightjack.CheckSkills(baseDir)
 
 	// then
-	if result.Status != CheckOK {
+	if result.Status != sightjack.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "Skills" {
@@ -322,10 +324,10 @@ func TestCheckSkills_Missing(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	result := checkSkills(baseDir)
+	result := sightjack.CheckSkills(baseDir)
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail for missing SKILL.md files, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -340,33 +342,33 @@ func TestCheckSkills_MissingSchemaVersion(t *testing.T) {
 	os.WriteFile(filepath.Join(skillsDir, "dmail-readable", "SKILL.md"), []byte("---\nname: dmail-readable\n---\n"), 0644)
 
 	// when
-	result := checkSkills(baseDir)
+	result := sightjack.CheckSkills(baseDir)
 
 	// then
-	if result.Status != CheckFail {
+	if result.Status != sightjack.CheckFail {
 		t.Errorf("expected CheckFail for missing schema version, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// given: nonexistent config path → config check fails, cfg=nil
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "ok")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
 	dir := t.TempDir()
 	ctx := context.Background()
 
 	// when
-	results := RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, NewLogger(io.Discard, false))
+	results := sightjack.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, sightjack.NewLogger(io.Discard, false))
 
 	// then: should have 7 results
 	if len(results) != 7 {
 		t.Fatalf("expected 7 results, got %d", len(results))
 	}
 	// Config should fail
-	if results[0].Status != CheckFail {
+	if results[0].Status != sightjack.CheckFail {
 		t.Errorf("Config: expected FAIL, got %v", results[0].Status)
 	}
 	// Claude Auth should be skipped (nil config)
@@ -374,7 +376,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if auth.Name != "Claude Auth" {
 		t.Errorf("expected 'Claude Auth', got %q", auth.Name)
 	}
-	if auth.Status != CheckSkip {
+	if auth.Status != sightjack.CheckSkip {
 		t.Errorf("Claude Auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
 	}
 	// Linear MCP should be skipped (nil config)
@@ -382,17 +384,17 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if mcp.Name != "Linear MCP" {
 		t.Errorf("expected 'Linear MCP', got %q", mcp.Name)
 	}
-	if mcp.Status != CheckSkip {
+	if mcp.Status != sightjack.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
 	}
 }
 
 func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	// given: claude binary does not exist → Claude Auth + Linear MCP should be skipped
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "ok")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
@@ -407,23 +409,23 @@ claude:
 	ctx := context.Background()
 
 	// when
-	results := RunDoctor(ctx, cfgPath, dir, NewLogger(io.Discard, false))
+	results := sightjack.RunDoctor(ctx, cfgPath, dir, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 7 {
 		t.Fatalf("expected 7 results, got %d", len(results))
 	}
 	// Config should pass
-	if results[0].Status != CheckOK {
+	if results[0].Status != sightjack.CheckOK {
 		t.Errorf("Config: expected OK, got %v", results[0].Status)
 	}
 	// claude binary check should fail (nonexistent binary)
-	if results[2].Status != CheckFail {
+	if results[2].Status != sightjack.CheckFail {
 		t.Errorf("claude: expected FAIL, got %v: %s", results[2].Status, results[2].Message)
 	}
 	// Claude Auth should be skipped because claude binary is unavailable
 	auth := results[5]
-	if auth.Status != CheckSkip {
+	if auth.Status != sightjack.CheckSkip {
 		t.Errorf("Claude Auth: expected SKIP, got %v: %s", auth.Status, auth.Message)
 	}
 	if !strings.Contains(auth.Message, "claude not available") {
@@ -431,17 +433,17 @@ claude:
 	}
 	// Linear MCP should be skipped because claude binary is unavailable
 	mcp := results[6]
-	if mcp.Status != CheckSkip {
+	if mcp.Status != sightjack.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
 	}
 }
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock claude for auth + MCP checks
-	newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "ok")
-	}
-	defer func() { newCmd = defaultNewCmd }()
+	})
+	defer cleanup()
 
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
@@ -454,22 +456,22 @@ linear:
 	ctx := context.Background()
 
 	// when
-	results := RunDoctor(ctx, cfgPath, dir, NewLogger(io.Discard, false))
+	results := sightjack.RunDoctor(ctx, cfgPath, dir, sightjack.NewLogger(io.Discard, false))
 
 	// then: should have 7 results (config, state dir, claude, git, skills, claude auth, linear mcp)
 	if len(results) != 7 {
 		t.Fatalf("expected 7 results, got %d: %v", len(results), results)
 	}
-	if results[0].Name != "Config" || results[0].Status != CheckOK {
+	if results[0].Name != "Config" || results[0].Status != sightjack.CheckOK {
 		t.Errorf("Config check: expected OK, got %v: %s", results[0].Status, results[0].Message)
 	}
-	if results[1].Name != "State Dir" || results[1].Status != CheckOK {
+	if results[1].Name != "State Dir" || results[1].Status != sightjack.CheckOK {
 		t.Errorf("State Dir check: expected OK, got %v: %s", results[1].Status, results[1].Message)
 	}
-	if results[5].Name != "Claude Auth" || results[5].Status != CheckOK {
+	if results[5].Name != "Claude Auth" || results[5].Status != sightjack.CheckOK {
 		t.Errorf("Claude Auth check: expected OK, got %v: %s", results[5].Status, results[5].Message)
 	}
-	if results[6].Name != "Linear MCP" || results[6].Status != CheckOK {
+	if results[6].Name != "Linear MCP" || results[6].Status != sightjack.CheckOK {
 		t.Errorf("Linear MCP check: expected OK, got %v: %s", results[6].Status, results[6].Message)
 	}
 }

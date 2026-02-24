@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"encoding/json"
@@ -7,23 +7,25 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestParseArchitectResult(t *testing.T) {
 	// given: a valid architect response JSON file
 	dir := t.TempDir()
 	path := filepath.Join(dir, "architect_auth_auth-w1.json")
-	data := ArchitectResponse{
+	data := sightjack.ArchitectResponse{
 		Analysis: "Splitting is unnecessary.",
-		ModifiedWave: &Wave{
+		ModifiedWave: &sightjack.Wave{
 			ID:          "auth-w1",
 			ClusterName: "Auth",
 			Title:       "Dependency Ordering",
-			Actions: []WaveAction{
+			Actions: []sightjack.WaveAction{
 				{Type: "add_dependency", IssueID: "ENG-101", Description: "Auth before token"},
 				{Type: "add_dod", IssueID: "ENG-101", Description: "Middleware interface"},
 			},
-			Delta:  WaveDelta{Before: 0.25, After: 0.42},
+			Delta:  sightjack.WaveDelta{Before: 0.25, After: 0.42},
 			Status: "available",
 		},
 		Reasoning: "Project scale favors fewer issues.",
@@ -37,7 +39,7 @@ func TestParseArchitectResult(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseArchitectResult(path)
+	result, err := sightjack.ParseArchitectResult(path)
 
 	// then
 	if err != nil {
@@ -63,7 +65,7 @@ func TestParseArchitectResult_NilWave(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseArchitectResult(path)
+	result, err := sightjack.ParseArchitectResult(path)
 
 	// then
 	if err != nil {
@@ -76,7 +78,7 @@ func TestParseArchitectResult_NilWave(t *testing.T) {
 
 func TestParseArchitectResult_FileNotFound(t *testing.T) {
 	// when
-	_, err := ParseArchitectResult("/nonexistent/path.json")
+	_, err := sightjack.ParseArchitectResult("/nonexistent/path.json")
 
 	// then
 	if err == nil {
@@ -85,16 +87,16 @@ func TestParseArchitectResult_FileNotFound(t *testing.T) {
 }
 
 func TestArchitectDiscussFileName(t *testing.T) {
-	wave := Wave{ID: "auth-w1", ClusterName: "Auth"}
-	name := architectDiscussFileName(wave)
+	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
+	name := sightjack.ArchitectDiscussFileName(wave)
 	if name != "architect_auth_auth-w1.json" {
 		t.Errorf("expected architect_auth_auth-w1.json, got %s", name)
 	}
 }
 
 func TestArchitectDiscussFileName_SpecialChars(t *testing.T) {
-	wave := Wave{ID: "w-1", ClusterName: "UI/Frontend"}
-	name := architectDiscussFileName(wave)
+	wave := sightjack.Wave{ID: "w-1", ClusterName: "UI/Frontend"}
+	name := sightjack.ArchitectDiscussFileName(wave)
 	if name != "architect_ui_frontend_w-1.json" {
 		t.Errorf("expected architect_ui_frontend_w-1.json, got %s", name)
 	}
@@ -103,19 +105,19 @@ func TestArchitectDiscussFileName_SpecialChars(t *testing.T) {
 func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	// given
 	scanDir := t.TempDir()
-	cfg := &Config{
+	cfg := &sightjack.Config{
 		Lang:   "en",
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
 	}
-	wave := Wave{
+	wave := sightjack.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
-		Actions:     []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Actions:     []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
 	}
 
 	// when
-	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", NewLogger(io.Discard, false))
+	err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -136,7 +138,7 @@ func TestParseArchitectResult_MalformedJSON(t *testing.T) {
 	}
 
 	// when
-	_, err := ParseArchitectResult(path)
+	_, err := sightjack.ParseArchitectResult(path)
 
 	// then
 	if err == nil {
@@ -167,7 +169,7 @@ func TestParseArchitectResult_ModifiedWaveNilActions(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseArchitectResult(path)
+	result, err := sightjack.ParseArchitectResult(path)
 
 	// then
 	if err != nil {
@@ -188,11 +190,11 @@ func TestParseArchitectResult_ModifiedWaveNilActions(t *testing.T) {
 func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	// given: wave with nil Actions — json.Marshal produces "null" not "[]"
 	scanDir := t.TempDir()
-	cfg := &Config{
+	cfg := &sightjack.Config{
 		Lang:   "en",
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
 	}
-	wave := Wave{
+	wave := sightjack.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Empty Wave",
@@ -200,7 +202,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	}
 
 	// when
-	err := RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", NewLogger(io.Discard, false))
+	err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -220,8 +222,8 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
 	// given: a pre-existing stale output file from a previous discuss round
 	scanDir := t.TempDir()
-	wave := Wave{ID: "auth-w1", ClusterName: "Auth", Title: "Test"}
-	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
+	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth", Title: "Test"}
+	outputFile := filepath.Join(scanDir, sightjack.ArchitectDiscussFileName(wave))
 	if err := os.WriteFile(outputFile, []byte(`{"analysis":"stale","modified_wave":null,"reasoning":"old"}`), 0644); err != nil {
 		t.Fatalf("write test file: %v", err)
 	}
@@ -231,8 +233,8 @@ func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
 		t.Fatal("precondition: stale file should exist")
 	}
 
-	// then: clearArchitectOutput removes it
-	clearArchitectOutput(scanDir, wave)
+	// then: ClearArchitectOutput removes it
+	sightjack.ClearArchitectOutput(scanDir, wave)
 
 	if _, err := os.Stat(outputFile); !os.IsNotExist(err) {
 		t.Error("expected stale output file to be removed")

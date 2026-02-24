@@ -8,18 +8,18 @@ import (
 	"path/filepath"
 )
 
-const stateDir = ".siren"
+const StateDir = ".siren"
 const stateFile = "state.json"
 const configFile = "config.yaml"
 
 // StatePath returns the path to the state file within the given base directory.
 func StatePath(baseDir string) string {
-	return filepath.Join(baseDir, stateDir, stateFile)
+	return filepath.Join(baseDir, StateDir, stateFile)
 }
 
 // ConfigPath returns the path to the config file within .siren/.
 func ConfigPath(baseDir string) string {
-	return filepath.Join(baseDir, stateDir, configFile)
+	return filepath.Join(baseDir, StateDir, configFile)
 }
 
 // WriteGitIgnore writes a .gitignore inside .siren/ that excludes ephemeral
@@ -27,18 +27,18 @@ func ConfigPath(baseDir string) string {
 // The write is idempotent — the file is always overwritten with the canonical content.
 func WriteGitIgnore(baseDir string) error {
 	content := "state.json\n.run/\ninbox/\noutbox/\n"
-	path := filepath.Join(baseDir, stateDir, ".gitignore")
+	path := filepath.Join(baseDir, StateDir, ".gitignore")
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
 // ScanDir returns the path to the scan directory for a given session.
 func ScanDir(baseDir, sessionID string) string {
-	return filepath.Join(baseDir, stateDir, ".run", sessionID)
+	return filepath.Join(baseDir, StateDir, ".run", sessionID)
 }
 
 // WriteState persists the session state as JSON to .siren/state.json.
 func WriteState(baseDir string, state *SessionState) error {
-	dir := filepath.Join(baseDir, stateDir)
+	dir := filepath.Join(baseDir, StateDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("create state dir: %w", err)
 	}

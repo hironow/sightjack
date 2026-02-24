@@ -116,7 +116,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 			Issues:       []IssueDetail{{ID: "SAMPLE-1", Identifier: "SAMPLE-1", Title: "Sample issue", Completeness: 0.5}},
 			Observations: []string{"sample observation for dry-run"},
 		}}
-		if _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
+		if _, _, _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
 			return fmt.Errorf("wave generate dry-run: %w", err)
 		}
 		// Also generate architect discuss prompt for dry-run
@@ -163,10 +163,12 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	}
 
 	// --- Pass 3: Wave Generate ---
-	waves, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
 	}
+	// waveWarnings are already logged by RunParallel; just propagate.
+	_ = waveWarnings
 
 	logger.OK("%d clusters, %d waves generated", len(scanResult.Clusters), len(waves))
 
@@ -733,11 +735,24 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to cache scan result: %v", err)
 	}
-	waves, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, rescanWarnings, failedNames, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
 	}
-	oldCompleted := BuildCompletedWaveMap(RestoreWaves(oldState.Waves))
+	// rescanWarnings are already logged by RunParallel; just propagate.
+	_ = rescanWarnings
+
+	// Carry forward old waves whose clusters failed regeneration so that
+	// completed progress is never lost on transient partial failures.
+	// Only carry forward clusters still present in the current scan;
+	// clusters removed by the scan are intentionally dropped.
+	scannedClusters := make(map[string]bool, len(scanResult.Clusters))
+	for _, c := range scanResult.Clusters {
+		scannedClusters[c.Name] = true
+	}
+	oldWaves := RestoreWaves(oldState.Waves)
+	waves = mergeOldWaves(oldWaves, waves, scannedClusters, failedNames)
+	oldCompleted := BuildCompletedWaveMap(oldWaves)
 	waves = MergeCompletedStatus(oldCompleted, waves)
 	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
 	completed := BuildCompletedWaveMap(waves)
@@ -858,6 +873,40 @@ func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 		}
 	}
 	return completed
+}
+
+// mergeOldWaves carries forward waves from clusters that failed wave
+// generation but are still present in the current scan. Old waves whose
+// cluster was removed from the scan (resolved issues, reorganized clusters)
+// are dropped so stale work items do not persist.
+//
+// failedClusterNames is the set of cluster names where at least one instance
+// failed generation (from detectFailedClusterNames). With duplicate cluster
+// names, a name marked as failed causes ALL old waves with that name to be
+// carried forward — safe over-inclusion to avoid progress loss. Old waves
+// whose WaveKey already exists in newWaves are skipped to prevent duplicates.
+func mergeOldWaves(oldWaves, newWaves []Wave, scannedClusters, failedClusterNames map[string]bool) []Wave {
+	regenerated := make(map[string]bool, len(newWaves))
+	newKeys := make(map[string]bool, len(newWaves))
+	for _, w := range newWaves {
+		regenerated[w.ClusterName] = true
+		newKeys[WaveKey(w)] = true
+	}
+	merged := make([]Wave, 0, len(newWaves)+len(oldWaves))
+	merged = append(merged, newWaves...)
+	for _, w := range oldWaves {
+		inScan := scannedClusters[w.ClusterName]
+		noRegeneration := !regenerated[w.ClusterName]
+		partialFailure := failedClusterNames[w.ClusterName]
+		// Carry forward if cluster is still in scan AND either:
+		// - no waves were regenerated for this name (complete failure), OR
+		// - at least one instance with this name failed (handles duplicates)
+		// Skip waves whose WaveKey already exists in newWaves to avoid duplicates.
+		if inScan && (noRegeneration || partialFailure) && !newKeys[WaveKey(w)] {
+			merged = append(merged, w)
+		}
+	}
+	return merged
 }
 
 // MergeCompletedStatus preserves completed status from a previous session
@@ -999,7 +1048,7 @@ func RecoverLatestState(baseDir string, logger *Logger) (*SessionState, error) {
 	var sessionIDs []string
 	seen := map[string]bool{}
 	for _, parent := range []string{
-		filepath.Join(baseDir, stateDir, ".run"),
+		filepath.Join(baseDir, StateDir, ".run"),
 	} {
 		entries, err := os.ReadDir(parent)
 		if err != nil {
@@ -1023,7 +1072,7 @@ func RecoverLatestState(baseDir string, logger *Logger) (*SessionState, error) {
 			return state, nil
 		}
 	}
-	return nil, fmt.Errorf("no recoverable session data in %s", filepath.Join(baseDir, stateDir))
+	return nil, fmt.Errorf("no recoverable session data in %s", filepath.Join(baseDir, StateDir))
 }
 
 // CompletedWavesForCluster returns all completed waves for the given cluster.

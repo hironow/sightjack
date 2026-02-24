@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"fmt"
@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestNextgenFileName(t *testing.T) {
-	wave := Wave{ClusterName: "Auth", ID: "auth-w2"}
-	got := nextgenFileName(wave)
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w2"}
+	got := sightjack.NextgenFileName(wave)
 	want := "nextgen_auth_auth-w2.json"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -20,12 +22,12 @@ func TestNextgenFileName(t *testing.T) {
 
 func TestClearNextgenOutput_RemovesFile(t *testing.T) {
 	dir := t.TempDir()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	path := filepath.Join(dir, nextgenFileName(wave))
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	path := filepath.Join(dir, sightjack.NextgenFileName(wave))
 	if err := os.WriteFile(path, []byte("old"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	clearNextgenOutput(dir, wave)
+	sightjack.ClearNextgenOutput(dir, wave)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Error("file should have been removed")
 	}
@@ -33,8 +35,8 @@ func TestClearNextgenOutput_RemovesFile(t *testing.T) {
 
 func TestClearNextgenOutput_NoopIfMissing(t *testing.T) {
 	dir := t.TempDir()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	clearNextgenOutput(dir, wave) // should not panic
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	sightjack.ClearNextgenOutput(dir, wave) // should not panic
 }
 
 func TestParseNextGenResult_Valid(t *testing.T) {
@@ -44,7 +46,7 @@ func TestParseNextGenResult_Valid(t *testing.T) {
 	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
 		t.Fatal(err)
 	}
-	result, err := ParseNextGenResult(path)
+	result, err := sightjack.ParseNextGenResult(path)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -66,7 +68,7 @@ func TestParseNextGenResult_EmptyWaves(t *testing.T) {
 	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
 		t.Fatal(err)
 	}
-	result, err := ParseNextGenResult(path)
+	result, err := sightjack.ParseNextGenResult(path)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -81,7 +83,7 @@ func TestParseNextGenResult_MalformedJSON(t *testing.T) {
 	if err := os.WriteFile(path, []byte("{bad json"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := ParseNextGenResult(path)
+	_, err := sightjack.ParseNextGenResult(path)
 	if err == nil {
 		t.Fatal("expected error for malformed JSON")
 	}
@@ -91,7 +93,7 @@ func TestParseNextGenResult_MalformedJSON(t *testing.T) {
 }
 
 func TestParseNextGenResult_MissingFile(t *testing.T) {
-	_, err := ParseNextGenResult("/nonexistent/file.json")
+	_, err := sightjack.ParseNextGenResult("/nonexistent/file.json")
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
@@ -103,23 +105,23 @@ func TestBuildNextGenPrompt_WithDoDTemplates(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := DefaultConfig()
-	cfg.DoDTemplates = map[string]DoDTemplate{
+	cfg := sightjack.DefaultConfig()
+	cfg.DoDTemplates = map[string]sightjack.DoDTemplate{
 		"Auth": {Must: []string{"Unit tests required"}, Should: []string{"Integration tests"}},
 	}
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := ClusterScanResult{
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
+	prompt, err := sightjack.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
 
 	// then
 	if err != nil {
-		t.Fatalf("buildNextGenPrompt: %v", err)
+		t.Fatalf("BuildNextGenPrompt: %v", err)
 	}
 	if !strings.Contains(prompt, "Unit tests required") {
 		t.Error("expected DoD Must item in prompt")
@@ -135,23 +137,23 @@ func TestBuildNextGenPrompt_WithRejectedActions(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := DefaultConfig()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := ClusterScanResult{
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
-	rejected := []WaveAction{
+	rejected := []sightjack.WaveAction{
 		{Type: "add_dod", IssueID: "ENG-101", Description: "Rejected DoD"},
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected, "fog", nil)
+	prompt, err := sightjack.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected, "fog", nil)
 
 	// then
 	if err != nil {
-		t.Fatalf("buildNextGenPrompt: %v", err)
+		t.Fatalf("BuildNextGenPrompt: %v", err)
 	}
 	if !strings.Contains(prompt, "Rejected DoD") {
 		t.Error("expected rejected action description in prompt")
@@ -167,20 +169,20 @@ func TestBuildNextGenPrompt_NilOptionals(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := DefaultConfig()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := ClusterScanResult{
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.5,
-		Issues:       []IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
 	}
 
 	// when: nil DoD, nil ADRs, nil rejected, nil completedWaves
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
+	prompt, err := sightjack.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
 
 	// then: should not panic and should produce valid prompt
 	if err != nil {
-		t.Fatalf("buildNextGenPrompt: %v", err)
+		t.Fatalf("BuildNextGenPrompt: %v", err)
 	}
 	if !strings.Contains(prompt, "Auth") {
 		t.Error("expected cluster name in prompt")
@@ -196,23 +198,23 @@ func TestBuildNextGenPrompt_WithExistingADRs(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := DefaultConfig()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := ClusterScanResult{
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
-	adrs := []ExistingADR{
+	adrs := []sightjack.ExistingADR{
 		{Filename: "0001-use-jwt.md", Content: "We chose JWT for auth tokens."},
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil, "fog", nil)
+	prompt, err := sightjack.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil, "fog", nil)
 
 	// then
 	if err != nil {
-		t.Fatalf("buildNextGenPrompt: %v", err)
+		t.Fatalf("BuildNextGenPrompt: %v", err)
 	}
 	if !strings.Contains(prompt, "0001-use-jwt.md") {
 		t.Error("expected ADR filename in prompt")
@@ -228,23 +230,23 @@ func TestBuildNextGenPrompt_WithFeedback(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := DefaultConfig()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := ClusterScanResult{
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
-	feedback := []*DMail{
-		{Name: "fb-arch-001", Kind: DMailFeedback, Description: "Architecture drift in auth module", Severity: "high", Body: "Token rotation not aligned with JWT spec."},
+	feedback := []*sightjack.DMail{
+		{Name: "fb-arch-001", Kind: sightjack.DMailFeedback, Description: "Architecture drift in auth module", Severity: "high", Body: "Token rotation not aligned with JWT spec."},
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", feedback)
+	prompt, err := sightjack.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", feedback)
 
 	// then
 	if err != nil {
-		t.Fatalf("buildNextGenPrompt: %v", err)
+		t.Fatalf("BuildNextGenPrompt: %v", err)
 	}
 	if !strings.Contains(prompt, "fb-arch-001") {
 		t.Error("expected feedback name in prompt")
@@ -266,20 +268,20 @@ func TestBuildNextGenPrompt_NilFeedback(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := DefaultConfig()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := ClusterScanResult{
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.5,
-		Issues:       []IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
 	}
 
 	// when
-	prompt, err := buildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
+	prompt, err := sightjack.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
 
 	// then
 	if err != nil {
-		t.Fatalf("buildNextGenPrompt: %v", err)
+		t.Fatalf("BuildNextGenPrompt: %v", err)
 	}
 	if strings.Contains(prompt, "受信フィードバック") || strings.Contains(prompt, "Received Feedback") {
 		t.Error("feedback section should be omitted when nil")
@@ -288,13 +290,13 @@ func TestBuildNextGenPrompt_NilFeedback(t *testing.T) {
 
 func TestNeedsMoreWaves_HighCompleteness_False(t *testing.T) {
 	// given: cluster completeness >= 0.95
-	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.96}
-	waves := []Wave{
+	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.96}
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 	}
 
 	// when
-	result := NeedsMoreWaves(cluster, waves)
+	result := sightjack.NeedsMoreWaves(cluster, waves)
 
 	// then
 	if result {
@@ -304,14 +306,14 @@ func TestNeedsMoreWaves_HighCompleteness_False(t *testing.T) {
 
 func TestNeedsMoreWaves_RemainingWaves_False(t *testing.T) {
 	// given: available waves still exist
-	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.5}
-	waves := []Wave{
+	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "auth-w2", ClusterName: "Auth", Status: "available"},
 	}
 
 	// when
-	result := NeedsMoreWaves(cluster, waves)
+	result := sightjack.NeedsMoreWaves(cluster, waves)
 
 	// then
 	if result {
@@ -321,10 +323,10 @@ func TestNeedsMoreWaves_RemainingWaves_False(t *testing.T) {
 
 func TestNeedsMoreWaves_WaveCapReached_False(t *testing.T) {
 	// given: 8 waves already exist for this cluster
-	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.6}
-	var waves []Wave
+	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.6}
+	var waves []sightjack.Wave
 	for i := range 8 {
-		waves = append(waves, Wave{
+		waves = append(waves, sightjack.Wave{
 			ID:          fmt.Sprintf("auth-w%d", i+1),
 			ClusterName: "Auth",
 			Status:      "completed",
@@ -332,7 +334,7 @@ func TestNeedsMoreWaves_WaveCapReached_False(t *testing.T) {
 	}
 
 	// when
-	result := NeedsMoreWaves(cluster, waves)
+	result := sightjack.NeedsMoreWaves(cluster, waves)
 
 	// then
 	if result {
@@ -342,13 +344,13 @@ func TestNeedsMoreWaves_WaveCapReached_False(t *testing.T) {
 
 func TestNeedsMoreWaves_LowCompleteness_NoRemaining_True(t *testing.T) {
 	// given: low completeness, all waves completed, under cap
-	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.5}
-	waves := []Wave{
+	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 	}
 
 	// when
-	result := NeedsMoreWaves(cluster, waves)
+	result := sightjack.NeedsMoreWaves(cluster, waves)
 
 	// then
 	if !result {
@@ -358,14 +360,14 @@ func TestNeedsMoreWaves_LowCompleteness_NoRemaining_True(t *testing.T) {
 
 func TestNeedsMoreWaves_IgnoresOtherClusterWaves(t *testing.T) {
 	// given: waves from other clusters should not affect count
-	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.5}
-	waves := []Wave{
+	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "infra-w1", ClusterName: "Infra", Status: "available"},
 	}
 
 	// when
-	result := NeedsMoreWaves(cluster, waves)
+	result := sightjack.NeedsMoreWaves(cluster, waves)
 
 	// then
 	if !result {
@@ -375,13 +377,13 @@ func TestNeedsMoreWaves_IgnoresOtherClusterWaves(t *testing.T) {
 
 func TestNeedsMoreWaves_PartialWaveIsPending(t *testing.T) {
 	// given: only wave is "partial" (failed apply), no other available/locked
-	cluster := ClusterScanResult{Name: "Auth", Completeness: 0.4}
-	waves := []Wave{
+	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.4}
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "partial"},
 	}
 
 	// when
-	result := NeedsMoreWaves(cluster, waves)
+	result := sightjack.NeedsMoreWaves(cluster, waves)
 
 	// then: partial wave = unfinished work, should NOT trigger nextgen
 	if result {
@@ -396,16 +398,16 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := DefaultConfig()
-	wave := Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := ClusterScanResult{
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
 	}
-	completedWaves := []Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
+	completedWaves := []sightjack.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
 
-	err := GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, NewLogger(io.Discard, false))
+	err := sightjack.GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, sightjack.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}

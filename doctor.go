@@ -41,8 +41,8 @@ func (s CheckStatus) StatusLabel() string {
 	}
 }
 
-// checkConfig validates that the config file exists and can be loaded.
-func checkConfig(configPath string) CheckResult {
+// CheckConfig validates that the config file exists and can be loaded.
+func CheckConfig(configPath string) CheckResult {
 	_, err := LoadConfig(configPath)
 	if err != nil {
 		return CheckResult{
@@ -58,9 +58,9 @@ func checkConfig(configPath string) CheckResult {
 	}
 }
 
-// checkTool verifies that a CLI tool is installed and executable.
+// CheckTool verifies that a CLI tool is installed and executable.
 // It runs `<tool> --version` to confirm functionality.
-func checkTool(ctx context.Context, name string) CheckResult {
+func CheckTool(ctx context.Context, name string) CheckResult {
 	path, err := exec.LookPath(name)
 	if err != nil {
 		return CheckResult{
@@ -87,10 +87,10 @@ func checkTool(ctx context.Context, name string) CheckResult {
 	}
 }
 
-// checkClaudeAuth verifies that Claude Code is authenticated by sending a
+// CheckClaudeAuth verifies that Claude Code is authenticated by sending a
 // simple prompt that does not require any MCP server.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func checkClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
+func CheckClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
 	if cfg == nil {
 		return CheckResult{
 			Name:    "Claude Auth",
@@ -124,10 +124,10 @@ func checkClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResu
 	}
 }
 
-// checkLinearMCP verifies Linear MCP connectivity by sending a prompt that
+// CheckLinearMCP verifies Linear MCP connectivity by sending a prompt that
 // references the configured Linear team.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func checkLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
+func CheckLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
 	if cfg == nil {
 		return CheckResult{
 			Name:    "Linear MCP",
@@ -154,10 +154,10 @@ func checkLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResul
 	}
 }
 
-// checkStateDir verifies that the .siren/ state directory exists or can be
+// CheckStateDir verifies that the .siren/ state directory exists or can be
 // created, and that it is writable. Uses a temporary file probe to confirm.
-func checkStateDir(baseDir string) CheckResult {
-	dir := filepath.Join(baseDir, stateDir)
+func CheckStateDir(baseDir string) CheckResult {
+	dir := filepath.Join(baseDir, StateDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return CheckResult{
 			Name:    "State Dir",
@@ -173,7 +173,7 @@ func checkStateDir(baseDir string) CheckResult {
 			Message: fmt.Sprintf("%s is not writable: %v", dir, err),
 		}
 	}
-	os.Remove(probe)
+	_ = os.Remove(probe)
 	return CheckResult{
 		Name:    "State Dir",
 		Status:  CheckOK,
@@ -181,11 +181,11 @@ func checkStateDir(baseDir string) CheckResult {
 	}
 }
 
-// checkSkills verifies that SKILL.md files exist under .siren/skills/
+// CheckSkills verifies that SKILL.md files exist under .siren/skills/
 // and that their frontmatter contains a dmail-schema-version field.
-func checkSkills(baseDir string) CheckResult {
+func CheckSkills(baseDir string) CheckResult {
 	skillNames := []string{"dmail-sendable", "dmail-readable"}
-	skillsDir := filepath.Join(baseDir, stateDir, "skills")
+	skillsDir := filepath.Join(baseDir, StateDir, "skills")
 
 	for _, name := range skillNames {
 		path := filepath.Join(skillsDir, name, "SKILL.md")
@@ -225,11 +225,11 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *L
 	var results []CheckResult
 
 	// 1. Config check
-	cfgResult := checkConfig(configPath)
+	cfgResult := CheckConfig(configPath)
 	results = append(results, cfgResult)
 
 	// 2. State directory check
-	results = append(results, checkStateDir(baseDir))
+	results = append(results, CheckStateDir(baseDir))
 
 	var cfg *Config
 	if cfgResult.Status == CheckOK {
@@ -242,14 +242,14 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *L
 	if cfg != nil && cfg.Claude.Command != "" {
 		claudeName = cfg.Claude.Command
 	}
-	claudeResult := checkTool(ctx, claudeName)
+	claudeResult := CheckTool(ctx, claudeName)
 	results = append(results, claudeResult)
 
 	// 4. git binary check
-	results = append(results, checkTool(ctx, "git"))
+	results = append(results, CheckTool(ctx, "git"))
 
 	// 5. Skills check
-	results = append(results, checkSkills(baseDir))
+	results = append(results, CheckSkills(baseDir))
 
 	// 6. Claude Auth check (skip if claude binary unavailable)
 	skipClaude := claudeResult.Status != CheckOK
@@ -260,7 +260,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *L
 			Message: "skipped (claude not available)",
 		})
 	} else {
-		authResult := checkClaudeAuth(ctx, cfg, logger)
+		authResult := CheckClaudeAuth(ctx, cfg, logger)
 		results = append(results, authResult)
 		if authResult.Status != CheckOK {
 			skipClaude = true
@@ -275,7 +275,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *L
 			Message: "skipped (claude not available)",
 		})
 	} else {
-		results = append(results, checkLinearMCP(ctx, cfg, logger))
+		results = append(results, CheckLinearMCP(ctx, cfg, logger))
 	}
 
 	return results

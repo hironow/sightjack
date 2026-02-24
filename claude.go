@@ -96,7 +96,7 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer,
 			n, readErr := reader.Read(buf)
 			if n > 0 {
 				chunk := buf[:n]
-				w.Write(chunk)
+				_, _ = w.Write(chunk)
 				output.Write(chunk)
 			}
 			if readErr != nil {

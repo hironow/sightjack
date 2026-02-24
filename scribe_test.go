@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"io"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestNextADRNumber_EmptyDir(t *testing.T) {
@@ -13,7 +15,7 @@ func TestNextADRNumber_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	num, err := NextADRNumber(dir)
+	num, err := sightjack.NextADRNumber(dir)
 
 	// then
 	if err != nil {
@@ -31,7 +33,7 @@ func TestNextADRNumber_WithGaps(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "0003-bar.md"), []byte(""), 0644)
 
 	// when
-	num, err := NextADRNumber(dir)
+	num, err := sightjack.NextADRNumber(dir)
 
 	// then
 	if err != nil {
@@ -47,7 +49,7 @@ func TestNextADRNumber_DirNotExist(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nonexistent")
 
 	// when
-	num, err := NextADRNumber(dir)
+	num, err := sightjack.NextADRNumber(dir)
 
 	// then
 	if err != nil {
@@ -67,7 +69,7 @@ func TestNextADRNumber_IgnoresNonMatchingFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "invalid-name.md"), []byte(""), 0644)
 
 	// when
-	num, err := NextADRNumber(dir)
+	num, err := sightjack.NextADRNumber(dir)
 
 	// then
 	if err != nil {
@@ -80,10 +82,10 @@ func TestNextADRNumber_IgnoresNonMatchingFiles(t *testing.T) {
 
 func TestScribeFileName(t *testing.T) {
 	// given
-	wave := Wave{ID: "auth-w1", ClusterName: "Auth"}
+	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
 
 	// when
-	name := scribeFileName(wave)
+	name := sightjack.ScribeFileName(wave)
 
 	// then
 	if name != "scribe_auth_auth-w1.json" {
@@ -93,10 +95,10 @@ func TestScribeFileName(t *testing.T) {
 
 func TestScribeFileName_SpecialChars(t *testing.T) {
 	// given
-	wave := Wave{ID: "w-1", ClusterName: "UI/Frontend"}
+	wave := sightjack.Wave{ID: "w-1", ClusterName: "UI/Frontend"}
 
 	// when
-	name := scribeFileName(wave)
+	name := sightjack.ScribeFileName(wave)
 
 	// then
 	if name != "scribe_ui_frontend_w-1.json" {
@@ -107,12 +109,12 @@ func TestScribeFileName_SpecialChars(t *testing.T) {
 func TestClearScribeOutput_RemovesExisting(t *testing.T) {
 	// given
 	scanDir := t.TempDir()
-	wave := Wave{ID: "auth-w1", ClusterName: "Auth"}
-	outputFile := filepath.Join(scanDir, scribeFileName(wave))
+	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
+	outputFile := filepath.Join(scanDir, sightjack.ScribeFileName(wave))
 	os.WriteFile(outputFile, []byte(`{"adr_id":"0001"}`), 0644)
 
 	// when
-	clearScribeOutput(scanDir, wave)
+	sightjack.ClearScribeOutput(scanDir, wave)
 
 	// then
 	if _, err := os.Stat(outputFile); !os.IsNotExist(err) {
@@ -123,33 +125,33 @@ func TestClearScribeOutput_RemovesExisting(t *testing.T) {
 func TestClearScribeOutput_NoOpIfMissing(t *testing.T) {
 	// given: no file exists
 	scanDir := t.TempDir()
-	wave := Wave{ID: "auth-w1", ClusterName: "Auth"}
+	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
 
 	// when: should not panic or error
-	clearScribeOutput(scanDir, wave)
+	sightjack.ClearScribeOutput(scanDir, wave)
 }
 
 func TestRunScribeADRDryRun(t *testing.T) {
 	// given
 	scanDir := t.TempDir()
 	adrDir := filepath.Join(t.TempDir(), "adr")
-	cfg := &Config{
+	cfg := &sightjack.Config{
 		Lang:   "en",
-		Claude: ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
 	}
-	wave := Wave{
+	wave := sightjack.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
-		Actions:     []WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Actions:     []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
 	}
-	architectResp := &ArchitectResponse{
+	architectResp := &sightjack.ArchitectResponse{
 		Analysis:  "Splitting recommended.",
 		Reasoning: "Scale favors smaller batches.",
 	}
 
 	// when
-	err := RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog", NewLogger(io.Discard, false))
+	err := sightjack.RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog", sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -169,7 +171,7 @@ func TestParseScribeResult_Valid(t *testing.T) {
 	os.WriteFile(path, []byte(data), 0644)
 
 	// when
-	result, err := ParseScribeResult(path)
+	result, err := sightjack.ParseScribeResult(path)
 
 	// then
 	if err != nil {
@@ -193,7 +195,7 @@ func TestParseScribeResult_MalformedJSON(t *testing.T) {
 	os.WriteFile(path, []byte(`{"adr_id": "truncated`), 0644)
 
 	// when
-	_, err := ParseScribeResult(path)
+	_, err := sightjack.ParseScribeResult(path)
 
 	// then
 	if err == nil {
@@ -206,7 +208,7 @@ func TestParseScribeResult_MalformedJSON(t *testing.T) {
 
 func TestParseScribeResult_FileNotFound(t *testing.T) {
 	// when
-	_, err := ParseScribeResult("/nonexistent/path.json")
+	_, err := sightjack.ParseScribeResult("/nonexistent/path.json")
 
 	// then
 	if err == nil {
@@ -219,7 +221,7 @@ func TestSanitizeADRTitle_Normal(t *testing.T) {
 	title := "adopt-event-sourcing"
 
 	// when
-	result := sanitizeADRTitle(title)
+	result := sightjack.SanitizeADRTitle(title)
 
 	// then
 	if result != "adopt-event-sourcing" {
@@ -232,7 +234,7 @@ func TestSanitizeADRTitle_PathTraversal(t *testing.T) {
 	title := "../../../etc/passwd"
 
 	// when
-	result := sanitizeADRTitle(title)
+	result := sightjack.SanitizeADRTitle(title)
 
 	// then: should not contain path separators or ..
 	if strings.Contains(result, "/") || strings.Contains(result, "..") {
@@ -245,7 +247,7 @@ func TestSanitizeADRTitle_SpecialChars(t *testing.T) {
 	title := "Use FastAPI for API Layer!"
 
 	// when
-	result := sanitizeADRTitle(title)
+	result := sightjack.SanitizeADRTitle(title)
 
 	// then: should only contain safe chars
 	for _, r := range result {
@@ -260,7 +262,7 @@ func TestSanitizeADRTitle_Empty(t *testing.T) {
 	title := ""
 
 	// when
-	result := sanitizeADRTitle(title)
+	result := sightjack.SanitizeADRTitle(title)
 
 	// then: should return fallback
 	if result != "untitled" {
@@ -273,7 +275,7 @@ func TestCountADRFiles_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	count := CountADRFiles(dir)
+	count := sightjack.CountADRFiles(dir)
 
 	// then
 	if count != 0 {
@@ -289,7 +291,7 @@ func TestCountADRFiles_WithMatchingAndNonMatching(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "README.md"), []byte(""), 0644)
 
 	// when
-	count := CountADRFiles(dir)
+	count := sightjack.CountADRFiles(dir)
 
 	// then: only 2 files match NNNN-*.md pattern
 	if count != 2 {
@@ -302,7 +304,7 @@ func TestCountADRFiles_NonexistentDir(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nonexistent")
 
 	// when
-	count := CountADRFiles(dir)
+	count := sightjack.CountADRFiles(dir)
 
 	// then
 	if count != 0 {
@@ -315,7 +317,7 @@ func TestReadExistingADRs_Empty(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	adrs, err := ReadExistingADRs(dir)
+	adrs, err := sightjack.ReadExistingADRs(dir)
 
 	// then
 	if err != nil {
@@ -334,7 +336,7 @@ func TestReadExistingADRs_ReturnsContent(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "README.md"), []byte("ignore this"), 0644) // non-ADR file
 
 	// when
-	adrs, err := ReadExistingADRs(dir)
+	adrs, err := sightjack.ReadExistingADRs(dir)
 
 	// then
 	if err != nil {
@@ -353,7 +355,7 @@ func TestReadExistingADRs_ReturnsContent(t *testing.T) {
 
 func TestReadExistingADRs_DirNotExist(t *testing.T) {
 	// when
-	adrs, err := ReadExistingADRs("/nonexistent/dir")
+	adrs, err := sightjack.ReadExistingADRs("/nonexistent/dir")
 
 	// then
 	if err != nil {
@@ -376,7 +378,7 @@ func TestReadExistingADRs_UnreadableFile_ReturnsError(t *testing.T) {
 	os.WriteFile(unreadable, []byte("secret"), 0000)
 
 	// when
-	_, err := ReadExistingADRs(dir)
+	_, err := sightjack.ReadExistingADRs(dir)
 
 	// then: should return error, not silently skip
 	if err == nil {
@@ -396,15 +398,15 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 	os.MkdirAll(adrDir, 0755)
 	os.WriteFile(filepath.Join(adrDir, "0001-auth.md"), []byte("# Auth ADR"), 0644)
 
-	cfg := &Config{
+	cfg := &sightjack.Config{
 		Lang:   "en",
-		Claude: ClaudeConfig{Command: "echo", TimeoutSec: 10},
+		Claude: sightjack.ClaudeConfig{Command: "echo", TimeoutSec: 10},
 	}
-	wave := Wave{ID: "w1", ClusterName: "Auth", Title: "Test"}
-	resp := &ArchitectResponse{Analysis: "test", Reasoning: "test"}
+	wave := sightjack.Wave{ID: "w1", ClusterName: "Auth", Title: "Test"}
+	resp := &sightjack.ArchitectResponse{Analysis: "test", Reasoning: "test"}
 
 	// when
-	err := RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog", NewLogger(io.Discard, false))
+	err := sightjack.RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog", sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -422,10 +424,10 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 
 func TestNormalizeScribeResult_MatchingID(t *testing.T) {
 	// given: Claude returned matching adr_id
-	result := &ScribeResponse{ADRID: "0003", Title: "test"}
+	result := &sightjack.ScribeResponse{ADRID: "0003", Title: "test"}
 
 	// when
-	normalizeScribeResult(result, "0003", NewLogger(io.Discard, false))
+	sightjack.NormalizeScribeResult(result, "0003", sightjack.NewLogger(io.Discard, false))
 
 	// then: no change
 	if result.ADRID != "0003" {
@@ -435,10 +437,10 @@ func TestNormalizeScribeResult_MatchingID(t *testing.T) {
 
 func TestNormalizeScribeResult_MismatchID(t *testing.T) {
 	// given: Claude returned wrong adr_id
-	result := &ScribeResponse{ADRID: "9999", Title: "test"}
+	result := &sightjack.ScribeResponse{ADRID: "9999", Title: "test"}
 
 	// when
-	normalizeScribeResult(result, "0003", NewLogger(io.Discard, false))
+	sightjack.NormalizeScribeResult(result, "0003", sightjack.NewLogger(io.Discard, false))
 
 	// then: overwritten with authoritative ID
 	if result.ADRID != "0003" {
@@ -448,10 +450,10 @@ func TestNormalizeScribeResult_MismatchID(t *testing.T) {
 
 func TestNormalizeScribeResult_EmptyID(t *testing.T) {
 	// given: Claude returned empty adr_id
-	result := &ScribeResponse{ADRID: "", Title: "test"}
+	result := &sightjack.ScribeResponse{ADRID: "", Title: "test"}
 
 	// when
-	normalizeScribeResult(result, "0003", NewLogger(io.Discard, false))
+	sightjack.NormalizeScribeResult(result, "0003", sightjack.NewLogger(io.Discard, false))
 
 	// then: filled with authoritative ID
 	if result.ADRID != "0003" {
@@ -461,7 +463,7 @@ func TestNormalizeScribeResult_EmptyID(t *testing.T) {
 
 func TestRenderADRFromDiscuss_Basic(t *testing.T) {
 	// given
-	dr := DiscussResult{
+	dr := sightjack.DiscussResult{
 		WaveID:    "auth-w1",
 		Analysis:  "JWT has trade-offs",
 		Reasoning: "Session-based auth is simpler",
@@ -471,7 +473,7 @@ func TestRenderADRFromDiscuss_Basic(t *testing.T) {
 	}
 
 	// when
-	md := RenderADRFromDiscuss(dr, 42)
+	md := sightjack.RenderADRFromDiscuss(dr, 42)
 
 	// then
 	if !strings.Contains(md, "# 0042.") {
@@ -493,14 +495,14 @@ func TestRenderADRFromDiscuss_Basic(t *testing.T) {
 
 func TestRenderADRFromDiscuss_UsesWaveIDWhenNoTitle(t *testing.T) {
 	// given
-	dr := DiscussResult{
+	dr := sightjack.DiscussResult{
 		WaveID:   "auth-w1",
 		Analysis: "ok",
 		Decision: "proceed",
 	}
 
 	// when
-	md := RenderADRFromDiscuss(dr, 1)
+	md := sightjack.RenderADRFromDiscuss(dr, 1)
 
 	// then
 	if !strings.Contains(md, "auth-w1") {
@@ -510,17 +512,17 @@ func TestRenderADRFromDiscuss_UsesWaveIDWhenNoTitle(t *testing.T) {
 
 func TestRenderADRFromDiscuss_WithModifications(t *testing.T) {
 	// given
-	dr := DiscussResult{
+	dr := sightjack.DiscussResult{
 		WaveID:   "w1",
 		Analysis: "changed approach",
 		Decision: "use Redis",
-		Modifications: []WaveModification{
+		Modifications: []sightjack.WaveModification{
 			{ActionIndex: 0, Change: "Added Redis dependency"},
 		},
 	}
 
 	// when
-	md := RenderADRFromDiscuss(dr, 5)
+	md := sightjack.RenderADRFromDiscuss(dr, 5)
 
 	// then
 	if !strings.Contains(md, "Redis dependency") {
