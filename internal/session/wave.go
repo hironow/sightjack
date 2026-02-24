@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -42,53 +43,6 @@ func ParseWaveApplyResult(path string) (*sightjack.WaveApplyResult, error) {
 	return &result, nil
 }
 
-// WaveKey returns a globally unique key for a wave: "ClusterName:ID".
-func WaveKey(w sightjack.Wave) string {
-	return w.ClusterName + ":" + w.ID
-}
-
-// NormalizeWavePrerequisites prefixes bare prerequisite IDs with the wave's own
-// cluster name so that all keys in the completed map use the composite format.
-// Prerequisites that already contain ":" are left unchanged.
-func NormalizeWavePrerequisites(waves []sightjack.Wave) []sightjack.Wave {
-	result := make([]sightjack.Wave, len(waves))
-	copy(result, waves)
-	for i, w := range result {
-		normalized := make([]string, len(w.Prerequisites))
-		for j, p := range w.Prerequisites {
-			if strings.Contains(p, ":") {
-				normalized[j] = p
-			} else {
-				normalized[j] = w.ClusterName + ":" + p
-			}
-		}
-		result[i].Prerequisites = normalized
-	}
-	return result
-}
-
-// MergeWaveResults flattens multiple per-cluster wave results into a single wave list,
-// normalizing prerequisite IDs to the composite "ClusterName:ID" format.
-func MergeWaveResults(results []sightjack.WaveGenerateResult) []sightjack.Wave {
-	var all []sightjack.Wave
-	for _, r := range results {
-		all = append(all, r.Waves...)
-	}
-	return NormalizeWavePrerequisites(all)
-}
-
-// AvailableWaves returns waves that have "available" status and are not completed.
-// The completed map is keyed by WaveKey (ClusterName:ID).
-func AvailableWaves(waves []sightjack.Wave, completed map[string]bool) []sightjack.Wave {
-	var available []sightjack.Wave
-	for _, w := range waves {
-		if w.Status == "available" && !completed[WaveKey(w)] {
-			available = append(available, w)
-		}
-	}
-	return available
-}
-
 // ToApplyResult converts the internal sightjack.WaveApplyResult to the pipe wire format sightjack.ApplyResult.
 // It builds per-action results from the wave's actions and the internal result's error list.
 func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sightjack.ApplyResult {
@@ -114,8 +68,6 @@ func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sig
 	}
 
 	// Interpolate completeness based on the ratio of successfully applied actions.
-	// All success → Delta.After, all failure → Delta.Before, partial → linear interpolation.
-	// Zero actions → Delta.Before (nothing accomplished).
 	total := len(wave.Actions)
 	var completeness float64
 	if total == 0 {
@@ -127,9 +79,6 @@ func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sig
 		completeness = wave.Delta.After
 	}
 
-	// Only mark "completed" on full success. Partial failures get "partial"
-	// so downstream logic (CompletedWavesForCluster, nextgen) does not treat
-	// failed actions as done.
 	if total == 0 || internal.Applied >= total {
 		wave.Status = "completed"
 	} else {
@@ -148,7 +97,7 @@ func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sig
 // WaveApplyFileName returns the output filename for a wave apply result.
 // Includes cluster name to avoid collisions when wave IDs are duplicated across clusters.
 func WaveApplyFileName(wave sightjack.Wave) string {
-	return fmt.Sprintf("apply_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
+	return fmt.Sprintf("apply_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 }
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
@@ -237,233 +186,3 @@ func RunReadyLabel(ctx context.Context, cfg *sightjack.Config, readyIssueIDs str
 	return nil
 }
 
-// EvaluateUnlocks checks locked waves and unlocks them if all prerequisites are met.
-// Prerequisites and the completed map both use the composite "ClusterName:ID" format.
-func EvaluateUnlocks(waves []sightjack.Wave, completed map[string]bool) []sightjack.Wave {
-	result := make([]sightjack.Wave, len(waves))
-	copy(result, waves)
-	for i, w := range result {
-		if w.Status != "locked" {
-			continue
-		}
-		allMet := true
-		for _, prereq := range w.Prerequisites {
-			if !completed[prereq] {
-				allMet = false
-				break
-			}
-		}
-		if allMet {
-			result[i].Status = "available"
-		}
-	}
-	return result
-}
-
-// CalcNewlyUnlocked computes how many waves were newly unlocked after completing a wave.
-// oldAvailable is the available count before the wave was completed (includes the completing wave).
-// newAvailable is the available count after completion and unlock evaluation.
-func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
-	// oldAvailable includes the wave being completed, so subtract 1 to get
-	// the baseline of waves that were already available before this action.
-	newCount := newAvailable - (oldAvailable - 1)
-	if newCount < 0 {
-		return 0
-	}
-	return newCount
-}
-
-// PartialApplyDelta computes the adjusted delta for a partially applied wave.
-// When TotalCount is 0, the original delta.After is returned.
-func PartialApplyDelta(result *sightjack.WaveApplyResult, delta sightjack.WaveDelta) float64 {
-	if result.TotalCount == 0 || result.Applied >= result.TotalCount {
-		return delta.After
-	}
-	if result.Applied == 0 {
-		return delta.Before
-	}
-	successRate := float64(result.Applied) / float64(result.TotalCount)
-	return delta.Before + (delta.After-delta.Before)*successRate
-}
-
-// IsWaveApplyComplete returns true when the apply result has no errors,
-// indicating all actions were successfully applied.
-func IsWaveApplyComplete(result *sightjack.WaveApplyResult) bool {
-	return len(result.Errors) == 0
-}
-
-// ApplyModifiedWave merges a modified wave from the architect into the original,
-// preserving identity fields (ID, ClusterName) so that completion bookkeeping
-// remains stable. Status is recomputed from the modified prerequisites against
-// the completed map to prevent applying waves with unmet dependencies.
-func ApplyModifiedWave(original, modified sightjack.Wave, completed map[string]bool) sightjack.Wave {
-	modified.ID = original.ID
-	modified.ClusterName = original.ClusterName
-
-	// Preserve original fields when architect omits them (nil/zero from JSON).
-	if modified.Actions == nil {
-		modified.Actions = original.Actions
-	}
-	if modified.Prerequisites == nil {
-		modified.Prerequisites = original.Prerequisites
-	}
-	if modified.Delta == (sightjack.WaveDelta{}) {
-		modified.Delta = original.Delta
-	}
-
-	// Normalize bare prerequisite IDs to composite "ClusterName:ID" format.
-	for i, p := range modified.Prerequisites {
-		if !strings.Contains(p, ":") {
-			modified.Prerequisites[i] = modified.ClusterName + ":" + p
-		}
-	}
-
-	// Recompute status: if any prerequisite is unmet, lock the wave.
-	modified.Status = "available"
-	for _, prereq := range modified.Prerequisites {
-		if !completed[prereq] {
-			modified.Status = "locked"
-			break
-		}
-	}
-	return modified
-}
-
-// PropagateWaveUpdate writes the updated wave back into the waves slice,
-// matching by WaveKey so that subsequent AvailableWaves calls see the new state.
-func PropagateWaveUpdate(waves []sightjack.Wave, updated sightjack.Wave) {
-	key := WaveKey(updated)
-	for i := range waves {
-		if WaveKey(waves[i]) == key {
-			waves[i] = updated
-			return
-		}
-	}
-}
-
-// BuildCompletedWaveMap returns a set of completed waves keyed by WaveKey (ClusterName:ID).
-func BuildCompletedWaveMap(waves []sightjack.Wave) map[string]bool {
-	completed := make(map[string]bool)
-	for _, w := range waves {
-		if w.Status == "completed" {
-			completed[WaveKey(w)] = true
-		}
-	}
-	return completed
-}
-
-// mergeOldWaves carries forward waves from clusters that failed wave
-// generation but are still present in the current scan. Old waves whose
-// cluster was removed from the scan (resolved issues, reorganized clusters)
-// are dropped so stale work items do not persist.
-//
-// failedClusterNames is the set of cluster names where at least one instance
-// failed generation (from detectFailedClusterNames). With duplicate cluster
-// names, a name marked as failed causes ALL old waves with that name to be
-// carried forward — safe over-inclusion to avoid progress loss. Old waves
-// whose WaveKey already exists in newWaves are skipped to prevent duplicates.
-func MergeOldWaves(oldWaves, newWaves []sightjack.Wave, scannedClusters, failedClusterNames map[string]bool) []sightjack.Wave {
-	regenerated := make(map[string]bool, len(newWaves))
-	newKeys := make(map[string]bool, len(newWaves))
-	for _, w := range newWaves {
-		regenerated[w.ClusterName] = true
-		newKeys[WaveKey(w)] = true
-	}
-	merged := make([]sightjack.Wave, 0, len(newWaves)+len(oldWaves))
-	merged = append(merged, newWaves...)
-	for _, w := range oldWaves {
-		inScan := scannedClusters[w.ClusterName]
-		noRegeneration := !regenerated[w.ClusterName]
-		partialFailure := failedClusterNames[w.ClusterName]
-		// Carry forward if cluster is still in scan AND either:
-		// - no waves were regenerated for this name (complete failure), OR
-		// - at least one instance with this name failed (handles duplicates)
-		// Skip waves whose WaveKey already exists in newWaves to avoid duplicates.
-		if inScan && (noRegeneration || partialFailure) && !newKeys[WaveKey(w)] {
-			merged = append(merged, w)
-		}
-	}
-	return merged
-}
-
-// MergeCompletedStatus preserves completed status from a previous session
-// when waves are regenerated after a re-scan. Waves in newWaves that match
-// a key in oldCompleted are marked "completed". Waves that were in the old
-// session but not in newWaves are dropped (Linear removed them).
-func MergeCompletedStatus(oldCompleted map[string]bool, newWaves []sightjack.Wave) []sightjack.Wave {
-	result := make([]sightjack.Wave, len(newWaves))
-	copy(result, newWaves)
-	for i, w := range result {
-		if oldCompleted[WaveKey(w)] {
-			result[i].Status = "completed"
-		}
-	}
-	return result
-}
-
-// RestoreWaves converts persisted sightjack.WaveState list back into sightjack.Wave list for session resume.
-func RestoreWaves(states []sightjack.WaveState) []sightjack.Wave {
-	waves := make([]sightjack.Wave, len(states))
-	for i, s := range states {
-		waves[i] = sightjack.Wave{
-			ID:            s.ID,
-			ClusterName:   s.ClusterName,
-			Title:         s.Title,
-			Description:   s.Description,
-			Actions:       s.Actions,
-			Prerequisites: s.Prerequisites,
-			Delta:         s.Delta,
-			Status:        s.Status,
-		}
-	}
-	return waves
-}
-
-// BuildWaveStates converts sightjack.Wave list to sightjack.WaveState list for persistence.
-func BuildWaveStates(waves []sightjack.Wave) []sightjack.WaveState {
-	states := make([]sightjack.WaveState, len(waves))
-	for i, w := range waves {
-		states[i] = sightjack.WaveState{
-			ID:            w.ID,
-			ClusterName:   w.ClusterName,
-			Title:         w.Title,
-			Status:        w.Status,
-			Prerequisites: w.Prerequisites,
-			ActionCount:   len(w.Actions),
-			Actions:       w.Actions,
-			Description:   w.Description,
-			Delta:         w.Delta,
-		}
-	}
-	return states
-}
-
-// CheckCompletenessConsistency verifies that the average of cluster completeness
-// values matches the overall completeness within a tolerance. Returns true if a
-// mismatch beyond the tolerance (5 percentage points) is detected.
-func CheckCompletenessConsistency(overall float64, clusters []sightjack.ClusterScanResult) bool {
-	if len(clusters) == 0 {
-		return false
-	}
-	var sum float64
-	for _, c := range clusters {
-		sum += c.Completeness
-	}
-	avg := sum / float64(len(clusters))
-	diff := overall - avg
-	if diff < 0 {
-		diff = -diff
-	}
-	return diff > 0.05
-}
-
-// CompletedWavesForCluster returns all completed waves for the given cluster.
-func CompletedWavesForCluster(waves []sightjack.Wave, clusterName string) []sightjack.Wave {
-	var result []sightjack.Wave
-	for _, w := range waves {
-		if w.ClusterName == clusterName && w.Status == "completed" {
-			result = append(result, w)
-		}
-	}
-	return result
-}

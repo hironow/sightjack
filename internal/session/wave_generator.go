@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -51,7 +52,7 @@ func NeedsMoreWaves(cluster sightjack.ClusterScanResult, waves []sightjack.Wave)
 
 // NextgenFileName returns the output filename for a nextgen wave generation run.
 func NextgenFileName(wave sightjack.Wave) string {
-	return fmt.Sprintf("nextgen_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
+	return fmt.Sprintf("nextgen_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 }
 
 // ClearNextgenOutput removes any existing nextgen output file.
@@ -79,7 +80,7 @@ func GenerateNextWavesDryRun(cfg *sightjack.Config, scanDir string, completedWav
 	if err != nil {
 		return err
 	}
-	dryRunName := fmt.Sprintf("nextgen_%s_%s", SanitizeName(completedWave.ClusterName), SanitizeName(completedWave.ID))
+	dryRunName := fmt.Sprintf("nextgen_%s_%s", domain.SanitizeName(completedWave.ClusterName), domain.SanitizeName(completedWave.ID))
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 
@@ -127,7 +128,7 @@ func GenerateNextWaves(ctx context.Context, cfg *sightjack.Config, scanDir strin
 		return nil, fmt.Errorf("parse nextgen %s: %w", completedWave.ClusterName, err)
 	}
 
-	newWaves := NormalizeWavePrerequisites(result.Waves)
+	newWaves := domain.NormalizeWavePrerequisites(result.Waves)
 	if len(newWaves) > 0 {
 		logger.OK("Generated %d new wave(s) for %s: %s", len(newWaves), completedWave.ClusterName, result.Reasoning)
 	}

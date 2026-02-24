@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // tracer is the package-level OTel tracer for session operations.
@@ -166,10 +167,10 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 
 	// Record waves generated
 	recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{
-		Waves: BuildWaveStates(waves),
+		Waves: domain.BuildWaveStates(waves),
 	})
 
-	completed := BuildCompletedWaveMap(waves)
+	completed := domain.BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
 	adrDir := ADRDir(baseDir)
 	adrCount := CountADRFiles(adrDir)
@@ -269,7 +270,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 
 		switch choice {
 		case sightjack.ApprovalApprove:
-			delete(sessionRejected, WaveKey(selected))
+			delete(sessionRejected, domain.WaveKey(selected))
 			loopSpan.AddEvent("wave.approved",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
@@ -287,7 +288,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			})
 			return selected, approvalApproved
 		case sightjack.ApprovalReject:
-			delete(sessionRejected, WaveKey(selected))
+			delete(sessionRejected, domain.WaveKey(selected))
 			loopSpan.AddEvent("wave.rejected",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
@@ -315,8 +316,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			}
 			DisplayArchitectResponse(out, result)
 			if result.ModifiedWave != nil {
-				selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
-				PropagateWaveUpdate(waves, selected)
+				selected = domain.ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+				domain.PropagateWaveUpdate(waves, selected)
 				recorder.Record(sightjack.EventWaveModified, sightjack.WaveModifiedPayload{
 					WaveID: selected.ID, ClusterName: selected.ClusterName,
 					UpdatedWave: sightjack.WaveState{
@@ -368,8 +369,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				fraction := float64(len(approved)) / float64(totalActions)
 				selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
 			}
-			PropagateWaveUpdate(waves, selected)
-			sessionRejected[WaveKey(selected)] = rejected
+			domain.PropagateWaveUpdate(waves, selected)
+			sessionRejected[domain.WaveKey(selected)] = rejected
 			recorder.Record(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
@@ -405,7 +406,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	}
 
 	// Count new waves unlocked by this completion
-	oldAvailable := len(AvailableWaves(*waves, completed))
+	oldAvailable := len(domain.AvailableWaves(*waves, completed))
 
 	// Record wave applied (always, even for partial failures)
 	recorder.Record(sightjack.EventWaveApplied, sightjack.WaveAppliedPayload{
@@ -414,7 +415,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		Errors: applyResult.Errors,
 	})
 
-	if !IsWaveApplyComplete(applyResult) {
+	if !domain.IsWaveApplyComplete(applyResult) {
 		loopSpan.AddEvent("wave.partial_failure",
 			trace.WithAttributes(
 				attribute.String("wave.id", selected.ID),
@@ -422,7 +423,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 				attribute.Int("wave.error_count", len(applyResult.Errors)),
 			),
 		)
-		logger.Warn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
+		logger.Warn("Wave %s partially failed (%d errors). Not marking as completed.", domain.WaveKey(selected), len(applyResult.Errors))
 		DisplayRippleEffects(out, applyResult.Ripples)
 		return
 	}
@@ -436,10 +437,10 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	)
 
 	// Mark wave completed using composite key (ClusterName:ID)
-	completed[WaveKey(selected)] = true
-	selectedKey := WaveKey(selected)
+	completed[domain.WaveKey(selected)] = true
+	selectedKey := domain.WaveKey(selected)
 	for i, w := range *waves {
-		if WaveKey(w) == selectedKey {
+		if domain.WaveKey(w) == selectedKey {
 			(*waves)[i].Status = "completed"
 			break
 		}
@@ -461,7 +462,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	// Update cluster completeness from delta, then recalculate overall
 	for i, c := range scanResult.Clusters {
 		if c.Name == selected.ClusterName {
-			adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
+			adjustedAfter := domain.PartialApplyDelta(applyResult, selected.Delta)
 			scanResult.Clusters[i].Completeness = adjustedAfter
 			// Note: per-issue completeness is NOT updated here because
 			// action types vary (add_dod vs add_dependency) and we lack
@@ -488,14 +489,14 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	})
 
 	// Display rich completion summary with grouped ripple effects
-	*waves = EvaluateUnlocks(*waves, completed)
-	newAvailable := len(AvailableWaves(*waves, completed))
-	newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
+	*waves = domain.EvaluateUnlocks(*waves, completed)
+	newAvailable := len(domain.AvailableWaves(*waves, completed))
+	newCount := domain.CalcNewlyUnlocked(oldAvailable, newAvailable)
 	if newCount > 0 {
 		var unlockedIDs []string
 		for _, w := range *waves {
 			if w.Status == "available" {
-				unlockedIDs = append(unlockedIDs, WaveKey(w))
+				unlockedIDs = append(unlockedIDs, domain.WaveKey(w))
 			}
 		}
 		recorder.Record(sightjack.EventWavesUnlocked, sightjack.WavesUnlockedPayload{
@@ -522,12 +523,12 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		)
 		logger.Debug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
 	} else {
-		completedWavesForCluster := CompletedWavesForCluster(*waves, selected.ClusterName)
+		completedWavesForCluster := domain.CompletedWavesForCluster(*waves, selected.ClusterName)
 		existingADRs, adrErr := ReadExistingADRs(adrDir)
 		if adrErr != nil {
 			logger.Warn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
 		}
-		rejectedForWave := sessionRejected[WaveKey(selected)]
+		rejectedForWave := sessionRejected[domain.WaveKey(selected)]
 		var feedback []*DMail
 		if fbCollector != nil {
 			feedback = fbCollector.FeedbackOnly()
@@ -537,10 +538,10 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 			logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
 		} else if len(newWaves) > 0 {
 			*waves = append(*waves, newWaves...)
-			*waves = EvaluateUnlocks(*waves, completed)
+			*waves = domain.EvaluateUnlocks(*waves, completed)
 			recorder.Record(sightjack.EventNextGenWavesAdded, sightjack.NextGenWavesAddedPayload{
 				ClusterName: selected.ClusterName,
-				Waves:       BuildWaveStates(newWaves),
+				Waves:       domain.BuildWaveStates(newWaves),
 			})
 		}
 	}
@@ -601,8 +602,8 @@ func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, ses
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
 outerLoop:
 	for {
-		waves = EvaluateUnlocks(waves, completed)
-		available := AvailableWaves(waves, completed)
+		waves = domain.EvaluateUnlocks(waves, completed)
+		available := domain.AvailableWaves(waves, completed)
 		if len(available) == 0 {
 			logger.OK("All waves completed or no available waves.")
 			break
@@ -632,7 +633,7 @@ outerLoop:
 	}
 
 	// Final consistency check
-	if CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
+	if domain.CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
 		logger.Warn("Completeness mismatch detected. Recalculating...")
 		scanResult.CalculateCompleteness()
 	}
@@ -656,8 +657,8 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
 	}
-	waves := RestoreWaves(state.Waves)
-	completed := BuildCompletedWaveMap(waves)
+	waves := domain.RestoreWaves(state.Waves)
+	completed := domain.BuildCompletedWaveMap(waves)
 	adrCount := CountADRFiles(ADRDir(baseDir))
 	return scanResult, waves, completed, adrCount, nil
 }
@@ -804,12 +805,12 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	for _, c := range scanResult.Clusters {
 		scannedClusters[c.Name] = true
 	}
-	oldWaves := RestoreWaves(oldState.Waves)
-	waves = MergeOldWaves(oldWaves, waves, scannedClusters, failedNames)
-	oldCompleted := BuildCompletedWaveMap(oldWaves)
-	waves = MergeCompletedStatus(oldCompleted, waves)
-	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
-	completed := BuildCompletedWaveMap(waves)
+	oldWaves := domain.RestoreWaves(oldState.Waves)
+	waves = domain.MergeOldWaves(oldWaves, waves, scannedClusters, failedNames)
+	oldCompleted := domain.BuildCompletedWaveMap(oldWaves)
+	waves = domain.MergeCompletedStatus(oldCompleted, waves)
+	waves = domain.EvaluateUnlocks(waves, domain.BuildCompletedWaveMap(waves))
+	completed := domain.BuildCompletedWaveMap(waves)
 	adrDir := ADRDir(baseDir)
 	adrCount := CountADRFiles(adrDir)
 	scanner := bufio.NewScanner(input)
@@ -836,7 +837,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		LastScanned:    scanTime,
 	})
 	recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{
-		Waves: BuildWaveStates(waves),
+		Waves: domain.BuildWaveStates(waves),
 	})
 
 	logger.OK("Re-scanned: %d clusters, %d waves (%d previously completed)",

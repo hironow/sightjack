@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -75,7 +76,7 @@ func TestAvailableWaves(t *testing.T) {
 	completed := map[string]bool{}
 
 	// when
-	available := session.AvailableWaves(waves, completed)
+	available := domain.AvailableWaves(waves, completed)
 
 	// then
 	if len(available) != 2 {
@@ -83,11 +84,11 @@ func TestAvailableWaves(t *testing.T) {
 	}
 
 	// given: after completing auth-w1
-	completed[session.WaveKey(waves[0])] = true
-	waves = session.EvaluateUnlocks(waves, completed)
+	completed[domain.WaveKey(waves[0])] = true
+	waves = domain.EvaluateUnlocks(waves, completed)
 
 	// when
-	available = session.AvailableWaves(waves, completed)
+	available = domain.AvailableWaves(waves, completed)
 
 	// then: auth-w2 should be unlocked now (prereq Auth:auth-w1 met)
 	// api-w2 still locked (needs API:api-w1 too)
@@ -111,14 +112,14 @@ func TestMergeWaveResults(t *testing.T) {
 		{ClusterName: "API", Waves: []sightjack.Wave{{ID: "api-w1"}}},
 	}
 
-	merged := session.MergeWaveResults(results)
+	merged := domain.MergeWaveResults(results)
 	if len(merged) != 3 {
 		t.Fatalf("expected 3 waves, got %d", len(merged))
 	}
 }
 
 func TestMergeWaveResults_Empty(t *testing.T) {
-	merged := session.MergeWaveResults(nil)
+	merged := domain.MergeWaveResults(nil)
 	if len(merged) != 0 {
 		t.Errorf("expected 0 waves, got %d", len(merged))
 	}
@@ -172,7 +173,7 @@ func TestWaveKey(t *testing.T) {
 	w := sightjack.Wave{ID: "w1", ClusterName: "Auth"}
 
 	// when
-	key := session.WaveKey(w)
+	key := domain.WaveKey(w)
 
 	// then
 	if key != "Auth:w1" {
@@ -187,10 +188,10 @@ func TestAvailableWaves_DuplicateIDsAcrossClusters(t *testing.T) {
 		{ID: "w1", ClusterName: "API", Status: "available"},
 	}
 	// only Auth:w1 is completed
-	completed := map[string]bool{session.WaveKey(waves[0]): true}
+	completed := map[string]bool{domain.WaveKey(waves[0]): true}
 
 	// when
-	available := session.AvailableWaves(waves, completed)
+	available := domain.AvailableWaves(waves, completed)
 
 	// then: API:w1 should still be available
 	if len(available) != 1 {
@@ -207,10 +208,10 @@ func TestEvaluateUnlocks_DuplicateIDsAcrossClusters(t *testing.T) {
 		{ID: "w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "w1", ClusterName: "API", Status: "locked", Prerequisites: []string{"Auth:w1"}},
 	}
-	completed := map[string]bool{session.WaveKey(waves[0]): true}
+	completed := map[string]bool{domain.WaveKey(waves[0]): true}
 
 	// when
-	updated := session.EvaluateUnlocks(waves, completed)
+	updated := domain.EvaluateUnlocks(waves, completed)
 
 	// then: API:w1 should be unlocked
 	if updated[1].Status != "available" {
@@ -227,7 +228,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 	}
 
 	// when
-	normalized := session.NormalizeWavePrerequisites(waves)
+	normalized := domain.NormalizeWavePrerequisites(waves)
 
 	// then: bare "w1" becomes "Auth:w1", explicit "Auth:w1" stays
 	if len(normalized[0].Prerequisites) != 0 {
@@ -255,7 +256,7 @@ func TestAvailableWaves_AllCompleted(t *testing.T) {
 	}
 
 	// when
-	available := session.AvailableWaves(waves, completed)
+	available := domain.AvailableWaves(waves, completed)
 
 	// then: no waves should be available — session is done
 	if len(available) != 0 {
@@ -277,12 +278,12 @@ func TestEvaluateUnlocks_AllCompleted(t *testing.T) {
 	}
 
 	// when
-	updated := session.EvaluateUnlocks(waves, completed)
+	updated := domain.EvaluateUnlocks(waves, completed)
 
 	// then: all remain completed, no status changes
 	for _, w := range updated {
 		if w.Status != "completed" {
-			t.Errorf("expected %s to remain completed, got %s", session.WaveKey(w), w.Status)
+			t.Errorf("expected %s to remain completed, got %s", domain.WaveKey(w), w.Status)
 		}
 	}
 }
@@ -316,7 +317,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 	completed := map[string]bool{"A:a-w1": true}
 
 	// when
-	updated := session.EvaluateUnlocks(waves, completed)
+	updated := domain.EvaluateUnlocks(waves, completed)
 
 	// then
 	if updated[1].Status != "available" {

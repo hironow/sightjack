@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 
 	pond "github.com/alitto/pond/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -162,11 +163,11 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 		defer clusterSpan.End()
 
 		cc := classify.Clusters[index]
-		chunks := ChunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
+		chunks := domain.ChunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
 		var chunkResults []sightjack.ClusterScanResult
 
 		for j, chunk := range chunks {
-			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, SanitizeName(cc.Name), j))
+			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, domain.SanitizeName(cc.Name), j))
 			prompt, renderErr := sightjack.RenderDeepScanPrompt(cfg.Lang, sightjack.DeepScanPromptData{
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
@@ -177,7 +178,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 				return sightjack.ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
 			}
 
-			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, SanitizeName(cc.Name), j)
+			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, domain.SanitizeName(cc.Name), j)
 			chunkOut, closeChunkLog := savePromptAndCreateLog(scanDir, promptBase, prompt, logger)
 
 			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
@@ -197,7 +198,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 			chunkResults = append(chunkResults, *result)
 		}
 
-		merged := MergeClusterChunks(cc.Name, chunkResults)
+		merged := domain.MergeClusterChunks(cc.Name, chunkResults)
 		merged.Labels = cc.Labels
 		logger.OK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
 		return merged, nil
@@ -243,40 +244,18 @@ func RunWaveGenerate(ctx context.Context, cfg *sightjack.Config, scanDir string,
 		return nil, warnings, nil, ctx.Err()
 	}
 
-	failedNames := DetectFailedClusterNames(clusters, successResults)
+	failedNames := domain.DetectFailedClusterNames(clusters, successResults)
 
 	if len(successResults) == 0 && len(clusters) > 0 {
 		return nil, warnings, failedNames, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
 	}
 
-	return MergeWaveResults(successResults), warnings, failedNames, nil
-}
-
-// DetectFailedClusterNames compares input cluster counts to success counts
-// and returns names where at least one instance failed wave generation.
-// With duplicate cluster names, a name is marked failed if fewer instances
-// succeeded than existed in the input.
-func DetectFailedClusterNames(clusters []sightjack.ClusterScanResult, successes []sightjack.WaveGenerateResult) map[string]bool {
-	inputCount := make(map[string]int, len(clusters))
-	for _, c := range clusters {
-		inputCount[c.Name]++
-	}
-	successCount := make(map[string]int, len(successes))
-	for _, r := range successes {
-		successCount[r.ClusterName]++
-	}
-	failed := make(map[string]bool)
-	for name, total := range inputCount {
-		if successCount[name] < total {
-			failed[name] = true
-		}
-	}
-	return failed
+	return domain.MergeWaveResults(successResults), warnings, failedNames, nil
 }
 
 // waveFileBase returns the base name for wave-related files (prompt, log, output).
 func waveFileBase(index int, clusterName string) string {
-	return fmt.Sprintf("wave_%02d_%s", index, SanitizeName(clusterName))
+	return fmt.Sprintf("wave_%02d_%s", index, domain.SanitizeName(clusterName))
 }
 
 // savePromptAndCreateLog writes the prompt file and creates a log writer.
@@ -367,58 +346,6 @@ func RunParallelDeepScan(ctx context.Context, cfg *sightjack.Config, scanDir str
 		},
 		func(c sightjack.ClusterScanResult) string { return c.Name },
 		logger)
-}
-
-// ChunkSlice splits items into sub-slices of at most size elements.
-func ChunkSlice(items []string, size int) [][]string {
-	if len(items) == 0 {
-		return nil
-	}
-	if size <= 0 {
-		return [][]string{items}
-	}
-	var chunks [][]string
-	for i := 0; i < len(items); i += size {
-		end := i + size
-		if end > len(items) {
-			end = len(items)
-		}
-		chunks = append(chunks, items[i:end])
-	}
-	return chunks
-}
-
-// MergeClusterChunks combines multiple chunk results from the same cluster
-// into a single sightjack.ClusterScanResult, recalculating completeness from individual issues.
-func MergeClusterChunks(name string, chunks []sightjack.ClusterScanResult) sightjack.ClusterScanResult {
-	merged := sightjack.ClusterScanResult{Name: name}
-	for _, c := range chunks {
-		merged.Issues = append(merged.Issues, c.Issues...)
-		merged.Observations = append(merged.Observations, c.Observations...)
-	}
-	if len(merged.Issues) > 0 {
-		total := 0.0
-		for _, issue := range merged.Issues {
-			total += issue.Completeness
-		}
-		merged.Completeness = total / float64(len(merged.Issues))
-	}
-	return merged
-}
-
-// SanitizeName converts a cluster name to a safe filename component.
-// Only ASCII alphanumeric, hyphen, and underscore are kept; everything else becomes underscore.
-func SanitizeName(name string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(name) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
-			b.WriteRune(r)
-		default:
-			b.WriteRune('_')
-		}
-	}
-	return b.String()
 }
 
 // RunParallel executes work for each item with bounded concurrency using a

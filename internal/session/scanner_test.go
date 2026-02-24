@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -130,7 +131,7 @@ func TestSanitizeName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := session.SanitizeName(tt.input)
+			got := domain.SanitizeName(tt.input)
 			if got != tt.expected {
 				t.Errorf("sanitizeName(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
@@ -154,7 +155,7 @@ func TestChunkSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := session.ChunkSlice(tt.items, tt.size)
+			got := domain.ChunkSlice(tt.items, tt.size)
 			if len(got) != tt.expected {
 				t.Fatalf("expected %d chunks, got %d", tt.expected, len(got))
 			}
@@ -191,7 +192,7 @@ func TestMergeClusterChunks(t *testing.T) {
 	}
 
 	// when
-	merged := session.MergeClusterChunks("Auth", chunks)
+	merged := domain.MergeClusterChunks("Auth", chunks)
 
 	// then
 	if merged.Name != "Auth" {
@@ -224,7 +225,7 @@ func TestMergeClusterChunks_SingleChunk(t *testing.T) {
 	}
 
 	// when
-	merged := session.MergeClusterChunks("API", chunks)
+	merged := domain.MergeClusterChunks("API", chunks)
 
 	// then: completeness must be recomputed from issues, not Claude's top-level value
 	expectedCompleteness := 0.75 // (0.5 + 1.0) / 2
@@ -243,7 +244,7 @@ func TestMergeClusterChunks_SingleChunk_CanonicalName(t *testing.T) {
 	}
 
 	// when: canonical name from pass-1 is "Auth"
-	merged := session.MergeClusterChunks("Auth", chunks)
+	merged := domain.MergeClusterChunks("Auth", chunks)
 
 	// then: canonical name must win
 	if merged.Name != "Auth" {
@@ -281,7 +282,7 @@ func TestRunWaveGenerate_ParsesResults(t *testing.T) {
 	}
 
 	// then: merge waves
-	allWaves := session.MergeWaveResults([]sightjack.WaveGenerateResult{*result0, *result1})
+	allWaves := domain.MergeWaveResults([]sightjack.WaveGenerateResult{*result0, *result1})
 	if len(allWaves) != 2 {
 		t.Fatalf("expected 2 waves, got %d", len(allWaves))
 	}
@@ -1003,7 +1004,7 @@ func TestDetectFailedClusterNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := session.DetectFailedClusterNames(tt.clusters, tt.successes)
+			got := domain.DetectFailedClusterNames(tt.clusters, tt.successes)
 			if len(got) != len(tt.want) {
 				t.Fatalf("expected %d failed names, got %d: %v", len(tt.want), len(got), got)
 			}

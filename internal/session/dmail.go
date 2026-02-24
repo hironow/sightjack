@@ -13,6 +13,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 
 	"gopkg.in/yaml.v3"
 )
@@ -501,7 +502,7 @@ func ReportBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string {
 
 // ComposeReport creates and sends a report d-mail for a completed wave.
 func ComposeReport(baseDir string, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
-	key := WaveKey(wave)
+	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
 		Kind:          DMailReport,
@@ -515,7 +516,7 @@ func ComposeReport(baseDir string, wave sightjack.Wave, result *sightjack.WaveAp
 
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
 func ComposeSpecification(baseDir string, wave sightjack.Wave) error {
-	key := WaveKey(wave)
+	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),
 		Kind:          DMailSpecification,

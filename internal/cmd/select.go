@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -54,7 +55,7 @@ for downstream commands (apply, discuss).`,
 			}
 			defer tty.Close()
 			scanner := bufio.NewScanner(tty)
-			available := session.AvailableWaves(plan.Waves, map[string]bool{})
+			available := domain.AvailableWaves(plan.Waves, map[string]bool{})
 
 			if len(available) == 0 {
 				return fmt.Errorf("no available waves (all locked or completed)")
@@ -81,9 +82,9 @@ for downstream commands (apply, discuss).`,
 			// Build remaining waves (all plan waves except the selected one)
 			// so downstream apply → nextgen can accurately check NeedsMoreWaves.
 			var remaining []sightjack.Wave
-			selectedKey := session.WaveKey(selected)
+			selectedKey := domain.WaveKey(selected)
 			for _, w := range plan.Waves {
-				if session.WaveKey(w) != selectedKey {
+				if domain.WaveKey(w) != selectedKey {
 					remaining = append(remaining, w)
 				}
 			}

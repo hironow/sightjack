@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -86,7 +87,7 @@ func ParseArchitectResult(path string) (*sightjack.ArchitectResponse, error) {
 
 // ArchitectDiscussFileName returns the output filename for an architect discussion.
 func ArchitectDiscussFileName(wave sightjack.Wave) string {
-	return fmt.Sprintf("architect_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
+	return fmt.Sprintf("architect_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 }
 
 // RunArchitectDiscussDryRun saves the architect prompt to a file instead of executing Claude.
@@ -109,7 +110,7 @@ func RunArchitectDiscussDryRun(cfg *sightjack.Config, scanDir string, wave sight
 		return fmt.Errorf("render architect prompt: %w", err)
 	}
 
-	dryRunName := fmt.Sprintf("architect_%s_%s", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
+	dryRunName := fmt.Sprintf("architect_%s_%s", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 

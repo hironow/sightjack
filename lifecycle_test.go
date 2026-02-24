@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -583,7 +584,7 @@ func TestLifecycle_HappyPath(t *testing.T) {
 	assertFileExists(t, filepath.Join(scanDir, "scan_result.json"))
 
 	// show path: RestoreWaves should reconstruct waves
-	waves := session.RestoreWaves(state.Waves)
+	waves := domain.RestoreWaves(state.Waves)
 	if len(waves) != 1 {
 		t.Fatalf("RestoreWaves: expected 1, got %d", len(waves))
 	}
@@ -1490,7 +1491,7 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 	cluster.Completeness = 0.65 // post-apply completeness
 
 	existingADRs, _ := session.ReadExistingADRs(session.ADRDir(baseDir))
-	completedWaves := session.CompletedWavesForCluster(waves, cluster.Name)
+	completedWaves := domain.CompletedWavesForCluster(waves, cluster.Name)
 	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, sightjack.NewLogger(io.Discard, false))

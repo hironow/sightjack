@@ -16,6 +16,7 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 const ADRSubdir = "docs/adr"
@@ -63,7 +64,7 @@ func NextADRNumber(adrDir string) (int, error) {
 // Prevents path traversal by stripping everything except [a-z0-9-_].
 // Returns "untitled" for empty input.
 func SanitizeADRTitle(title string) string {
-	s := SanitizeName(title)
+	s := domain.SanitizeName(title)
 	if s == "" {
 		return "untitled"
 	}
@@ -142,7 +143,7 @@ func ReadExistingADRs(adrDir string) ([]sightjack.ExistingADR, error) {
 
 // ScribeFileName returns the output filename for a scribe run.
 func ScribeFileName(wave sightjack.Wave) string {
-	return fmt.Sprintf("scribe_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
+	return fmt.Sprintf("scribe_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 }
 
 // ClearScribeOutput removes any existing scribe output file to prevent
@@ -186,7 +187,7 @@ func RunScribeADRDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wa
 		return fmt.Errorf("render scribe prompt: %w", err)
 	}
 
-	dryRunName := fmt.Sprintf("scribe_%s_%s", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
+	dryRunName := fmt.Sprintf("scribe_%s_%s", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 
