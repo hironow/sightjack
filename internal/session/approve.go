@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"context"

@@ -1,10 +1,11 @@
-package sightjack_test
+package session_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 // Compile-time check: Handoff interface exists and has expected methods.
@@ -62,7 +63,7 @@ func TestReadyIssueIDs(t *testing.T) {
 	// AUTH-1 is only in w1 (completed) -> ready
 	// AUTH-2 is in w1 (completed) and w2 (completed) -> ready
 	// AUTH-3 is in w2 (completed) and w3 (available) -> NOT ready
-	ready := sightjack.ReadyIssueIDs(waves)
+	ready := session.ReadyIssueIDs(waves)
 
 	if len(ready) != 2 {
 		t.Fatalf("expected 2 ready issues, got %d: %v", len(ready), ready)
@@ -86,7 +87,7 @@ func TestReadyIssueIDsNoCompleted(t *testing.T) {
 	waves := []sightjack.Wave{
 		{ID: "w1", Status: "available", Actions: []sightjack.WaveAction{{IssueID: "A-1"}}},
 	}
-	ready := sightjack.ReadyIssueIDs(waves)
+	ready := session.ReadyIssueIDs(waves)
 	if len(ready) != 0 {
 		t.Errorf("expected 0 ready issues, got %d", len(ready))
 	}
@@ -97,7 +98,7 @@ func TestReadyIssueIDsAllCompleted(t *testing.T) {
 		{ID: "w1", Status: "completed", Actions: []sightjack.WaveAction{{IssueID: "A-1"}}},
 		{ID: "w2", Status: "completed", Actions: []sightjack.WaveAction{{IssueID: "A-1"}, {IssueID: "A-2"}}},
 	}
-	ready := sightjack.ReadyIssueIDs(waves)
+	ready := session.ReadyIssueIDs(waves)
 	if len(ready) != 2 {
 		t.Errorf("expected 2 ready issues, got %d", len(ready))
 	}
@@ -114,7 +115,7 @@ func TestReadyIssueIDs_Sorted(t *testing.T) {
 	}
 
 	// when
-	ready := sightjack.ReadyIssueIDs(waves)
+	ready := session.ReadyIssueIDs(waves)
 
 	// then: results are sorted
 	if len(ready) != 3 {

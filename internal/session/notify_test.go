@@ -1,4 +1,4 @@
-package sightjack_test
+package session_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestNopNotifier_NoError(t *testing.T) {
@@ -25,7 +26,7 @@ func TestNopNotifier_NoError(t *testing.T) {
 func TestLocalNotifier_Darwin(t *testing.T) {
 	// given: LocalNotifier forced to darwin, with captured command
 	var captured []string
-	n := sightjack.NewLocalNotifierForTest("darwin",
+	n := session.NewLocalNotifierForTest("darwin",
 		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			captured = append(captured, name)
 			captured = append(captured, args...)
@@ -55,7 +56,7 @@ func TestLocalNotifier_Darwin(t *testing.T) {
 func TestLocalNotifier_Linux(t *testing.T) {
 	// given: LocalNotifier forced to linux
 	var captured []string
-	n := sightjack.NewLocalNotifierForTest("linux",
+	n := session.NewLocalNotifierForTest("linux",
 		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			captured = append(captured, name)
 			captured = append(captured, args...)
@@ -80,7 +81,7 @@ func TestLocalNotifier_Linux(t *testing.T) {
 
 func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	// given: unsupported OS
-	n := sightjack.NewLocalNotifierForTest("windows",
+	n := session.NewLocalNotifierForTest("windows",
 		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			return exec.Command("true")
 		},
@@ -98,7 +99,7 @@ func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 func TestCmdNotifier_Placeholders(t *testing.T) {
 	// given: template with placeholders, using echo to verify substitution
 	var captured []string
-	n := sightjack.NewCmdNotifierForTest("echo {title}: {message}",
+	n := session.NewCmdNotifierForTest("echo {title}: {message}",
 		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			captured = append(captured, name)
 			captured = append(captured, args...)
@@ -124,7 +125,7 @@ func TestCmdNotifier_Placeholders(t *testing.T) {
 
 func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 	// given: empty template
-	n := sightjack.NewCmdNotifierForTest("", nil)
+	n := session.NewCmdNotifierForTest("", nil)
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
@@ -147,7 +148,7 @@ func TestShellQuote(t *testing.T) {
 		{"$(rm -rf /)", "'$(rm -rf /)'"},
 	}
 	for _, tt := range tests {
-		got := sightjack.ShellQuote(tt.input)
+		got := session.ShellQuote(tt.input)
 		if got != tt.want {
 			t.Errorf("ShellQuote(%q): got %q, want %q", tt.input, got, tt.want)
 		}

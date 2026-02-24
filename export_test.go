@@ -21,19 +21,3 @@ func SetTracer(t trace.Tracer) func() {
 	tracer = t
 	return func() { tracer = old }
 }
-
-// NewLocalNotifierForTest creates a LocalNotifier with test overrides.
-func NewLocalNotifierForTest(osName string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *LocalNotifier {
-	return &LocalNotifier{forceOS: osName, cmdFactory: factory}
-}
-
-// NewCmdNotifierForTest creates a CmdNotifier with a test command factory.
-func NewCmdNotifierForTest(template string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *CmdNotifier {
-	return &CmdNotifier{template: template, cmdFactory: factory}
-}
-
-// NewCmdApproverForTest creates a CmdApprover with a test command factory.
-func NewCmdApproverForTest(template string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *CmdApprover {
-	return &CmdApprover{template: template, cmdFactory: factory}
-}
-

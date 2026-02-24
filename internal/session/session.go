@@ -540,7 +540,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	// Apply ready labels after nextgen so the final wave list is used.
 	// Only label newly ready issues to avoid redundant API calls.
 	if cfg.Labels.Enabled {
-		readyIDs := sightjack.ReadyIssueIDs(*waves)
+		readyIDs := ReadyIssueIDs(*waves)
 		var newlyReady []string
 		for _, id := range readyIDs {
 			if !labeledReady[id] {

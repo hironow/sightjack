@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"context"
@@ -14,11 +14,6 @@ type cmdFactoryFunc func(ctx context.Context, name string, args ...string) *exec
 func defaultCmdFactory(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
 }
-
-// NopNotifier is a no-op notifier for tests and quiet mode.
-type NopNotifier struct{}
-
-func (n *NopNotifier) Notify(_ context.Context, _, _ string) error { return nil }
 
 // LocalNotifier sends desktop notifications using OS-native tools.
 // darwin: osascript with Funk sound, linux: notify-send.

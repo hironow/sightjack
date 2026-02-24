@@ -21,6 +21,11 @@ type Notifier interface {
 	Notify(ctx context.Context, title, message string) error
 }
 
+// NopNotifier is a no-op notifier for tests and quiet mode.
+type NopNotifier struct{}
+
+func (n *NopNotifier) Notify(_ context.Context, _, _ string) error { return nil }
+
 // Approver requests user approval for a convergence gate.
 type Approver interface {
 	RequestApproval(ctx context.Context, message string) (approved bool, err error)

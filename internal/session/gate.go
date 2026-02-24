@@ -114,19 +114,19 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*sightjack.DMa
 // If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
 func BuildNotifier(cfg *sightjack.Config) sightjack.Notifier {
 	if cfg.Gate.NotifyCmd != "" {
-		return sightjack.NewCmdNotifier(cfg.Gate.NotifyCmd)
+		return NewCmdNotifier(cfg.Gate.NotifyCmd)
 	}
-	return &sightjack.LocalNotifier{}
+	return &LocalNotifier{}
 }
 
 // BuildApprover creates the appropriate Approver based on config.
 // Priority: AutoApprove → CmdApprover → StdinApprover.
 func BuildApprover(cfg *sightjack.Config, input io.Reader, out io.Writer) sightjack.Approver {
 	if cfg.Gate.AutoApprove {
-		return &sightjack.AutoApprover{}
+		return &AutoApprover{}
 	}
 	if cfg.Gate.ApproveCmd != "" {
-		return sightjack.NewCmdApprover(cfg.Gate.ApproveCmd)
+		return NewCmdApprover(cfg.Gate.ApproveCmd)
 	}
-	return sightjack.NewStdinApprover(input, out)
+	return NewStdinApprover(input, out)
 }
