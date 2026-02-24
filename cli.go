@@ -161,17 +161,6 @@ func PromptSelectiveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner,
 	}
 }
 
-// DisplayRippleEffects shows cross-cluster effects after a wave is applied.
-func DisplayRippleEffects(w io.Writer, ripples []Ripple) {
-	if len(ripples) == 0 {
-		return
-	}
-	fmt.Fprintln(w, "\n  Ripple effects:")
-	for _, r := range ripples {
-		fmt.Fprintf(w, "    -> %s: %s\n", r.ClusterName, r.Description)
-	}
-}
-
 // PromptDiscussTopic reads a free-text discussion topic from the user.
 func PromptDiscussTopic(ctx context.Context, w io.Writer, s *bufio.Scanner) (string, error) {
 	fmt.Fprint(w, "\n  Topic: ")
@@ -188,22 +177,6 @@ func PromptDiscussTopic(ctx context.Context, w io.Writer, s *bufio.Scanner) (str
 		return "", fmt.Errorf("empty topic")
 	}
 	return input, nil
-}
-
-// DisplayArchitectResponse shows the architect's analysis and any wave modifications.
-func DisplayArchitectResponse(w io.Writer, resp *ArchitectResponse) {
-	fmt.Fprintf(w, "\n  [Architect] %s\n", resp.Analysis)
-	if resp.Reasoning != "" {
-		fmt.Fprintf(w, "\n  Reasoning: %s\n", resp.Reasoning)
-	}
-	if resp.ModifiedWave != nil {
-		fmt.Fprintf(w, "\n  Modified actions (%d):\n", len(resp.ModifiedWave.Actions))
-		for i, a := range resp.ModifiedWave.Actions {
-			fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
-		}
-		fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n",
-			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100)
-	}
 }
 
 // PromptResume displays previous session info and asks the user to resume, start new, or re-scan.
@@ -239,28 +212,6 @@ func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, state *Ses
 	}
 }
 
-// DisplayShibitoWarnings shows shibito resurrection detection warnings.
-func DisplayShibitoWarnings(w io.Writer, warnings []ShibitoWarning) {
-	if len(warnings) == 0 {
-		return
-	}
-	fmt.Fprintln(w, "\n  [Shibito] Resurrection warnings:")
-	for _, warn := range warnings {
-		fmt.Fprintf(w, "    %s -> %s [%s]: %s\n",
-			warn.ClosedIssueID, warn.CurrentIssueID, warn.RiskLevel, warn.Description)
-	}
-}
-
-// DisplayADRConflicts shows potential conflicts between new and existing ADRs.
-func DisplayADRConflicts(w io.Writer, conflicts []ADRConflict) {
-	if len(conflicts) == 0 {
-		return
-	}
-	for _, c := range conflicts {
-		fmt.Fprintf(w, "  [Scribe] Warning: Potential conflict with ADR-%s: %s\n", c.ExistingADRID, c.Description)
-	}
-}
-
 // CompletedWaves filters waves to only those with "completed" status.
 func CompletedWaves(waves []Wave) []Wave {
 	var result []Wave
@@ -270,18 +221,6 @@ func CompletedWaves(waves []Wave) []Wave {
 		}
 	}
 	return result
-}
-
-// DisplayCompletedWaveActions shows the actions that were applied in a completed wave.
-func DisplayCompletedWaveActions(w io.Writer, wave Wave) {
-	fmt.Fprintf(w, "\n  --- %s - %s (completed) ---\n", wave.ClusterName, wave.Title)
-	fmt.Fprintf(w, "  Actions applied (%d):\n", len(wave.Actions))
-	for i, a := range wave.Actions {
-		fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
-	}
-	if wave.Delta != (WaveDelta{}) {
-		fmt.Fprintf(w, "\n  Result: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
-	}
 }
 
 // PromptCompletedWaveSelection displays completed waves and reads the user's choice.
@@ -307,41 +246,4 @@ func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Sca
 		return Wave{}, fmt.Errorf("invalid selection: %s", input)
 	}
 	return completed[num-1], nil
-}
-
-// DisplayWaveCompletion shows a rich wave completion summary with grouped ripple effects.
-func DisplayWaveCompletion(w io.Writer, wave Wave, ripples []Ripple, overallCompleteness float64, newWavesAvailable int) {
-	fmt.Fprintf(w, "\n  Wave completed: %s - %s\n", wave.ClusterName, wave.Title)
-	fmt.Fprintf(w, "  Completeness: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
-
-	if len(ripples) > 0 {
-		fmt.Fprintln(w, "\n  Ripple effects:")
-		// Group by cluster
-		grouped := make(map[string][]Ripple)
-		var order []string
-		for _, r := range ripples {
-			if _, seen := grouped[r.ClusterName]; !seen {
-				order = append(order, r.ClusterName)
-			}
-			grouped[r.ClusterName] = append(grouped[r.ClusterName], r)
-		}
-		for _, name := range order {
-			fmt.Fprintf(w, "    %s:\n", name)
-			for _, r := range grouped[name] {
-				fmt.Fprintf(w, "      -> %s\n", r.Description)
-			}
-		}
-	}
-
-	if newWavesAvailable > 0 {
-		fmt.Fprintf(w, "\n  New waves available: %d\n", newWavesAvailable)
-	}
-
-	fmt.Fprintf(w, "  %s\n", RenderProgressBar(overallCompleteness, 20))
-}
-
-// DisplayScribeResponse shows the scribe's ADR generation result.
-func DisplayScribeResponse(w io.Writer, resp *ScribeResponse) {
-	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
-	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", adrSubdir, resp.ADRID, SanitizeADRTitle(resp.Title))
 }
