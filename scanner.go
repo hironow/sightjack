@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -110,7 +111,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
-	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
+	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
 	if cfg.Labels.Enabled {
 		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
 			classifySpan.End()
@@ -224,7 +225,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 
 	logger.Scan("Pass 3: Generating waves for %d clusters...", len(clusters))
 
-	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
+	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
 
 	successResults, warnings := RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
 		func(ctx context.Context, index int, cluster ClusterScanResult) (WaveGenerateResult, error) {

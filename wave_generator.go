@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -112,7 +113,7 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 	}
 
 	logger.Scan("Generating next waves: %s", completedWave.ClusterName)
-	if _, err := RunClaude(ctx, cfg, prompt, nextgenOut, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, nextgenOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}
 

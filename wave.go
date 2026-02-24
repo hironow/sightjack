@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -198,7 +199,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 		logger.Warn("create apply log: %v", applyLogErr)
 	}
 
-	linearTools := WithAllowedTools(LinearMCPAllowedTools...)
+	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
 	logger.Scan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
 	if _, err := RunClaudeOnce(ctx, cfg, prompt, applyOut, logger, linearTools); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
