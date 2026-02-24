@@ -49,9 +49,12 @@ func (s *FileEventStore) Append(events ...sightjack.Event) error {
 		if _, writeErr := f.Write(data); writeErr != nil {
 			return fmt.Errorf("event store write: %w", writeErr)
 		}
+		if syncErr := f.Sync(); syncErr != nil {
+			return fmt.Errorf("event store sync: %w", syncErr)
+		}
 	}
 
-	return f.Sync()
+	return nil
 }
 
 // ReadAll reads all events from the JSONL file.
