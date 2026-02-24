@@ -27,14 +27,21 @@ func NewSessionRecorder(store sightjack.EventStore, sessionID string) *SessionRe
 }
 
 // Record creates and appends an event with the next sequence number.
+// CorrelationID is set to the session ID to link all events in a session.
+// CausationID is set to the previous event's sequence number (empty for the first event).
 func (r *SessionRecorder) Record(eventType sightjack.EventType, payload any) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	prevSeq := r.seq
 	r.seq++
 	event, err := sightjack.NewEvent(eventType, r.sessionID, r.seq, payload)
 	if err != nil {
 		return fmt.Errorf("recorder new event: %w", err)
+	}
+	event.CorrelationID = r.sessionID
+	if prevSeq > 0 {
+		event.CausationID = fmt.Sprintf("%d", prevSeq)
 	}
 	return r.store.Append(event)
 }
