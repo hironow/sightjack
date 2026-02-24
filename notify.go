@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-// Notifier sends a notification to the user.
-type Notifier interface {
-	Notify(ctx context.Context, title, message string) error
-}
-
 // cmdFactoryFunc creates an *exec.Cmd — injectable for testing.
 type cmdFactoryFunc func(ctx context.Context, name string, args ...string) *exec.Cmd
 

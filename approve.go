@@ -9,11 +9,6 @@ import (
 	"strings"
 )
 
-// Approver requests user approval for a convergence gate.
-type Approver interface {
-	RequestApproval(ctx context.Context, message string) (approved bool, err error)
-}
-
 // AutoApprover always approves — for CI or --auto-approve flag.
 type AutoApprover struct{}
 
