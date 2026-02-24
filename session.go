@@ -43,8 +43,8 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 		initial := DrainInboxFeedback(inboxCh, logger)
 
 		// Convergence gate with re-drain: catches late-arriving convergence
-		notifier := buildNotifier(cfg)
-		approver := buildApprover(cfg, input, out)
+		notifier := BuildNotifier(cfg)
+		approver := BuildApprover(cfg, input, out)
 		allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 		if gateErr != nil {
 			return fmt.Errorf("convergence gate: %w", gateErr)
@@ -701,8 +701,8 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	initial := DrainInboxFeedback(inboxCh, logger)
 
 	// Convergence gate with re-drain: catches late-arriving convergence
-	notifier := buildNotifier(cfg)
-	approver := buildApprover(cfg, input, out)
+	notifier := BuildNotifier(cfg)
+	approver := BuildApprover(cfg, input, out)
 	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 	if gateErr != nil {
 		return fmt.Errorf("convergence gate: %w", gateErr)
@@ -761,8 +761,8 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	initial := DrainInboxFeedback(inboxCh, logger)
 
 	// Convergence gate with re-drain: catches late-arriving convergence
-	notifier := buildNotifier(cfg)
-	approver := buildApprover(cfg, input, out)
+	notifier := BuildNotifier(cfg)
+	approver := BuildApprover(cfg, input, out)
 	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 	if gateErr != nil {
 		return fmt.Errorf("convergence gate: %w", gateErr)
@@ -806,7 +806,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 		scannedClusters[c.Name] = true
 	}
 	oldWaves := RestoreWaves(oldState.Waves)
-	waves = mergeOldWaves(oldWaves, waves, scannedClusters, failedNames)
+	waves = MergeOldWaves(oldWaves, waves, scannedClusters, failedNames)
 	oldCompleted := BuildCompletedWaveMap(oldWaves)
 	waves = MergeCompletedStatus(oldCompleted, waves)
 	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))

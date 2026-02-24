@@ -37,7 +37,3 @@ func NewCmdApproverForTest(template string, factory func(ctx context.Context, na
 	return &CmdApprover{template: template, cmdFactory: factory}
 }
 
-// MergeOldWaves exports mergeOldWaves for external tests.
-func MergeOldWaves(oldWaves, newWaves []Wave, scannedClusters, failedClusterNames map[string]bool) []Wave {
-	return mergeOldWaves(oldWaves, newWaves, scannedClusters, failedClusterNames)
-}

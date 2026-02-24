@@ -360,7 +360,7 @@ func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 // names, a name marked as failed causes ALL old waves with that name to be
 // carried forward — safe over-inclusion to avoid progress loss. Old waves
 // whose WaveKey already exists in newWaves are skipped to prevent duplicates.
-func mergeOldWaves(oldWaves, newWaves []Wave, scannedClusters, failedClusterNames map[string]bool) []Wave {
+func MergeOldWaves(oldWaves, newWaves []Wave, scannedClusters, failedClusterNames map[string]bool) []Wave {
 	regenerated := make(map[string]bool, len(newWaves))
 	newKeys := make(map[string]bool, len(newWaves))
 	for _, w := range newWaves {
