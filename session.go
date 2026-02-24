@@ -883,11 +883,14 @@ func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 // failedClusterNames is the set of cluster names where at least one instance
 // failed generation (from detectFailedClusterNames). With duplicate cluster
 // names, a name marked as failed causes ALL old waves with that name to be
-// carried forward — safe over-inclusion to avoid progress loss.
+// carried forward — safe over-inclusion to avoid progress loss. Old waves
+// whose WaveKey already exists in newWaves are skipped to prevent duplicates.
 func mergeOldWaves(oldWaves, newWaves []Wave, scannedClusters, failedClusterNames map[string]bool) []Wave {
 	regenerated := make(map[string]bool, len(newWaves))
+	newKeys := make(map[string]bool, len(newWaves))
 	for _, w := range newWaves {
 		regenerated[w.ClusterName] = true
+		newKeys[WaveKey(w)] = true
 	}
 	merged := make([]Wave, 0, len(newWaves)+len(oldWaves))
 	merged = append(merged, newWaves...)
@@ -898,7 +901,8 @@ func mergeOldWaves(oldWaves, newWaves []Wave, scannedClusters, failedClusterName
 		// Carry forward if cluster is still in scan AND either:
 		// - no waves were regenerated for this name (complete failure), OR
 		// - at least one instance with this name failed (handles duplicates)
-		if inScan && (noRegeneration || partialFailure) {
+		// Skip waves whose WaveKey already exists in newWaves to avoid duplicates.
+		if inScan && (noRegeneration || partialFailure) && !newKeys[WaveKey(w)] {
 			merged = append(merged, w)
 		}
 	}

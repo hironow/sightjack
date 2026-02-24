@@ -2005,3 +2005,40 @@ func TestMergeOldWaves_DuplicateName_AllSucceeded(t *testing.T) {
 		t.Errorf("should only have new waves, got %v", merged)
 	}
 }
+
+func TestMergeOldWaves_DuplicateName_DedupsWaveKey(t *testing.T) {
+	// Copilot review: when partialFailure carries forward old waves,
+	// old waves whose WaveKey already exists in newWaves must be skipped
+	// to avoid duplicate WaveKey entries in the merged slice.
+	//
+	// Scenario: Two "Auth" instances. Instance 1 succeeds and regenerates
+	// wave ABC-123. Instance 2 fails. Old session also had wave ABC-123.
+	// Without dedup, Auth:ABC-123 appears twice.
+	oldWaves := []sightjack.Wave{
+		{ID: "ABC-123", ClusterName: "Auth", Title: "Auth old", Status: "completed"},
+		{ID: "DEF-456", ClusterName: "Auth", Title: "Auth old 2", Status: "pending"},
+	}
+	newWaves := []sightjack.Wave{
+		{ID: "ABC-123", ClusterName: "Auth", Title: "Auth regenerated"},
+	}
+	scannedClusters := map[string]bool{"Auth": true}
+	failedNames := map[string]bool{"Auth": true} // instance 2 failed
+
+	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+
+	// Expected: 1 new (ABC-123) + 1 old carried forward (DEF-456) = 2
+	// ABC-123 must NOT appear twice.
+	if len(merged) != 2 {
+		t.Fatalf("expected 2 waves (deduped), got %d: %v", len(merged), merged)
+	}
+
+	// Verify no duplicate WaveKeys
+	seen := make(map[string]bool)
+	for _, w := range merged {
+		key := w.ClusterName + ":" + w.ID
+		if seen[key] {
+			t.Errorf("duplicate WaveKey %q in merged result", key)
+		}
+		seen[key] = true
+	}
+}
