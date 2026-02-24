@@ -70,3 +70,17 @@ func LoadScanResult(path string) (*ScanResult, error) {
 	}
 	return &result, nil
 }
+
+// CanResume checks whether a saved session state supports resumption.
+// It returns false when the cached ScanResult path is empty (e.g. v0.4
+// state files) or the file no longer exists on disk.
+func CanResume(state *SessionState) bool {
+	if state.ScanResultPath == "" {
+		return false
+	}
+	if len(state.Waves) == 0 {
+		return false
+	}
+	_, err := os.Stat(state.ScanResultPath)
+	return err == nil
+}

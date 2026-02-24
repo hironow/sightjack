@@ -1,4 +1,4 @@
-package sightjack_test
+package session_test
 
 import (
 	"bufio"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestIsWaveApplyComplete_NoErrors(t *testing.T) {
@@ -91,7 +92,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -147,7 +148,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -172,7 +173,7 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: should get an input-related error, not a panic or scan error
 	if err == nil {
@@ -912,7 +913,7 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1051,7 +1052,7 @@ func TestResumeSession_RestoresWavesFromState(t *testing.T) {
 		ADRCount: 2,
 	}
 	// when: ResumeSession loads state and returns waves + scan result
-	resumedScanResult, waves, completed, adrCount, err := sightjack.ResumeSession(baseDir, state)
+	resumedScanResult, waves, completed, adrCount, err := session.ResumeSession(baseDir, state)
 
 	// then
 	if err != nil {
@@ -1088,7 +1089,7 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1112,7 +1113,7 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1132,7 +1133,7 @@ func TestResumeSession_ErrorOnMissingScanResultPath(t *testing.T) {
 	}
 
 	// when
-	_, _, _, _, err := sightjack.ResumeSession(t.TempDir(), state)
+	_, _, _, _, err := session.ResumeSession(t.TempDir(), state)
 
 	// then
 	if err == nil {
@@ -1152,7 +1153,7 @@ func TestResumeSession_ErrorOnMissingScanResultFile(t *testing.T) {
 	}
 
 	// when
-	_, _, _, _, err := sightjack.ResumeSession(t.TempDir(), state)
+	_, _, _, _, err := session.ResumeSession(t.TempDir(), state)
 
 	// then
 	if err == nil {
@@ -1194,7 +1195,7 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 		ADRCount:       2, // stale: says 2 but filesystem has 3
 	}
 	// when
-	_, _, _, adrCount, err := sightjack.ResumeSession(baseDir, state)
+	_, _, _, adrCount, err := session.ResumeSession(baseDir, state)
 
 	// then
 	if err != nil {
@@ -1357,7 +1358,7 @@ func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
 	}
 
 	// when: restore waves and evaluate unlocks
-	_, waves, completed, _, err := sightjack.ResumeSession(baseDir, state)
+	_, waves, completed, _, err := session.ResumeSession(baseDir, state)
 	if err != nil {
 		t.Fatalf("ResumeSession: %v", err)
 	}
@@ -1419,7 +1420,7 @@ func TestResumeScanDir_DerivedFromScanResultPath(t *testing.T) {
 	}
 
 	// when
-	got := sightjack.ResumeScanDir(state, "/project")
+	got := session.ResumeScanDir(state, "/project")
 
 	// then: should derive scanDir from ScanResultPath
 	want := "/project/.siren/.run/old-session"
@@ -1436,7 +1437,7 @@ func TestResumeScanDir_EmptyScanResultPath_FallsBack(t *testing.T) {
 	}
 
 	// when
-	got := sightjack.ResumeScanDir(state, "/project")
+	got := session.ResumeScanDir(state, "/project")
 
 	// then: should fall back to ScanDir()
 	want := sightjack.ScanDir("/project", "new-session")
@@ -1453,7 +1454,7 @@ func TestResumeScanDir_CurrentPathFormat(t *testing.T) {
 	}
 
 	// when
-	got := sightjack.ResumeScanDir(state, "/project")
+	got := session.ResumeScanDir(state, "/project")
 
 	// then: should derive from ScanResultPath
 	want := "/project/.siren/.run/current-session"
