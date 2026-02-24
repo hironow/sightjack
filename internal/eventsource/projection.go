@@ -10,13 +10,23 @@ import (
 	sightjack "github.com/hironow/sightjack"
 )
 
+// projectionContext tracks seen entities during replay to ensure idempotency.
+type projectionContext struct {
+	seenWaves map[string]bool // key = ClusterName:WaveID
+	seenADRs  map[string]bool // key = ADRID
+}
+
 // ProjectState replays a sequence of events to produce a SessionState.
 // Unknown event types are silently skipped.
 // Returns a zero-value SessionState for nil/empty input.
 func ProjectState(events []sightjack.Event) *sightjack.SessionState {
 	state := &sightjack.SessionState{}
+	ctx := &projectionContext{
+		seenWaves: make(map[string]bool),
+		seenADRs:  make(map[string]bool),
+	}
 	for _, e := range events {
-		applyEvent(state, e)
+		applyEvent(state, ctx, e)
 	}
 	return state
 }
@@ -35,7 +45,8 @@ func LoadState(store sightjack.EventStore) (*sightjack.SessionState, error) {
 }
 
 // applyEvent mutates state according to the event type.
-func applyEvent(state *sightjack.SessionState, e sightjack.Event) {
+// The projectionContext tracks seen entities to ensure idempotent replay.
+func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightjack.Event) {
 	switch e.Type {
 	case sightjack.EventSessionStarted:
 		var p sightjack.SessionStartedPayload
@@ -59,7 +70,13 @@ func applyEvent(state *sightjack.SessionState, e sightjack.Event) {
 	case sightjack.EventWavesGenerated:
 		var p sightjack.WavesGeneratedPayload
 		if unmarshalPayload(e, &p) {
-			state.Waves = append(state.Waves, p.Waves...)
+			for _, w := range p.Waves {
+				key := w.ClusterName + ":" + w.ID
+				if !ctx.seenWaves[key] {
+					ctx.seenWaves[key] = true
+					state.Waves = append(state.Waves, w)
+				}
+			}
 		}
 
 	case sightjack.EventWaveCompleted:
@@ -104,7 +121,13 @@ func applyEvent(state *sightjack.SessionState, e sightjack.Event) {
 	case sightjack.EventNextGenWavesAdded:
 		var p sightjack.NextGenWavesAddedPayload
 		if unmarshalPayload(e, &p) {
-			state.Waves = append(state.Waves, p.Waves...)
+			for _, w := range p.Waves {
+				key := w.ClusterName + ":" + w.ID
+				if !ctx.seenWaves[key] {
+					ctx.seenWaves[key] = true
+					state.Waves = append(state.Waves, w)
+				}
+			}
 		}
 
 	case sightjack.EventWaveModified:
@@ -120,7 +143,13 @@ func applyEvent(state *sightjack.SessionState, e sightjack.Event) {
 		}
 
 	case sightjack.EventADRGenerated:
-		state.ADRCount++
+		var p sightjack.ADRGeneratedPayload
+		if unmarshalPayload(e, &p) {
+			if !ctx.seenADRs[p.ADRID] {
+				ctx.seenADRs[p.ADRID] = true
+				state.ADRCount++
+			}
+		}
 
 	case sightjack.EventWaveApproved, sightjack.EventWaveRejected, sightjack.EventWaveApplied,
 		sightjack.EventSpecificationSent, sightjack.EventReportSent,

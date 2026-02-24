@@ -451,6 +451,104 @@ func TestLoadLatestState_EmptyEventsDir(t *testing.T) {
 	}
 }
 
+func TestProjectState_WavesGenerated_Idempotent(t *testing.T) {
+	// given: same WavesGenerated event replayed twice
+	waveEvent := mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+		sightjack.WavesGeneratedPayload{
+			Waves: []sightjack.WaveState{
+				{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available"},
+				{ID: "w2", ClusterName: "Auth", Title: "Second", Status: "locked"},
+			},
+		})
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		waveEvent,
+		waveEvent, // duplicate replay
+	}
+
+	// when
+	state := eventsource.ProjectState(events)
+
+	// then: waves should not be duplicated
+	if len(state.Waves) != 2 {
+		t.Errorf("expected 2 waves (idempotent), got %d", len(state.Waves))
+	}
+}
+
+func TestProjectState_NextGenWavesAdded_Idempotent(t *testing.T) {
+	// given: same NextGenWavesAdded event replayed twice
+	nextgenEvent := mustNewEvent(t, sightjack.EventNextGenWavesAdded, "s1", 3,
+		sightjack.NextGenWavesAddedPayload{
+			ClusterName: "Auth",
+			Waves:       []sightjack.WaveState{{ID: "w2", ClusterName: "Auth"}},
+		})
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{{ID: "w1", ClusterName: "Auth"}},
+			}),
+		nextgenEvent,
+		nextgenEvent, // duplicate replay
+	}
+
+	// when
+	state := eventsource.ProjectState(events)
+
+	// then: w2 should appear only once
+	if len(state.Waves) != 2 {
+		t.Errorf("expected 2 waves (w1 + w2 deduped), got %d", len(state.Waves))
+	}
+}
+
+func TestProjectState_NextGenWavesAdded_DifferentWaves_Appends(t *testing.T) {
+	// given: two different NextGenWavesAdded events with different waves
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{{ID: "w1", ClusterName: "Auth"}},
+			}),
+		mustNewEvent(t, sightjack.EventNextGenWavesAdded, "s1", 3,
+			sightjack.NextGenWavesAddedPayload{
+				ClusterName: "Auth",
+				Waves:       []sightjack.WaveState{{ID: "w2", ClusterName: "Auth"}},
+			}),
+		mustNewEvent(t, sightjack.EventNextGenWavesAdded, "s1", 4,
+			sightjack.NextGenWavesAddedPayload{
+				ClusterName: "Auth",
+				Waves:       []sightjack.WaveState{{ID: "w3", ClusterName: "Auth"}},
+			}),
+	}
+
+	// when
+	state := eventsource.ProjectState(events)
+
+	// then: all three different waves should be present
+	if len(state.Waves) != 3 {
+		t.Errorf("expected 3 waves (w1, w2, w3), got %d", len(state.Waves))
+	}
+}
+
+func TestProjectState_ADRGenerated_Idempotent(t *testing.T) {
+	// given: same ADRGenerated event replayed twice
+	adrEvent := mustNewEvent(t, sightjack.EventADRGenerated, "s1", 2,
+		sightjack.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"})
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		adrEvent,
+		adrEvent, // duplicate replay
+	}
+
+	// when
+	state := eventsource.ProjectState(events)
+
+	// then: ADRCount should be 1, not 2
+	if state.ADRCount != 1 {
+		t.Errorf("expected ADRCount 1 (idempotent), got %d", state.ADRCount)
+	}
+}
+
 // mustNewEvent is a test helper that creates an event and fails on error.
 func mustNewEvent(t *testing.T, eventType sightjack.EventType, sessionID string, seq int64, payload any) sightjack.Event {
 	t.Helper()
