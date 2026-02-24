@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"bufio"
@@ -8,6 +8,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // ErrQuit signals the user chose to quit.
@@ -40,7 +42,7 @@ func ScanLine(ctx context.Context, s *bufio.Scanner) (string, error) {
 }
 
 // PromptWaveSelection displays available waves and reads the user's choice.
-func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, waves []Wave) (Wave, error) {
+func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, waves []sightjack.Wave) (sightjack.Wave, error) {
 	fmt.Fprintln(w, "\nAvailable waves:")
 	for i, wave := range waves {
 		fmt.Fprintf(w, "  %d. %-6s W: %-20s (%2.0f%% -> %2.0f%%)\n",
@@ -51,24 +53,24 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return Wave{}, ErrQuit
+		return sightjack.Wave{}, ErrQuit
 	}
 	input := strings.TrimSpace(line)
 	if input == "q" {
-		return Wave{}, ErrQuit
+		return sightjack.Wave{}, ErrQuit
 	}
 	if input == "b" {
-		return Wave{}, ErrGoBack
+		return sightjack.Wave{}, ErrGoBack
 	}
 	num, parseErr := strconv.Atoi(input)
 	if parseErr != nil || num < 1 || num > len(waves) {
-		return Wave{}, fmt.Errorf("invalid selection: %s", input)
+		return sightjack.Wave{}, fmt.Errorf("invalid selection: %s", input)
 	}
 	return waves[num-1], nil
 }
 
 // PromptWaveApproval displays a wave proposal and reads approve/reject/discuss.
-func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave Wave) (ApprovalChoice, error) {
+func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave sightjack.Wave) (sightjack.ApprovalChoice, error) {
 	fmt.Fprintf(w, "\n--- %s - %s ---\n", wave.ClusterName, wave.Title)
 	fmt.Fprintf(w, "  Proposed actions (%d):\n", len(wave.Actions))
 	for i, a := range wave.Actions {
@@ -79,28 +81,28 @@ func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return ApprovalQuit, ErrQuit
+		return sightjack.ApprovalQuit, ErrQuit
 	}
 	input := strings.TrimSpace(strings.ToLower(line))
 	switch input {
 	case "a":
-		return ApprovalApprove, nil
+		return sightjack.ApprovalApprove, nil
 	case "r":
-		return ApprovalReject, nil
+		return sightjack.ApprovalReject, nil
 	case "d":
-		return ApprovalDiscuss, nil
+		return sightjack.ApprovalDiscuss, nil
 	case "s":
-		return ApprovalSelective, nil
+		return sightjack.ApprovalSelective, nil
 	case "q":
-		return ApprovalQuit, ErrQuit
+		return sightjack.ApprovalQuit, ErrQuit
 	default:
-		return ApprovalQuit, fmt.Errorf("invalid input: %s", input)
+		return sightjack.ApprovalQuit, fmt.Errorf("invalid input: %s", input)
 	}
 }
 
 // PromptSelectiveApproval displays wave actions with toggle checkboxes.
 // Returns approved and rejected action lists.
-func PromptSelectiveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave Wave) ([]WaveAction, []WaveAction, error) {
+func PromptSelectiveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave sightjack.Wave) ([]sightjack.WaveAction, []sightjack.WaveAction, error) {
 	if len(wave.Actions) == 0 {
 		return nil, nil, nil
 	}
@@ -131,7 +133,7 @@ func PromptSelectiveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner,
 		case "q":
 			return nil, nil, ErrQuit
 		case "done":
-			var approved, rejected []WaveAction
+			var approved, rejected []sightjack.WaveAction
 			for i, a := range wave.Actions {
 				if selected[i] {
 					approved = append(approved, a)
@@ -180,11 +182,11 @@ func PromptDiscussTopic(ctx context.Context, w io.Writer, s *bufio.Scanner) (str
 }
 
 // PromptResume displays previous session info and asks the user to resume, start new, or re-scan.
-func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, state *SessionState) (ResumeChoice, error) {
+func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, state *sightjack.SessionState) (sightjack.ResumeChoice, error) {
 	completePct := int(state.Completeness * 100)
 	fmt.Fprintf(w, "\n  Previous session found (%d%% complete, %d ADRs)\n", completePct, state.ADRCount)
 	fmt.Fprintf(w, "  Last scan: %s\n\n", state.LastScanned.Format("2006-01-02 15:04"))
-	if CanResume(state) {
+	if sightjack.CanResume(state) {
 		fmt.Fprintln(w, "  [r] Resume session")
 	} else {
 		fmt.Fprintln(w, "  [r] Resume session (unavailable — rescan required)")
@@ -195,26 +197,26 @@ func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, state *Ses
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return ResumeChoiceResume, ErrQuit
+		return sightjack.ResumeChoiceResume, ErrQuit
 	}
 	input := strings.TrimSpace(strings.ToLower(line))
 	switch input {
 	case "r":
-		return ResumeChoiceResume, nil
+		return sightjack.ResumeChoiceResume, nil
 	case "n":
-		return ResumeChoiceNew, nil
+		return sightjack.ResumeChoiceNew, nil
 	case "s":
-		return ResumeChoiceRescan, nil
+		return sightjack.ResumeChoiceRescan, nil
 	case "q":
-		return ResumeChoiceResume, ErrQuit
+		return sightjack.ResumeChoiceResume, ErrQuit
 	default:
-		return ResumeChoiceResume, fmt.Errorf("invalid input: %s", input)
+		return sightjack.ResumeChoiceResume, fmt.Errorf("invalid input: %s", input)
 	}
 }
 
 // CompletedWaves filters waves to only those with "completed" status.
-func CompletedWaves(waves []Wave) []Wave {
-	var result []Wave
+func CompletedWaves(waves []sightjack.Wave) []sightjack.Wave {
+	var result []sightjack.Wave
 	for _, w := range waves {
 		if w.Status == "completed" {
 			result = append(result, w)
@@ -224,7 +226,7 @@ func CompletedWaves(waves []Wave) []Wave {
 }
 
 // PromptCompletedWaveSelection displays completed waves and reads the user's choice.
-func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, completed []Wave) (Wave, error) {
+func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, completed []sightjack.Wave) (sightjack.Wave, error) {
 	fmt.Fprintln(w, "\n  Completed waves:")
 	for i, wave := range completed {
 		fmt.Fprintf(w, "    %d. %-6s W: %-20s (%2.0f%% -> %2.0f%%)\n",
@@ -235,15 +237,15 @@ func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Sca
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return Wave{}, ErrQuit
+		return sightjack.Wave{}, ErrQuit
 	}
 	input := strings.TrimSpace(line)
 	if input == "b" {
-		return Wave{}, ErrGoBack
+		return sightjack.Wave{}, ErrGoBack
 	}
 	num, parseErr := strconv.Atoi(input)
 	if parseErr != nil || num < 1 || num > len(completed) {
-		return Wave{}, fmt.Errorf("invalid selection: %s", input)
+		return sightjack.Wave{}, fmt.Errorf("invalid selection: %s", input)
 	}
 	return completed[num-1], nil
 }

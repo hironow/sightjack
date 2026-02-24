@@ -64,8 +64,8 @@ if event data is found in .siren/events/.`,
 				if stateErr == nil {
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
-						choice, promptErr := sightjack.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, existingState)
-						if promptErr == sightjack.ErrQuit {
+						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, existingState)
+						if promptErr == session.ErrQuit {
 							return nil
 						}
 						if promptErr != nil {

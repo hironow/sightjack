@@ -1,4 +1,4 @@
-package sightjack_test
+package session_test
 
 import (
 	"bufio"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestPromptWaveSelection(t *testing.T) {
@@ -22,7 +23,7 @@ func TestPromptWaveSelection(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	selected, err := sightjack.PromptWaveSelection(ctx, &output, scanner, waves)
+	selected, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,8 +44,8 @@ func TestPromptWaveSelection_Quit(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	_, err := sightjack.PromptWaveSelection(ctx, &output, scanner, waves)
-	if err != sightjack.ErrQuit {
+	_, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }
@@ -64,7 +65,7 @@ func TestPromptWaveApproval_Approve(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, wave)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, wave)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,7 +81,7 @@ func TestPromptWaveApproval_Reject(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, wave)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, wave)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,7 +103,7 @@ func TestPromptWaveApproval_Discuss(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, wave)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, wave)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -126,7 +127,7 @@ func TestPromptSequence_SelectionThenApproval(t *testing.T) {
 	ctx := context.Background()
 
 	// when: selection then approval using same scanner
-	selected, err := sightjack.PromptWaveSelection(ctx, &output, scanner, waves)
+	selected, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
 	if err != nil {
 		t.Fatalf("selection: unexpected error: %v", err)
 	}
@@ -134,7 +135,7 @@ func TestPromptSequence_SelectionThenApproval(t *testing.T) {
 		t.Errorf("expected auth-w1, got %s", selected.ID)
 	}
 
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("approval: unexpected error: %v", err)
 	}
@@ -157,7 +158,7 @@ func TestScanLine_ContextCancelled(t *testing.T) {
 		cancel()
 	}()
 
-	_, err := sightjack.ScanLine(ctx, scanner)
+	_, err := session.ScanLine(ctx, scanner)
 
 	// then: should return context error, not block
 	if err == nil {
@@ -174,7 +175,7 @@ func TestScanLine_NormalInput(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	line, err := sightjack.ScanLine(ctx, scanner)
+	line, err := session.ScanLine(ctx, scanner)
 
 	// then
 	if err != nil {
@@ -192,7 +193,7 @@ func TestDisplayRippleEffects(t *testing.T) {
 	}
 
 	var output bytes.Buffer
-	sightjack.DisplayRippleEffects(&output, ripples)
+	session.DisplayRippleEffects(&output, ripples)
 
 	out := output.String()
 	if !strings.Contains(out, "API") {
@@ -210,7 +211,7 @@ func TestPromptDiscussTopic(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	topic, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	topic, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
 	if err != nil {
@@ -231,10 +232,10 @@ func TestPromptDiscussTopic_Quit(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	_, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	_, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
-	if err != sightjack.ErrQuit {
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }
@@ -246,13 +247,13 @@ func TestPromptDiscussTopic_Empty(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	_, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	_, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
 	if err == nil {
 		t.Fatal("expected error for empty topic")
 	}
-	if err == sightjack.ErrQuit {
+	if err == session.ErrQuit {
 		t.Error("expected non-quit error for empty topic")
 	}
 }
@@ -276,7 +277,7 @@ func TestDisplayArchitectResponse_WithModifiedWave(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayArchitectResponse(&output, resp)
+	session.DisplayArchitectResponse(&output, resp)
 
 	// then
 	out := output.String()
@@ -301,7 +302,7 @@ func TestDisplayArchitectResponse_NoModifications(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayArchitectResponse(&output, resp)
+	session.DisplayArchitectResponse(&output, resp)
 
 	// then
 	out := output.String()
@@ -336,7 +337,7 @@ func TestPromptWaveApproval_UppercaseInput(t *testing.T) {
 			var output bytes.Buffer
 			ctx := context.Background()
 
-			choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, wave)
+			choice, err := session.PromptWaveApproval(ctx, &output, scanner, wave)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -353,8 +354,8 @@ func TestPromptWaveApproval_UppercaseQ(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	_, err := sightjack.PromptWaveApproval(ctx, &output, scanner, wave)
-	if err != sightjack.ErrQuit {
+	_, err := session.PromptWaveApproval(ctx, &output, scanner, wave)
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit for uppercase Q, got %v", err)
 	}
 }
@@ -377,11 +378,11 @@ func TestPromptWaveApproval_InvalidInput(t *testing.T) {
 			var output bytes.Buffer
 			ctx := context.Background()
 
-			_, err := sightjack.PromptWaveApproval(ctx, &output, scanner, wave)
+			_, err := session.PromptWaveApproval(ctx, &output, scanner, wave)
 			if err == nil {
 				t.Fatal("expected error for invalid input")
 			}
-			if err == sightjack.ErrQuit {
+			if err == session.ErrQuit {
 				t.Error("expected non-quit error for invalid input")
 			}
 		})
@@ -395,10 +396,10 @@ func TestPromptDiscussTopic_PaddedQuit(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	_, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	_, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
-	if err != sightjack.ErrQuit {
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit for padded 'q', got %v", err)
 	}
 }
@@ -410,10 +411,10 @@ func TestPromptDiscussTopic_UppercaseQuit(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	_, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	_, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
-	if err != sightjack.ErrQuit {
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit for uppercase 'Q', got %v", err)
 	}
 }
@@ -431,7 +432,7 @@ func TestDisplayArchitectResponse_ZeroDelta(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayArchitectResponse(&output, resp)
+	session.DisplayArchitectResponse(&output, resp)
 
 	// then
 	out := output.String()
@@ -449,7 +450,7 @@ func TestDisplayArchitectResponse_EmptyAnalysis(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayArchitectResponse(&output, resp)
+	session.DisplayArchitectResponse(&output, resp)
 
 	// then
 	out := output.String()
@@ -472,7 +473,7 @@ func TestDisplayArchitectResponse_ModifiedWaveNilActions(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayArchitectResponse(&output, resp)
+	session.DisplayArchitectResponse(&output, resp)
 
 	// then
 	out := output.String()
@@ -492,7 +493,7 @@ func TestDisplayScribeResponse(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayScribeResponse(&output, resp)
+	session.DisplayScribeResponse(&output, resp)
 
 	// then
 	out := output.String()
@@ -516,7 +517,7 @@ func TestDisplayScribeResponse_EmptyTitle(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayScribeResponse(&output, resp)
+	session.DisplayScribeResponse(&output, resp)
 
 	// then
 	out := output.String()
@@ -539,7 +540,7 @@ func TestPromptResume_ChooseResume(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := sightjack.PromptResume(ctx, &output, scanner, state)
+	choice, err := session.PromptResume(ctx, &output, scanner, state)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -562,7 +563,7 @@ func TestPromptResume_ChooseNew(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := sightjack.PromptResume(ctx, &output, scanner, state)
+	choice, err := session.PromptResume(ctx, &output, scanner, state)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -579,7 +580,7 @@ func TestPromptResume_ChooseRescan(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := sightjack.PromptResume(ctx, &output, scanner, state)
+	choice, err := session.PromptResume(ctx, &output, scanner, state)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -596,9 +597,9 @@ func TestPromptResume_ChooseQuit(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	_, err := sightjack.PromptResume(ctx, &output, scanner, state)
+	_, err := session.PromptResume(ctx, &output, scanner, state)
 
-	if err != sightjack.ErrQuit {
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }
@@ -610,12 +611,12 @@ func TestPromptResume_InvalidInput(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	_, err := sightjack.PromptResume(ctx, &output, scanner, state)
+	_, err := session.PromptResume(ctx, &output, scanner, state)
 
 	if err == nil {
 		t.Fatal("expected error for invalid input")
 	}
-	if err == sightjack.ErrQuit {
+	if err == session.ErrQuit {
 		t.Error("should not be ErrQuit for invalid input")
 	}
 }
@@ -625,7 +626,7 @@ func TestDisplayShibitoWarnings_Empty(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayShibitoWarnings(&output, nil)
+	session.DisplayShibitoWarnings(&output, nil)
 
 	// then: no output
 	if output.Len() != 0 {
@@ -638,7 +639,7 @@ func TestDisplayShibitoWarnings_EmptySlice(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayShibitoWarnings(&output, []sightjack.ShibitoWarning{})
+	session.DisplayShibitoWarnings(&output, []sightjack.ShibitoWarning{})
 
 	// then: no output
 	if output.Len() != 0 {
@@ -655,7 +656,7 @@ func TestDisplayShibitoWarnings_MultipleWarnings(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayShibitoWarnings(&output, warnings)
+	session.DisplayShibitoWarnings(&output, warnings)
 
 	// then
 	out := output.String()
@@ -684,7 +685,7 @@ func TestDisplayADRConflicts_Empty(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayADRConflicts(&output, nil)
+	session.DisplayADRConflicts(&output, nil)
 
 	// then: no output
 	if output.Len() != 0 {
@@ -697,7 +698,7 @@ func TestDisplayADRConflicts_EmptySlice(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayADRConflicts(&output, []sightjack.ADRConflict{})
+	session.DisplayADRConflicts(&output, []sightjack.ADRConflict{})
 
 	// then
 	if output.Len() != 0 {
@@ -714,7 +715,7 @@ func TestDisplayADRConflicts_MultipleConflicts(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayADRConflicts(&output, conflicts)
+	session.DisplayADRConflicts(&output, conflicts)
 
 	// then
 	out := output.String()
@@ -741,7 +742,7 @@ func TestCompletedWaves_FiltersCompleted(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.CompletedWaves(waves)
+	result := session.CompletedWaves(waves)
 
 	// then
 	if len(result) != 2 {
@@ -763,7 +764,7 @@ func TestCompletedWaves_NoneCompleted(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.CompletedWaves(waves)
+	result := session.CompletedWaves(waves)
 
 	// then
 	if len(result) != 0 {
@@ -785,7 +786,7 @@ func TestDisplayCompletedWaveActions_ShowsActions(t *testing.T) {
 	}
 
 	// when
-	sightjack.DisplayCompletedWaveActions(&buf, wave)
+	session.DisplayCompletedWaveActions(&buf, wave)
 
 	// then
 	output := buf.String()
@@ -809,7 +810,7 @@ func TestDisplayCompletedWaveActions_NoActions(t *testing.T) {
 	wave := sightjack.Wave{ClusterName: "Auth", Title: "Empty"}
 
 	// when
-	sightjack.DisplayCompletedWaveActions(&buf, wave)
+	session.DisplayCompletedWaveActions(&buf, wave)
 
 	// then
 	output := buf.String()
@@ -829,7 +830,7 @@ func TestPromptCompletedWaveSelection_ValidChoice(t *testing.T) {
 	}
 
 	// when
-	selected, err := sightjack.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+	selected, err := session.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
 
 	// then
 	if err != nil {
@@ -848,10 +849,10 @@ func TestPromptCompletedWaveSelection_Back(t *testing.T) {
 	completed := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
 
 	// when
-	_, err := sightjack.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+	_, err := session.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
 
 	// then: b returns ErrGoBack (back to main navigator)
-	if err != sightjack.ErrGoBack {
+	if err != session.ErrGoBack {
 		t.Errorf("expected ErrGoBack, got %v", err)
 	}
 }
@@ -864,10 +865,10 @@ func TestPromptCompletedWaveSelection_Invalid(t *testing.T) {
 	completed := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
 
 	// when
-	_, err := sightjack.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
+	_, err := session.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
 
 	// then
-	if err == nil || err == sightjack.ErrQuit {
+	if err == nil || err == session.ErrQuit {
 		t.Error("expected invalid selection error")
 	}
 }
@@ -883,7 +884,7 @@ func TestDisplayWaveCompletion_Basic(t *testing.T) {
 	}
 
 	// when
-	sightjack.DisplayWaveCompletion(&buf, wave, ripples, 0.52, 2)
+	session.DisplayWaveCompletion(&buf, wave, ripples, 0.52, 2)
 
 	// then
 	output := buf.String()
@@ -920,7 +921,7 @@ func TestDisplayWaveCompletion_NoRipples(t *testing.T) {
 	wave := sightjack.Wave{ClusterName: "Auth", Title: "Deps", Delta: sightjack.WaveDelta{Before: 0.25, After: 0.40}}
 
 	// when
-	sightjack.DisplayWaveCompletion(&buf, wave, nil, 0.36, 0)
+	session.DisplayWaveCompletion(&buf, wave, nil, 0.36, 0)
 
 	// then
 	output := buf.String()
@@ -939,7 +940,7 @@ func TestDisplayWaveCompletion_ZeroNewWaves(t *testing.T) {
 	ripples := []sightjack.Ripple{{ClusterName: "DB", Description: "Updated"}}
 
 	// when
-	sightjack.DisplayWaveCompletion(&buf, wave, ripples, 0.50, 0)
+	session.DisplayWaveCompletion(&buf, wave, ripples, 0.50, 0)
 
 	// then
 	output := buf.String()
@@ -956,10 +957,10 @@ func TestPromptWaveSelection_BackOption(t *testing.T) {
 	waves := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
 
 	// when
-	_, err := sightjack.PromptWaveSelection(context.Background(), &buf, scanner, waves)
+	_, err := session.PromptWaveSelection(context.Background(), &buf, scanner, waves)
 
 	// then
-	if err != sightjack.ErrGoBack {
+	if err != session.ErrGoBack {
 		t.Errorf("expected ErrGoBack, got %v", err)
 	}
 }
@@ -975,7 +976,7 @@ func TestPromptWaveApproval_Selective(t *testing.T) {
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
 
-	choice, err := sightjack.PromptWaveApproval(context.Background(), &buf, scanner, wave)
+	choice, err := session.PromptWaveApproval(context.Background(), &buf, scanner, wave)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -994,7 +995,7 @@ func TestPromptSelectiveApproval_AllSelected(t *testing.T) {
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
 
-	approved, rejected, err := sightjack.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	approved, rejected, err := session.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -1017,7 +1018,7 @@ func TestPromptSelectiveApproval_ToggleOne(t *testing.T) {
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
 
-	approved, rejected, err := sightjack.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	approved, rejected, err := session.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -1041,7 +1042,7 @@ func TestPromptSelectiveApproval_SelectNoneThenDone(t *testing.T) {
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
 
-	approved, rejected, err := sightjack.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	approved, rejected, err := session.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -1063,7 +1064,7 @@ func TestPromptSelectiveApproval_SelectAll(t *testing.T) {
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
 
-	approved, _, err := sightjack.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	approved, _, err := session.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -1079,8 +1080,8 @@ func TestPromptSelectiveApproval_Quit(t *testing.T) {
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
 
-	_, _, err := sightjack.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
-	if err != sightjack.ErrQuit {
+	_, _, err := session.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }
@@ -1101,7 +1102,7 @@ func TestDisplayCompletedWaveActions(t *testing.T) {
 	var buf bytes.Buffer
 
 	// when
-	sightjack.DisplayCompletedWaveActions(&buf, wave)
+	session.DisplayCompletedWaveActions(&buf, wave)
 
 	// then: output should contain wave title and all action descriptions
 	output := buf.String()
@@ -1128,7 +1129,7 @@ func TestDisplayCompletedWaveActions_Empty(t *testing.T) {
 	var buf bytes.Buffer
 
 	// when
-	sightjack.DisplayCompletedWaveActions(&buf, wave)
+	session.DisplayCompletedWaveActions(&buf, wave)
 
 	// then: should not panic, should still show wave title
 	output := buf.String()
@@ -1147,7 +1148,7 @@ func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	sightjack.DisplayScribeResponse(&output, resp)
+	session.DisplayScribeResponse(&output, resp)
 
 	// then: "Saved to" line should show sanitized filename, not raw title
 	out := output.String()

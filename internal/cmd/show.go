@@ -11,6 +11,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newShowCmd() *cobra.Command {
@@ -66,7 +67,7 @@ func runShowFromStdin(w io.Writer) error {
 		if err := json.Unmarshal(data, &scanResult); err != nil {
 			return fmt.Errorf("parse ScanResult: %w", err)
 		}
-		nav := sightjack.RenderNavigator(&scanResult, "")
+		nav := session.RenderNavigator(&scanResult, "")
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
@@ -81,7 +82,7 @@ func runShowFromStdin(w io.Writer) error {
 		} else {
 			result = &sightjack.ScanResult{}
 		}
-		nav := sightjack.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
+		nav := session.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
@@ -115,7 +116,7 @@ func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) err
 	if strictness == "" {
 		strictness = "fog"
 	}
-	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, (*time.Time)(nil), strictness, state.ShibitoCount)
+	nav := session.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, (*time.Time)(nil), strictness, state.ShibitoCount)
 	fmt.Fprintln(w)
 	fmt.Fprint(w, nav)
 	logger.Info("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))

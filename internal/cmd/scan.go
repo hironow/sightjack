@@ -11,6 +11,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newScanCmd() *cobra.Command {
@@ -71,7 +72,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				}
 				fmt.Fprintln(w, string(data))
 			} else {
-				nav := sightjack.RenderNavigator(result, cfg.Linear.Project)
+				nav := session.RenderNavigator(result, cfg.Linear.Project)
 				fmt.Fprintln(w)
 				fmt.Fprint(w, nav)
 			}

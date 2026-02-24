@@ -188,38 +188,38 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, selectPhaseResult, bool) {
 
 	// Display Link Navigator
-	nav := sightjack.RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
+	nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
 	fmt.Fprintln(out)
 	fmt.Fprint(out, nav)
 
 	// Display shibito warnings once (static data, does not change during session)
 	if !shibitoShown {
-		sightjack.DisplayShibitoWarnings(out, scanResult.ShibitoWarnings)
+		DisplayShibitoWarnings(out, scanResult.ShibitoWarnings)
 		shibitoShown = true
 	}
 
 	// Prompt wave selection
-	selected, err := sightjack.PromptWaveSelection(ctx, out, scanner, available)
-	if err == sightjack.ErrQuit {
+	selected, err := PromptWaveSelection(ctx, out, scanner, available)
+	if err == ErrQuit {
 		loopSpan.AddEvent("session.paused")
 		logger.Info("Session paused. State saved.")
 		return sightjack.Wave{}, selectQuit, shibitoShown
 	}
-	if err == sightjack.ErrGoBack {
-		completedList := sightjack.CompletedWaves(waves)
+	if err == ErrGoBack {
+		completedList := CompletedWaves(waves)
 		if len(completedList) == 0 {
 			logger.Info("No completed waves to revisit.")
 			return sightjack.Wave{}, selectRetry, shibitoShown
 		}
-		revisit, backErr := sightjack.PromptCompletedWaveSelection(ctx, out, scanner, completedList)
-		if backErr == sightjack.ErrQuit {
+		revisit, backErr := PromptCompletedWaveSelection(ctx, out, scanner, completedList)
+		if backErr == ErrQuit {
 			logger.Info("Session paused. State saved.")
 			return sightjack.Wave{}, selectQuit, shibitoShown
 		}
 		if backErr != nil {
 			return sightjack.Wave{}, selectRetry, shibitoShown
 		}
-		sightjack.DisplayCompletedWaveActions(out, revisit)
+		DisplayCompletedWaveActions(out, revisit)
 		return sightjack.Wave{}, selectRetry, shibitoShown
 	}
 	if err != nil {
@@ -250,8 +250,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, approvalPhaseResult) {
 
 	for {
-		choice, err := sightjack.PromptWaveApproval(ctx, out, scanner, selected)
-		if err == sightjack.ErrQuit {
+		choice, err := PromptWaveApproval(ctx, out, scanner, selected)
+		if err == ErrQuit {
 			return selected, approvalRejected
 		}
 		if err != nil {
@@ -292,8 +292,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			logger.Info("Wave rejected.")
 			return selected, approvalRejected
 		case sightjack.ApprovalDiscuss:
-			topic, topicErr := sightjack.PromptDiscussTopic(ctx, out, scanner)
-			if topicErr == sightjack.ErrQuit {
+			topic, topicErr := PromptDiscussTopic(ctx, out, scanner)
+			if topicErr == ErrQuit {
 				continue
 			}
 			if topicErr != nil {
@@ -305,7 +305,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				logger.Error("Architect discussion failed: %v", discussErr)
 				continue
 			}
-			sightjack.DisplayArchitectResponse(out, result)
+			DisplayArchitectResponse(out, result)
 			if result.ModifiedWave != nil {
 				selected = sightjack.ApplyModifiedWave(selected, *result.ModifiedWave, completed)
 				sightjack.PropagateWaveUpdate(waves, selected)
@@ -326,8 +326,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 					if scribeErr != nil {
 						logger.Warn("Scribe failed (non-fatal): %v", scribeErr)
 					} else {
-						sightjack.DisplayScribeResponse(out, scribeResp)
-						sightjack.DisplayADRConflicts(out, scribeResp.Conflicts)
+						DisplayScribeResponse(out, scribeResp)
+						DisplayADRConflicts(out, scribeResp.Conflicts)
 						*adrCount++
 						recorder.Record(sightjack.EventADRGenerated, sightjack.ADRGeneratedPayload{
 							ADRID: scribeResp.ADRID, Title: scribeResp.Title,
@@ -341,8 +341,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			}
 			continue // back to approval prompt with (possibly modified) wave
 		case sightjack.ApprovalSelective:
-			approved, rejected, selErr := sightjack.PromptSelectiveApproval(ctx, out, scanner, selected)
-			if selErr == sightjack.ErrQuit {
+			approved, rejected, selErr := PromptSelectiveApproval(ctx, out, scanner, selected)
+			if selErr == ErrQuit {
 				return selected, approvalRejected
 			}
 			if selErr != nil {
@@ -415,7 +415,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 			),
 		)
 		logger.Warn("Wave %s partially failed (%d errors). Not marking as completed.", sightjack.WaveKey(selected), len(applyResult.Errors))
-		sightjack.DisplayRippleEffects(out, applyResult.Ripples)
+		DisplayRippleEffects(out, applyResult.Ripples)
 		return
 	}
 
@@ -494,7 +494,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 			UnlockedWaveIDs: unlockedIDs,
 		})
 	}
-	sightjack.DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
+	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 	// --- Post-completion: Generate next waves ---
 	var clusterForNextgen sightjack.ClusterScanResult

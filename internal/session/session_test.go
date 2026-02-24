@@ -242,7 +242,7 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 	ctx := context.Background()
 
 	// when: selection
-	selected, err := sightjack.PromptWaveSelection(ctx, &output, scanner, waves)
+	selected, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
 	if err != nil {
 		t.Fatalf("selection error: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 	}
 
 	// when: first approval -> discuss
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("first approval error: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 	}
 
 	// when: topic input
-	topic, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	topic, err := session.PromptDiscussTopic(ctx, &output, scanner)
 	if err != nil {
 		t.Fatalf("topic error: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 	}
 
 	// when: second approval -> approve
-	choice, err = sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err = session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("second approval error: %v", err)
 	}
@@ -365,13 +365,13 @@ func TestDiscussBranchThenReject(t *testing.T) {
 	ctx := context.Background()
 
 	// when: selection
-	selected, err := sightjack.PromptWaveSelection(ctx, &output, scanner, waves)
+	selected, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
 	if err != nil {
 		t.Fatalf("selection error: %v", err)
 	}
 
 	// when: first approval -> discuss
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("first approval error: %v", err)
 	}
@@ -380,7 +380,7 @@ func TestDiscussBranchThenReject(t *testing.T) {
 	}
 
 	// when: topic input
-	topic, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	topic, err := session.PromptDiscussTopic(ctx, &output, scanner)
 	if err != nil {
 		t.Fatalf("topic error: %v", err)
 	}
@@ -389,7 +389,7 @@ func TestDiscussBranchThenReject(t *testing.T) {
 	}
 
 	// when: second approval -> reject
-	choice, err = sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err = session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("second approval error: %v", err)
 	}
@@ -411,13 +411,13 @@ func TestDiscussBranchQuitAtTopic(t *testing.T) {
 	ctx := context.Background()
 
 	// when: selection
-	selected, err := sightjack.PromptWaveSelection(ctx, &output, scanner, waves)
+	selected, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
 	if err != nil {
 		t.Fatalf("selection error: %v", err)
 	}
 
 	// when: approval -> discuss
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("approval error: %v", err)
 	}
@@ -426,8 +426,8 @@ func TestDiscussBranchQuitAtTopic(t *testing.T) {
 	}
 
 	// when: topic -> quit
-	_, err = sightjack.PromptDiscussTopic(ctx, &output, scanner)
-	if err != sightjack.ErrQuit {
+	_, err = session.PromptDiscussTopic(ctx, &output, scanner)
+	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit when quitting at topic, got %v", err)
 	}
 }
@@ -445,20 +445,20 @@ func TestMultipleDiscussRounds(t *testing.T) {
 	ctx := context.Background()
 
 	// when: selection
-	selected, err := sightjack.PromptWaveSelection(ctx, &output, scanner, waves)
+	selected, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
 	if err != nil {
 		t.Fatalf("selection error: %v", err)
 	}
 
 	// Round 1: discuss
-	choice, err := sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err := session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("round 1 approval error: %v", err)
 	}
 	if choice != sightjack.ApprovalDiscuss {
 		t.Fatalf("round 1: expected ApprovalDiscuss, got %d", choice)
 	}
-	topic, err := sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	topic, err := session.PromptDiscussTopic(ctx, &output, scanner)
 	if err != nil {
 		t.Fatalf("round 1 topic error: %v", err)
 	}
@@ -467,14 +467,14 @@ func TestMultipleDiscussRounds(t *testing.T) {
 	}
 
 	// Round 2: discuss again
-	choice, err = sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err = session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("round 2 approval error: %v", err)
 	}
 	if choice != sightjack.ApprovalDiscuss {
 		t.Fatalf("round 2: expected ApprovalDiscuss, got %d", choice)
 	}
-	topic, err = sightjack.PromptDiscussTopic(ctx, &output, scanner)
+	topic, err = session.PromptDiscussTopic(ctx, &output, scanner)
 	if err != nil {
 		t.Fatalf("round 2 topic error: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestMultipleDiscussRounds(t *testing.T) {
 	}
 
 	// Final: approve
-	choice, err = sightjack.PromptWaveApproval(ctx, &output, scanner, selected)
+	choice, err = session.PromptWaveApproval(ctx, &output, scanner, selected)
 	if err != nil {
 		t.Fatalf("final approval error: %v", err)
 	}
