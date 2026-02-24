@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newDoctorCmd() *cobra.Command {
@@ -36,7 +36,7 @@ is working. Reports pass/fail/skip for each check.`,
 			fmt.Fprintln(w)
 
 			logger := loggerFrom(cmd)
-			results := sightjack.RunDoctor(cmd.Context(), resolved, baseDir, logger)
+			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger)
 
 			var fails, skips int
 			for _, r := range results {
@@ -45,9 +45,9 @@ is working. Reports pass/fail/skip for each check.`,
 					fmt.Fprintf(w, "  hint: %s\n", r.Hint)
 				}
 				switch r.Status {
-				case sightjack.CheckFail:
+				case session.CheckFail:
 					fails++
-				case sightjack.CheckSkip:
+				case session.CheckSkip:
 					skips++
 				}
 			}

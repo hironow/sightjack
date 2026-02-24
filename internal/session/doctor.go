@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // CheckStatus represents the outcome of a single doctor check.
@@ -43,7 +45,7 @@ func (s CheckStatus) StatusLabel() string {
 
 // CheckConfig validates that the config file exists and can be loaded.
 func CheckConfig(configPath string) CheckResult {
-	_, err := LoadConfig(configPath)
+	_, err := sightjack.LoadConfig(configPath)
 	if err != nil {
 		return CheckResult{
 			Name:    "Config",
@@ -90,7 +92,7 @@ func CheckTool(ctx context.Context, name string) CheckResult {
 // CheckClaudeAuth verifies that Claude Code is authenticated by sending a
 // simple prompt that does not require any MCP server.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func CheckClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
+func CheckClaudeAuth(ctx context.Context, cfg *sightjack.Config, logger *sightjack.Logger) CheckResult {
 	if cfg == nil {
 		return CheckResult{
 			Name:    "Claude Auth",
@@ -99,7 +101,7 @@ func CheckClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResu
 		}
 	}
 
-	output, err := RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger, WithAllowedTools("Write"))
+	output, err := sightjack.RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger, sightjack.WithAllowedTools("Write"))
 	if err != nil {
 		hint := fmt.Sprintf("claude execution failed: %v", err)
 		if strings.Contains(output, "Not logged in") {
@@ -127,7 +129,7 @@ func CheckClaudeAuth(ctx context.Context, cfg *Config, logger *Logger) CheckResu
 // CheckLinearMCP verifies Linear MCP connectivity by sending a prompt that
 // references the configured Linear team.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func CheckLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResult {
+func CheckLinearMCP(ctx context.Context, cfg *sightjack.Config, logger *sightjack.Logger) CheckResult {
 	if cfg == nil {
 		return CheckResult{
 			Name:    "Linear MCP",
@@ -137,7 +139,7 @@ func CheckLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResul
 	}
 
 	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Linear.Team)
-	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, WithAllowedTools(LinearMCPAllowedTools...))
+	_, err := sightjack.RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, sightjack.WithAllowedTools(sightjack.LinearMCPAllowedTools...))
 	if err != nil {
 		return CheckResult{
 			Name:    "Linear MCP",
@@ -157,7 +159,7 @@ func CheckLinearMCP(ctx context.Context, cfg *Config, logger *Logger) CheckResul
 // CheckStateDir verifies that the .siren/ state directory exists or can be
 // created, and that it is writable. Uses a temporary file probe to confirm.
 func CheckStateDir(baseDir string) CheckResult {
-	dir := filepath.Join(baseDir, StateDir)
+	dir := filepath.Join(baseDir, sightjack.StateDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return CheckResult{
 			Name:    "State Dir",
@@ -185,7 +187,7 @@ func CheckStateDir(baseDir string) CheckResult {
 // and that their frontmatter contains a dmail-schema-version field.
 func CheckSkills(baseDir string) CheckResult {
 	skillNames := []string{"dmail-sendable", "dmail-readable"}
-	skillsDir := filepath.Join(baseDir, StateDir, "skills")
+	skillsDir := filepath.Join(baseDir, sightjack.StateDir, "skills")
 
 	for _, name := range skillNames {
 		path := filepath.Join(skillsDir, name, "SKILL.md")
@@ -218,9 +220,9 @@ func CheckSkills(baseDir string) CheckResult {
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
 // baseDir is used to verify the .siren/ state directory is writable.
-func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *Logger) []CheckResult {
+func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *sightjack.Logger) []CheckResult {
 	if logger == nil {
-		logger = NewLogger(nil, false)
+		logger = sightjack.NewLogger(nil, false)
 	}
 	var results []CheckResult
 
@@ -231,10 +233,10 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *L
 	// 2. State directory check
 	results = append(results, CheckStateDir(baseDir))
 
-	var cfg *Config
+	var cfg *sightjack.Config
 	if cfgResult.Status == CheckOK {
 		// Re-load to use for subsequent checks (checkConfig already validated).
-		cfg, _ = LoadConfig(configPath)
+		cfg, _ = sightjack.LoadConfig(configPath)
 	}
 
 	// 3. claude binary check
