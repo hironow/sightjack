@@ -81,3 +81,44 @@ rules:
     paths:
       exclude:
         - "*_test.go"
+
+  # --- ADR 0003: OTel noop-default (continued) ---
+
+  # Rule 5: otel.SetMeterProvider outside InitTracer
+  # Source: ADR 0003 — centralized provider initialization
+  - id: adr0003-otel-set-meter-provider-outside-init
+    languages: [go]
+    message: |
+      otel.SetMeterProvider() は InitTracer() 内でのみ呼び出してください。
+      MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
+      TracerProvider と同様に集中管理してください。
+      Ref: docs/adr/0003-otel-noop-default-tracer.md
+    severity: WARNING
+    patterns:
+      - pattern: otel.SetMeterProvider(...)
+      - pattern-not-inside: |
+          func InitTracer(...) $RET {
+            ...
+          }
+    paths:
+      exclude:
+        - "*_test.go"
+
+  # --- ADR 0005: fsnotify daemon (continued) ---
+
+  # Rule 6: mutex Lock without defer Unlock
+  # Source: ADR 0005 — thread-safe daemon operations
+  - id: adr0005-mutex-lock-without-defer-unlock
+    languages: [go]
+    message: |
+      $M.Lock() の直後に defer $M.Unlock() がありません。
+      Lock/Unlock のペアリングを忘れるとデッドロックの原因になります。
+      条件付き Unlock が必要な場合は nosemgrep を付与してください。
+      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+    severity: ERROR
+    patterns:
+      - pattern: $M.Lock()
+      - pattern-not-inside: |
+          $M.Lock()
+          ...
+          defer $M.Unlock()
