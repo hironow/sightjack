@@ -58,6 +58,7 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
+	recorder = NewLoggingRecorder(recorder, logger)
 	if !dryRun && input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -718,6 +719,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
+	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -777,6 +779,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
+	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
