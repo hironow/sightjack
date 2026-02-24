@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/sightjack"
 )
 
 func itemName(s string) string { return s }
@@ -18,10 +20,10 @@ func TestRunParallel_AllSucceed(t *testing.T) {
 	work := func(_ context.Context, index int, item string) (string, error) {
 		return fmt.Sprintf("result-%s", item), nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, warnings := RunParallel(context.Background(), items, 2, work, itemName, logger)
+	results, warnings := sightjack.RunParallel(context.Background(), items, 2, work, itemName, logger)
 
 	// then: all 3 results in original order, no warnings
 	if len(results) != 3 {
@@ -44,10 +46,10 @@ func TestRunParallel_PartialFailure(t *testing.T) {
 		}
 		return fmt.Sprintf("result-%s", item), nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, warnings := RunParallel(context.Background(), items, 2, work, itemName, logger)
+	results, warnings := sightjack.RunParallel(context.Background(), items, 2, work, itemName, logger)
 
 	// then: 2 successes (A, C) in order, 1 warning mentioning "B"
 	if len(results) != 2 {
@@ -70,10 +72,10 @@ func TestRunParallel_AllFail(t *testing.T) {
 	work := func(_ context.Context, _ int, item string) (string, error) {
 		return "", fmt.Errorf("%s failed", item)
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, warnings := RunParallel(context.Background(), items, 2, work, itemName, logger)
+	results, warnings := sightjack.RunParallel(context.Background(), items, 2, work, itemName, logger)
 
 	// then: 0 results, 2 warnings
 	if len(results) != 0 {
@@ -90,10 +92,10 @@ func TestRunParallel_EmptyItems(t *testing.T) {
 		t.Fatal("work should not be called")
 		return "", nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, warnings := RunParallel(context.Background(), nil, 2, work, itemName, logger)
+	results, warnings := sightjack.RunParallel(context.Background(), nil, 2, work, itemName, logger)
 
 	// then
 	if len(results) != 0 {
@@ -115,10 +117,10 @@ func TestRunParallel_ContextCancelled(t *testing.T) {
 		callCount++
 		return "x", nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, _ := RunParallel(ctx, items, 2, work, itemName, logger)
+	results, _ := sightjack.RunParallel(ctx, items, 2, work, itemName, logger)
 
 	// then: no goroutines launched
 	if callCount != 0 {
@@ -137,10 +139,10 @@ func TestRunParallel_PreservesOrder(t *testing.T) {
 		time.Sleep(time.Duration(item[0]-'A') * time.Millisecond)
 		return item, nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, _ := RunParallel(context.Background(), items, 2, work, itemName, logger)
+	results, _ := sightjack.RunParallel(context.Background(), items, 2, work, itemName, logger)
 
 	// then: results in original order (E, D, C, B, A), not completion order
 	if len(results) != 5 {
@@ -162,10 +164,10 @@ func TestRunParallel_ConcurrencyBound(t *testing.T) {
 		order = append(order, item)
 		return item, nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, _ := RunParallel(context.Background(), items, 1, work, itemName, logger)
+	results, _ := sightjack.RunParallel(context.Background(), items, 1, work, itemName, logger)
 
 	// then: all succeed
 	if len(results) != 4 {
@@ -187,10 +189,10 @@ func TestRunParallel_PanicRecovery(t *testing.T) {
 		}
 		return fmt.Sprintf("result-%s", item), nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, warnings := RunParallel(context.Background(), items, 2, work, itemName, logger)
+	results, warnings := sightjack.RunParallel(context.Background(), items, 2, work, itemName, logger)
 
 	// then: A and C succeed, B panics → warning
 	if len(results) != 2 {
@@ -218,10 +220,10 @@ func TestRunParallel_CancelWhileWaitingSemaphore(t *testing.T) {
 		}
 		return item, nil
 	}
-	logger := NewLogger(io.Discard, false)
+	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
-	results, _ := RunParallel(ctx, items, 1, work, itemName, logger)
+	results, _ := sightjack.RunParallel(ctx, items, 1, work, itemName, logger)
 
 	// then: at most 1 result (A completed before cancel)
 	if len(results) > 1 {

@@ -1044,7 +1044,7 @@ func RecoverLatestState(baseDir string, logger *Logger) (*SessionState, error) {
 	var sessionIDs []string
 	seen := map[string]bool{}
 	for _, parent := range []string{
-		filepath.Join(baseDir, stateDir, ".run"),
+		filepath.Join(baseDir, StateDir, ".run"),
 	} {
 		entries, err := os.ReadDir(parent)
 		if err != nil {
@@ -1068,7 +1068,7 @@ func RecoverLatestState(baseDir string, logger *Logger) (*SessionState, error) {
 			return state, nil
 		}
 	}
-	return nil, fmt.Errorf("no recoverable session data in %s", filepath.Join(baseDir, stateDir))
+	return nil, fmt.Errorf("no recoverable session data in %s", filepath.Join(baseDir, StateDir))
 }
 
 // CompletedWavesForCluster returns all completed waves for the given cluster.

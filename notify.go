@@ -83,15 +83,15 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	if n.template == "" {
 		return fmt.Errorf("notify: empty command template")
 	}
-	expanded := strings.ReplaceAll(n.template, "{title}", shellQuote(title))
-	expanded = strings.ReplaceAll(expanded, "{message}", shellQuote(message))
+	expanded := strings.ReplaceAll(n.template, "{title}", ShellQuote(title))
+	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	cmd := n.factory()(ctx, "sh", "-c", expanded)
 	return cmd.Run()
 }
 
-// shellQuote wraps a string in single quotes with proper escaping
+// ShellQuote wraps a string in single quotes with proper escaping
 // to prevent shell injection. Single quotes within the string are
 // escaped by splitting: quote -> quote-backslash-quote-quote (see implementation).
-func shellQuote(s string) string {
+func ShellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }

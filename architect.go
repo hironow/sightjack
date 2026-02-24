@@ -81,8 +81,8 @@ func ParseArchitectResult(path string) (*ArchitectResponse, error) {
 	return &result, nil
 }
 
-// architectDiscussFileName returns the output filename for an architect discussion.
-func architectDiscussFileName(wave Wave) string {
+// ArchitectDiscussFileName returns the output filename for an architect discussion.
+func ArchitectDiscussFileName(wave Wave) string {
 	return fmt.Sprintf("architect_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 }
 
@@ -93,7 +93,7 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 		return fmt.Errorf("marshal wave actions: %w", err)
 	}
 
-	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
+	outputFile := filepath.Join(scanDir, ArchitectDiscussFileName(wave))
 	prompt, err := RenderArchitectDiscussPrompt(cfg.Lang, ArchitectDiscussPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
@@ -110,11 +110,11 @@ func RunArchitectDiscussDryRun(cfg *Config, scanDir string, wave Wave, topic str
 	return RunClaudeDryRun(cfg, prompt, scanDir, dryRunName, logger)
 }
 
-// clearArchitectOutput removes any existing architect output file to prevent
+// ClearArchitectOutput removes any existing architect output file to prevent
 // stale results from a prior discuss round being parsed if Claude fails to
 // write a new file.
-func clearArchitectOutput(scanDir string, wave Wave) {
-	path := filepath.Join(scanDir, architectDiscussFileName(wave))
+func ClearArchitectOutput(scanDir string, wave Wave) {
+	path := filepath.Join(scanDir, ArchitectDiscussFileName(wave))
 	_ = os.Remove(path)
 }
 
@@ -128,8 +128,8 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 	)
 	defer discussSpan.End()
 
-	clearArchitectOutput(scanDir, wave)
-	outputFile := filepath.Join(scanDir, architectDiscussFileName(wave))
+	ClearArchitectOutput(scanDir, wave)
+	outputFile := filepath.Join(scanDir, ArchitectDiscussFileName(wave))
 
 	actionsJSON, err := json.Marshal(wave.Actions)
 	if err != nil {
@@ -149,7 +149,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 	}
 
 	// Save prompt + tee output for debugging.
-	promptBase := architectDiscussFileName(wave)
+	promptBase := ArchitectDiscussFileName(wave)
 	promptBase = strings.TrimSuffix(promptBase, ".json")
 	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
 		logger.Warn("save architect prompt: %v", err)
@@ -168,7 +168,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *Config, scanDir string, wave 
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}
 
-	if normErr := normalizeJSONFile(outputFile); normErr != nil {
+	if normErr := NormalizeJSONFile(outputFile); normErr != nil {
 		logger.Warn("normalize architect JSON: %v", normErr)
 	}
 	result, err := ParseArchitectResult(outputFile)

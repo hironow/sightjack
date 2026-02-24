@@ -142,9 +142,9 @@ func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
 	}
 }
 
-// waveApplyFileName returns the output filename for a wave apply result.
+// WaveApplyFileName returns the output filename for a wave apply result.
 // Includes cluster name to avoid collisions when wave IDs are duplicated across clusters.
-func waveApplyFileName(wave Wave) string {
+func WaveApplyFileName(wave Wave) string {
 	return fmt.Sprintf("apply_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 }
 
@@ -160,7 +160,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 	)
 	defer applySpan.End()
 
-	applyFile := filepath.Join(scanDir, waveApplyFileName(wave))
+	applyFile := filepath.Join(scanDir, WaveApplyFileName(wave))
 
 	actionsJSON, err := json.Marshal(wave.Actions)
 	if err != nil {
@@ -185,7 +185,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 	}
 
 	// Save prompt + tee output for debugging.
-	promptBase := strings.TrimSuffix(waveApplyFileName(wave), ".json")
+	promptBase := strings.TrimSuffix(WaveApplyFileName(wave), ".json")
 	if err := os.WriteFile(filepath.Join(scanDir, promptBase+"_prompt.md"), []byte(prompt), 0644); err != nil {
 		logger.Warn("save apply prompt: %v", err)
 	}
@@ -204,7 +204,7 @@ func RunWaveApply(ctx context.Context, cfg *Config, scanDir string, wave Wave, s
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
 
-	if normErr := normalizeJSONFile(applyFile); normErr != nil {
+	if normErr := NormalizeJSONFile(applyFile); normErr != nil {
 		logger.Warn("normalize wave apply JSON: %v", normErr)
 	}
 	result, err := ParseWaveApplyResult(applyFile)

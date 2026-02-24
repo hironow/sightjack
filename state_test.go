@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"encoding/json"
@@ -7,28 +7,30 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestState_WriteAndRead_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	state := SessionState{
+	state := sightjack.SessionState{
 		Version:      "0.1",
 		SessionID:    "test-session-123",
 		Project:      "Test Project",
 		LastScanned:  time.Date(2026, 2, 16, 10, 0, 0, 0, time.UTC),
 		Completeness: 0.32,
-		Clusters: []ClusterState{
+		Clusters: []sightjack.ClusterState{
 			{Name: "Auth", Completeness: 0.25, IssueCount: 5},
 			{Name: "API", Completeness: 0.40, IssueCount: 8},
 		},
 	}
 
-	err := WriteState(dir, &state)
+	err := sightjack.WriteState(dir, &state)
 	if err != nil {
 		t.Fatalf("write failed: %v", err)
 	}
 
-	loaded, err := ReadState(dir)
+	loaded, err := sightjack.ReadState(dir)
 	if err != nil {
 		t.Fatalf("read failed: %v", err)
 	}
@@ -49,7 +51,7 @@ func TestState_WriteAndRead_RoundTrip(t *testing.T) {
 
 func TestState_ReadMissing_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	_, err := ReadState(dir)
+	_, err := sightjack.ReadState(dir)
 	if err == nil {
 		t.Error("expected error for missing state file")
 	}
@@ -58,26 +60,26 @@ func TestState_ReadMissing_ReturnsError(t *testing.T) {
 func TestState_WriteAndRead_WithWaves(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	state := &SessionState{
+	state := &sightjack.SessionState{
 		Version:      "0.2",
 		SessionID:    "test-session",
 		Project:      "TestProject",
 		LastScanned:  time.Now().Truncate(time.Second),
 		Completeness: 0.35,
-		Clusters: []ClusterState{
+		Clusters: []sightjack.ClusterState{
 			{Name: "Auth", Completeness: 0.25, IssueCount: 4},
 		},
-		Waves: []WaveState{
+		Waves: []sightjack.WaveState{
 			{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed", ActionCount: 3},
 			{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available", Prerequisites: []string{"auth-w1"}, ActionCount: 5},
 		},
 	}
 
 	// when
-	if err := WriteState(dir, state); err != nil {
+	if err := sightjack.WriteState(dir, state); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	loaded, err := ReadState(dir)
+	loaded, err := sightjack.ReadState(dir)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -98,7 +100,7 @@ func TestState_WriteAndRead_WithWaves(t *testing.T) {
 }
 
 func TestStatePath(t *testing.T) {
-	path := StatePath("/project")
+	path := sightjack.StatePath("/project")
 	expected := filepath.Join("/project", ".siren", "state.json")
 	if path != expected {
 		t.Errorf("expected %s, got %s", expected, path)
@@ -107,7 +109,7 @@ func TestStatePath(t *testing.T) {
 
 func TestConfigPath(t *testing.T) {
 	// when
-	path := ConfigPath("/project")
+	path := sightjack.ConfigPath("/project")
 
 	// then
 	expected := filepath.Join("/project", ".siren", "config.yaml")
@@ -119,11 +121,11 @@ func TestConfigPath(t *testing.T) {
 func TestWriteGitIgnore(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	sirenDir := filepath.Join(dir, stateDir)
+	sirenDir := filepath.Join(dir, sightjack.StateDir)
 	os.MkdirAll(sirenDir, 0755)
 
 	// when
-	err := WriteGitIgnore(dir)
+	err := sightjack.WriteGitIgnore(dir)
 
 	// then
 	if err != nil {
@@ -145,14 +147,14 @@ func TestWriteGitIgnore(t *testing.T) {
 func TestWriteGitIgnore_Idempotent(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	sirenDir := filepath.Join(dir, stateDir)
+	sirenDir := filepath.Join(dir, sightjack.StateDir)
 	os.MkdirAll(sirenDir, 0755)
 
 	// when: call twice
-	if err := WriteGitIgnore(dir); err != nil {
+	if err := sightjack.WriteGitIgnore(dir); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	if err := WriteGitIgnore(dir); err != nil {
+	if err := sightjack.WriteGitIgnore(dir); err != nil {
 		t.Fatalf("second call: %v", err)
 	}
 
@@ -172,13 +174,13 @@ func TestEnsureScanDir_CreatesGitIgnore(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	_, err := EnsureScanDir(dir, "test-session")
+	_, err := sightjack.EnsureScanDir(dir, "test-session")
 
 	// then
 	if err != nil {
 		t.Fatalf("EnsureScanDir failed: %v", err)
 	}
-	data, readErr := os.ReadFile(filepath.Join(dir, stateDir, ".gitignore"))
+	data, readErr := os.ReadFile(filepath.Join(dir, sightjack.StateDir, ".gitignore"))
 	if readErr != nil {
 		t.Fatalf(".gitignore not created: %v", readErr)
 	}
@@ -190,7 +192,7 @@ func TestEnsureScanDir_CreatesGitIgnore(t *testing.T) {
 
 func TestSessionState_ADRCount_Positive(t *testing.T) {
 	// given
-	state := SessionState{
+	state := sightjack.SessionState{
 		Version:  "0.4",
 		ADRCount: 3,
 	}
@@ -200,7 +202,7 @@ func TestSessionState_ADRCount_Positive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded SessionState
+	var decoded sightjack.SessionState
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -213,7 +215,7 @@ func TestSessionState_ADRCount_Positive(t *testing.T) {
 
 func TestSessionState_ADRCount_ZeroOmitted(t *testing.T) {
 	// given: ADRCount = 0 should be omitted from JSON (omitempty)
-	state := SessionState{
+	state := sightjack.SessionState{
 		Version:  "0.4",
 		ADRCount: 0,
 	}
@@ -233,10 +235,10 @@ func TestSessionState_ADRCount_ZeroOmitted(t *testing.T) {
 
 func TestWaveState_FullFieldsRoundTrip(t *testing.T) {
 	// given: WaveState with all v0.5 fields populated
-	state := &SessionState{
+	state := &sightjack.SessionState{
 		Version:   "0.5",
 		SessionID: "test-full-wave",
-		Waves: []WaveState{
+		Waves: []sightjack.WaveState{
 			{
 				ID:            "auth-w1",
 				ClusterName:   "Auth",
@@ -244,22 +246,22 @@ func TestWaveState_FullFieldsRoundTrip(t *testing.T) {
 				Status:        "completed",
 				Prerequisites: []string{"Auth:auth-w0"},
 				ActionCount:   2,
-				Actions: []WaveAction{
+				Actions: []sightjack.WaveAction{
 					{Type: "add_dependency", IssueID: "ENG-101", Description: "Add dep"},
 					{Type: "add_dod", IssueID: "ENG-102", Description: "Add DoD"},
 				},
 				Description: "Order dependencies first",
-				Delta:       WaveDelta{Before: 0.25, After: 0.50},
+				Delta:       sightjack.WaveDelta{Before: 0.25, After: 0.50},
 			},
 		},
 	}
 
 	// when: round-trip through WriteState / ReadState
 	dir := t.TempDir()
-	if err := WriteState(dir, state); err != nil {
+	if err := sightjack.WriteState(dir, state); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	loaded, err := ReadState(dir)
+	loaded, err := sightjack.ReadState(dir)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -283,21 +285,21 @@ func TestWaveState_FullFieldsRoundTrip(t *testing.T) {
 func TestSessionState_ADRCount_WriteAndRead(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	state := &SessionState{
+	state := &sightjack.SessionState{
 		Version:      "0.4",
 		SessionID:    "test-adr-count",
 		Project:      "TestProject",
 		LastScanned:  time.Now().Truncate(time.Second),
 		Completeness: 0.50,
-		Clusters:     []ClusterState{{Name: "Auth", Completeness: 0.50, IssueCount: 3}},
+		Clusters:     []sightjack.ClusterState{{Name: "Auth", Completeness: 0.50, IssueCount: 3}},
 		ADRCount:     5,
 	}
 
 	// when
-	if err := WriteState(dir, state); err != nil {
+	if err := sightjack.WriteState(dir, state); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	loaded, err := ReadState(dir)
+	loaded, err := sightjack.ReadState(dir)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -312,12 +314,12 @@ func TestWriteAndLoadScanResult_RoundTrip(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	path := filepath.Join(dir, "scan_result.json")
-	original := &ScanResult{
-		Clusters: []ClusterScanResult{
+	original := &sightjack.ScanResult{
+		Clusters: []sightjack.ClusterScanResult{
 			{
 				Name:         "Auth",
 				Completeness: 0.25,
-				Issues: []IssueDetail{
+				Issues: []sightjack.IssueDetail{
 					{ID: "ENG-101", Identifier: "ENG-101", Title: "Login", Completeness: 0.30},
 				},
 				Observations: []string{"Missing MFA"},
@@ -325,7 +327,7 @@ func TestWriteAndLoadScanResult_RoundTrip(t *testing.T) {
 			{
 				Name:         "API",
 				Completeness: 0.40,
-				Issues: []IssueDetail{
+				Issues: []sightjack.IssueDetail{
 					{ID: "ENG-201", Identifier: "ENG-201", Title: "Rate limit", Completeness: 0.40},
 				},
 				Observations: []string{"No throttling"},
@@ -337,10 +339,10 @@ func TestWriteAndLoadScanResult_RoundTrip(t *testing.T) {
 	}
 
 	// when
-	if err := WriteScanResult(path, original); err != nil {
+	if err := sightjack.WriteScanResult(path, original); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	loaded, err := LoadScanResult(path)
+	loaded, err := sightjack.LoadScanResult(path)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -365,7 +367,7 @@ func TestWriteAndLoadScanResult_RoundTrip(t *testing.T) {
 
 func TestLoadScanResult_FileNotFound(t *testing.T) {
 	// when
-	_, err := LoadScanResult("/nonexistent/scan_result.json")
+	_, err := sightjack.LoadScanResult("/nonexistent/scan_result.json")
 
 	// then
 	if err == nil {
@@ -376,17 +378,17 @@ func TestLoadScanResult_FileNotFound(t *testing.T) {
 func TestSessionState_ScanResultPath_RoundTrip(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	state := &SessionState{
+	state := &sightjack.SessionState{
 		Version:        "0.5",
 		SessionID:      "test-scan-path",
 		ScanResultPath: ".siren/.run/session-123/scan_result.json",
 	}
 
 	// when
-	if err := WriteState(dir, state); err != nil {
+	if err := sightjack.WriteState(dir, state); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	loaded, err := ReadState(dir)
+	loaded, err := sightjack.ReadState(dir)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -399,7 +401,7 @@ func TestSessionState_ScanResultPath_RoundTrip(t *testing.T) {
 
 func TestSessionState_ScanResultPath_OmittedWhenEmpty(t *testing.T) {
 	// given
-	state := SessionState{Version: "0.5", ScanResultPath: ""}
+	state := sightjack.SessionState{Version: "0.5", ScanResultPath: ""}
 
 	// when
 	data, err := json.Marshal(state)
@@ -427,7 +429,7 @@ func TestLoadScanResult_SnakeCaseFormat(t *testing.T) {
 	}`), 0644)
 
 	// when
-	result, err := LoadScanResult(path)
+	result, err := sightjack.LoadScanResult(path)
 
 	// then
 	if err != nil {
@@ -449,18 +451,17 @@ func TestLoadScanResult_SnakeCaseFormat(t *testing.T) {
 
 func TestState_OldVersionRoundTrip(t *testing.T) {
 	// given: state.json written by an older version (v0.0.9 format)
-	// The current code should read it without error — version is just a string field.
 	dir := t.TempDir()
-	oldState := SessionState{
+	oldState := sightjack.SessionState{
 		Version:      "0.0.9",
 		SessionID:    "old-session",
 		Project:      "legacy",
 		LastScanned:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		Completeness: 0.75,
-		Clusters: []ClusterState{
+		Clusters: []sightjack.ClusterState{
 			{Name: "Auth", Completeness: 0.80, IssueCount: 3},
 		},
-		Waves: []WaveState{
+		Waves: []sightjack.WaveState{
 			{ID: "w1", ClusterName: "Auth", Status: "completed", ActionCount: 2},
 		},
 		ADRCount:     1,
@@ -468,10 +469,10 @@ func TestState_OldVersionRoundTrip(t *testing.T) {
 	}
 
 	// when: write with old version and read back
-	if err := WriteState(dir, &oldState); err != nil {
+	if err := sightjack.WriteState(dir, &oldState); err != nil {
 		t.Fatalf("WriteState: %v", err)
 	}
-	loaded, err := ReadState(dir)
+	loaded, err := sightjack.ReadState(dir)
 	if err != nil {
 		t.Fatalf("ReadState: %v", err)
 	}
@@ -497,8 +498,8 @@ func TestState_OldVersionRoundTrip(t *testing.T) {
 func TestState_FutureFieldsIgnored(t *testing.T) {
 	// given: state.json with extra fields not in current struct (forward compatibility)
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".siren")
-	os.MkdirAll(stateDir, 0755)
+	sirenDir := filepath.Join(dir, ".siren")
+	os.MkdirAll(sirenDir, 0755)
 	rawJSON := `{
 		"version": "0.1.0",
 		"session_id": "future-session",
@@ -507,10 +508,10 @@ func TestState_FutureFieldsIgnored(t *testing.T) {
 		"unknown_field": "should be ignored",
 		"nested_unknown": {"a": 1}
 	}`
-	os.WriteFile(filepath.Join(stateDir, "state.json"), []byte(rawJSON), 0644)
+	os.WriteFile(filepath.Join(sirenDir, "state.json"), []byte(rawJSON), 0644)
 
 	// when
-	loaded, err := ReadState(dir)
+	loaded, err := sightjack.ReadState(dir)
 
 	// then: should load without error, unknown fields silently ignored
 	if err != nil {
@@ -531,7 +532,7 @@ func TestLoadScanResult_MalformedJSON(t *testing.T) {
 	os.WriteFile(path, []byte(`{invalid`), 0644)
 
 	// when
-	_, err := LoadScanResult(path)
+	_, err := sightjack.LoadScanResult(path)
 
 	// then
 	if err == nil {
@@ -541,11 +542,11 @@ func TestLoadScanResult_MalformedJSON(t *testing.T) {
 
 func TestWriteGitIgnore_IncludesMailDirs(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, stateDir), 0755)
-	if err := WriteGitIgnore(dir); err != nil {
+	os.MkdirAll(filepath.Join(dir, sightjack.StateDir), 0755)
+	if err := sightjack.WriteGitIgnore(dir); err != nil {
 		t.Fatalf("WriteGitIgnore: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(dir, stateDir, ".gitignore"))
+	data, _ := os.ReadFile(filepath.Join(dir, sightjack.StateDir, ".gitignore"))
 	content := string(data)
 	if !strings.Contains(content, "inbox/") {
 		t.Error("expected inbox/ in .gitignore")

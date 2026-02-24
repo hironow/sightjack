@@ -1,10 +1,12 @@
-package sightjack
+package sightjack_test
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestNormalizeJSONFile_ConvertsUnicodeEscapes(t *testing.T) {
@@ -17,7 +19,7 @@ func TestNormalizeJSONFile_ConvertsUnicodeEscapes(t *testing.T) {
 	}
 
 	// when
-	err := normalizeJSONFile(path)
+	err := sightjack.NormalizeJSONFile(path)
 
 	// then
 	if err != nil {
@@ -46,7 +48,7 @@ func TestNormalizeJSONFile_PreservesValidJSON(t *testing.T) {
 	}
 
 	// when
-	err := normalizeJSONFile(path)
+	err := sightjack.NormalizeJSONFile(path)
 
 	// then
 	if err != nil {
@@ -70,7 +72,7 @@ func TestNormalizeJSONFile_RejectsInvalidJSON(t *testing.T) {
 	}
 
 	// when
-	err := normalizeJSONFile(path)
+	err := sightjack.NormalizeJSONFile(path)
 
 	// then
 	if err == nil {
@@ -80,7 +82,7 @@ func TestNormalizeJSONFile_RejectsInvalidJSON(t *testing.T) {
 
 func TestNormalizeJSONFile_MissingFile(t *testing.T) {
 	// when
-	err := normalizeJSONFile("/nonexistent/file.json")
+	err := sightjack.NormalizeJSONFile("/nonexistent/file.json")
 
 	// then
 	if err == nil {

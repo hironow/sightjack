@@ -1,15 +1,17 @@
-package sightjack
+package sightjack_test
 
 import (
 	"context"
 	"os/exec"
 	"strings"
 	"testing"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 func TestNopNotifier_NoError(t *testing.T) {
 	// given
-	n := &NopNotifier{}
+	n := &sightjack.NopNotifier{}
 
 	// when
 	err := n.Notify(context.Background(), "title", "message")
@@ -23,14 +25,13 @@ func TestNopNotifier_NoError(t *testing.T) {
 func TestLocalNotifier_Darwin(t *testing.T) {
 	// given: LocalNotifier forced to darwin, with captured command
 	var captured []string
-	n := &LocalNotifier{
-		forceOS: "darwin",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	n := sightjack.NewLocalNotifierForTest("darwin",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			captured = append(captured, name)
 			captured = append(captured, args...)
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	err := n.Notify(context.Background(), "Test Title", "Test Message")
@@ -54,14 +55,13 @@ func TestLocalNotifier_Darwin(t *testing.T) {
 func TestLocalNotifier_Linux(t *testing.T) {
 	// given: LocalNotifier forced to linux
 	var captured []string
-	n := &LocalNotifier{
-		forceOS: "linux",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	n := sightjack.NewLocalNotifierForTest("linux",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			captured = append(captured, name)
 			captured = append(captured, args...)
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	err := n.Notify(context.Background(), "Test Title", "Test Message")
@@ -80,12 +80,11 @@ func TestLocalNotifier_Linux(t *testing.T) {
 
 func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	// given: unsupported OS
-	n := &LocalNotifier{
-		forceOS: "windows",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	n := sightjack.NewLocalNotifierForTest("windows",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
@@ -99,14 +98,13 @@ func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 func TestCmdNotifier_Placeholders(t *testing.T) {
 	// given: template with placeholders, using echo to verify substitution
 	var captured []string
-	n := &CmdNotifier{
-		template: "echo {title}: {message}",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	n := sightjack.NewCmdNotifierForTest("echo {title}: {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			captured = append(captured, name)
 			captured = append(captured, args...)
 			return exec.Command("true")
 		},
-	}
+	)
 
 	// when
 	err := n.Notify(context.Background(), "Hello", "World")
@@ -126,7 +124,7 @@ func TestCmdNotifier_Placeholders(t *testing.T) {
 
 func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 	// given: empty template
-	n := &CmdNotifier{template: ""}
+	n := sightjack.NewCmdNotifierForTest("", nil)
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
@@ -149,9 +147,9 @@ func TestShellQuote(t *testing.T) {
 		{"$(rm -rf /)", "'$(rm -rf /)'"},
 	}
 	for _, tt := range tests {
-		got := shellQuote(tt.input)
+		got := sightjack.ShellQuote(tt.input)
 		if got != tt.want {
-			t.Errorf("shellQuote(%q): got %q, want %q", tt.input, got, tt.want)
+			t.Errorf("ShellQuote(%q): got %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

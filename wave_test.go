@@ -1,9 +1,11 @@
-package sightjack
+package sightjack_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestParseWaveGenerateResult(t *testing.T) {
@@ -21,7 +23,7 @@ func TestParseWaveGenerateResult(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseWaveGenerateResult(path)
+	result, err := sightjack.ParseWaveGenerateResult(path)
 
 	// then
 	if err != nil {
@@ -50,7 +52,7 @@ func TestParseWaveApplyResult(t *testing.T) {
 	}
 
 	// when
-	result, err := ParseWaveApplyResult(path)
+	result, err := sightjack.ParseWaveApplyResult(path)
 
 	// then
 	if err != nil {
@@ -63,7 +65,7 @@ func TestParseWaveApplyResult(t *testing.T) {
 
 func TestAvailableWaves(t *testing.T) {
 	// given
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "available", Prerequisites: nil},
 		{ID: "auth-w2", ClusterName: "Auth", Status: "locked", Prerequisites: []string{"Auth:auth-w1"}},
 		{ID: "api-w1", ClusterName: "API", Status: "available", Prerequisites: nil},
@@ -72,7 +74,7 @@ func TestAvailableWaves(t *testing.T) {
 	completed := map[string]bool{}
 
 	// when
-	available := AvailableWaves(waves, completed)
+	available := sightjack.AvailableWaves(waves, completed)
 
 	// then
 	if len(available) != 2 {
@@ -80,11 +82,11 @@ func TestAvailableWaves(t *testing.T) {
 	}
 
 	// given: after completing auth-w1
-	completed[WaveKey(waves[0])] = true
-	waves = EvaluateUnlocks(waves, completed)
+	completed[sightjack.WaveKey(waves[0])] = true
+	waves = sightjack.EvaluateUnlocks(waves, completed)
 
 	// when
-	available = AvailableWaves(waves, completed)
+	available = sightjack.AvailableWaves(waves, completed)
 
 	// then: auth-w2 should be unlocked now (prereq Auth:auth-w1 met)
 	// api-w2 still locked (needs API:api-w1 too)
@@ -103,19 +105,19 @@ func TestAvailableWaves(t *testing.T) {
 }
 
 func TestMergeWaveResults(t *testing.T) {
-	results := []WaveGenerateResult{
-		{ClusterName: "Auth", Waves: []Wave{{ID: "auth-w1"}, {ID: "auth-w2"}}},
-		{ClusterName: "API", Waves: []Wave{{ID: "api-w1"}}},
+	results := []sightjack.WaveGenerateResult{
+		{ClusterName: "Auth", Waves: []sightjack.Wave{{ID: "auth-w1"}, {ID: "auth-w2"}}},
+		{ClusterName: "API", Waves: []sightjack.Wave{{ID: "api-w1"}}},
 	}
 
-	merged := MergeWaveResults(results)
+	merged := sightjack.MergeWaveResults(results)
 	if len(merged) != 3 {
 		t.Fatalf("expected 3 waves, got %d", len(merged))
 	}
 }
 
 func TestMergeWaveResults_Empty(t *testing.T) {
-	merged := MergeWaveResults(nil)
+	merged := sightjack.MergeWaveResults(nil)
 	if len(merged) != 0 {
 		t.Errorf("expected 0 waves, got %d", len(merged))
 	}
@@ -123,10 +125,10 @@ func TestMergeWaveResults_Empty(t *testing.T) {
 
 func TestWaveApplyFileName(t *testing.T) {
 	// given
-	wave := Wave{ID: "auth-w1", ClusterName: "Auth"}
+	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
 
 	// when
-	got := waveApplyFileName(wave)
+	got := sightjack.WaveApplyFileName(wave)
 
 	// then
 	expected := "apply_auth_auth-w1.json"
@@ -137,10 +139,10 @@ func TestWaveApplyFileName(t *testing.T) {
 
 func TestWaveApplyFileName_SpecialChars(t *testing.T) {
 	// given
-	wave := Wave{ID: "w2", ClusterName: "My Cluster"}
+	wave := sightjack.Wave{ID: "w2", ClusterName: "My Cluster"}
 
 	// when
-	got := waveApplyFileName(wave)
+	got := sightjack.WaveApplyFileName(wave)
 
 	// then
 	expected := "apply_my_cluster_w2.json"
@@ -151,12 +153,12 @@ func TestWaveApplyFileName_SpecialChars(t *testing.T) {
 
 func TestWaveApplyFileName_DuplicateIDsDifferentClusters(t *testing.T) {
 	// given: two waves with same ID but different clusters
-	authWave := Wave{ID: "w1", ClusterName: "Auth"}
-	apiWave := Wave{ID: "w1", ClusterName: "API"}
+	authWave := sightjack.Wave{ID: "w1", ClusterName: "Auth"}
+	apiWave := sightjack.Wave{ID: "w1", ClusterName: "API"}
 
 	// when
-	authFile := waveApplyFileName(authWave)
-	apiFile := waveApplyFileName(apiWave)
+	authFile := sightjack.WaveApplyFileName(authWave)
+	apiFile := sightjack.WaveApplyFileName(apiWave)
 
 	// then: filenames must differ
 	if authFile == apiFile {
@@ -166,10 +168,10 @@ func TestWaveApplyFileName_DuplicateIDsDifferentClusters(t *testing.T) {
 
 func TestWaveKey(t *testing.T) {
 	// given
-	w := Wave{ID: "w1", ClusterName: "Auth"}
+	w := sightjack.Wave{ID: "w1", ClusterName: "Auth"}
 
 	// when
-	key := WaveKey(w)
+	key := sightjack.WaveKey(w)
 
 	// then
 	if key != "Auth:w1" {
@@ -179,15 +181,15 @@ func TestWaveKey(t *testing.T) {
 
 func TestAvailableWaves_DuplicateIDsAcrossClusters(t *testing.T) {
 	// given: two clusters with the same wave ID "w1"
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "w1", ClusterName: "Auth", Status: "available"},
 		{ID: "w1", ClusterName: "API", Status: "available"},
 	}
 	// only Auth:w1 is completed
-	completed := map[string]bool{WaveKey(waves[0]): true}
+	completed := map[string]bool{sightjack.WaveKey(waves[0]): true}
 
 	// when
-	available := AvailableWaves(waves, completed)
+	available := sightjack.AvailableWaves(waves, completed)
 
 	// then: API:w1 should still be available
 	if len(available) != 1 {
@@ -200,14 +202,14 @@ func TestAvailableWaves_DuplicateIDsAcrossClusters(t *testing.T) {
 
 func TestEvaluateUnlocks_DuplicateIDsAcrossClusters(t *testing.T) {
 	// given: Auth:w1 completed, API:w1 locked with prereq Auth:w1
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "w1", ClusterName: "API", Status: "locked", Prerequisites: []string{"Auth:w1"}},
 	}
-	completed := map[string]bool{WaveKey(waves[0]): true}
+	completed := map[string]bool{sightjack.WaveKey(waves[0]): true}
 
 	// when
-	updated := EvaluateUnlocks(waves, completed)
+	updated := sightjack.EvaluateUnlocks(waves, completed)
 
 	// then: API:w1 should be unlocked
 	if updated[1].Status != "available" {
@@ -217,14 +219,14 @@ func TestEvaluateUnlocks_DuplicateIDsAcrossClusters(t *testing.T) {
 
 func TestNormalizeWavePrerequisites(t *testing.T) {
 	// given: bare IDs should be prefixed with the wave's own cluster name
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "w1", ClusterName: "Auth", Prerequisites: nil},
 		{ID: "w2", ClusterName: "Auth", Prerequisites: []string{"w1"}},
 		{ID: "w1", ClusterName: "API", Prerequisites: []string{"Auth:w1"}},
 	}
 
 	// when
-	normalized := NormalizeWavePrerequisites(waves)
+	normalized := sightjack.NormalizeWavePrerequisites(waves)
 
 	// then: bare "w1" becomes "Auth:w1", explicit "Auth:w1" stays
 	if len(normalized[0].Prerequisites) != 0 {
@@ -240,7 +242,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 
 func TestAvailableWaves_AllCompleted(t *testing.T) {
 	// given: all waves are completed
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "auth-w2", ClusterName: "Auth", Status: "completed"},
 		{ID: "api-w1", ClusterName: "API", Status: "completed"},
@@ -252,7 +254,7 @@ func TestAvailableWaves_AllCompleted(t *testing.T) {
 	}
 
 	// when
-	available := AvailableWaves(waves, completed)
+	available := sightjack.AvailableWaves(waves, completed)
 
 	// then: no waves should be available — session is done
 	if len(available) != 0 {
@@ -262,7 +264,7 @@ func TestAvailableWaves_AllCompleted(t *testing.T) {
 
 func TestEvaluateUnlocks_AllCompleted(t *testing.T) {
 	// given: all waves already completed, nothing left to unlock
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "a-w1", ClusterName: "A", Status: "completed"},
 		{ID: "a-w2", ClusterName: "A", Status: "completed", Prerequisites: []string{"A:a-w1"}},
 		{ID: "b-w1", ClusterName: "B", Status: "completed", Prerequisites: []string{"A:a-w1"}},
@@ -274,28 +276,28 @@ func TestEvaluateUnlocks_AllCompleted(t *testing.T) {
 	}
 
 	// when
-	updated := EvaluateUnlocks(waves, completed)
+	updated := sightjack.EvaluateUnlocks(waves, completed)
 
 	// then: all remain completed, no status changes
 	for _, w := range updated {
 		if w.Status != "completed" {
-			t.Errorf("expected %s to remain completed, got %s", WaveKey(w), w.Status)
+			t.Errorf("expected %s to remain completed, got %s", sightjack.WaveKey(w), w.Status)
 		}
 	}
 }
 
 func TestToApplyResult_ZeroActions_ReturnsBeforeCompleteness(t *testing.T) {
 	// given: wave with no actions — nothing to accomplish
-	wave := Wave{
+	wave := sightjack.Wave{
 		ID:          "empty-w1",
 		ClusterName: "Auth",
-		Delta:       WaveDelta{Before: 0.3, After: 0.5},
+		Delta:       sightjack.WaveDelta{Before: 0.3, After: 0.5},
 		Actions:     nil,
 	}
-	internal := &WaveApplyResult{WaveID: "empty-w1", Applied: 0}
+	internal := &sightjack.WaveApplyResult{WaveID: "empty-w1", Applied: 0}
 
 	// when
-	result := ToApplyResult(wave, internal)
+	result := sightjack.ToApplyResult(wave, internal)
 
 	// then: no actions means nothing accomplished → completeness should be Before
 	if result.NewCompleteness != 0.3 {
@@ -305,7 +307,7 @@ func TestToApplyResult_ZeroActions_ReturnsBeforeCompleteness(t *testing.T) {
 
 func TestEvaluateUnlocks(t *testing.T) {
 	// given
-	waves := []Wave{
+	waves := []sightjack.Wave{
 		{ID: "a-w1", ClusterName: "A", Status: "completed"},
 		{ID: "a-w2", ClusterName: "A", Status: "locked", Prerequisites: []string{"A:a-w1"}},
 		{ID: "b-w1", ClusterName: "B", Status: "locked", Prerequisites: []string{"A:a-w1", "A:a-w2"}},
@@ -313,7 +315,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 	completed := map[string]bool{"A:a-w1": true}
 
 	// when
-	updated := EvaluateUnlocks(waves, completed)
+	updated := sightjack.EvaluateUnlocks(waves, completed)
 
 	// then
 	if updated[1].Status != "available" {

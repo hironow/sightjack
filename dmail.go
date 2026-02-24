@@ -38,19 +38,19 @@ const (
 )
 
 const (
-	inboxDir   = "inbox"
-	outboxDir  = "outbox"
-	archiveDir = "archive"
+	InboxDir   = "inbox"
+	OutboxDir  = "outbox"
+	ArchiveDir = "archive"
 )
 
 // MailDir returns the path to a mail subdirectory under the state root.
 func MailDir(baseDir, sub string) string {
-	return filepath.Join(baseDir, stateDir, sub)
+	return filepath.Join(baseDir, StateDir, sub)
 }
 
 // EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.
 func EnsureMailDirs(baseDir string) error {
-	for _, sub := range []string{inboxDir, outboxDir, archiveDir} {
+	for _, sub := range []string{InboxDir, OutboxDir, ArchiveDir} {
 		if err := os.MkdirAll(MailDir(baseDir, sub), 0755); err != nil {
 			return fmt.Errorf("create %s dir: %w", sub, err)
 		}
@@ -115,7 +115,7 @@ func ComposeDMail(baseDir string, mail *DMail) error {
 		return err
 	}
 	filename := mail.Filename()
-	for _, sub := range []string{archiveDir, outboxDir} {
+	for _, sub := range []string{ArchiveDir, OutboxDir} {
 		path := filepath.Join(MailDir(baseDir, sub), filename)
 		if err := os.WriteFile(path, data, 0644); err != nil {
 			return fmt.Errorf("dmail compose to %s: %w", sub, err)
@@ -172,9 +172,9 @@ func receiveDMailIfNew(baseDir, filename string, logger *Logger) *DMail {
 	// NOTE: Dedup is filename-based by design — the d-mail filename acts as a
 	// message ID in the protocol. Senders that need to deliver updated content
 	// for the same wave must use a distinct filename (e.g. append a sequence number).
-	archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
+	archivePath := filepath.Join(MailDir(baseDir, ArchiveDir), filename)
 	if _, err := os.Stat(archivePath); err == nil {
-		if rmErr := os.Remove(filepath.Join(MailDir(baseDir, inboxDir), filename)); rmErr != nil && !os.IsNotExist(rmErr) {
+		if rmErr := os.Remove(filepath.Join(MailDir(baseDir, InboxDir), filename)); rmErr != nil && !os.IsNotExist(rmErr) {
 			logger.Warn("dedup remove %s: %v", filename, rmErr)
 		}
 		return nil
@@ -202,7 +202,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *
 		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
 	}
 
-	inboxPath := MailDir(baseDir, inboxDir)
+	inboxPath := MailDir(baseDir, InboxDir)
 	if err := watcher.Add(inboxPath); err != nil {
 		watcher.Close()
 		return nil, fmt.Errorf("dmail monitor: add inbox: %w", err)
@@ -212,7 +212,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *
 	// watcher.Add is called first so files created during the drain
 	// are caught by fsnotify and deduplicated by receiveDMailIfNew.
 	var initial []*DMail
-	files, listErr := ListDMail(baseDir, inboxDir)
+	files, listErr := ListDMail(baseDir, InboxDir)
 	if listErr == nil {
 		for _, filename := range files {
 			if mail := receiveDMailIfNew(baseDir, filename, logger); mail != nil {
@@ -426,7 +426,7 @@ func (c *feedbackCollector) All() []*DMail {
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.
 func ReceiveDMail(baseDir, filename string) (*DMail, error) {
-	inboxPath := filepath.Join(MailDir(baseDir, inboxDir), filename)
+	inboxPath := filepath.Join(MailDir(baseDir, InboxDir), filename)
 	data, err := os.ReadFile(inboxPath)
 	if err != nil {
 		return nil, fmt.Errorf("dmail read inbox: %w", err)
@@ -435,7 +435,7 @@ func ReceiveDMail(baseDir, filename string) (*DMail, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dmail parse inbox %s: %w", filename, err)
 	}
-	archivePath := filepath.Join(MailDir(baseDir, archiveDir), filename)
+	archivePath := filepath.Join(MailDir(baseDir, ArchiveDir), filename)
 	if err := os.WriteFile(archivePath, data, 0644); err != nil {
 		return nil, fmt.Errorf("dmail archive %s: %w", filename, err)
 	}
@@ -466,8 +466,8 @@ func DMailName(prefix, waveKey string) string {
 	return strings.TrimRight(b.String(), "_")
 }
 
-// waveIssueIDs extracts unique, sorted issue IDs from wave actions.
-func waveIssueIDs(wave Wave) []string {
+// WaveIssueIDs extracts unique, sorted issue IDs from wave actions.
+func WaveIssueIDs(wave Wave) []string {
 	seen := make(map[string]bool)
 	for _, a := range wave.Actions {
 		if a.IssueID != "" {
@@ -482,8 +482,8 @@ func waveIssueIDs(wave Wave) []string {
 	return ids
 }
 
-// specificationBody formats wave actions as Markdown body for a specification d-mail.
-func specificationBody(wave Wave) string {
+// SpecificationBody formats wave actions as Markdown body for a specification d-mail.
+func SpecificationBody(wave Wave) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", wave.Title)
 	if wave.Description != "" {
@@ -496,8 +496,8 @@ func specificationBody(wave Wave) string {
 	return b.String()
 }
 
-// reportBody formats wave apply results as Markdown body for a report d-mail.
-func reportBody(wave Wave, result *WaveApplyResult) string {
+// ReportBody formats wave apply results as Markdown body for a report d-mail.
+func ReportBody(wave Wave, result *WaveApplyResult) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Wave Completed: %s\n\n", wave.Title)
 	fmt.Fprintf(&b, "Applied %d action(s).\n\n", result.Applied)
@@ -525,8 +525,8 @@ func ComposeReport(baseDir string, wave Wave, result *WaveApplyResult) error {
 		Kind:          DMailReport,
 		Description:   fmt.Sprintf("Wave %s completed", key),
 		SchemaVersion: "1",
-		Issues:        waveIssueIDs(wave),
-		Body:          reportBody(wave, result),
+		Issues:        WaveIssueIDs(wave),
+		Body:          ReportBody(wave, result),
 	}
 	return ComposeDMail(baseDir, mail)
 }
@@ -539,8 +539,8 @@ func ComposeSpecification(baseDir string, wave Wave) error {
 		Kind:          DMailSpecification,
 		Description:   wave.Title,
 		SchemaVersion: "1",
-		Issues:        waveIssueIDs(wave),
-		Body:          specificationBody(wave),
+		Issues:        WaveIssueIDs(wave),
+		Body:          SpecificationBody(wave),
 	}
 	return ComposeDMail(baseDir, mail)
 }

@@ -1,4 +1,4 @@
-package sightjack
+package sightjack_test
 
 import (
 	"io"
@@ -6,17 +6,19 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/hironow/sightjack"
 )
 
 func TestListExpiredArchive_EmptyDir(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
-	if err := EnsureMailDirs(baseDir); err != nil {
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
 
 	// when
-	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
+	files, err := sightjack.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -30,10 +32,10 @@ func TestListExpiredArchive_EmptyDir(t *testing.T) {
 func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
-	if err := EnsureMailDirs(baseDir); err != nil {
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archDir := MailDir(baseDir, archiveDir)
+	archDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
 
 	// Create old file (40 days ago)
 	oldFile := filepath.Join(archDir, "report-old-w1.md")
@@ -56,7 +58,7 @@ func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 	}
 
 	// when — threshold 30 days
-	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
+	files, err := sightjack.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -73,10 +75,10 @@ func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 func TestListExpiredArchive_OnlyMdFiles(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
-	if err := EnsureMailDirs(baseDir); err != nil {
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archDir := MailDir(baseDir, archiveDir)
+	archDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
 
 	// Create old .md file
 	mdFile := filepath.Join(archDir, "feedback-001.md")
@@ -98,7 +100,7 @@ func TestListExpiredArchive_OnlyMdFiles(t *testing.T) {
 	}
 
 	// when
-	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
+	files, err := sightjack.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -117,7 +119,7 @@ func TestListExpiredArchive_NoDirReturnsEmpty(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	files, err := ListExpiredArchive(baseDir, 30, NewLogger(io.Discard, false))
+	files, err := sightjack.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -131,10 +133,10 @@ func TestListExpiredArchive_NoDirReturnsEmpty(t *testing.T) {
 func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
-	if err := EnsureMailDirs(baseDir); err != nil {
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	ad := MailDir(baseDir, archiveDir)
+	ad := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
 
 	oldFile := filepath.Join(ad, "report-old-w1.md")
 	if err := os.WriteFile(oldFile, []byte("old"), 0644); err != nil {
@@ -151,7 +153,7 @@ func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 	}
 
 	// when
-	deleted, err := PruneArchive(baseDir, 30, NewLogger(io.Discard, false))
+	deleted, err := sightjack.PruneArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -179,7 +181,7 @@ func TestListExpiredArchive_NegativeDaysReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	_, err := ListExpiredArchive(baseDir, -1, NewLogger(io.Discard, false))
+	_, err := sightjack.ListExpiredArchive(baseDir, -1, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -195,7 +197,7 @@ func TestPruneArchive_NegativeDaysReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	_, err := PruneArchive(baseDir, -1, NewLogger(io.Discard, false))
+	_, err := sightjack.PruneArchive(baseDir, -1, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -208,7 +210,7 @@ func TestPruneArchive_NoDirReturnsEmpty(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	deleted, err := PruneArchive(baseDir, 30, NewLogger(io.Discard, false))
+	deleted, err := sightjack.PruneArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -222,10 +224,10 @@ func TestPruneArchive_NoDirReturnsEmpty(t *testing.T) {
 func TestDeleteArchiveFiles_DeletesSpecifiedFiles(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
-	if err := EnsureMailDirs(baseDir); err != nil {
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archDir := MailDir(baseDir, archiveDir)
+	archDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
 
 	f1 := filepath.Join(archDir, "report-old-w1.md")
 	if err := os.WriteFile(f1, []byte("old"), 0644); err != nil {
@@ -237,7 +239,7 @@ func TestDeleteArchiveFiles_DeletesSpecifiedFiles(t *testing.T) {
 	}
 
 	// when — delete only f1
-	deleted, err := DeleteArchiveFiles(baseDir, []string{"report-old-w1.md"})
+	deleted, err := sightjack.DeleteArchiveFiles(baseDir, []string{"report-old-w1.md"})
 
 	// then
 	if err != nil {
@@ -262,12 +264,12 @@ func TestDeleteArchiveFiles_DeletesSpecifiedFiles(t *testing.T) {
 func TestDeleteArchiveFiles_EmptyListNoOp(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
-	if err := EnsureMailDirs(baseDir); err != nil {
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
 
 	// when
-	deleted, err := DeleteArchiveFiles(baseDir, nil)
+	deleted, err := sightjack.DeleteArchiveFiles(baseDir, nil)
 
 	// then
 	if err != nil {
@@ -281,12 +283,12 @@ func TestDeleteArchiveFiles_EmptyListNoOp(t *testing.T) {
 func TestDeleteArchiveFiles_AlreadyDeletedIgnored(t *testing.T) {
 	// given
 	baseDir := t.TempDir()
-	if err := EnsureMailDirs(baseDir); err != nil {
+	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
 
 	// when — file doesn't exist
-	deleted, err := DeleteArchiveFiles(baseDir, []string{"nonexistent.md"})
+	deleted, err := sightjack.DeleteArchiveFiles(baseDir, []string{"nonexistent.md"})
 
 	// then — should succeed silently (ErrNotExist ignored)
 	if err != nil {
