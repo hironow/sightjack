@@ -76,9 +76,14 @@ if event data is found in .siren/events/.`,
 								logger.Warn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}
-							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), logger)
+							resumeStore := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, existingState.SessionID))
+							resumeRecorder := sightjack.NewSessionRecorder(resumeStore, existingState.SessionID)
+							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
-							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), logger)
+							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
+							rescanStore := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, rescanID))
+							rescanRecorder := sightjack.NewSessionRecorder(rescanStore, rescanID)
+							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -89,10 +94,13 @@ if event data is found in .siren/events/.`,
 
 			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 			var sessionInput io.Reader
+			var recorder sightjack.Recorder = sightjack.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
+				sessionStore := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
+				recorder = sightjack.NewSessionRecorder(sessionStore, sessionID)
 			}
-			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), logger)
+			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
 		},
 	}
 

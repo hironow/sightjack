@@ -91,7 +91,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -147,7 +147,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -172,7 +172,7 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: should get an input-related error, not a panic or scan error
 	if err == nil {
@@ -912,7 +912,7 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1088,7 +1088,7 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1112,7 +1112,7 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunRescanSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {

@@ -65,6 +65,12 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.S
 	}
 }
 
+// testRecorder creates a real Recorder backed by the event store for lifecycle tests.
+func testRecorder(baseDir, sessionID string) sightjack.Recorder {
+	store := sightjack.NewFileEventStore(sightjack.EventStorePath(baseDir, sessionID))
+	return sightjack.NewSessionRecorder(store, sessionID)
+}
+
 // testConfig returns a minimal Config for lifecycle tests.
 // Labels and Scribe disabled to avoid extra Claude calls.
 func testConfig() *sightjack.Config {
@@ -547,7 +553,7 @@ func TestLifecycle_HappyPath(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -603,7 +609,7 @@ func TestLifecycle_RejectThenApprove(t *testing.T) {
 	input := strings.NewReader("1\nr\n1\na\nq\n")
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -643,7 +649,7 @@ func TestLifecycle_PartialApplyNotCompleted(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -740,7 +746,7 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err = sightjack.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err = sightjack.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, testRecorder(baseDir, state.SessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -784,7 +790,7 @@ func TestLifecycle_QuitAndResume(t *testing.T) {
 	// stdin: select wave 1, approve, quit
 	input := strings.NewReader("1\na\nq\n")
 
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), sightjack.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("Phase 1 RunSession failed: %v", err)
 	}
@@ -808,7 +814,7 @@ func TestLifecycle_QuitAndResume(t *testing.T) {
 	defer cleanup2()
 
 	input2 := strings.NewReader("1\na\nq\n")
-	err = sightjack.RunResumeSession(ctx, cfg, baseDir, state, input2, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err = sightjack.RunResumeSession(ctx, cfg, baseDir, state, input2, io.Discard, testRecorder(baseDir, state.SessionID), sightjack.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("Phase 2 RunResumeSession failed: %v", err)
 	}
@@ -855,7 +861,7 @@ func TestLifecycle_MultiCluster(t *testing.T) {
 	input := strings.NewReader("1\na\n1\na\nq\n")
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -955,7 +961,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err = sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err = sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then: session completes without error
 	if err != nil {
@@ -1136,7 +1142,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err = sightjack.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err = sightjack.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, testRecorder(baseDir, state.SessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1215,7 +1221,7 @@ func TestLifecycle_DMailNoFeedback_StillGeneratesSpecAndReport(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, sightjack.NewLogger(io.Discard, false))
+	err := sightjack.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {

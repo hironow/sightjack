@@ -54,7 +54,7 @@ func buildApprover(cfg *Config, input io.Reader, out io.Writer) Approver {
 }
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
-func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, logger *Logger) error {
+func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder Recorder, logger *Logger) error {
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
@@ -159,10 +159,6 @@ func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID stri
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to cache scan result: %v", err)
 	}
-
-	// Initialize event recorder
-	store := NewFileEventStore(EventStorePath(baseDir, sessionID))
-	recorder := NewSessionRecorder(store, sessionID)
 
 	// Record session start + scan completed
 	recorder.Record(EventSessionStarted, SessionStartedPayload{
@@ -283,7 +279,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *Config, scanDir, baseDir string, selected Wave, resolvedStrictness string,
 	waves []Wave, completed map[string]bool,
 	sessionRejected map[string][]WaveAction, adrDir string, adrCount *int,
-	recorder *SessionRecorder,
+	recorder Recorder,
 	out io.Writer, loopSpan trace.Span, logger *Logger) (Wave, approvalPhaseResult) {
 
 	for {
@@ -424,7 +420,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 	waves *[]Wave, completed map[string]bool,
 	scanResult *ScanResult, sessionRejected map[string][]WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *feedbackCollector, recorder *SessionRecorder, out io.Writer, loopSpan trace.Span, logger *Logger) {
+	fbCollector *feedbackCollector, recorder Recorder, out io.Writer, loopSpan trace.Span, logger *Logger) {
 
 	// --- Pass 4: Wave Apply ---
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
@@ -611,7 +607,7 @@ func applyPhase(ctx context.Context, cfg *Config,
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
 func runInteractiveLoop(ctx context.Context, cfg *Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *ScanResult, waves []Wave, completed map[string]bool, adrCount int,
-	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *feedbackCollector, recorder *SessionRecorder, out io.Writer, logger *Logger) error {
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *feedbackCollector, recorder Recorder, out io.Writer, logger *Logger) error {
 
 	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
@@ -671,7 +667,7 @@ outerLoop:
 		logger.Warn("Failed to update cached scan result: %v", err)
 	}
 
-	logger.OK("Session events saved to %s", EventsDir(baseDir))
+	logger.OK("Session events saved to %s", filepath.Join(baseDir, StateDir, "events"))
 	return nil
 }
 
@@ -718,7 +714,7 @@ func ResumeScanDir(state *SessionState, baseDir string) string {
 }
 
 // RunResumeSession resumes an existing session from saved state.
-func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader, out io.Writer, logger *Logger) error {
+func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *SessionState, input io.Reader, out io.Writer, recorder Recorder, logger *Logger) error {
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
@@ -765,9 +761,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 	adrDir := ADRDir(baseDir)
 	lastScanned := state.LastScanned
 
-	// Initialize event recorder (resume appends to existing session's event log)
-	store := NewFileEventStore(EventStorePath(baseDir, state.SessionID))
-	recorder := NewSessionRecorder(store, state.SessionID)
+	// Record resume event
 	recorder.Record(EventSessionResumed, SessionResumedPayload{
 		OriginalSessionID: state.SessionID,
 	})
@@ -779,7 +773,7 @@ func RunResumeSession(ctx context.Context, cfg *Config, baseDir string, state *S
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
-func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState *SessionState, input io.Reader, out io.Writer, logger *Logger) error {
+func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState *SessionState, sessionID string, input io.Reader, out io.Writer, recorder Recorder, logger *Logger) error {
 	if logger == nil {
 		logger = NewLogger(nil, false)
 	}
@@ -816,7 +810,6 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 
 	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
-	sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
@@ -858,9 +851,7 @@ func RunRescanSession(ctx context.Context, cfg *Config, baseDir string, oldState
 	adrCount := CountADRFiles(adrDir)
 	scanner := bufio.NewScanner(input)
 
-	// Initialize event recorder for rescan session
-	store := NewFileEventStore(EventStorePath(baseDir, sessionID))
-	recorder := NewSessionRecorder(store, sessionID)
+	// Record rescan events
 	recorder.Record(EventSessionRescanned, SessionRescannedPayload{
 		OriginalSessionID: oldState.SessionID,
 	})
