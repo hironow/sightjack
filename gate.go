@@ -3,6 +3,7 @@ package sightjack
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -105,4 +106,25 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 		}
 		logger.Info("[CONVERGENCE] Late convergence detected during approval, re-checking gate")
 	}
+}
+
+// buildNotifier creates the appropriate Notifier based on config.
+// If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
+func buildNotifier(cfg *Config) Notifier {
+	if cfg.Gate.NotifyCmd != "" {
+		return NewCmdNotifier(cfg.Gate.NotifyCmd)
+	}
+	return &LocalNotifier{}
+}
+
+// buildApprover creates the appropriate Approver based on config.
+// Priority: AutoApprove → CmdApprover → StdinApprover.
+func buildApprover(cfg *Config, input io.Reader, out io.Writer) Approver {
+	if cfg.Gate.AutoApprove {
+		return &AutoApprover{}
+	}
+	if cfg.Gate.ApproveCmd != "" {
+		return NewCmdApprover(cfg.Gate.ApproveCmd)
+	}
+	return NewStdinApprover(input, out)
 }

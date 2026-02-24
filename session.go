@@ -14,27 +14,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// buildNotifier creates the appropriate Notifier based on config.
-// If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
-func buildNotifier(cfg *Config) Notifier {
-	if cfg.Gate.NotifyCmd != "" {
-		return NewCmdNotifier(cfg.Gate.NotifyCmd)
-	}
-	return &LocalNotifier{}
-}
-
-// buildApprover creates the appropriate Approver based on config.
-// Priority: AutoApprove → CmdApprover → StdinApprover.
-func buildApprover(cfg *Config, input io.Reader, out io.Writer) Approver {
-	if cfg.Gate.AutoApprove {
-		return &AutoApprover{}
-	}
-	if cfg.Gate.ApproveCmd != "" {
-		return NewCmdApprover(cfg.Gate.ApproveCmd)
-	}
-	return NewStdinApprover(input, out)
-}
-
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder Recorder, logger *Logger) error {
 	if logger == nil {
