@@ -54,7 +54,7 @@ for downstream commands (apply, discuss).`,
 			}
 			defer tty.Close()
 			scanner := bufio.NewScanner(tty)
-			available := sightjack.AvailableWaves(plan.Waves, map[string]bool{})
+			available := session.AvailableWaves(plan.Waves, map[string]bool{})
 
 			if len(available) == 0 {
 				return fmt.Errorf("no available waves (all locked or completed)")
@@ -81,9 +81,9 @@ for downstream commands (apply, discuss).`,
 			// Build remaining waves (all plan waves except the selected one)
 			// so downstream apply → nextgen can accurately check NeedsMoreWaves.
 			var remaining []sightjack.Wave
-			selectedKey := sightjack.WaveKey(selected)
+			selectedKey := session.WaveKey(selected)
 			for _, w := range plan.Waves {
-				if sightjack.WaveKey(w) != selectedKey {
+				if session.WaveKey(w) != selectedKey {
 					remaining = append(remaining, w)
 				}
 			}

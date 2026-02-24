@@ -1,4 +1,4 @@
-package sightjack_test
+package session_test
 
 import (
 	"bytes"
@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestNopRecorder_NoOp(t *testing.T) {
 	// given
-	var r sightjack.Recorder = sightjack.NopRecorder{}
+	var r sightjack.Recorder = session.NopRecorder{}
 
 	// when/then: should return nil without recording anything
 	if err := r.Record(sightjack.EventSessionStarted, nil); err != nil {
@@ -30,7 +31,7 @@ func TestLoggingRecorder_LogsErrorAndReturnsNil(t *testing.T) {
 	// given
 	var buf bytes.Buffer
 	logger := sightjack.NewLogger(&buf, true)
-	recorder := sightjack.NewLoggingRecorder(failingRecorder{}, logger)
+	recorder := session.NewLoggingRecorder(failingRecorder{}, logger)
 
 	// when
 	err := recorder.Record(sightjack.EventSessionStarted, nil)
@@ -51,7 +52,7 @@ func TestLoggingRecorder_PassesThroughOnSuccess(t *testing.T) {
 	// given
 	var buf bytes.Buffer
 	logger := sightjack.NewLogger(&buf, true)
-	recorder := sightjack.NewLoggingRecorder(sightjack.NopRecorder{}, logger)
+	recorder := session.NewLoggingRecorder(session.NopRecorder{}, logger)
 
 	// when
 	err := recorder.Record(sightjack.EventSessionStarted, nil)

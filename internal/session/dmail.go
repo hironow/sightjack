@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"bytes"
@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	sightjack "github.com/hironow/sightjack"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -37,26 +39,6 @@ const (
 	DMailConvergence   DMailKind = "convergence"
 )
 
-const (
-	InboxDir   = "inbox"
-	OutboxDir  = "outbox"
-	ArchiveDir = "archive"
-)
-
-// MailDir returns the path to a mail subdirectory under the state root.
-func MailDir(baseDir, sub string) string {
-	return filepath.Join(baseDir, StateDir, sub)
-}
-
-// EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.
-func EnsureMailDirs(baseDir string) error {
-	for _, sub := range []string{InboxDir, OutboxDir, ArchiveDir} {
-		if err := os.MkdirAll(MailDir(baseDir, sub), 0755); err != nil {
-			return fmt.Errorf("create %s dir: %w", sub, err)
-		}
-	}
-	return nil
-}
 
 // Filename returns the canonical filename: "<name>.md".
 func (d *DMail) Filename() string {
@@ -115,8 +97,8 @@ func ComposeDMail(baseDir string, mail *DMail) error {
 		return err
 	}
 	filename := mail.Filename()
-	for _, sub := range []string{ArchiveDir, OutboxDir} {
-		path := filepath.Join(MailDir(baseDir, sub), filename)
+	for _, sub := range []string{sightjack.ArchiveDir, sightjack.OutboxDir} {
+		path := filepath.Join(sightjack.MailDir(baseDir, sub), filename)
 		if err := os.WriteFile(path, data, 0644); err != nil {
 			return fmt.Errorf("dmail compose to %s: %w", sub, err)
 		}
@@ -149,7 +131,7 @@ func ValidateDMail(mail *DMail) error {
 
 // ListDMail returns all .md filenames in the given mail subdirectory.
 func ListDMail(baseDir, sub string) ([]string, error) {
-	dir := MailDir(baseDir, sub)
+	dir := sightjack.MailDir(baseDir, sub)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("dmail list %s: %w", sub, err)
@@ -167,14 +149,14 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 // receiveDMailIfNew reads a d-mail from inbox, applies consumer-side dedup (MY-271),
 // archives it, and returns it only if it is a feedback d-mail.
 // Returns nil for already-archived, non-feedback, or unreadable files.
-func receiveDMailIfNew(baseDir, filename string, logger *Logger) *DMail {
+func receiveDMailIfNew(baseDir, filename string, logger *sightjack.Logger) *DMail {
 	// Consumer-side dedup: skip if already in archive.
 	// NOTE: Dedup is filename-based by design — the d-mail filename acts as a
 	// message ID in the protocol. Senders that need to deliver updated content
 	// for the same wave must use a distinct filename (e.g. append a sequence number).
-	archivePath := filepath.Join(MailDir(baseDir, ArchiveDir), filename)
+	archivePath := filepath.Join(sightjack.MailDir(baseDir, sightjack.ArchiveDir), filename)
 	if _, err := os.Stat(archivePath); err == nil {
-		if rmErr := os.Remove(filepath.Join(MailDir(baseDir, InboxDir), filename)); rmErr != nil && !os.IsNotExist(rmErr) {
+		if rmErr := os.Remove(filepath.Join(sightjack.MailDir(baseDir, sightjack.InboxDir), filename)); rmErr != nil && !os.IsNotExist(rmErr) {
 			logger.Warn("dedup remove %s: %v", filename, rmErr)
 		}
 		return nil
@@ -196,13 +178,13 @@ func receiveDMailIfNew(baseDir, filename string, logger *Logger) *DMail {
 // Each d-mail is received (archived + removed from inbox). Only feedback and convergence
 // d-mails are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
-func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *DMail, error) {
+func MonitorInbox(ctx context.Context, baseDir string, logger *sightjack.Logger) (<-chan *DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
 	}
 
-	inboxPath := MailDir(baseDir, InboxDir)
+	inboxPath := sightjack.MailDir(baseDir, sightjack.InboxDir)
 	if err := watcher.Add(inboxPath); err != nil {
 		watcher.Close()
 		return nil, fmt.Errorf("dmail monitor: add inbox: %w", err)
@@ -212,7 +194,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *
 	// watcher.Add is called first so files created during the drain
 	// are caught by fsnotify and deduplicated by receiveDMailIfNew.
 	var initial []*DMail
-	files, listErr := ListDMail(baseDir, InboxDir)
+	files, listErr := ListDMail(baseDir, sightjack.InboxDir)
 	if listErr == nil {
 		for _, filename := range files {
 			if mail := receiveDMailIfNew(baseDir, filename, logger); mail != nil {
@@ -265,7 +247,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger *Logger) (<-chan *
 
 // DrainInboxFeedback reads all currently buffered d-mails (feedback and convergence)
 // from the monitor channel and logs them. Returns the drained messages for downstream use.
-func DrainInboxFeedback(ch <-chan *DMail, logger *Logger) []*DMail {
+func DrainInboxFeedback(ch <-chan *DMail, logger *sightjack.Logger) []*DMail {
 	if ch == nil {
 		return nil
 	}
@@ -333,16 +315,16 @@ type FeedbackCollector struct {
 	mu               sync.Mutex
 	items            []*DMail
 	convergenceNames []string
-	notifier         Notifier
+	notifier         sightjack.Notifier
 }
 
 // CollectFeedback creates a FeedbackCollector seeded with initial feedback
 // and starts a background goroutine to accumulate late-arriving items
 // from the channel. Convergence d-mails trigger a notification via notifier.
 // Safe to call with nil initial, nil channel, or nil notifier.
-func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier Notifier, logger *Logger) *FeedbackCollector {
+func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier sightjack.Notifier, logger *sightjack.Logger) *FeedbackCollector {
 	if notifier == nil {
-		notifier = &NopNotifier{}
+		notifier = &sightjack.NopNotifier{}
 	}
 	c := &FeedbackCollector{notifier: notifier}
 	if len(initial) > 0 {
@@ -426,7 +408,7 @@ func (c *FeedbackCollector) All() []*DMail {
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.
 func ReceiveDMail(baseDir, filename string) (*DMail, error) {
-	inboxPath := filepath.Join(MailDir(baseDir, InboxDir), filename)
+	inboxPath := filepath.Join(sightjack.MailDir(baseDir, sightjack.InboxDir), filename)
 	data, err := os.ReadFile(inboxPath)
 	if err != nil {
 		return nil, fmt.Errorf("dmail read inbox: %w", err)
@@ -435,7 +417,7 @@ func ReceiveDMail(baseDir, filename string) (*DMail, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dmail parse inbox %s: %w", filename, err)
 	}
-	archivePath := filepath.Join(MailDir(baseDir, ArchiveDir), filename)
+	archivePath := filepath.Join(sightjack.MailDir(baseDir, sightjack.ArchiveDir), filename)
 	if err := os.WriteFile(archivePath, data, 0644); err != nil {
 		return nil, fmt.Errorf("dmail archive %s: %w", filename, err)
 	}
@@ -467,7 +449,7 @@ func DMailName(prefix, waveKey string) string {
 }
 
 // WaveIssueIDs extracts unique, sorted issue IDs from wave actions.
-func WaveIssueIDs(wave Wave) []string {
+func WaveIssueIDs(wave sightjack.Wave) []string {
 	seen := make(map[string]bool)
 	for _, a := range wave.Actions {
 		if a.IssueID != "" {
@@ -483,7 +465,7 @@ func WaveIssueIDs(wave Wave) []string {
 }
 
 // SpecificationBody formats wave actions as Markdown body for a specification d-mail.
-func SpecificationBody(wave Wave) string {
+func SpecificationBody(wave sightjack.Wave) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", wave.Title)
 	if wave.Description != "" {
@@ -497,7 +479,7 @@ func SpecificationBody(wave Wave) string {
 }
 
 // ReportBody formats wave apply results as Markdown body for a report d-mail.
-func ReportBody(wave Wave, result *WaveApplyResult) string {
+func ReportBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Wave Completed: %s\n\n", wave.Title)
 	fmt.Fprintf(&b, "Applied %d action(s).\n\n", result.Applied)
@@ -518,7 +500,7 @@ func ReportBody(wave Wave, result *WaveApplyResult) string {
 }
 
 // ComposeReport creates and sends a report d-mail for a completed wave.
-func ComposeReport(baseDir string, wave Wave, result *WaveApplyResult) error {
+func ComposeReport(baseDir string, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
 	key := WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
@@ -532,7 +514,7 @@ func ComposeReport(baseDir string, wave Wave, result *WaveApplyResult) error {
 }
 
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
-func ComposeSpecification(baseDir string, wave Wave) error {
+func ComposeSpecification(baseDir string, wave sightjack.Wave) error {
 	key := WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),

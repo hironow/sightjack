@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"bufio"
@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	sightjack "github.com/hironow/sightjack"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -19,6 +21,14 @@ var newCmd = defaultNewCmd
 
 func defaultNewCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
+}
+
+// OverrideNewCmd replaces the command constructor for testing and returns a
+// cleanup function. Exported for cross-package test injection (root test suite).
+func OverrideNewCmd(fn func(ctx context.Context, name string, args ...string) *exec.Cmd) func() {
+	old := newCmd
+	newCmd = fn
+	return func() { newCmd = old }
 }
 
 // RunOption configures optional behavior for RunClaudeOnce / RunClaude.
@@ -41,7 +51,7 @@ func WithAllowedTools(tools ...string) RunOption {
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
-func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger, opts ...RunOption) (string, error) {
+func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *sightjack.Logger, opts ...RunOption) (string, error) {
 	ctx, span := tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("claude.model", cfg.Claude.Model),
@@ -129,7 +139,7 @@ func RunClaudeOnce(ctx context.Context, cfg *Config, prompt string, w io.Writer,
 // complete.
 // Pass os.Stdout for interactive single-process usage, or io.Discard for
 // parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer, logger *Logger, opts ...RunOption) (string, error) {
+func RunClaude(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *sightjack.Logger, opts ...RunOption) (string, error) {
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
@@ -183,7 +193,7 @@ func RunClaude(ctx context.Context, cfg *Config, prompt string, w io.Writer, log
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
-func RunClaudeDryRun(cfg *Config, prompt, outputPath string, name string, logger *Logger) error {
+func RunClaudeDryRun(cfg *sightjack.Config, prompt, outputPath string, name string, logger *sightjack.Logger) error {
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return fmt.Errorf("create dry-run dir: %w", err)
 	}

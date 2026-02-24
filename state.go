@@ -10,6 +10,27 @@ import (
 const StateDir = ".siren"
 const configFile = "config.yaml"
 
+const (
+	InboxDir   = "inbox"
+	OutboxDir  = "outbox"
+	ArchiveDir = "archive"
+)
+
+// MailDir returns the path to a mail subdirectory under the state root.
+func MailDir(baseDir, sub string) string {
+	return filepath.Join(baseDir, StateDir, sub)
+}
+
+// EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.
+func EnsureMailDirs(baseDir string) error {
+	for _, sub := range []string{InboxDir, OutboxDir, ArchiveDir} {
+		if err := os.MkdirAll(MailDir(baseDir, sub), 0755); err != nil {
+			return fmt.Errorf("create %s dir: %w", sub, err)
+		}
+	}
+	return nil
+}
+
 // StateFormatVersion is the version string written into SessionState files.
 // Centralised so that all code paths (scan, session, recovery) produce
 // consistent state files.

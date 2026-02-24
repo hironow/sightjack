@@ -111,7 +111,7 @@ func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) err
 		result.TotalIssues += c.IssueCount
 	}
 
-	waves := sightjack.RestoreWaves(state.Waves)
+	waves := session.RestoreWaves(state.Waves)
 	strictness := state.StrictnessLevel
 	if strictness == "" {
 		strictness = "fog"

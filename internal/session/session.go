@@ -19,12 +19,20 @@ import (
 // tracer is the package-level OTel tracer for session operations.
 var tracer = otel.Tracer("session")
 
+// OverrideTracer replaces the session package-level tracer for testing and
+// returns a cleanup function. Exported for cross-package test injection.
+func OverrideTracer(t trace.Tracer) func() {
+	old := tracer
+	tracer = t
+	return func() { tracer = old }
+}
+
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder sightjack.Recorder, logger *sightjack.Logger) error {
 	if logger == nil {
 		logger = sightjack.NewLogger(nil, false)
 	}
-	recorder = sightjack.NewLoggingRecorder(recorder, logger)
+	recorder = NewLoggingRecorder(recorder, logger)
 	if !dryRun && input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -37,15 +45,15 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 	// Start inbox monitor (fsnotify-based) for feedback d-mails.
 	// CollectFeedback accumulates initial + late-arriving feedback so
 	// all feedback is available for nextgen prompt injection.
-	var fbCollector *sightjack.FeedbackCollector
+	var fbCollector *FeedbackCollector
 	if !dryRun {
 		monitorCtx, monitorCancel := context.WithCancel(ctx)
 		defer monitorCancel()
-		inboxCh, monitorErr := sightjack.MonitorInbox(monitorCtx, baseDir, logger)
+		inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir, logger)
 		if monitorErr != nil {
 			logger.Warn("D-Mail monitor failed: %v", monitorErr)
 		}
-		initial := sightjack.DrainInboxFeedback(inboxCh, logger)
+		initial := DrainInboxFeedback(inboxCh, logger)
 
 		// Convergence gate with re-drain: catches late-arriving convergence
 		notifier := BuildNotifier(cfg)
@@ -59,7 +67,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 			return nil
 		}
 
-		fbCollector = sightjack.CollectFeedback(allDmails, inboxCh, notifier, logger)
+		fbCollector = CollectFeedback(allDmails, inboxCh, notifier, logger)
 	}
 
 	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
@@ -68,7 +76,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 	}
 
 	// --- Pass 1+2: Scan (reuse v0.1 RunScan) ---
-	scanResult, err := sightjack.RunScan(ctx, cfg, baseDir, sessionID, dryRun, out, logger)
+	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, dryRun, out, logger)
 	if err != nil {
 		return fmt.Errorf("scan: %w", err)
 	}
@@ -81,7 +89,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 			Issues:       []sightjack.IssueDetail{{ID: "SAMPLE-1", Identifier: "SAMPLE-1", Title: "Sample issue", Completeness: 0.5}},
 			Observations: []string{"sample observation for dry-run"},
 		}}
-		if _, _, _, err := sightjack.RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
+		if _, _, _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
 			return fmt.Errorf("wave generate dry-run: %w", err)
 		}
 		// Also generate architect discuss prompt for dry-run
@@ -91,7 +99,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 			Title:       "Sample Wave",
 			Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "SAMPLE-1", Description: "Sample DoD"}},
 		}
-		if err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic", string(cfg.Strictness.Default), logger); err != nil {
+		if err := RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic", string(cfg.Strictness.Default), logger); err != nil {
 			return fmt.Errorf("architect discuss dry-run: %w", err)
 		}
 		// Also generate scribe ADR prompt for dry-run
@@ -100,14 +108,14 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 				Analysis:  "Sample architect analysis for dry-run",
 				Reasoning: "Sample reasoning",
 			}
-			if err := sightjack.RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, sightjack.ADRDir(baseDir), string(cfg.Strictness.Default), logger); err != nil {
+			if err := RunScribeADRDryRun(cfg, scanDir, sampleWave, sampleArchitectResp, ADRDir(baseDir), string(cfg.Strictness.Default), logger); err != nil {
 				return fmt.Errorf("scribe dry-run: %w", err)
 			}
 		}
 		// Also generate nextgen prompt for dry-run
 		sampleCompletedWaves := []sightjack.Wave{sampleWave}
 		sampleCluster := sightjack.ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
-		if err := sightjack.GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil, logger); err != nil {
+		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil, logger); err != nil {
 			return fmt.Errorf("nextgen dry-run: %w", err)
 		}
 		logger.OK("Dry-run complete. Check .siren/.run/ for generated prompts.")
@@ -147,7 +155,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 	})
 
 	// --- Pass 3: Wave Generate ---
-	waves, waveWarnings, _, err := sightjack.RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
 	}
@@ -158,13 +166,13 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 
 	// Record waves generated
 	recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{
-		Waves: sightjack.BuildWaveStates(waves),
+		Waves: BuildWaveStates(waves),
 	})
 
-	completed := sightjack.BuildCompletedWaveMap(waves)
+	completed := BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
-	adrDir := sightjack.ADRDir(baseDir)
-	adrCount := sightjack.CountADRFiles(adrDir)
+	adrDir := ADRDir(baseDir)
+	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
 		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, recorder, out, logger)
@@ -261,7 +269,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 
 		switch choice {
 		case sightjack.ApprovalApprove:
-			delete(sessionRejected, sightjack.WaveKey(selected))
+			delete(sessionRejected, WaveKey(selected))
 			loopSpan.AddEvent("wave.approved",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
@@ -271,7 +279,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			recorder.Record(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
-			if err := sightjack.ComposeSpecification(baseDir, selected); err != nil {
+			if err := ComposeSpecification(baseDir, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			}
 			recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
@@ -279,7 +287,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			})
 			return selected, approvalApproved
 		case sightjack.ApprovalReject:
-			delete(sessionRejected, sightjack.WaveKey(selected))
+			delete(sessionRejected, WaveKey(selected))
 			loopSpan.AddEvent("wave.rejected",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
@@ -300,15 +308,15 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				logger.Warn("Invalid topic: %v", topicErr)
 				continue
 			}
-			result, discussErr := sightjack.RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
+			result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
 			if discussErr != nil {
 				logger.Error("Architect discussion failed: %v", discussErr)
 				continue
 			}
 			DisplayArchitectResponse(out, result)
 			if result.ModifiedWave != nil {
-				selected = sightjack.ApplyModifiedWave(selected, *result.ModifiedWave, completed)
-				sightjack.PropagateWaveUpdate(waves, selected)
+				selected = ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+				PropagateWaveUpdate(waves, selected)
 				recorder.Record(sightjack.EventWaveModified, sightjack.WaveModifiedPayload{
 					WaveID: selected.ID, ClusterName: selected.ClusterName,
 					UpdatedWave: sightjack.WaveState{
@@ -322,7 +330,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				// Trigger Scribe to generate ADR for the modification
 				// (runs even for locked waves — the decision itself is worth recording)
 				if cfg.Scribe.Enabled {
-					scribeResp, scribeErr := sightjack.RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness, out, logger)
+					scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness, out, logger)
 					if scribeErr != nil {
 						logger.Warn("Scribe failed (non-fatal): %v", scribeErr)
 					} else {
@@ -360,12 +368,12 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				fraction := float64(len(approved)) / float64(totalActions)
 				selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
 			}
-			sightjack.PropagateWaveUpdate(waves, selected)
-			sessionRejected[sightjack.WaveKey(selected)] = rejected
+			PropagateWaveUpdate(waves, selected)
+			sessionRejected[WaveKey(selected)] = rejected
 			recorder.Record(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
-			if err := sightjack.ComposeSpecification(baseDir, selected); err != nil {
+			if err := ComposeSpecification(baseDir, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			}
 			recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
@@ -387,17 +395,17 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	waves *[]sightjack.Wave, completed map[string]bool,
 	scanResult *sightjack.ScanResult, sessionRejected map[string][]sightjack.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *sightjack.FeedbackCollector, recorder sightjack.Recorder, out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) {
+	fbCollector *FeedbackCollector, recorder sightjack.Recorder, out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) {
 
 	// --- Pass 4: Wave Apply ---
-	applyResult, err := sightjack.RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
+	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
 	if err != nil {
 		logger.Error("Apply failed: %v", err)
 		return
 	}
 
 	// Count new waves unlocked by this completion
-	oldAvailable := len(sightjack.AvailableWaves(*waves, completed))
+	oldAvailable := len(AvailableWaves(*waves, completed))
 
 	// Record wave applied (always, even for partial failures)
 	recorder.Record(sightjack.EventWaveApplied, sightjack.WaveAppliedPayload{
@@ -406,7 +414,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		Errors: applyResult.Errors,
 	})
 
-	if !sightjack.IsWaveApplyComplete(applyResult) {
+	if !IsWaveApplyComplete(applyResult) {
 		loopSpan.AddEvent("wave.partial_failure",
 			trace.WithAttributes(
 				attribute.String("wave.id", selected.ID),
@@ -414,7 +422,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 				attribute.Int("wave.error_count", len(applyResult.Errors)),
 			),
 		)
-		logger.Warn("Wave %s partially failed (%d errors). Not marking as completed.", sightjack.WaveKey(selected), len(applyResult.Errors))
+		logger.Warn("Wave %s partially failed (%d errors). Not marking as completed.", WaveKey(selected), len(applyResult.Errors))
 		DisplayRippleEffects(out, applyResult.Ripples)
 		return
 	}
@@ -428,10 +436,10 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	)
 
 	// Mark wave completed using composite key (ClusterName:ID)
-	completed[sightjack.WaveKey(selected)] = true
-	selectedKey := sightjack.WaveKey(selected)
+	completed[WaveKey(selected)] = true
+	selectedKey := WaveKey(selected)
 	for i, w := range *waves {
-		if sightjack.WaveKey(w) == selectedKey {
+		if WaveKey(w) == selectedKey {
 			(*waves)[i].Status = "completed"
 			break
 		}
@@ -443,7 +451,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	})
 
 	// Compose report d-mail for the completed wave
-	if err := sightjack.ComposeReport(baseDir, selected, applyResult); err != nil {
+	if err := ComposeReport(baseDir, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	}
 	recorder.Record(sightjack.EventReportSent, sightjack.WaveIdentityPayload{
@@ -453,7 +461,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	// Update cluster completeness from delta, then recalculate overall
 	for i, c := range scanResult.Clusters {
 		if c.Name == selected.ClusterName {
-			adjustedAfter := sightjack.PartialApplyDelta(applyResult, selected.Delta)
+			adjustedAfter := PartialApplyDelta(applyResult, selected.Delta)
 			scanResult.Clusters[i].Completeness = adjustedAfter
 			// Note: per-issue completeness is NOT updated here because
 			// action types vary (add_dod vs add_dependency) and we lack
@@ -480,14 +488,14 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	})
 
 	// Display rich completion summary with grouped ripple effects
-	*waves = sightjack.EvaluateUnlocks(*waves, completed)
-	newAvailable := len(sightjack.AvailableWaves(*waves, completed))
-	newCount := sightjack.CalcNewlyUnlocked(oldAvailable, newAvailable)
+	*waves = EvaluateUnlocks(*waves, completed)
+	newAvailable := len(AvailableWaves(*waves, completed))
+	newCount := CalcNewlyUnlocked(oldAvailable, newAvailable)
 	if newCount > 0 {
 		var unlockedIDs []string
 		for _, w := range *waves {
 			if w.Status == "available" {
-				unlockedIDs = append(unlockedIDs, sightjack.WaveKey(w))
+				unlockedIDs = append(unlockedIDs, WaveKey(w))
 			}
 		}
 		recorder.Record(sightjack.EventWavesUnlocked, sightjack.WavesUnlockedPayload{
@@ -506,7 +514,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	}
 	if clusterForNextgen.Name == "" {
 		logger.Warn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
-	} else if !sightjack.NeedsMoreWaves(clusterForNextgen, *waves) {
+	} else if !NeedsMoreWaves(clusterForNextgen, *waves) {
 		loopSpan.AddEvent("nextgen.skipped",
 			trace.WithAttributes(
 				attribute.String("wave.cluster_name", selected.ClusterName),
@@ -514,25 +522,25 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		)
 		logger.Debug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
 	} else {
-		completedWavesForCluster := sightjack.CompletedWavesForCluster(*waves, selected.ClusterName)
-		existingADRs, adrErr := sightjack.ReadExistingADRs(adrDir)
+		completedWavesForCluster := CompletedWavesForCluster(*waves, selected.ClusterName)
+		existingADRs, adrErr := ReadExistingADRs(adrDir)
 		if adrErr != nil {
 			logger.Warn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
 		}
-		rejectedForWave := sessionRejected[sightjack.WaveKey(selected)]
-		var feedback []*sightjack.DMail
+		rejectedForWave := sessionRejected[WaveKey(selected)]
+		var feedback []*DMail
 		if fbCollector != nil {
 			feedback = fbCollector.FeedbackOnly()
 		}
-		newWaves, nextgenErr := sightjack.GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, logger)
+		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, logger)
 		if nextgenErr != nil {
 			logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
 		} else if len(newWaves) > 0 {
 			*waves = append(*waves, newWaves...)
-			*waves = sightjack.EvaluateUnlocks(*waves, completed)
+			*waves = EvaluateUnlocks(*waves, completed)
 			recorder.Record(sightjack.EventNextGenWavesAdded, sightjack.NextGenWavesAddedPayload{
 				ClusterName: selected.ClusterName,
-				Waves:       sightjack.BuildWaveStates(newWaves),
+				Waves:       BuildWaveStates(newWaves),
 			})
 		}
 	}
@@ -549,7 +557,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		}
 		if len(newlyReady) > 0 {
 			readyIssueStr := strings.Join(newlyReady, ", ")
-			if err := sightjack.RunReadyLabel(ctx, cfg, readyIssueStr, out, logger); err != nil {
+			if err := RunReadyLabel(ctx, cfg, readyIssueStr, out, logger); err != nil {
 				logger.Warn("Ready label failed: %v", err)
 			} else {
 				for _, id := range newlyReady {
@@ -574,7 +582,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
 func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *sightjack.ScanResult, waves []sightjack.Wave, completed map[string]bool, adrCount int,
-	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *sightjack.FeedbackCollector, recorder sightjack.Recorder, out io.Writer, logger *sightjack.Logger) error {
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector, recorder sightjack.Recorder, out io.Writer, logger *sightjack.Logger) error {
 
 	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
@@ -593,8 +601,8 @@ func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, ses
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
 outerLoop:
 	for {
-		waves = sightjack.EvaluateUnlocks(waves, completed)
-		available := sightjack.AvailableWaves(waves, completed)
+		waves = EvaluateUnlocks(waves, completed)
+		available := AvailableWaves(waves, completed)
 		if len(available) == 0 {
 			logger.OK("All waves completed or no available waves.")
 			break
@@ -624,7 +632,7 @@ outerLoop:
 	}
 
 	// Final consistency check
-	if sightjack.CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
+	if CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
 		logger.Warn("Completeness mismatch detected. Recalculating...")
 		scanResult.CalculateCompleteness()
 	}
@@ -648,9 +656,9 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
 	}
-	waves := sightjack.RestoreWaves(state.Waves)
-	completed := sightjack.BuildCompletedWaveMap(waves)
-	adrCount := sightjack.CountADRFiles(sightjack.ADRDir(baseDir))
+	waves := RestoreWaves(state.Waves)
+	completed := BuildCompletedWaveMap(waves)
+	adrCount := CountADRFiles(ADRDir(baseDir))
 	return scanResult, waves, completed, adrCount, nil
 }
 
@@ -671,7 +679,7 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	if logger == nil {
 		logger = sightjack.NewLogger(nil, false)
 	}
-	recorder = sightjack.NewLoggingRecorder(recorder, logger)
+	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -685,11 +693,11 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	// CollectFeedback accumulates initial + late-arriving feedback.
 	monitorCtx, monitorCancel := context.WithCancel(ctx)
 	defer monitorCancel()
-	inboxCh, monitorErr := sightjack.MonitorInbox(monitorCtx, baseDir, logger)
+	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir, logger)
 	if monitorErr != nil {
 		logger.Warn("D-Mail monitor failed: %v", monitorErr)
 	}
-	initial := sightjack.DrainInboxFeedback(inboxCh, logger)
+	initial := DrainInboxFeedback(inboxCh, logger)
 
 	// Convergence gate with re-drain: catches late-arriving convergence
 	notifier := BuildNotifier(cfg)
@@ -703,7 +711,7 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		return nil
 	}
 
-	fbCollector := sightjack.CollectFeedback(allDmails, inboxCh, notifier, logger)
+	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
@@ -712,7 +720,7 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	scanDir := ResumeScanDir(state, baseDir)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	scanner := bufio.NewScanner(input)
-	adrDir := sightjack.ADRDir(baseDir)
+	adrDir := ADRDir(baseDir)
 	lastScanned := state.LastScanned
 
 	// Record resume event
@@ -731,7 +739,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	if logger == nil {
 		logger = sightjack.NewLogger(nil, false)
 	}
-	recorder = sightjack.NewLoggingRecorder(recorder, logger)
+	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -745,11 +753,11 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	// CollectFeedback accumulates initial + late-arriving feedback.
 	monitorCtx, monitorCancel := context.WithCancel(ctx)
 	defer monitorCancel()
-	inboxCh, monitorErr := sightjack.MonitorInbox(monitorCtx, baseDir, logger)
+	inboxCh, monitorErr := MonitorInbox(monitorCtx, baseDir, logger)
 	if monitorErr != nil {
 		logger.Warn("D-Mail monitor failed: %v", monitorErr)
 	}
-	initial := sightjack.DrainInboxFeedback(inboxCh, logger)
+	initial := DrainInboxFeedback(inboxCh, logger)
 
 	// Convergence gate with re-drain: catches late-arriving convergence
 	notifier := BuildNotifier(cfg)
@@ -763,13 +771,13 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		return nil
 	}
 
-	fbCollector := sightjack.CollectFeedback(allDmails, inboxCh, notifier, logger)
+	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
 	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
 	}
-	scanResult, err := sightjack.RunScan(ctx, cfg, baseDir, sessionID, false, out, logger)
+	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, false, out, logger)
 	if err != nil {
 		return fmt.Errorf("re-scan: %w", err)
 	}
@@ -781,7 +789,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to cache scan result: %v", err)
 	}
-	waves, rescanWarnings, failedNames, err := sightjack.RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, rescanWarnings, failedNames, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
 	}
@@ -796,14 +804,14 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	for _, c := range scanResult.Clusters {
 		scannedClusters[c.Name] = true
 	}
-	oldWaves := sightjack.RestoreWaves(oldState.Waves)
-	waves = sightjack.MergeOldWaves(oldWaves, waves, scannedClusters, failedNames)
-	oldCompleted := sightjack.BuildCompletedWaveMap(oldWaves)
-	waves = sightjack.MergeCompletedStatus(oldCompleted, waves)
-	waves = sightjack.EvaluateUnlocks(waves, sightjack.BuildCompletedWaveMap(waves))
-	completed := sightjack.BuildCompletedWaveMap(waves)
-	adrDir := sightjack.ADRDir(baseDir)
-	adrCount := sightjack.CountADRFiles(adrDir)
+	oldWaves := RestoreWaves(oldState.Waves)
+	waves = MergeOldWaves(oldWaves, waves, scannedClusters, failedNames)
+	oldCompleted := BuildCompletedWaveMap(oldWaves)
+	waves = MergeCompletedStatus(oldCompleted, waves)
+	waves = EvaluateUnlocks(waves, BuildCompletedWaveMap(waves))
+	completed := BuildCompletedWaveMap(waves)
+	adrDir := ADRDir(baseDir)
+	adrCount := CountADRFiles(adrDir)
 	scanner := bufio.NewScanner(input)
 
 	// Record rescan events
@@ -828,7 +836,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		LastScanned:    scanTime,
 	})
 	recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{
-		Waves: sightjack.BuildWaveStates(waves),
+		Waves: BuildWaveStates(waves),
 	})
 
 	logger.OK("Re-scanned: %d clusters, %d waves (%d previously completed)",

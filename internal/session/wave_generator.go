@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	sightjack "github.com/hironow/sightjack"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -23,7 +25,7 @@ const maxWavesPerCluster = 8
 //   - cluster completeness >= 0.95 (effectively done)
 //   - available (non-completed) waves still remain for the cluster
 //   - total wave count for the cluster >= maxWavesPerCluster
-func NeedsMoreWaves(cluster ClusterScanResult, waves []Wave) bool {
+func NeedsMoreWaves(cluster sightjack.ClusterScanResult, waves []sightjack.Wave) bool {
 	if cluster.Completeness >= 0.95 {
 		return false
 	}
@@ -48,23 +50,23 @@ func NeedsMoreWaves(cluster ClusterScanResult, waves []Wave) bool {
 }
 
 // NextgenFileName returns the output filename for a nextgen wave generation run.
-func NextgenFileName(wave Wave) string {
+func NextgenFileName(wave sightjack.Wave) string {
 	return fmt.Sprintf("nextgen_%s_%s.json", SanitizeName(wave.ClusterName), SanitizeName(wave.ID))
 }
 
 // ClearNextgenOutput removes any existing nextgen output file.
-func ClearNextgenOutput(scanDir string, wave Wave) {
+func ClearNextgenOutput(scanDir string, wave sightjack.Wave) {
 	path := filepath.Join(scanDir, NextgenFileName(wave))
 	_ = os.Remove(path)
 }
 
 // ParseNextGenResult reads and parses a nextgen wave generation result JSON file.
-func ParseNextGenResult(path string) (*NextGenResult, error) {
+func ParseNextGenResult(path string) (*sightjack.NextGenResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read nextgen result: %w", err)
 	}
-	var result NextGenResult
+	var result sightjack.NextGenResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse nextgen result: %w", err)
 	}
@@ -72,7 +74,7 @@ func ParseNextGenResult(path string) (*NextGenResult, error) {
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt to a file instead of executing Claude.
-func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string, feedback []*DMail, logger *Logger) error {
+func GenerateNextWavesDryRun(cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail, logger *sightjack.Logger) error {
 	prompt, err := BuildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness, feedback)
 	if err != nil {
 		return err
@@ -82,7 +84,7 @@ func GenerateNextWavesDryRun(cfg *Config, scanDir string, completedWave Wave, cl
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string, feedback []*DMail, logger *Logger) ([]Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail, logger *sightjack.Logger) ([]sightjack.Wave, error) {
 	ctx, nextgenSpan := tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", completedWave.ClusterName),
@@ -133,7 +135,7 @@ func GenerateNextWaves(ctx context.Context, cfg *Config, scanDir string, complet
 }
 
 // BuildNextGenPrompt constructs the prompt for post-completion wave generation.
-func BuildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster ClusterScanResult, completedWaves []Wave, existingADRs []ExistingADR, rejectedActions []WaveAction, strictness string, feedback []*DMail) (string, error) {
+func BuildNextGenPrompt(cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail) (string, error) {
 	outputFile := filepath.Join(scanDir, NextgenFileName(completedWave))
 
 	issuesJSON, err := json.Marshal(cluster.Issues)
@@ -155,9 +157,9 @@ func BuildNextGenPrompt(cfg *Config, scanDir string, completedWave Wave, cluster
 		rejectedStr = string(rejectedJSON)
 	}
 
-	dodSection := ResolveDoDSection(cfg.DoDTemplates, completedWave.ClusterName)
+	dodSection := sightjack.ResolveDoDSection(cfg.DoDTemplates, completedWave.ClusterName)
 
-	return RenderNextGenPrompt(cfg.Lang, NextGenPromptData{
+	return sightjack.RenderNextGenPrompt(cfg.Lang, sightjack.NextGenPromptData{
 		ClusterName:     completedWave.ClusterName,
 		Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
 		Issues:          string(issuesJSON),

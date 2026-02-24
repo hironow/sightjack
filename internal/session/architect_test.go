@@ -1,4 +1,4 @@
-package sightjack_test
+package session_test
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestParseArchitectResult(t *testing.T) {
@@ -39,7 +40,7 @@ func TestParseArchitectResult(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.ParseArchitectResult(path)
+	result, err := session.ParseArchitectResult(path)
 
 	// then
 	if err != nil {
@@ -65,7 +66,7 @@ func TestParseArchitectResult_NilWave(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.ParseArchitectResult(path)
+	result, err := session.ParseArchitectResult(path)
 
 	// then
 	if err != nil {
@@ -78,7 +79,7 @@ func TestParseArchitectResult_NilWave(t *testing.T) {
 
 func TestParseArchitectResult_FileNotFound(t *testing.T) {
 	// when
-	_, err := sightjack.ParseArchitectResult("/nonexistent/path.json")
+	_, err := session.ParseArchitectResult("/nonexistent/path.json")
 
 	// then
 	if err == nil {
@@ -88,7 +89,7 @@ func TestParseArchitectResult_FileNotFound(t *testing.T) {
 
 func TestArchitectDiscussFileName(t *testing.T) {
 	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
-	name := sightjack.ArchitectDiscussFileName(wave)
+	name := session.ArchitectDiscussFileName(wave)
 	if name != "architect_auth_auth-w1.json" {
 		t.Errorf("expected architect_auth_auth-w1.json, got %s", name)
 	}
@@ -96,7 +97,7 @@ func TestArchitectDiscussFileName(t *testing.T) {
 
 func TestArchitectDiscussFileName_SpecialChars(t *testing.T) {
 	wave := sightjack.Wave{ID: "w-1", ClusterName: "UI/Frontend"}
-	name := sightjack.ArchitectDiscussFileName(wave)
+	name := session.ArchitectDiscussFileName(wave)
 	if name != "architect_ui_frontend_w-1.json" {
 		t.Errorf("expected architect_ui_frontend_w-1.json, got %s", name)
 	}
@@ -117,7 +118,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
+	err := session.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -138,7 +139,7 @@ func TestParseArchitectResult_MalformedJSON(t *testing.T) {
 	}
 
 	// when
-	_, err := sightjack.ParseArchitectResult(path)
+	_, err := session.ParseArchitectResult(path)
 
 	// then
 	if err == nil {
@@ -169,7 +170,7 @@ func TestParseArchitectResult_ModifiedWaveNilActions(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.ParseArchitectResult(path)
+	result, err := session.ParseArchitectResult(path)
 
 	// then
 	if err != nil {
@@ -202,7 +203,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
+	err := session.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -223,7 +224,7 @@ func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
 	// given: a pre-existing stale output file from a previous discuss round
 	scanDir := t.TempDir()
 	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth", Title: "Test"}
-	outputFile := filepath.Join(scanDir, sightjack.ArchitectDiscussFileName(wave))
+	outputFile := filepath.Join(scanDir, session.ArchitectDiscussFileName(wave))
 	if err := os.WriteFile(outputFile, []byte(`{"analysis":"stale","modified_wave":null,"reasoning":"old"}`), 0644); err != nil {
 		t.Fatalf("write test file: %v", err)
 	}
@@ -234,7 +235,7 @@ func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
 	}
 
 	// then: ClearArchitectOutput removes it
-	sightjack.ClearArchitectOutput(scanDir, wave)
+	session.ClearArchitectOutput(scanDir, wave)
 
 	if _, err := os.Stat(outputFile); !os.IsNotExist(err) {
 		t.Error("expected stale output file to be removed")

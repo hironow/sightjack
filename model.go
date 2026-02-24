@@ -339,3 +339,9 @@ type ActionResult struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error,omitempty"`
 }
+
+// ExistingADR holds the filename and content of an existing ADR file.
+type ExistingADR struct {
+	Filename string
+	Content  string
+}

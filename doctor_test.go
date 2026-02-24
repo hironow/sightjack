@@ -109,7 +109,7 @@ func TestCheckStatusLabel(t *testing.T) {
 
 func TestCheckClaudeAuth_Success(t *testing.T) {
 	// given: mock claude that responds OK
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "OK")
 	})
 	defer cleanup()
@@ -134,7 +134,7 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 
 func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 	// given: mock claude that outputs "Not logged in" and exits 1
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("sh", "-c", `echo "Not logged in · Please run /login"; exit 1`)
 	})
 	defer cleanup()
@@ -159,7 +159,7 @@ func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 
 func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
 	// given: mock claude that fails with unknown error
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("false")
 	})
 	defer cleanup()
@@ -196,7 +196,7 @@ func TestCheckClaudeAuth_NilConfig_Skips(t *testing.T) {
 
 func TestCheckLinearMCP_Success(t *testing.T) {
 	// given: mock claude that returns team info
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", `{"teams": [{"name": "Engineering"}]}`)
 	})
 	defer cleanup()
@@ -219,7 +219,7 @@ func TestCheckLinearMCP_Success(t *testing.T) {
 
 func TestCheckLinearMCP_Failure(t *testing.T) {
 	// given: mock claude that fails (auth is OK but MCP fails)
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("false")
 	})
 	defer cleanup()
@@ -353,7 +353,7 @@ func TestCheckSkills_MissingSchemaVersion(t *testing.T) {
 
 func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// given: nonexistent config path → config check fails, cfg=nil
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "ok")
 	})
 	defer cleanup()
@@ -392,7 +392,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 
 func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	// given: claude binary does not exist → Claude Auth + Linear MCP should be skipped
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "ok")
 	})
 	defer cleanup()
@@ -441,7 +441,7 @@ claude:
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// given: mock claude for auth + MCP checks
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "ok")
 	})
 	defer cleanup()

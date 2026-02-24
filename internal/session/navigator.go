@@ -374,5 +374,5 @@ func DisplayWaveCompletion(w io.Writer, wave sightjack.Wave, ripples []sightjack
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *sightjack.ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
-	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", sightjack.ADRSubdir, resp.ADRID, sightjack.SanitizeADRTitle(resp.Title))
+	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", ADRSubdir, resp.ADRID, SanitizeADRTitle(resp.Title))
 }

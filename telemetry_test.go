@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 // setupTestTracer installs an InMemoryExporter with a synchronous span processor
@@ -22,11 +23,13 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	cleanupTracer := sightjack.SetTracer(tp.Tracer("sightjack-test"))
+	cleanupRootTracer := sightjack.SetTracer(tp.Tracer("sightjack-test"))
+	cleanupSessionTracer := session.OverrideTracer(tp.Tracer("session-test"))
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		cleanupTracer()
+		cleanupSessionTracer()
+		cleanupRootTracer()
 	})
 	return exp
 }
@@ -61,7 +64,7 @@ func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.CommandContext(ctx, "echo", "hello")
 	})
 	t.Cleanup(cleanup)
@@ -71,7 +74,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
-	_, err := sightjack.RunClaude(context.Background(), cfg, "test prompt", io.Discard, sightjack.NewLogger(io.Discard, false))
+	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, sightjack.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunClaude failed: %v", err)
 	}
@@ -97,7 +100,7 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	exp := setupTestTracer(t)
 
 	callCount := 0
-	cleanup := sightjack.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
 		if callCount == 1 {
 			return exec.CommandContext(ctx, "false") // exit 1
@@ -114,7 +117,7 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	// Create a parent span so retry events have a recording span to attach to.
 	tr := otel.Tracer("sightjack-test")
 	ctx, parentSpan := tr.Start(context.Background(), "test-parent")
-	_, _ = sightjack.RunClaude(ctx, cfg, "test", io.Discard, sightjack.NewLogger(io.Discard, false))
+	_, _ = session.RunClaude(ctx, cfg, "test", io.Discard, sightjack.NewLogger(io.Discard, false))
 	parentSpan.End()
 
 	spans := exp.GetSpans()

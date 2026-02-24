@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newADRCmd() *cobra.Command {
@@ -43,13 +44,13 @@ Output is written to stdout for redirection to docs/adr/.`,
 				return fmt.Errorf("invalid DiscussResult JSON: %w", err)
 			}
 
-			adrDir := sightjack.ADRDir(baseDir)
-			adrNum, err := sightjack.NextADRNumber(adrDir)
+			adrDir := session.ADRDir(baseDir)
+			adrNum, err := session.NextADRNumber(adrDir)
 			if err != nil {
 				return fmt.Errorf("failed to determine ADR number: %w", err)
 			}
 
-			md := sightjack.RenderADRFromDiscuss(dr, adrNum)
+			md := session.RenderADRFromDiscuss(dr, adrNum)
 			fmt.Fprint(cmd.OutOrStdout(), md)
 			return nil
 		},

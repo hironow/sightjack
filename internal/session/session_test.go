@@ -26,7 +26,7 @@ func TestIsWaveApplyComplete_NoErrors(t *testing.T) {
 	}
 
 	// when
-	complete := sightjack.IsWaveApplyComplete(result)
+	complete := session.IsWaveApplyComplete(result)
 
 	// then
 	if !complete {
@@ -44,7 +44,7 @@ func TestIsWaveApplyComplete_WithErrors(t *testing.T) {
 	}
 
 	// when
-	complete := sightjack.IsWaveApplyComplete(result)
+	complete := session.IsWaveApplyComplete(result)
 
 	// then
 	if complete {
@@ -61,7 +61,7 @@ func TestIsWaveApplyComplete_NilErrors(t *testing.T) {
 	}
 
 	// when
-	complete := sightjack.IsWaveApplyComplete(result)
+	complete := session.IsWaveApplyComplete(result)
 
 	// then
 	if !complete {
@@ -92,7 +92,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -148,7 +148,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -173,7 +173,7 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := session.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: should get an input-related error, not a panic or scan error
 	if err == nil {
@@ -191,7 +191,7 @@ func TestBuildCompletedWaveMap(t *testing.T) {
 		{ID: "api-w1", ClusterName: "API", Status: "completed"},
 	}
 
-	completed := sightjack.BuildCompletedWaveMap(waves)
+	completed := session.BuildCompletedWaveMap(waves)
 	if len(completed) != 2 {
 		t.Fatalf("expected 2 completed, got %d", len(completed))
 	}
@@ -212,7 +212,7 @@ func TestBuildWaveStates(t *testing.T) {
 		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available", Prerequisites: []string{"auth-w1"}, Actions: make([]sightjack.WaveAction, 5)},
 	}
 
-	states := sightjack.BuildWaveStates(waves)
+	states := session.BuildWaveStates(waves)
 	if len(states) != 2 {
 		t.Fatalf("expected 2, got %d", len(states))
 	}
@@ -291,7 +291,7 @@ func TestBuildCompletedWaveMap_Empty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// when
-			completed := sightjack.BuildCompletedWaveMap(tt.waves)
+			completed := session.BuildCompletedWaveMap(tt.waves)
 
 			// then: should return non-nil empty map (callers do completed[key] lookups)
 			if completed == nil {
@@ -312,7 +312,7 @@ func TestBuildCompletedWaveMap_DuplicateIDsAcrossClusters(t *testing.T) {
 	}
 
 	// when
-	completed := sightjack.BuildCompletedWaveMap(waves)
+	completed := session.BuildCompletedWaveMap(waves)
 
 	// then: composite keys should be distinct
 	if len(completed) != 2 {
@@ -339,7 +339,7 @@ func TestBuildWaveStates_Empty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// when
-			states := sightjack.BuildWaveStates(tt.waves)
+			states := session.BuildWaveStates(tt.waves)
 
 			// then: make([]WaveState, 0) returns non-nil empty slice
 			if states == nil {
@@ -516,7 +516,7 @@ func TestApplyModifiedWave_PreservesIdentity(t *testing.T) {
 	}
 
 	// when: no prerequisites, empty completed map
-	result := sightjack.ApplyModifiedWave(original, modified, map[string]bool{})
+	result := session.ApplyModifiedWave(original, modified, map[string]bool{})
 
 	// then: identity preserved from original
 	if result.ID != "auth-w1" {
@@ -561,7 +561,7 @@ func TestApplyModifiedWave_LocksOnUnmetPrerequisites(t *testing.T) {
 	completed := map[string]bool{}
 
 	// when
-	result := sightjack.ApplyModifiedWave(original, modified, completed)
+	result := session.ApplyModifiedWave(original, modified, completed)
 
 	// then: status should be "locked" because prerequisite is unmet
 	if result.Status != "locked" {
@@ -590,7 +590,7 @@ func TestApplyModifiedWave_AvailableWhenPrereqsMet(t *testing.T) {
 	completed := map[string]bool{"Auth:auth-w1": true}
 
 	// when
-	result := sightjack.ApplyModifiedWave(original, modified, completed)
+	result := session.ApplyModifiedWave(original, modified, completed)
 
 	// then: status should remain "available" because prerequisite is met
 	if result.Status != "available" {
@@ -617,7 +617,7 @@ func TestApplyModifiedWave_NormalizesBarePrerequisites(t *testing.T) {
 	completed := map[string]bool{"Auth:auth-w1": true}
 
 	// when
-	result := sightjack.ApplyModifiedWave(original, modified, completed)
+	result := session.ApplyModifiedWave(original, modified, completed)
 
 	// then: should be "available" because bare "auth-w1" normalizes to "Auth:auth-w1"
 	if result.Status != "available" {
@@ -645,13 +645,13 @@ func TestApplyModifiedWave_PropagatesLockToWaves(t *testing.T) {
 	completed := map[string]bool{}
 
 	// when: apply modification
-	result := sightjack.ApplyModifiedWave(waves[0], modified, completed)
+	result := session.ApplyModifiedWave(waves[0], modified, completed)
 	if result.Status != "locked" {
 		t.Fatalf("precondition: expected locked, got %s", result.Status)
 	}
 
 	// when: propagate back to waves slice
-	sightjack.PropagateWaveUpdate(waves, result)
+	session.PropagateWaveUpdate(waves, result)
 
 	// then: the waves slice entry should be updated
 	if waves[0].Status != "locked" {
@@ -684,7 +684,7 @@ func TestApplyModifiedWave_PreservesOriginalPrerequisitesWhenNil(t *testing.T) {
 	completed := map[string]bool{} // auth-w1 NOT completed
 
 	// when
-	result := sightjack.ApplyModifiedWave(original, modified, completed)
+	result := session.ApplyModifiedWave(original, modified, completed)
 
 	// then: prerequisites should fall back to original, not be empty
 	if len(result.Prerequisites) != 1 || result.Prerequisites[0] != "Auth:auth-w1" {
@@ -713,7 +713,7 @@ func TestApplyModifiedWave_PreservesOriginalDeltaWhenZero(t *testing.T) {
 	completed := map[string]bool{}
 
 	// when
-	result := sightjack.ApplyModifiedWave(original, modified, completed)
+	result := session.ApplyModifiedWave(original, modified, completed)
 
 	// then: delta should fall back to original
 	if result.Delta.Before != 0.25 || result.Delta.After != 0.50 {
@@ -735,26 +735,26 @@ func TestMergeCompletedStatus_PreservesCompleted(t *testing.T) {
 	}
 
 	// when
-	merged := sightjack.MergeCompletedStatus(oldCompleted, newWaves)
+	merged := session.MergeCompletedStatus(oldCompleted, newWaves)
 
 	// then: auth-w1 should be completed (was in old)
 	for _, w := range merged {
-		if sightjack.WaveKey(w) == "Auth:auth-w1" && w.Status != "completed" {
+		if session.WaveKey(w) == "Auth:auth-w1" && w.Status != "completed" {
 			t.Errorf("expected Auth:auth-w1 completed, got %s", w.Status)
 		}
 	}
 	// then: api-w1 not in new waves (dropped from Linear) — not present at all
 	for _, w := range merged {
-		if sightjack.WaveKey(w) == "API:api-w1" {
+		if session.WaveKey(w) == "API:api-w1" {
 			t.Error("API:api-w1 should not appear in merged result")
 		}
 	}
 	// then: auth-w2 and api-w2 keep original status
 	for _, w := range merged {
-		if sightjack.WaveKey(w) == "Auth:auth-w2" && w.Status != "locked" {
+		if session.WaveKey(w) == "Auth:auth-w2" && w.Status != "locked" {
 			t.Errorf("expected Auth:auth-w2 locked, got %s", w.Status)
 		}
-		if sightjack.WaveKey(w) == "API:api-w2" && w.Status != "available" {
+		if session.WaveKey(w) == "API:api-w2" && w.Status != "available" {
 			t.Errorf("expected API:api-w2 available, got %s", w.Status)
 		}
 	}
@@ -768,7 +768,7 @@ func TestMergeCompletedStatus_EmptyOld(t *testing.T) {
 	}
 
 	// when
-	merged := sightjack.MergeCompletedStatus(oldCompleted, newWaves)
+	merged := session.MergeCompletedStatus(oldCompleted, newWaves)
 
 	// then: all waves keep original status
 	if len(merged) != 1 {
@@ -785,7 +785,7 @@ func TestMergeCompletedStatus_EmptyNew(t *testing.T) {
 	var newWaves []sightjack.Wave
 
 	// when
-	merged := sightjack.MergeCompletedStatus(oldCompleted, newWaves)
+	merged := session.MergeCompletedStatus(oldCompleted, newWaves)
 
 	// then
 	if len(merged) != 0 {
@@ -812,7 +812,7 @@ func TestBuildWaveStates_IncludesFullFields(t *testing.T) {
 	}
 
 	// when
-	states := sightjack.BuildWaveStates(waves)
+	states := session.BuildWaveStates(waves)
 
 	// then
 	s := states[0]
@@ -856,7 +856,7 @@ func TestRestoreWaves_ConvertsWaveStatesToWaves(t *testing.T) {
 	}
 
 	// when
-	waves := sightjack.RestoreWaves(states)
+	waves := session.RestoreWaves(states)
 
 	// then
 	if len(waves) != 2 {
@@ -888,7 +888,7 @@ func TestRestoreWaves_EmptyInput(t *testing.T) {
 	var states []sightjack.WaveState
 
 	// when
-	waves := sightjack.RestoreWaves(states)
+	waves := session.RestoreWaves(states)
 
 	// then
 	if waves == nil {
@@ -913,7 +913,7 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -935,7 +935,7 @@ func TestCalcNewlyUnlocked_CompletingWaveUnlocksOne(t *testing.T) {
 	newAvailable := 1
 
 	// when
-	got := sightjack.CalcNewlyUnlocked(oldAvailable, newAvailable)
+	got := session.CalcNewlyUnlocked(oldAvailable, newAvailable)
 
 	// then
 	if got != 1 {
@@ -951,7 +951,7 @@ func TestCalcNewlyUnlocked_CompletingWaveUnlocksTwo(t *testing.T) {
 	newAvailable := 3
 
 	// when
-	got := sightjack.CalcNewlyUnlocked(oldAvailable, newAvailable)
+	got := session.CalcNewlyUnlocked(oldAvailable, newAvailable)
 
 	// then
 	if got != 2 {
@@ -967,7 +967,7 @@ func TestCalcNewlyUnlocked_CompletingWaveUnlocksNone(t *testing.T) {
 	newAvailable := 2
 
 	// when
-	got := sightjack.CalcNewlyUnlocked(oldAvailable, newAvailable)
+	got := session.CalcNewlyUnlocked(oldAvailable, newAvailable)
 
 	// then
 	if got != 0 {
@@ -996,7 +996,7 @@ func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	completed := map[string]bool{}
 
 	// when
-	result := sightjack.ApplyModifiedWave(original, modified, completed)
+	result := session.ApplyModifiedWave(original, modified, completed)
 
 	// then: actions should fall back to original
 	if len(result.Actions) != 2 {
@@ -1089,7 +1089,7 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := session.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1113,7 +1113,7 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := session.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, sightjack.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1181,7 +1181,7 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 	}
 
 	// Create 3 ADR files on filesystem
-	adrDir := sightjack.ADRDir(baseDir)
+	adrDir := session.ADRDir(baseDir)
 	os.MkdirAll(adrDir, 0755)
 	for _, name := range []string{"0001-first.md", "0002-second.md", "0003-third.md"} {
 		os.WriteFile(filepath.Join(adrDir, name), []byte("# ADR"), 0644)
@@ -1272,7 +1272,7 @@ func TestPartialApplyDelta(t *testing.T) {
 			delta := sightjack.WaveDelta{Before: tt.before, After: tt.after}
 
 			// when
-			got := sightjack.PartialApplyDelta(result, delta)
+			got := session.PartialApplyDelta(result, delta)
 
 			// then
 			if fmt.Sprintf("%.4f", got) != fmt.Sprintf("%.4f", tt.wantAfter) {
@@ -1304,7 +1304,7 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sightjack.CheckCompletenessConsistency(tt.overall, tt.clusters)
+			got := session.CheckCompletenessConsistency(tt.overall, tt.clusters)
 			if got != tt.wantWarn {
 				t.Errorf("CheckCompletenessConsistency: got %v, want %v", got, tt.wantWarn)
 			}
@@ -1362,7 +1362,7 @@ func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResumeSession: %v", err)
 	}
-	waves = sightjack.EvaluateUnlocks(waves, completed)
+	waves = session.EvaluateUnlocks(waves, completed)
 
 	// then: auth-w2 should be unlocked since auth-w1 is completed
 	var w2Status string
@@ -1392,7 +1392,7 @@ func TestMergeCompletedStatus_AllCompleted(t *testing.T) {
 	}
 
 	// when
-	merged := sightjack.MergeCompletedStatus(oldCompleted, newWaves)
+	merged := session.MergeCompletedStatus(oldCompleted, newWaves)
 
 	// then: auth-w1, auth-w2, api-w1 should be completed (carried over)
 	completedCount := 0
@@ -1477,7 +1477,7 @@ func TestMergeOldWaves_CarriesForwardFailedClusters(t *testing.T) {
 	scannedClusters := map[string]bool{"auth": true, "db": true, "api": true}
 	failedNames := map[string]bool{"db": true}
 
-	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+	merged := session.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	// Expect 3 waves: 2 new + 1 carried forward (db failed but still scanned).
 	if len(merged) != 3 {
@@ -1509,7 +1509,7 @@ func TestMergeOldWaves_DropsRemovedClusters(t *testing.T) {
 	scannedClusters := map[string]bool{"auth": true}
 	failedNames := map[string]bool{} // no failures
 
-	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+	merged := session.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	if len(merged) != 1 {
 		t.Fatalf("expected 1 wave (obsolete dropped), got %d: %v", len(merged), merged)
@@ -1529,7 +1529,7 @@ func TestMergeOldWaves_AllClustersRegenerated(t *testing.T) {
 	scannedClusters := map[string]bool{"auth": true}
 	failedNames := map[string]bool{} // no failures
 
-	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+	merged := session.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	if len(merged) != 1 {
 		t.Fatalf("expected 1 wave, got %d", len(merged))
@@ -1548,7 +1548,7 @@ func TestMergeOldWaves_NoClustersRegenerated(t *testing.T) {
 	scannedClusters := map[string]bool{"auth": true, "db": true}
 	failedNames := map[string]bool{"auth": true, "db": true}
 
-	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+	merged := session.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	if len(merged) != 2 {
 		t.Fatalf("expected 2 carried-forward waves, got %d", len(merged))
@@ -1571,7 +1571,7 @@ func TestMergeOldWaves_DuplicateName_PartialFailure(t *testing.T) {
 	// detectFailedClusterNames: 2 input "Auth", 1 success → failed
 	failedNames := map[string]bool{"Auth": true}
 
-	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+	merged := session.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	// 1 new + 2 old carried forward (safe over-inclusion for duplicates)
 	if len(merged) != 3 {
@@ -1595,7 +1595,7 @@ func TestMergeOldWaves_DuplicateName_AllSucceeded(t *testing.T) {
 	scannedClusters := map[string]bool{"Auth": true}
 	failedNames := map[string]bool{} // both succeeded
 
-	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+	merged := session.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	// Only new waves, no carry-forward.
 	if len(merged) != 2 {
@@ -1624,7 +1624,7 @@ func TestMergeOldWaves_DuplicateName_DedupsWaveKey(t *testing.T) {
 	scannedClusters := map[string]bool{"Auth": true}
 	failedNames := map[string]bool{"Auth": true} // instance 2 failed
 
-	merged := sightjack.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
+	merged := session.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedNames)
 
 	// Expected: 1 new (ABC-123) + 1 old carried forward (DEF-456) = 2
 	// ABC-123 must NOT appear twice.

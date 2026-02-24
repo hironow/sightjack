@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestClassifyResult_UnmarshalJSON(t *testing.T) {
@@ -1103,7 +1104,7 @@ func TestToDiscussResult_Basic(t *testing.T) {
 	topic := "auth approach"
 
 	// when
-	result := sightjack.ToDiscussResult(wave, resp, topic)
+	result := session.ToDiscussResult(wave, resp, topic)
 
 	// then
 	if result.WaveID != "w1" {
@@ -1143,7 +1144,7 @@ func TestToDiscussResult_WithModifiedWave(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.ToDiscussResult(wave, resp, "session store")
+	result := session.ToDiscussResult(wave, resp, "session store")
 
 	// then
 	if len(result.Modifications) != 1 {
@@ -1160,7 +1161,7 @@ func TestToDiscussResult_NilModifiedWave(t *testing.T) {
 	resp := &sightjack.ArchitectResponse{Analysis: "ok", Reasoning: "no changes needed"}
 
 	// when
-	result := sightjack.ToDiscussResult(wave, resp, "review")
+	result := session.ToDiscussResult(wave, resp, "review")
 
 	// then
 	if len(result.Modifications) != 0 {
@@ -1190,7 +1191,7 @@ func TestToDiscussResult_WithAddedActions(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.ToDiscussResult(wave, resp, "expand scope")
+	result := session.ToDiscussResult(wave, resp, "expand scope")
 
 	// then: added action should be reported as a modification
 	if len(result.Modifications) != 1 {
@@ -1226,7 +1227,7 @@ func TestToDiscussResult_WithRemovedActions(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.ToDiscussResult(wave, resp, "simplify")
+	result := session.ToDiscussResult(wave, resp, "simplify")
 
 	// then: removed action should be reported
 	if len(result.Modifications) != 1 {
@@ -1251,7 +1252,7 @@ func TestToDiscussResult_UsesArchitectDecision(t *testing.T) {
 	topic := "Should we use JWT or sessions?"
 
 	// when
-	result := sightjack.ToDiscussResult(wave, resp, topic)
+	result := session.ToDiscussResult(wave, resp, topic)
 
 	// then: decision should come from architect, not topic
 	if result.Decision != "Use session-based auth with httpOnly cookies" {
@@ -1269,7 +1270,7 @@ func TestToDiscussResult_FallsBackToTopicWhenNoDecision(t *testing.T) {
 	topic := "review wave"
 
 	// when
-	result := sightjack.ToDiscussResult(wave, resp, topic)
+	result := session.ToDiscussResult(wave, resp, topic)
 
 	// then: falls back to topic
 	if result.Decision != "review wave" {
@@ -1291,7 +1292,7 @@ func TestToApplyResult_PartialFailureStatus(t *testing.T) {
 	internal := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 1, Errors: []string{"denied"}}
 
 	// when
-	result := sightjack.ToApplyResult(wave, internal)
+	result := session.ToApplyResult(wave, internal)
 
 	// then: partial failure should NOT be marked "completed"
 	if result.CompletedWave.Status == "completed" {
@@ -1321,7 +1322,7 @@ func TestToApplyResult_AllSuccess(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.ToApplyResult(wave, internal)
+	result := session.ToApplyResult(wave, internal)
 
 	// then
 	if result.WaveID != "w1" {
@@ -1362,7 +1363,7 @@ func TestToApplyResult_WithErrors(t *testing.T) {
 	}
 
 	// when
-	result := sightjack.ToApplyResult(wave, internal)
+	result := session.ToApplyResult(wave, internal)
 
 	// then
 	if len(result.AppliedActions) != 2 {
@@ -1391,7 +1392,7 @@ func TestToApplyResult_NoActions(t *testing.T) {
 	internal := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 0}
 
 	// when
-	result := sightjack.ToApplyResult(wave, internal)
+	result := session.ToApplyResult(wave, internal)
 
 	// then
 	if result.AppliedActions == nil {
@@ -1420,7 +1421,7 @@ func TestToApplyResult_EmbedCompletedWave(t *testing.T) {
 	internal := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 1}
 
 	// when
-	result := sightjack.ToApplyResult(wave, internal)
+	result := session.ToApplyResult(wave, internal)
 
 	// then: completed wave should be embedded
 	if result.CompletedWave == nil {
@@ -1483,7 +1484,7 @@ func TestApplyResult_RemainingWaves_RoundTrip(t *testing.T) {
 	// Verify NeedsMoreWaves sees the full picture.
 	allWaves := append([]sightjack.Wave{*decoded.CompletedWave}, decoded.RemainingWaves...)
 	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.50}
-	if sightjack.NeedsMoreWaves(cluster, allWaves) {
+	if session.NeedsMoreWaves(cluster, allWaves) {
 		t.Error("NeedsMoreWaves should return false when available waves remain")
 	}
 }

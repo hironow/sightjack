@@ -1,4 +1,4 @@
-package sightjack_test
+package session_test
 
 import (
 	"os"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestNormalizeJSONFile_ConvertsUnicodeEscapes(t *testing.T) {
@@ -19,7 +19,7 @@ func TestNormalizeJSONFile_ConvertsUnicodeEscapes(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.NormalizeJSONFile(path)
+	err := session.NormalizeJSONFile(path)
 
 	// then
 	if err != nil {
@@ -48,7 +48,7 @@ func TestNormalizeJSONFile_PreservesValidJSON(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.NormalizeJSONFile(path)
+	err := session.NormalizeJSONFile(path)
 
 	// then
 	if err != nil {
@@ -72,7 +72,7 @@ func TestNormalizeJSONFile_RejectsInvalidJSON(t *testing.T) {
 	}
 
 	// when
-	err := sightjack.NormalizeJSONFile(path)
+	err := session.NormalizeJSONFile(path)
 
 	// then
 	if err == nil {
@@ -82,7 +82,7 @@ func TestNormalizeJSONFile_RejectsInvalidJSON(t *testing.T) {
 
 func TestNormalizeJSONFile_MissingFile(t *testing.T) {
 	// when
-	err := sightjack.NormalizeJSONFile("/nonexistent/file.json")
+	err := session.NormalizeJSONFile("/nonexistent/file.json")
 
 	// then
 	if err == nil {

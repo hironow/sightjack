@@ -1,4 +1,4 @@
-package sightjack
+package session
 
 import (
 	"context"
@@ -10,18 +10,20 @@ import (
 	"slices"
 	"strings"
 
+	sightjack "github.com/hironow/sightjack"
+
 	pond "github.com/alitto/pond/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // ParseClassifyResult reads and parses the classify.json output file.
-func ParseClassifyResult(path string) (*ClassifyResult, error) {
+func ParseClassifyResult(path string) (*sightjack.ClassifyResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read classify result: %w", err)
 	}
-	var result ClassifyResult
+	var result sightjack.ClassifyResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse classify result: %w", err)
 	}
@@ -29,22 +31,22 @@ func ParseClassifyResult(path string) (*ClassifyResult, error) {
 }
 
 // ParseClusterScanResult reads and parses a cluster_{name}.json output file.
-func ParseClusterScanResult(path string) (*ClusterScanResult, error) {
+func ParseClusterScanResult(path string) (*sightjack.ClusterScanResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read cluster result: %w", err)
 	}
-	var result ClusterScanResult
+	var result sightjack.ClusterScanResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse cluster result: %w", err)
 	}
 	return &result, nil
 }
 
-// MergeScanResults combines per-cluster deep scan results into a single ScanResult.
+// MergeScanResults combines per-cluster deep scan results into a single sightjack.ScanResult.
 // shibitoWarnings are propagated from the Pass 1 classify result.
-func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWarning, scanWarnings []string) ScanResult {
-	result := ScanResult{Clusters: clusters, ShibitoWarnings: shibitoWarnings, ScanWarnings: scanWarnings}
+func MergeScanResults(clusters []sightjack.ClusterScanResult, shibitoWarnings []sightjack.ShibitoWarning, scanWarnings []string) sightjack.ScanResult {
+	result := sightjack.ScanResult{Clusters: clusters, ShibitoWarnings: shibitoWarnings, ScanWarnings: scanWarnings}
 	result.CalculateCompleteness()
 
 	for _, c := range clusters {
@@ -56,16 +58,16 @@ func MergeScanResults(clusters []ClusterScanResult, shibitoWarnings []ShibitoWar
 // RunScan executes the full two-pass scan.
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
-func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger *Logger) (*ScanResult, error) {
+func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger *sightjack.Logger) (*sightjack.ScanResult, error) {
 	if logger == nil {
-		logger = NewLogger(nil, false)
+		logger = sightjack.NewLogger(nil, false)
 	}
 	ctx, scanSpan := tracer.Start(ctx, "scan",
 		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
 	)
 	defer scanSpan.End()
 
-	scanDir, err := EnsureScanDir(baseDir, sessionID)
+	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +77,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	classifyCtx, classifySpan := tracer.Start(ctx, "classify")
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
-	classifyPrompt, err := RenderClassifyPrompt(cfg.Lang, ClassifyPromptData{
+	classifyPrompt, err := sightjack.RenderClassifyPrompt(cfg.Lang, sightjack.ClassifyPromptData{
 		TeamFilter:      cfg.Linear.Team,
 		ProjectFilter:   cfg.Linear.Project,
 		CycleFilter:     cfg.Linear.Cycle,
@@ -148,12 +150,12 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 	// Build scan cluster list from classify results. The index parameter in
 	// DeepScanFunc maps directly to classify.Clusters, so duplicate cluster
 	// names are handled safely without a name-keyed map.
-	scanClusters := make([]ClusterScanResult, len(classify.Clusters))
+	scanClusters := make([]sightjack.ClusterScanResult, len(classify.Clusters))
 	for i, cc := range classify.Clusters {
-		scanClusters[i] = ClusterScanResult{Name: cc.Name, Labels: cc.Labels}
+		scanClusters[i] = sightjack.ClusterScanResult{Name: cc.Name, Labels: cc.Labels}
 	}
 
-	deepScanFn := func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+	deepScanFn := func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 		ctx, clusterSpan := tracer.Start(ctx, "deepscan.cluster",
 			trace.WithAttributes(attribute.String("cluster.name", cluster.Name)),
 		)
@@ -161,18 +163,18 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 
 		cc := classify.Clusters[index]
 		chunks := ChunkSlice(cc.IssueIDs, cfg.Scan.ChunkSize)
-		var chunkResults []ClusterScanResult
+		var chunkResults []sightjack.ClusterScanResult
 
 		for j, chunk := range chunks {
 			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, SanitizeName(cc.Name), j))
-			prompt, renderErr := RenderDeepScanPrompt(cfg.Lang, DeepScanPromptData{
+			prompt, renderErr := sightjack.RenderDeepScanPrompt(cfg.Lang, sightjack.DeepScanPromptData{
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
 				OutputPath:      chunkFile,
-				StrictnessLevel: string(ResolveStrictness(cfg.Strictness, append([]string{cc.Name}, cc.Labels...))),
+				StrictnessLevel: string(sightjack.ResolveStrictness(cfg.Strictness, append([]string{cc.Name}, cc.Labels...))),
 			})
 			if renderErr != nil {
-				return ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
+				return sightjack.ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
 			}
 
 			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, SanitizeName(cc.Name), j)
@@ -182,7 +184,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools)
 			closeChunkLog()
 			if runErr != nil {
-				return ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
+				return sightjack.ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
 			}
 
 			if normErr := NormalizeJSONFile(chunkFile); normErr != nil {
@@ -190,7 +192,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 			}
 			result, parseErr := ParseClusterScanResult(chunkFile)
 			if parseErr != nil {
-				return ClusterScanResult{}, fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
+				return sightjack.ClusterScanResult{}, fmt.Errorf("parse %s chunk %d: %w", cc.Name, j, parseErr)
 			}
 			chunkResults = append(chunkResults, *result)
 		}
@@ -218,7 +220,7 @@ func RunScan(ctx context.Context, cfg *Config, baseDir string, sessionID string,
 // Failed clusters are skipped with warnings (partial success), matching the
 // fault-tolerance pattern of RunParallelDeepScan. Returns an error only when
 // ALL clusters fail.
-func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters []ClusterScanResult, dryRun bool, logger *Logger) ([]Wave, []string, map[string]bool, error) {
+func RunWaveGenerate(ctx context.Context, cfg *sightjack.Config, scanDir string, clusters []sightjack.ClusterScanResult, dryRun bool, logger *sightjack.Logger) ([]sightjack.Wave, []string, map[string]bool, error) {
 	ctx, waveGenSpan := tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
@@ -229,10 +231,10 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
 
 	successResults, warnings := RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
-		func(ctx context.Context, index int, cluster ClusterScanResult) (WaveGenerateResult, error) {
+		func(ctx context.Context, index int, cluster sightjack.ClusterScanResult) (sightjack.WaveGenerateResult, error) {
 			return generateWaveForCluster(ctx, cfg, scanDir, index, cluster, dryRun, linearTools, logger)
 		},
-		func(c ClusterScanResult) string { return c.Name },
+		func(c sightjack.ClusterScanResult) string { return c.Name },
 		logger)
 
 	// Context cancellation must be surfaced even when some clusters
@@ -254,7 +256,7 @@ func RunWaveGenerate(ctx context.Context, cfg *Config, scanDir string, clusters 
 // and returns names where at least one instance failed wave generation.
 // With duplicate cluster names, a name is marked failed if fewer instances
 // succeeded than existed in the input.
-func DetectFailedClusterNames(clusters []ClusterScanResult, successes []WaveGenerateResult) map[string]bool {
+func DetectFailedClusterNames(clusters []sightjack.ClusterScanResult, successes []sightjack.WaveGenerateResult) map[string]bool {
 	inputCount := make(map[string]int, len(clusters))
 	for _, c := range clusters {
 		inputCount[c.Name]++
@@ -279,7 +281,7 @@ func waveFileBase(index int, clusterName string) string {
 
 // savePromptAndCreateLog writes the prompt file and creates a log writer.
 // Returns the log writer and a cleanup function for the log file.
-func savePromptAndCreateLog(scanDir, base, prompt string, logger *Logger) (io.Writer, func()) {
+func savePromptAndCreateLog(scanDir, base, prompt string, logger *sightjack.Logger) (io.Writer, func()) {
 	if err := os.WriteFile(filepath.Join(scanDir, base+"_prompt.md"), []byte(prompt), 0644); err != nil {
 		logger.Warn("save prompt: %v", err)
 	}
@@ -293,7 +295,7 @@ func savePromptAndCreateLog(scanDir, base, prompt string, logger *Logger) (io.Wr
 
 // parseAndNormalizeWaveResult parses the wave JSON and overrides ClusterName
 // to the canonical input name — model output may omit or mislabel it.
-func parseAndNormalizeWaveResult(path, clusterName string) (*WaveGenerateResult, error) {
+func parseAndNormalizeWaveResult(path, clusterName string) (*sightjack.WaveGenerateResult, error) {
 	result, err := ParseWaveGenerateResult(path)
 	if err != nil {
 		return nil, err
@@ -303,30 +305,30 @@ func parseAndNormalizeWaveResult(path, clusterName string) (*WaveGenerateResult,
 }
 
 // generateWaveForCluster generates waves for a single cluster.
-func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult, dryRun bool, linearTools RunOption, logger *Logger) (WaveGenerateResult, error) {
+func generateWaveForCluster(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult, dryRun bool, linearTools RunOption, logger *sightjack.Logger) (sightjack.WaveGenerateResult, error) {
 	base := waveFileBase(index, cluster.Name)
 	waveFile := filepath.Join(scanDir, base+".json")
 
 	issuesJSON, err := json.Marshal(cluster.Issues)
 	if err != nil {
-		return WaveGenerateResult{}, fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
+		return sightjack.WaveGenerateResult{}, fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
 	}
 
-	prompt, err := RenderWaveGeneratePrompt(cfg.Lang, WaveGeneratePromptData{
+	prompt, err := sightjack.RenderWaveGeneratePrompt(cfg.Lang, sightjack.WaveGeneratePromptData{
 		ClusterName:     cluster.Name,
 		Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
 		Issues:          string(issuesJSON),
 		Observations:    strings.Join(cluster.Observations, "\n"),
-		DoDSection:      ResolveDoDSection(cfg.DoDTemplates, cluster.Name),
+		DoDSection:      sightjack.ResolveDoDSection(cfg.DoDTemplates, cluster.Name),
 		OutputPath:      waveFile,
-		StrictnessLevel: string(ResolveStrictness(cfg.Strictness, append([]string{cluster.Name}, cluster.Labels...))),
+		StrictnessLevel: string(sightjack.ResolveStrictness(cfg.Strictness, append([]string{cluster.Name}, cluster.Labels...))),
 	})
 	if err != nil {
-		return WaveGenerateResult{}, fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)
+		return sightjack.WaveGenerateResult{}, fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)
 	}
 
 	if dryRun {
-		return WaveGenerateResult{ClusterName: cluster.Name}, RunClaudeDryRun(cfg, prompt, scanDir, base, logger)
+		return sightjack.WaveGenerateResult{ClusterName: cluster.Name}, RunClaudeDryRun(cfg, prompt, scanDir, base, logger)
 	}
 
 	logOut, closeLog := savePromptAndCreateLog(scanDir, base, prompt, logger)
@@ -334,7 +336,7 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 
 	logger.Scan("Generating waves: %s", cluster.Name)
 	if _, err := RunClaude(ctx, cfg, prompt, logOut, logger, linearTools); err != nil {
-		return WaveGenerateResult{}, fmt.Errorf("wave generate %s: %w", cluster.Name, err)
+		return sightjack.WaveGenerateResult{}, fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 	}
 
 	if normErr := NormalizeJSONFile(waveFile); normErr != nil {
@@ -342,7 +344,7 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 	}
 	result, err := parseAndNormalizeWaveResult(waveFile, cluster.Name)
 	if err != nil {
-		return WaveGenerateResult{}, fmt.Errorf("parse waves %s: %w", cluster.Name, err)
+		return sightjack.WaveGenerateResult{}, fmt.Errorf("parse waves %s: %w", cluster.Name, err)
 	}
 	logger.OK("Cluster %s: %d waves generated", cluster.Name, len(result.Waves))
 	return *result, nil
@@ -351,19 +353,19 @@ func generateWaveForCluster(ctx context.Context, cfg *Config, scanDir string, in
 // DeepScanFunc is the function signature for scanning a single cluster.
 // The index parameter identifies the cluster's position in the original slice,
 // enabling safe lookup even when duplicate cluster names exist.
-type DeepScanFunc func(ctx context.Context, cfg *Config, scanDir string, index int, cluster ClusterScanResult) (ClusterScanResult, error)
+type DeepScanFunc func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error)
 
 // RunParallelDeepScan executes deep scan across clusters with bounded concurrency.
 // Delegates to RunParallel for pond-based parallel orchestration.
 // Failed clusters produce warnings and are skipped; successful results preserve order.
-func RunParallelDeepScan(ctx context.Context, cfg *Config, scanDir string,
-	clusters []ClusterScanResult, scanFn DeepScanFunc, logger *Logger) ([]ClusterScanResult, []string) {
+func RunParallelDeepScan(ctx context.Context, cfg *sightjack.Config, scanDir string,
+	clusters []sightjack.ClusterScanResult, scanFn DeepScanFunc, logger *sightjack.Logger) ([]sightjack.ClusterScanResult, []string) {
 
 	return RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
-		func(ctx context.Context, index int, cluster ClusterScanResult) (ClusterScanResult, error) {
+		func(ctx context.Context, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			return scanFn(ctx, cfg, scanDir, index, cluster)
 		},
-		func(c ClusterScanResult) string { return c.Name },
+		func(c sightjack.ClusterScanResult) string { return c.Name },
 		logger)
 }
 
@@ -387,9 +389,9 @@ func ChunkSlice(items []string, size int) [][]string {
 }
 
 // MergeClusterChunks combines multiple chunk results from the same cluster
-// into a single ClusterScanResult, recalculating completeness from individual issues.
-func MergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResult {
-	merged := ClusterScanResult{Name: name}
+// into a single sightjack.ClusterScanResult, recalculating completeness from individual issues.
+func MergeClusterChunks(name string, chunks []sightjack.ClusterScanResult) sightjack.ClusterScanResult {
+	merged := sightjack.ClusterScanResult{Name: name}
 	for _, c := range chunks {
 		merged.Issues = append(merged.Issues, c.Issues...)
 		merged.Observations = append(merged.Observations, c.Observations...)
@@ -430,7 +432,7 @@ func RunParallel[I, R any](
 	concurrency int,
 	work func(ctx context.Context, index int, item I) (R, error),
 	itemName func(I) string,
-	logger *Logger,
+	logger *sightjack.Logger,
 ) ([]R, []string) {
 	if len(items) == 0 {
 		return nil, nil

@@ -96,7 +96,7 @@ if event data is found in .siren/events/.`,
 
 			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 			var sessionInput io.Reader
-			var recorder sightjack.Recorder = sightjack.NopRecorder{}
+			var recorder sightjack.Recorder = session.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
 				sessionStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))

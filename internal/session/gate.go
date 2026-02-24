@@ -14,10 +14,10 @@ import (
 )
 
 // FilterConvergence returns convergence-kind D-Mails from the slice.
-func FilterConvergence(dmails []*sightjack.DMail) []*sightjack.DMail {
-	var result []*sightjack.DMail
+func FilterConvergence(dmails []*DMail) []*DMail {
+	var result []*DMail
 	for _, m := range dmails {
-		if m.Kind == sightjack.DMailConvergence {
+		if m.Kind == DMailConvergence {
 			result = append(result, m)
 		}
 	}
@@ -27,7 +27,7 @@ func FilterConvergence(dmails []*sightjack.DMail) []*sightjack.DMail {
 // RunConvergenceGate checks for convergence D-Mails and runs the
 // notify + approve flow. Returns true if approved or no convergence found.
 // Returns false if denied. Returns error on failure (fail-closed).
-func RunConvergenceGate(ctx context.Context, dmails []*sightjack.DMail, notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (bool, error) {
+func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (bool, error) {
 	convergence := FilterConvergence(dmails)
 	if len(convergence) == 0 {
 		return true, nil
@@ -90,9 +90,9 @@ func RunConvergenceGate(ctx context.Context, dmails []*sightjack.DMail, notifier
 // convergence D-Mails. Returns the accumulated D-Mails, approval status,
 // and any error. The loop exits when no new convergence D-Mails arrived
 // during the approval prompt.
-func RunConvergenceGateWithRedrain(ctx context.Context, initial []*sightjack.DMail, inboxCh <-chan *sightjack.DMail,
-	notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (dmails []*sightjack.DMail, approved bool, err error) {
-	all := append([]*sightjack.DMail{}, initial...)
+func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
+	notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (dmails []*DMail, approved bool, err error) {
+	all := append([]*DMail{}, initial...)
 	for {
 		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)
 		if gateErr != nil {
@@ -101,7 +101,7 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*sightjack.DMa
 		if !ok {
 			return nil, false, nil
 		}
-		late := sightjack.DrainInboxFeedback(inboxCh, logger)
+		late := DrainInboxFeedback(inboxCh, logger)
 		all = append(all, late...)
 		if len(FilterConvergence(late)) == 0 {
 			return all, true, nil

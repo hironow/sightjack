@@ -54,7 +54,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if jsonOutput {
 				streamOut = cmd.ErrOrStderr()
 			}
-			result, err := sightjack.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, streamOut, logger)
+			result, err := session.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, streamOut, logger)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}

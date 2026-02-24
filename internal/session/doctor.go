@@ -101,7 +101,7 @@ func CheckClaudeAuth(ctx context.Context, cfg *sightjack.Config, logger *sightja
 		}
 	}
 
-	output, err := sightjack.RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger, sightjack.WithAllowedTools("Write"))
+	output, err := RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger, WithAllowedTools("Write"))
 	if err != nil {
 		hint := fmt.Sprintf("claude execution failed: %v", err)
 		if strings.Contains(output, "Not logged in") {
@@ -139,7 +139,7 @@ func CheckLinearMCP(ctx context.Context, cfg *sightjack.Config, logger *sightjac
 	}
 
 	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Linear.Team)
-	_, err := sightjack.RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, sightjack.WithAllowedTools(sightjack.LinearMCPAllowedTools...))
+	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, WithAllowedTools(LinearMCPAllowedTools...))
 	if err != nil {
 		return CheckResult{
 			Name:    "Linear MCP",
