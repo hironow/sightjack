@@ -30,7 +30,7 @@ const (
 )
 
 // EventSchemaVersion is the schema version stamped into every event envelope.
-const EventSchemaVersion = "1"
+const EventSchemaVersion = "2"
 
 // Event is the immutable event envelope persisted to the event store.
 // PayloadRaw holds the JSON-encoded payload; the Payload field is transient.
@@ -40,6 +40,8 @@ type Event struct {
 	Timestamp     time.Time       `json:"timestamp"`
 	SessionID     string          `json:"session_id"`
 	Sequence      int64           `json:"sequence"`
+	CorrelationID string          `json:"correlation_id"`
+	CausationID   string          `json:"causation_id"`
 	PayloadRaw    json.RawMessage `json:"payload"`
 }
 

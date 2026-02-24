@@ -74,6 +74,18 @@ func TestMarshalEvent_JSONRoundTrip(t *testing.T) {
 	if decoded.Sequence != 1 {
 		t.Errorf("expected sequence 1, got %d", decoded.Sequence)
 	}
+
+	// Verify CorrelationID and CausationID fields are present in JSON
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal raw: %v", err)
+	}
+	if _, ok := raw["correlation_id"]; !ok {
+		t.Error("expected correlation_id field in JSON")
+	}
+	if _, ok := raw["causation_id"]; !ok {
+		t.Error("expected causation_id field in JSON")
+	}
 }
 
 func TestMarshalEvent_NoTrailingNewline(t *testing.T) {
