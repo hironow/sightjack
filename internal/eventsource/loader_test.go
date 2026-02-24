@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
@@ -16,7 +17,7 @@ func TestProjectState_SessionStarted(t *testing.T) {
 		sightjack.SessionStartedPayload{Project: "my-project", StrictnessLevel: "fog"})
 
 	// when
-	state := eventsource.ProjectState([]sightjack.Event{event})
+	state := domain.ProjectState([]sightjack.Event{event})
 
 	// then
 	if state.Version != sightjack.StateFormatVersion {
@@ -49,7 +50,7 @@ func TestProjectState_ScanCompleted(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if state.Completeness != 0.5 {
@@ -80,7 +81,7 @@ func TestProjectState_WavesGenerated(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if len(state.Waves) != 2 {
@@ -106,7 +107,7 @@ func TestProjectState_WaveCompleted(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if len(state.Waves) != 1 {
@@ -131,7 +132,7 @@ func TestProjectState_CompletenessUpdated(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if state.Completeness != 0.7 {
@@ -158,7 +159,7 @@ func TestProjectState_WavesUnlocked(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if state.Waves[1].Status != "available" {
@@ -182,7 +183,7 @@ func TestProjectState_NextGenWavesAdded(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if len(state.Waves) != 2 {
@@ -206,7 +207,7 @@ func TestProjectState_WaveModified(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if state.Waves[0].Title != "Modified" {
@@ -225,7 +226,7 @@ func TestProjectState_ADRGenerated(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if state.ADRCount != 2 {
@@ -266,7 +267,7 @@ func TestProjectState_FullLifecycle(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if state.Project != "test-project" {
@@ -308,8 +309,8 @@ func TestProjectState_Idempotent(t *testing.T) {
 	}
 
 	// when: replay twice
-	state1 := eventsource.ProjectState(events)
-	state2 := eventsource.ProjectState(events)
+	state1 := domain.ProjectState(events)
+	state2 := domain.ProjectState(events)
 
 	// then
 	if state1.Completeness != state2.Completeness {
@@ -329,7 +330,7 @@ func TestProjectState_UnknownEventType_Skipped(t *testing.T) {
 	}
 
 	// when: should not panic
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then
 	if state.Project != "p1" {
@@ -339,7 +340,7 @@ func TestProjectState_UnknownEventType_Skipped(t *testing.T) {
 
 func TestProjectState_EmptyEvents(t *testing.T) {
 	// when
-	state := eventsource.ProjectState(nil)
+	state := domain.ProjectState(nil)
 
 	// then: should return zero-value state
 	if state.SessionID != "" {
@@ -467,7 +468,7 @@ func TestProjectState_WavesGenerated_Idempotent(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then: waves should not be duplicated
 	if len(state.Waves) != 2 {
@@ -493,7 +494,7 @@ func TestProjectState_NextGenWavesAdded_Idempotent(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then: w2 should appear only once
 	if len(state.Waves) != 2 {
@@ -522,7 +523,7 @@ func TestProjectState_NextGenWavesAdded_DifferentWaves_Appends(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then: all three different waves should be present
 	if len(state.Waves) != 3 {
@@ -541,7 +542,7 @@ func TestProjectState_ADRGenerated_Idempotent(t *testing.T) {
 	}
 
 	// when
-	state := eventsource.ProjectState(events)
+	state := domain.ProjectState(events)
 
 	// then: ADRCount should be 1, not 2
 	if state.ADRCount != 1 {
