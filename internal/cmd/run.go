@@ -59,12 +59,22 @@ if event data is found in .siren/events/.`,
 				cfg.Gate.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 			}
 			// Check for existing state (resume detection)
+			// First try to find a resumable session; fall back to the latest
+			// state for rescan/new choices.
 			if !dryRun {
-				existingState, existingSessionID, stateErr := eventsource.LoadLatestState(baseDir)
+				// Find best resumable session (may differ from the latest)
+				resumableState, resumableSessionID, _ := eventsource.LoadLatestResumableState(baseDir, session.CanResume)
+				// Find latest state for display and rescan (regardless of resumability)
+				displayState, _, stateErr := eventsource.LoadLatestState(baseDir)
 				if stateErr == nil {
+					// If a resumable session exists, prefer it for the prompt display
+					promptState := displayState
+					if resumableState != nil {
+						promptState = resumableState
+					}
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
-						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, existingState)
+						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, promptState)
 						if promptErr == session.ErrQuit {
 							return nil
 						}
@@ -74,16 +84,16 @@ if event data is found in .siren/events/.`,
 						}
 						switch choice {
 						case sightjack.ResumeChoiceResume:
-							if !session.CanResume(existingState) {
-								logger.Warn("Cached scan data missing — starting fresh session instead.")
+							if resumableState == nil {
+								logger.Warn("No resumable session found — starting fresh session instead.")
 								goto freshSession
 							}
-							resumeStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, existingSessionID))
-							resumeRecorder, recErr := eventsource.NewSessionRecorder(resumeStore, existingSessionID)
+							resumeStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, resumableSessionID))
+							resumeRecorder, recErr := eventsource.NewSessionRecorder(resumeStore, resumableSessionID)
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
-							return session.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
+							return session.RunResumeSession(cmd.Context(), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 							rescanStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, rescanID))
@@ -91,7 +101,7 @@ if event data is found in .siren/events/.`,
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
-							return session.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
+							return session.RunRescanSession(cmd.Context(), cfg, baseDir, displayState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
