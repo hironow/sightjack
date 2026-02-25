@@ -139,7 +139,7 @@ func TestE2E_Show_UnrecognizedJSON(t *testing.T) {
 }
 
 func TestE2E_Nextgen_NoWaveContext(t *testing.T) {
-	// given: valid JSON ApplyResult with no CompletedWave + no state.json
+	// given: valid JSON ApplyResult with no CompletedWave + no events
 	dir := initDir(t)
 	input := `{"wave_id": "x", "applied": 0, "total_count": 0, "errors": []}`
 
@@ -187,11 +187,8 @@ func TestE2E_State_Persistence(t *testing.T) {
 		t.Fatalf("scan failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	// then: state.json should exist
-	stateFile := filepath.Join(dir, ".siren", "state.json")
-	if _, statErr := os.Stat(stateFile); os.IsNotExist(statErr) {
-		t.Error("state.json not created after scan")
-	}
+	// then: events should exist
+	assertEventsExist(t, dir)
 
 	// and: show should succeed
 	showCmd := exec.Command(sightjackBin(), "show", dir)

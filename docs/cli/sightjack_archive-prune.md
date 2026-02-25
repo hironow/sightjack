@@ -1,12 +1,13 @@
 ## sightjack archive-prune
 
-Prune expired d-mails from archive
+Prune expired d-mails and event files
 
 ### Synopsis
 
-Prune expired d-mails from the archive directory.
+Prune expired d-mails from the archive directory and
+expired event files from the events directory.
 
-Lists archived d-mail files older than the retention threshold.
+Lists archived d-mail files and event files older than the retention threshold.
 By default, runs in dry-run mode showing what would be deleted.
 Pass --execute to actually remove the files.
 
@@ -46,4 +47,4 @@ sightjack archive-prune [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear

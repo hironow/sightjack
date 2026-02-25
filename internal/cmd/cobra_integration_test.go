@@ -79,7 +79,7 @@ func TestCobraRouting_Doctor_OutputGoesToStderr(t *testing.T) {
 }
 
 func TestCobraRouting_Show_NoState(t *testing.T) {
-	// given: a directory with no .siren/state.json
+	// given: a directory with no .siren/events/
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer
 

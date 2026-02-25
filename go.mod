@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2
+	github.com/alitto/pond/v2 v2.6.2
 	github.com/creativeprojects/go-selfupdate v1.5.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/spf13/cobra v1.10.2
@@ -19,7 +20,6 @@ require (
 require (
 	code.gitea.io/sdk/gitea v0.22.1 // indirect
 	github.com/42wim/httpsig v1.2.3 // indirect
-	github.com/alitto/pond/v2 v2.6.2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect

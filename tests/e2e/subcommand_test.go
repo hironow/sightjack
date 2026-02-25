@@ -109,7 +109,7 @@ func TestE2E_UnknownCommand(t *testing.T) {
 }
 
 func TestE2E_Show_NoState(t *testing.T) {
-	// given: a directory with no .siren/state.json
+	// given: a directory with no .siren/events/
 	dir := t.TempDir()
 
 	// when

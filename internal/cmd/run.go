@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newRunCmd() *cobra.Command {
@@ -20,7 +22,7 @@ func newRunCmd() *cobra.Command {
 
 Combines scan → waves → select → apply → nextgen in a single
 interactive session. Supports resume from a previous session
-if state is found in .siren/state.json.`,
+if event data is found in .siren/events/.`,
 		Example: `  # Start a new interactive session
   sightjack run
 
@@ -57,20 +59,23 @@ if state is found in .siren/state.json.`,
 				cfg.Gate.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 			}
 			// Check for existing state (resume detection)
+			// First try to find a resumable session; fall back to the latest
+			// state for rescan/new choices.
 			if !dryRun {
-				existingState, stateErr := sightjack.ReadState(baseDir)
-				if stateErr != nil {
-					recovered, recErr := sightjack.RecoverLatestState(baseDir, logger)
-					if recErr == nil {
-						existingState = recovered
-						stateErr = nil
-					}
-				}
+				// Find best resumable session (may differ from the latest)
+				resumableState, resumableSessionID, _ := eventsource.LoadLatestResumableState(baseDir, session.CanResume)
+				// Find latest state for display and rescan (regardless of resumability)
+				displayState, _, stateErr := eventsource.LoadLatestState(baseDir)
 				if stateErr == nil {
+					// If a resumable session exists, prefer it for the prompt display
+					promptState := displayState
+					if resumableState != nil {
+						promptState = resumableState
+					}
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
-						choice, promptErr := sightjack.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, existingState)
-						if promptErr == sightjack.ErrQuit {
+						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, promptState)
+						if promptErr == session.ErrQuit {
 							return nil
 						}
 						if promptErr != nil {
@@ -79,13 +84,24 @@ if state is found in .siren/state.json.`,
 						}
 						switch choice {
 						case sightjack.ResumeChoiceResume:
-							if !sightjack.CanResume(existingState) {
-								logger.Warn("Cached scan data missing — starting fresh session instead.")
+							if resumableState == nil {
+								logger.Warn("No resumable session found — starting fresh session instead.")
 								goto freshSession
 							}
-							return sightjack.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), logger)
+							resumeStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, resumableSessionID))
+							resumeRecorder, recErr := eventsource.NewSessionRecorder(resumeStore, resumableSessionID)
+							if recErr != nil {
+								return fmt.Errorf("resume recorder: %w", recErr)
+							}
+							return session.RunResumeSession(cmd.Context(), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
-							return sightjack.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), logger)
+							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
+							rescanStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, rescanID))
+							rescanRecorder, recErr := eventsource.NewSessionRecorder(rescanStore, rescanID)
+							if recErr != nil {
+								return fmt.Errorf("rescan recorder: %w", recErr)
+							}
+							return session.RunRescanSession(cmd.Context(), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -96,10 +112,17 @@ if state is found in .siren/state.json.`,
 
 			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 			var sessionInput io.Reader
+			var recorder sightjack.Recorder = session.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
+				sessionStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
+				rec, recErr := eventsource.NewSessionRecorder(sessionStore, sessionID)
+				if recErr != nil {
+					return fmt.Errorf("session recorder: %w", recErr)
+				}
+				recorder = rec
 			}
-			return sightjack.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), logger)
+			return session.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
 		},
 	}
 

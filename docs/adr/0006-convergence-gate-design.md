@@ -50,16 +50,19 @@ Implement a convergence gate architecture with the following properties:
 ## Consequences
 
 ### Positive
+
 - Fail-closed semantics prevent accidental continuation past convergence signals
 - StdinApprover's byte-at-a-time read preserves shared stdin for subsequent reads
 - Redrain loop closes the TOCTOU race window between drain and gate check
 - `--auto-approve` enables unattended CI/CD usage
 
 ### Negative
+
 - StdinApprover goroutine leaks on context cancel (acceptable: single prompt,
   cleaned up on process exit)
 - Redrain loop may prompt multiple times if convergence signals keep arriving
 
 ### Neutral
+
 - Notification runs in a detached goroutine with independent span context
   so it does not block gate evaluation or get cancelled by gate context

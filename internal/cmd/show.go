@@ -10,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newShowCmd() *cobra.Command {
@@ -20,7 +23,7 @@ func newShowCmd() *cobra.Command {
 
 When stdin is a pipe, auto-detects ScanResult or WavePlan JSON
 and renders the appropriate navigator view. When run without pipe,
-reads from .siren/state.json and displays the matrix navigator.`,
+replays events from .siren/events/ and displays the matrix navigator.`,
 		Example: `  # Show from saved state
   sightjack show
 
@@ -65,7 +68,7 @@ func runShowFromStdin(w io.Writer) error {
 		if err := json.Unmarshal(data, &scanResult); err != nil {
 			return fmt.Errorf("parse ScanResult: %w", err)
 		}
-		nav := sightjack.RenderNavigator(&scanResult, "")
+		nav := session.RenderNavigator(&scanResult, "")
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
@@ -80,7 +83,7 @@ func runShowFromStdin(w io.Writer) error {
 		} else {
 			result = &sightjack.ScanResult{}
 		}
-		nav := sightjack.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
+		nav := session.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
@@ -91,7 +94,7 @@ func runShowFromStdin(w io.Writer) error {
 }
 
 func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) error {
-	state, err := sightjack.ReadState(baseDir)
+	state, _, err := eventsource.LoadLatestState(baseDir)
 	if err != nil {
 		logger.Info("Run 'sightjack scan' first.")
 		return fmt.Errorf("no previous scan found: %w", err)
@@ -109,12 +112,13 @@ func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) err
 		result.TotalIssues += c.IssueCount
 	}
 
-	waves := sightjack.RestoreWaves(state.Waves)
+	waves := domain.RestoreWaves(state.Waves)
 	strictness := state.StrictnessLevel
 	if strictness == "" {
 		strictness = "fog"
 	}
-	nav := sightjack.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, (*time.Time)(nil), strictness, state.ShibitoCount)
+	adrCount := session.CountADRFiles(session.ADRDir(baseDir))
+	nav := session.RenderMatrixNavigator(result, state.Project, waves, adrCount, (*time.Time)(nil), strictness, state.ShibitoCount)
 	fmt.Fprintln(w)
 	fmt.Fprint(w, nav)
 	logger.Info("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))

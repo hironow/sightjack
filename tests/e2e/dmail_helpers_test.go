@@ -159,6 +159,39 @@ func assertFileNotExists(t *testing.T, path string) {
 	}
 }
 
+// assertEventsExist verifies that .siren/events/ has at least one .jsonl file.
+func assertEventsExist(t *testing.T, baseDir string) {
+	t.Helper()
+	eventsDir := filepath.Join(baseDir, ".siren", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		t.Errorf("expected events dir to exist: %s: %v", eventsDir, err)
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".jsonl" {
+			return
+		}
+	}
+	t.Errorf("expected at least one .jsonl file in %s", eventsDir)
+}
+
+// assertNoEvents verifies that .siren/events/ does not exist or is empty.
+func assertNoEvents(t *testing.T, baseDir string) {
+	t.Helper()
+	eventsDir := filepath.Join(baseDir, ".siren", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		return // dir doesn't exist — no events
+	}
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".jsonl" {
+			t.Errorf("expected no .jsonl files in %s, found %s", eventsDir, e.Name())
+			return
+		}
+	}
+}
+
 // assertDirExists verifies a directory exists at the given path.
 func assertDirExists(t *testing.T, path string) {
 	t.Helper()

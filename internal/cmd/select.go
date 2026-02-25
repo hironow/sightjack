@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newSelectCmd() *cobra.Command {
@@ -53,15 +55,15 @@ for downstream commands (apply, discuss).`,
 			}
 			defer tty.Close()
 			scanner := bufio.NewScanner(tty)
-			available := sightjack.AvailableWaves(plan.Waves, map[string]bool{})
+			available := domain.AvailableWaves(plan.Waves, map[string]bool{})
 
 			if len(available) == 0 {
 				return fmt.Errorf("no available waves (all locked or completed)")
 			}
 
-			selected, err := sightjack.PromptWaveSelection(cmd.Context(), cmd.ErrOrStderr(), scanner, available)
+			selected, err := session.PromptWaveSelection(cmd.Context(), cmd.ErrOrStderr(), scanner, available)
 			if err != nil {
-				if err == sightjack.ErrQuit || err == sightjack.ErrGoBack {
+				if err == session.ErrQuit || err == session.ErrGoBack {
 					return nil
 				}
 				return fmt.Errorf("selection failed: %w", err)
@@ -80,9 +82,9 @@ for downstream commands (apply, discuss).`,
 			// Build remaining waves (all plan waves except the selected one)
 			// so downstream apply → nextgen can accurately check NeedsMoreWaves.
 			var remaining []sightjack.Wave
-			selectedKey := sightjack.WaveKey(selected)
+			selectedKey := domain.WaveKey(selected)
 			for _, w := range plan.Waves {
-				if sightjack.WaveKey(w) != selectedKey {
+				if domain.WaveKey(w) != selectedKey {
 					remaining = append(remaining, w)
 				}
 			}

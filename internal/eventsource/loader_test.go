@@ -1,0 +1,570 @@
+package eventsource_test
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/eventsource"
+)
+
+func TestProjectState_SessionStarted(t *testing.T) {
+	// given
+	event := mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1,
+		sightjack.SessionStartedPayload{Project: "my-project", StrictnessLevel: "fog"})
+
+	// when
+	state := domain.ProjectState([]sightjack.Event{event})
+
+	// then
+	if state.Version != sightjack.StateFormatVersion {
+		t.Errorf("expected version %s, got %s", sightjack.StateFormatVersion, state.Version)
+	}
+	if state.SessionID != "s1" {
+		t.Errorf("expected s1, got %s", state.SessionID)
+	}
+	if state.Project != "my-project" {
+		t.Errorf("expected my-project, got %s", state.Project)
+	}
+	if state.StrictnessLevel != "fog" {
+		t.Errorf("expected fog, got %s", state.StrictnessLevel)
+	}
+}
+
+func TestProjectState_ScanCompleted(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1,
+			sightjack.SessionStartedPayload{Project: "p1"}),
+		mustNewEvent(t, sightjack.EventScanCompleted, "s1", 2,
+			sightjack.ScanCompletedPayload{
+				Clusters:       []sightjack.ClusterState{{Name: "Auth", Completeness: 0.5, IssueCount: 3}},
+				Completeness:   0.5,
+				ShibitoCount:   2,
+				ScanResultPath: "/path/scan.json",
+				LastScanned:    time.Date(2026, 2, 24, 10, 0, 0, 0, time.UTC),
+			}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.Completeness != 0.5 {
+		t.Errorf("expected 0.5, got %f", state.Completeness)
+	}
+	if len(state.Clusters) != 1 || state.Clusters[0].Name != "Auth" {
+		t.Errorf("expected Auth cluster, got %v", state.Clusters)
+	}
+	if state.ShibitoCount != 2 {
+		t.Errorf("expected 2, got %d", state.ShibitoCount)
+	}
+	if state.ScanResultPath != "/path/scan.json" {
+		t.Errorf("expected path, got %s", state.ScanResultPath)
+	}
+}
+
+func TestProjectState_WavesGenerated(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{
+					{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available", ActionCount: 2},
+					{ID: "w2", ClusterName: "Auth", Title: "Second", Status: "locked", ActionCount: 1},
+				},
+			}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if len(state.Waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(state.Waves))
+	}
+	if state.Waves[0].ID != "w1" {
+		t.Errorf("expected w1, got %s", state.Waves[0].ID)
+	}
+}
+
+func TestProjectState_WaveCompleted(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{
+					{ID: "w1", ClusterName: "Auth", Status: "available"},
+				},
+			}),
+		mustNewEvent(t, sightjack.EventWaveCompleted, "s1", 3,
+			sightjack.WaveCompletedPayload{WaveID: "w1", ClusterName: "Auth", Applied: 3, TotalCount: 3}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if len(state.Waves) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(state.Waves))
+	}
+	if state.Waves[0].Status != "completed" {
+		t.Errorf("expected completed, got %s", state.Waves[0].Status)
+	}
+}
+
+func TestProjectState_CompletenessUpdated(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventScanCompleted, "s1", 2,
+			sightjack.ScanCompletedPayload{
+				Clusters:     []sightjack.ClusterState{{Name: "Auth", Completeness: 0.3}},
+				Completeness: 0.3,
+			}),
+		mustNewEvent(t, sightjack.EventCompletenessUpdated, "s1", 3,
+			sightjack.CompletenessUpdatedPayload{ClusterName: "Auth", ClusterCompleteness: 0.7, OverallCompleteness: 0.7}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.Completeness != 0.7 {
+		t.Errorf("expected 0.7, got %f", state.Completeness)
+	}
+	if state.Clusters[0].Completeness != 0.7 {
+		t.Errorf("expected cluster 0.7, got %f", state.Clusters[0].Completeness)
+	}
+}
+
+func TestProjectState_WavesUnlocked(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{
+					{ID: "w1", ClusterName: "Auth", Status: "completed"},
+					{ID: "w2", ClusterName: "Auth", Status: "locked"},
+				},
+			}),
+		mustNewEvent(t, sightjack.EventWavesUnlocked, "s1", 3,
+			sightjack.WavesUnlockedPayload{UnlockedWaveIDs: []string{"Auth:w2"}}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.Waves[1].Status != "available" {
+		t.Errorf("expected available after unlock, got %s", state.Waves[1].Status)
+	}
+}
+
+func TestProjectState_NextGenWavesAdded(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{{ID: "w1", ClusterName: "Auth"}},
+			}),
+		mustNewEvent(t, sightjack.EventNextGenWavesAdded, "s1", 3,
+			sightjack.NextGenWavesAddedPayload{
+				ClusterName: "Auth",
+				Waves:       []sightjack.WaveState{{ID: "w2", ClusterName: "Auth"}},
+			}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if len(state.Waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(state.Waves))
+	}
+}
+
+func TestProjectState_WaveModified(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{{ID: "w1", ClusterName: "Auth", Title: "Original"}},
+			}),
+		mustNewEvent(t, sightjack.EventWaveModified, "s1", 3,
+			sightjack.WaveModifiedPayload{
+				WaveID: "w1", ClusterName: "Auth",
+				UpdatedWave: sightjack.WaveState{ID: "w1", ClusterName: "Auth", Title: "Modified"},
+			}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.Waves[0].Title != "Modified" {
+		t.Errorf("expected Modified, got %s", state.Waves[0].Title)
+	}
+}
+
+func TestProjectState_ADRGenerated(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventADRGenerated, "s1", 2,
+			sightjack.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"}),
+		mustNewEvent(t, sightjack.EventADRGenerated, "s1", 3,
+			sightjack.ADRGeneratedPayload{ADRID: "0009", Title: "Another"}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.ADRCount != 2 {
+		t.Errorf("expected 2, got %d", state.ADRCount)
+	}
+}
+
+func TestProjectState_FullLifecycle(t *testing.T) {
+	// given: a realistic event sequence
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1,
+			sightjack.SessionStartedPayload{Project: "test-project", StrictnessLevel: "alert"}),
+		mustNewEvent(t, sightjack.EventScanCompleted, "s1", 2,
+			sightjack.ScanCompletedPayload{
+				Clusters:       []sightjack.ClusterState{{Name: "Auth", Completeness: 0.3, IssueCount: 5}},
+				Completeness:   0.3,
+				ShibitoCount:   1,
+				ScanResultPath: "/scan.json",
+				LastScanned:    time.Date(2026, 2, 24, 10, 0, 0, 0, time.UTC),
+			}),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 3,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{
+					{ID: "w1", ClusterName: "Auth", Title: "First Wave", Status: "available", ActionCount: 3},
+					{ID: "w2", ClusterName: "Auth", Title: "Second Wave", Status: "locked", ActionCount: 2},
+				},
+			}),
+		mustNewEvent(t, sightjack.EventWaveApproved, "s1", 4,
+			sightjack.WaveIdentityPayload{WaveID: "w1", ClusterName: "Auth"}),
+		mustNewEvent(t, sightjack.EventWaveCompleted, "s1", 5,
+			sightjack.WaveCompletedPayload{WaveID: "w1", ClusterName: "Auth", Applied: 3, TotalCount: 3}),
+		mustNewEvent(t, sightjack.EventCompletenessUpdated, "s1", 6,
+			sightjack.CompletenessUpdatedPayload{ClusterName: "Auth", ClusterCompleteness: 0.6, OverallCompleteness: 0.6}),
+		mustNewEvent(t, sightjack.EventWavesUnlocked, "s1", 7,
+			sightjack.WavesUnlockedPayload{UnlockedWaveIDs: []string{"Auth:w2"}}),
+		mustNewEvent(t, sightjack.EventADRGenerated, "s1", 8,
+			sightjack.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.Project != "test-project" {
+		t.Errorf("project: got %s", state.Project)
+	}
+	if state.StrictnessLevel != "alert" {
+		t.Errorf("strictness: got %s", state.StrictnessLevel)
+	}
+	if state.Completeness != 0.6 {
+		t.Errorf("completeness: got %f", state.Completeness)
+	}
+	if state.Clusters[0].Completeness != 0.6 {
+		t.Errorf("cluster completeness: got %f", state.Clusters[0].Completeness)
+	}
+	if len(state.Waves) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(state.Waves))
+	}
+	if state.Waves[0].Status != "completed" {
+		t.Errorf("w1 status: got %s", state.Waves[0].Status)
+	}
+	if state.Waves[1].Status != "available" {
+		t.Errorf("w2 status: got %s", state.Waves[1].Status)
+	}
+	if state.ADRCount != 1 {
+		t.Errorf("ADRCount: got %d", state.ADRCount)
+	}
+	if state.ShibitoCount != 1 {
+		t.Errorf("ShibitoCount: got %d", state.ShibitoCount)
+	}
+}
+
+func TestProjectState_Idempotent(t *testing.T) {
+	// given
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1,
+			sightjack.SessionStartedPayload{Project: "p1"}),
+		mustNewEvent(t, sightjack.EventScanCompleted, "s1", 2,
+			sightjack.ScanCompletedPayload{Completeness: 0.5}),
+	}
+
+	// when: replay twice
+	state1 := domain.ProjectState(events)
+	state2 := domain.ProjectState(events)
+
+	// then
+	if state1.Completeness != state2.Completeness {
+		t.Errorf("not idempotent: %f vs %f", state1.Completeness, state2.Completeness)
+	}
+	if state1.Project != state2.Project {
+		t.Errorf("not idempotent: %s vs %s", state1.Project, state2.Project)
+	}
+}
+
+func TestProjectState_UnknownEventType_Skipped(t *testing.T) {
+	// given: events including an unknown type
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1,
+			sightjack.SessionStartedPayload{Project: "p1"}),
+		mustNewEvent(t, "future_event_type", "s1", 2, nil),
+	}
+
+	// when: should not panic
+	state := domain.ProjectState(events)
+
+	// then
+	if state.Project != "p1" {
+		t.Errorf("expected p1, got %s", state.Project)
+	}
+}
+
+func TestProjectState_EmptyEvents(t *testing.T) {
+	// when
+	state := domain.ProjectState(nil)
+
+	// then: should return zero-value state
+	if state.SessionID != "" {
+		t.Errorf("expected empty session ID, got %s", state.SessionID)
+	}
+}
+
+func TestLoadState_RoundTrip(t *testing.T) {
+	// given: store with events
+	dir := t.TempDir()
+	storePath := filepath.Join(dir, "events", "s1.jsonl")
+	store := eventsource.NewFileEventStore(storePath)
+	recorder, recErr := eventsource.NewSessionRecorder(store, "s1")
+	if recErr != nil {
+		t.Fatalf("NewSessionRecorder: %v", recErr)
+	}
+
+	recorder.Record(sightjack.EventSessionStarted,
+		sightjack.SessionStartedPayload{Project: "test"})
+	recorder.Record(sightjack.EventScanCompleted,
+		sightjack.ScanCompletedPayload{Completeness: 0.4})
+
+	// when
+	state, err := eventsource.LoadState(store)
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	if state.Project != "test" {
+		t.Errorf("expected test, got %s", state.Project)
+	}
+	if state.Completeness != 0.4 {
+		t.Errorf("expected 0.4, got %f", state.Completeness)
+	}
+}
+
+func TestLoadState_EmptyStore_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
+
+	// when
+	_, err := eventsource.LoadState(store)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for empty store")
+	}
+}
+
+func TestLoadLatestState_FindsNewestSession(t *testing.T) {
+	// given: two event files, older and newer
+	baseDir := t.TempDir()
+	eventsDir := eventsource.EventsDir(baseDir)
+	os.MkdirAll(eventsDir, 0755)
+
+	// Older session
+	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-1000-1"))
+	rec1, err1 := eventsource.NewSessionRecorder(store1, "session-1000-1")
+	if err1 != nil {
+		t.Fatalf("NewSessionRecorder: %v", err1)
+	}
+	rec1.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{Project: "old-project"})
+	rec1.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.3})
+
+	// Newer session
+	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-2000-2"))
+	rec2, err2 := eventsource.NewSessionRecorder(store2, "session-2000-2")
+	if err2 != nil {
+		t.Fatalf("NewSessionRecorder: %v", err2)
+	}
+	rec2.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{Project: "new-project"})
+	rec2.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.7})
+
+	// when
+	state, sessionID, err := eventsource.LoadLatestState(baseDir)
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadLatestState: %v", err)
+	}
+	if sessionID != "session-2000-2" {
+		t.Errorf("expected session-2000-2, got %s", sessionID)
+	}
+	if state.Project != "new-project" {
+		t.Errorf("expected new-project, got %s", state.Project)
+	}
+	if state.Completeness != 0.7 {
+		t.Errorf("expected 0.7, got %f", state.Completeness)
+	}
+}
+
+func TestLoadLatestState_NoEventsDir(t *testing.T) {
+	// given: baseDir with no events directory
+	baseDir := t.TempDir()
+
+	// when
+	_, _, err := eventsource.LoadLatestState(baseDir)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for missing events dir")
+	}
+}
+
+func TestLoadLatestState_EmptyEventsDir(t *testing.T) {
+	// given: events directory with no files
+	baseDir := t.TempDir()
+	os.MkdirAll(eventsource.EventsDir(baseDir), 0755)
+
+	// when
+	_, _, err := eventsource.LoadLatestState(baseDir)
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for empty events dir")
+	}
+}
+
+func TestProjectState_WavesGenerated_Idempotent(t *testing.T) {
+	// given: same WavesGenerated event replayed twice
+	waveEvent := mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+		sightjack.WavesGeneratedPayload{
+			Waves: []sightjack.WaveState{
+				{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available"},
+				{ID: "w2", ClusterName: "Auth", Title: "Second", Status: "locked"},
+			},
+		})
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		waveEvent,
+		waveEvent, // duplicate replay
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then: waves should not be duplicated
+	if len(state.Waves) != 2 {
+		t.Errorf("expected 2 waves (idempotent), got %d", len(state.Waves))
+	}
+}
+
+func TestProjectState_NextGenWavesAdded_Idempotent(t *testing.T) {
+	// given: same NextGenWavesAdded event replayed twice
+	nextgenEvent := mustNewEvent(t, sightjack.EventNextGenWavesAdded, "s1", 3,
+		sightjack.NextGenWavesAddedPayload{
+			ClusterName: "Auth",
+			Waves:       []sightjack.WaveState{{ID: "w2", ClusterName: "Auth"}},
+		})
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{{ID: "w1", ClusterName: "Auth"}},
+			}),
+		nextgenEvent,
+		nextgenEvent, // duplicate replay
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then: w2 should appear only once
+	if len(state.Waves) != 2 {
+		t.Errorf("expected 2 waves (w1 + w2 deduped), got %d", len(state.Waves))
+	}
+}
+
+func TestProjectState_NextGenWavesAdded_DifferentWaves_Appends(t *testing.T) {
+	// given: two different NextGenWavesAdded events with different waves
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, sightjack.EventWavesGenerated, "s1", 2,
+			sightjack.WavesGeneratedPayload{
+				Waves: []sightjack.WaveState{{ID: "w1", ClusterName: "Auth"}},
+			}),
+		mustNewEvent(t, sightjack.EventNextGenWavesAdded, "s1", 3,
+			sightjack.NextGenWavesAddedPayload{
+				ClusterName: "Auth",
+				Waves:       []sightjack.WaveState{{ID: "w2", ClusterName: "Auth"}},
+			}),
+		mustNewEvent(t, sightjack.EventNextGenWavesAdded, "s1", 4,
+			sightjack.NextGenWavesAddedPayload{
+				ClusterName: "Auth",
+				Waves:       []sightjack.WaveState{{ID: "w3", ClusterName: "Auth"}},
+			}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then: all three different waves should be present
+	if len(state.Waves) != 3 {
+		t.Errorf("expected 3 waves (w1, w2, w3), got %d", len(state.Waves))
+	}
+}
+
+func TestProjectState_ADRGenerated_Idempotent(t *testing.T) {
+	// given: same ADRGenerated event replayed twice
+	adrEvent := mustNewEvent(t, sightjack.EventADRGenerated, "s1", 2,
+		sightjack.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"})
+	events := []sightjack.Event{
+		mustNewEvent(t, sightjack.EventSessionStarted, "s1", 1, nil),
+		adrEvent,
+		adrEvent, // duplicate replay
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then: ADRCount should be 1, not 2
+	if state.ADRCount != 1 {
+		t.Errorf("expected ADRCount 1 (idempotent), got %d", state.ADRCount)
+	}
+}
+
+// mustNewEvent is a test helper that creates an event and fails on error.
+func mustNewEvent(t *testing.T, eventType sightjack.EventType, sessionID string, seq int64, payload any) sightjack.Event {
+	t.Helper()
+	event, err := sightjack.NewEvent(eventType, sessionID, seq, payload)
+	if err != nil {
+		t.Fatalf("NewEvent(%s): %v", eventType, err)
+	}
+	return event
+}

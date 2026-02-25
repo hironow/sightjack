@@ -8,7 +8,7 @@ Run an interactive session with wave approval and apply loop.
 
 Combines scan → waves → select → apply → nextgen in a single
 interactive session. Supports resume from a previous session
-if state is found in .siren/state.json.
+if event data is found in .siren/events/.
 
 ```
 sightjack run [path] [flags]
@@ -53,4 +53,4 @@ sightjack run [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear

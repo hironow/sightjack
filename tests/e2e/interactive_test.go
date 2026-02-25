@@ -132,11 +132,8 @@ func TestE2E_Run_NewSession(t *testing.T) {
 		t.Fatalf("run exited with error: %v", waitErr)
 	}
 
-	// then: state.json should exist
-	stateFile := filepath.Join(dir, ".siren", "state.json")
-	if _, statErr := os.Stat(stateFile); os.IsNotExist(statErr) {
-		t.Error("state.json not created after run session")
-	}
+	// then: events should exist
+	assertEventsExist(t, dir)
 }
 
 func TestE2E_Run_QuitImmediately(t *testing.T) {
@@ -179,9 +176,6 @@ func TestE2E_Run_QuitImmediately(t *testing.T) {
 		t.Fatalf("run exited with error: %v", waitErr)
 	}
 
-	// then: state should still be saved (paused session)
-	stateFile := filepath.Join(dir, ".siren", "state.json")
-	if _, statErr := os.Stat(stateFile); os.IsNotExist(statErr) {
-		t.Error("state.json not created after quitting run")
-	}
+	// then: events should still be saved (paused session)
+	assertEventsExist(t, dir)
 }

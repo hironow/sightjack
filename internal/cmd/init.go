@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newInitCmd() *cobra.Command {
@@ -119,13 +120,13 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 		return fmt.Errorf("write config: %w", err)
 	}
 
-	_ = sightjack.WriteGitIgnore(baseDir)
+	_ = session.WriteGitIgnore(baseDir)
 
 	if err := sightjack.InstallSkills(baseDir); err != nil {
 		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
 	}
 
-	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
+	if err := session.EnsureMailDirs(baseDir); err != nil {
 		fmt.Fprintf(w, "Warning: failed to create mail dirs: %v\n", err)
 	}
 

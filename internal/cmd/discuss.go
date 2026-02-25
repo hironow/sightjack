@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newDiscussCmd() *cobra.Command {
@@ -85,19 +86,19 @@ suitable for piping into 'adr' for ADR generation.`,
 			logger := loggerFrom(cmd)
 
 			if dryRun {
-				if err := sightjack.RunArchitectDiscussDryRun(cfg, scanDir, wave, topic, strictness, logger); err != nil {
+				if err := session.RunArchitectDiscussDryRun(cfg, scanDir, wave, topic, strictness, logger); err != nil {
 					return fmt.Errorf("dry-run failed: %w", err)
 				}
 				logger.OK("Dry-run complete. Check %s for generated prompt.", scanDir)
 				return nil
 			}
 
-			resp, err := sightjack.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, cmd.OutOrStdout(), logger)
+			resp, err := session.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, cmd.OutOrStdout(), logger)
 			if err != nil {
 				return fmt.Errorf("discussion failed: %w", err)
 			}
 
-			result := sightjack.ToDiscussResult(wave, resp, topic)
+			result := session.ToDiscussResult(wave, resp, topic)
 			out, jsonErr := json.MarshalIndent(result, "", "  ")
 			if jsonErr != nil {
 				return fmt.Errorf("JSON marshal failed: %w", jsonErr)

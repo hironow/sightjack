@@ -212,8 +212,8 @@ func TestRunInit_CreatesGitIgnore(t *testing.T) {
 		t.Fatalf(".gitignore not created: %v", readErr)
 	}
 	content := string(data)
-	if !strings.Contains(content, "state.json") {
-		t.Errorf("expected state.json in .gitignore, got:\n%s", content)
+	if !strings.Contains(content, "events/") {
+		t.Errorf("expected events/ in .gitignore, got:\n%s", content)
 	}
 }
 

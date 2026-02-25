@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestRenderInitConfig_BasicOutput(t *testing.T) {
@@ -44,7 +45,7 @@ func TestRenderInitConfig_LoadableByLoadConfig(t *testing.T) {
 	}
 
 	// when: LoadConfig reads it
-	cfg, err := sightjack.LoadConfig(path)
+	cfg, err := session.LoadConfig(path)
 
 	// then: values match
 	if err != nil {
@@ -154,7 +155,7 @@ func TestRenderInitConfig_DefaultsApplied(t *testing.T) {
 	os.WriteFile(path, []byte(output), 0644)
 
 	// when
-	cfg, err := sightjack.LoadConfig(path)
+	cfg, err := session.LoadConfig(path)
 
 	// then: DefaultConfig values are applied for unspecified fields
 	if err != nil {
