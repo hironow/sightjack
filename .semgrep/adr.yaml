@@ -62,7 +62,7 @@ rules:
       - pattern: |
           $W, $ERR := fsnotify.NewWatcher()
       - pattern-not-inside: |
-          $W, $_ := fsnotify.NewWatcher()
+          $W, $ERR := fsnotify.NewWatcher()
           ...
           defer $W.Close()
 
