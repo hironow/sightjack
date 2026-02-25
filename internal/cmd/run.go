@@ -101,7 +101,7 @@ if event data is found in .siren/events/.`,
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
-							return session.RunRescanSession(cmd.Context(), cfg, baseDir, displayState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
+							return session.RunRescanSession(cmd.Context(), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
