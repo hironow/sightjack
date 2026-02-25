@@ -2,8 +2,10 @@ package eventsource
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -124,22 +126,24 @@ func (s *FileEventStore) readAllUnlocked() ([]sightjack.Event, error) {
 	defer f.Close()
 
 	var events []sightjack.Event
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // 1MB max to handle large event payloads
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
+	reader := bufio.NewReader(f)
+	for {
+		line, readErr := reader.ReadBytes('\n')
+		// Trim trailing newline (and handle last line without newline)
+		line = bytes.TrimRight(line, "\n")
+		if len(line) > 0 {
+			var e sightjack.Event
+			if jsonErr := json.Unmarshal(line, &e); jsonErr == nil {
+				events = append(events, e)
+			}
+			// Skip corrupt lines silently
 		}
-		var e sightjack.Event
-		if err := json.Unmarshal(line, &e); err != nil {
-			// Skip corrupt lines
-			continue
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
+			return events, fmt.Errorf("event store read: %w", readErr)
 		}
-		events = append(events, e)
-	}
-	if err := scanner.Err(); err != nil {
-		return events, fmt.Errorf("event store scan: %w", err)
 	}
 	return events, nil
 }
