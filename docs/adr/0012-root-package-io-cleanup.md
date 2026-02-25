@@ -47,3 +47,4 @@ Move all I/O functions out of the root package in four incremental steps, each i
 ### Neutral
 - Three go:embed-bound items remain as accepted ADR 0011 violations (InstallSkills, Render* prompts, Logger)
 - root package still exports ~70 types and ~10 pure functions, which is appropriate for a Go library package
+- ADR 0010 stated "EventStore interface → event.go"; it was subsequently moved to interfaces.go during ADR 0011 interface extraction (commit 92a31c4). This is an organizational deviation within root, not a layer violation
