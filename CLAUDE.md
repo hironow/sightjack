@@ -8,8 +8,16 @@
 
 - Entry: `cmd/sightjack/main.go` (signal.NotifyContext + DefaultToScan)
 - CLI: `internal/cmd/` (cobra v1.10.2, `NewRootCommand()` exported for testability)
-- Library: root package `sightjack` (scan, wave, dmail, feedback, gate, notify, approve, telemetry, logger)
-- OTel: `telemetry.go` (noop default + OTLP HTTP exporter, shutdown via cobra.OnFinalize)
+- Root package `sightjack`: types, interfaces, constants, go:embed templates, pure functions only (ADR 0011/0012)
+  - `types.go`, `interfaces.go`, `event.go`: 70+ types, 5 interfaces, Event system
+  - `config.go`: Config type group (8 structs) + pure functions (ResolveStrictness, DefaultConfig, ValidLang)
+  - `state.go`: constants (StateDir, InboxDir, etc.) + path helpers (MailDir, ConfigPath, ScanDir)
+  - `prompt.go`, `init.go`: go:embed templates + render/install functions
+  - `logger.go`: Logger type + methods
+- Domain: `internal/domain/` (pure functions — wave scheduling, scan utils, event projection)
+- Session: `internal/session/` (I/O orchestration — Claude subprocess, file ops, scanner, dmail, archive, config loading, state I/O)
+- Event sourcing: `internal/eventsource/` (event store infrastructure)
+- OTel: `internal/cmd/telemetry.go` (noop default + OTLP HTTP exporter, shutdown via cobra.OnFinalize)
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
 - Release: `.goreleaser.yaml`
