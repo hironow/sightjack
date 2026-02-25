@@ -304,7 +304,7 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 func TestCheckSkills_OK(t *testing.T) {
 	// given: valid SKILL.md files installed
 	baseDir := t.TempDir()
-	if err := sightjack.InstallSkills(baseDir); err != nil {
+	if err := session.InstallSkills(baseDir, sightjack.SkillsFS); err != nil {
 		t.Fatalf("InstallSkills: %v", err)
 	}
 

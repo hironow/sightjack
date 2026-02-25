@@ -122,7 +122,7 @@ func runInit(baseDir string, r io.Reader, w io.Writer) error {
 
 	_ = session.WriteGitIgnore(baseDir)
 
-	if err := sightjack.InstallSkills(baseDir); err != nil {
+	if err := session.InstallSkills(baseDir, sightjack.SkillsFS); err != nil {
 		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
 	}
 
