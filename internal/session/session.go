@@ -282,10 +282,11 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			})
 			if err := ComposeSpecification(baseDir, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
+			} else {
+				recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
+					WaveID: selected.ID, ClusterName: selected.ClusterName,
+				})
 			}
-			recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
-				WaveID: selected.ID, ClusterName: selected.ClusterName,
-			})
 			return selected, approvalApproved
 		case sightjack.ApprovalReject:
 			delete(sessionRejected, domain.WaveKey(selected))
@@ -376,10 +377,11 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			})
 			if err := ComposeSpecification(baseDir, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
+			} else {
+				recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
+					WaveID: selected.ID, ClusterName: selected.ClusterName,
+				})
 			}
-			recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
-				WaveID: selected.ID, ClusterName: selected.ClusterName,
-			})
 			return selected, approvalApproved
 		}
 		return selected, approvalRejected
@@ -454,10 +456,11 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	// Compose report d-mail for the completed wave
 	if err := ComposeReport(baseDir, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
+	} else {
+		recorder.Record(sightjack.EventReportSent, sightjack.WaveIdentityPayload{
+			WaveID: selected.ID, ClusterName: selected.ClusterName,
+		})
 	}
-	recorder.Record(sightjack.EventReportSent, sightjack.WaveIdentityPayload{
-		WaveID: selected.ID, ClusterName: selected.ClusterName,
-	})
 
 	// Update cluster completeness from delta, then recalculate overall
 	for i, c := range scanResult.Clusters {
@@ -489,14 +492,20 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	})
 
 	// Display rich completion summary with grouped ripple effects
+	// Capture available wave keys before unlock to compute the diff
+	beforeAvailable := make(map[string]bool)
+	for _, w := range domain.AvailableWaves(*waves, completed) {
+		beforeAvailable[domain.WaveKey(w)] = true
+	}
 	*waves = domain.EvaluateUnlocks(*waves, completed)
 	newAvailable := len(domain.AvailableWaves(*waves, completed))
 	newCount := domain.CalcNewlyUnlocked(oldAvailable, newAvailable)
 	if newCount > 0 {
 		var unlockedIDs []string
-		for _, w := range *waves {
-			if w.Status == "available" {
-				unlockedIDs = append(unlockedIDs, domain.WaveKey(w))
+		for _, w := range domain.AvailableWaves(*waves, completed) {
+			key := domain.WaveKey(w)
+			if !beforeAvailable[key] {
+				unlockedIDs = append(unlockedIDs, key)
 			}
 		}
 		recorder.Record(sightjack.EventWavesUnlocked, sightjack.WavesUnlockedPayload{

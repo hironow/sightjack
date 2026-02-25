@@ -16,7 +16,11 @@ type LoggingRecorder struct {
 }
 
 // NewLoggingRecorder creates a LoggingRecorder that wraps the given Recorder.
+// If inner is nil, NopRecorder is used to prevent panics.
 func NewLoggingRecorder(inner sightjack.Recorder, logger *sightjack.Logger) *LoggingRecorder {
+	if inner == nil {
+		inner = NopRecorder{}
+	}
 	return &LoggingRecorder{inner: inner, logger: logger}
 }
 

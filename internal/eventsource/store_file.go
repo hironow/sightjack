@@ -125,6 +125,7 @@ func (s *FileEventStore) readAllUnlocked() ([]sightjack.Event, error) {
 
 	var events []sightjack.Event
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // 1MB max to handle large event payloads
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {

@@ -32,7 +32,10 @@ func loadTestState(t *testing.T, baseDir string) *sightjack.SessionState {
 func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.SessionState) {
 	t.Helper()
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
-	recorder := eventsource.NewSessionRecorder(store, sessionID)
+	recorder, err := eventsource.NewSessionRecorder(store, sessionID)
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
 	if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
 		Project:         state.Project,
 		StrictnessLevel: state.StrictnessLevel,
@@ -71,7 +74,11 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.S
 // testRecorder creates a real Recorder backed by the event store for lifecycle tests.
 func testRecorder(baseDir, sessionID string) sightjack.Recorder {
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
-	return eventsource.NewSessionRecorder(store, sessionID)
+	rec, recErr := eventsource.NewSessionRecorder(store, sessionID)
+	if recErr != nil {
+		panic("NewSessionRecorder: " + recErr.Error())
+	}
+	return rec
 }
 
 // testConfig returns a minimal Config for lifecycle tests.

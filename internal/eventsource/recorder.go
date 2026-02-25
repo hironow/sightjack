@@ -17,13 +17,17 @@ type SessionRecorder struct {
 }
 
 // NewSessionRecorder creates a SessionRecorder that resumes from the store's last sequence.
-func NewSessionRecorder(store sightjack.EventStore, sessionID string) *SessionRecorder {
-	lastSeq, _ := store.LastSequence()
+// Returns an error if the store's last sequence cannot be read.
+func NewSessionRecorder(store sightjack.EventStore, sessionID string) (*SessionRecorder, error) {
+	lastSeq, err := store.LastSequence()
+	if err != nil {
+		return nil, fmt.Errorf("new session recorder: %w", err)
+	}
 	return &SessionRecorder{
 		store:     store,
 		sessionID: sessionID,
 		seq:       lastSeq,
-	}
+	}, nil
 }
 
 // Record creates and appends an event with the next sequence number.

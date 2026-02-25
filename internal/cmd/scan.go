@@ -93,7 +93,10 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				})
 			}
 			store := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
-			recorder := eventsource.NewSessionRecorder(store, sessionID)
+			recorder, recErr := eventsource.NewSessionRecorder(store, sessionID)
+			if recErr != nil {
+				return fmt.Errorf("session recorder: %w", recErr)
+			}
 			if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
 				Project:         cfg.Linear.Project,
 				StrictnessLevel: string(cfg.Strictness.Default),

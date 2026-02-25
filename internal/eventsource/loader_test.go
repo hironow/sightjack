@@ -353,7 +353,10 @@ func TestLoadState_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "events", "s1.jsonl")
 	store := eventsource.NewFileEventStore(storePath)
-	recorder := eventsource.NewSessionRecorder(store, "s1")
+	recorder, recErr := eventsource.NewSessionRecorder(store, "s1")
+	if recErr != nil {
+		t.Fatalf("NewSessionRecorder: %v", recErr)
+	}
 
 	recorder.Record(sightjack.EventSessionStarted,
 		sightjack.SessionStartedPayload{Project: "test"})
@@ -397,13 +400,19 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 
 	// Older session
 	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-1000-1"))
-	rec1 := eventsource.NewSessionRecorder(store1, "session-1000-1")
+	rec1, err1 := eventsource.NewSessionRecorder(store1, "session-1000-1")
+	if err1 != nil {
+		t.Fatalf("NewSessionRecorder: %v", err1)
+	}
 	rec1.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{Project: "old-project"})
 	rec1.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.3})
 
 	// Newer session
 	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-2000-2"))
-	rec2 := eventsource.NewSessionRecorder(store2, "session-2000-2")
+	rec2, err2 := eventsource.NewSessionRecorder(store2, "session-2000-2")
+	if err2 != nil {
+		t.Fatalf("NewSessionRecorder: %v", err2)
+	}
 	rec2.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{Project: "new-project"})
 	rec2.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.7})
 

@@ -206,7 +206,7 @@ func RunClaudeDryRun(cfg *sightjack.Config, prompt, outputPath string, name stri
 }
 
 // Base tools (e.g. filesystem access, basic bash) that
-// are generally useful and safe to
+// are generally useful and safe to enable by default for most workflows.
 var BaseAllowedTools = []string{
 	"Read",
 	"Write",

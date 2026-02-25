@@ -12,7 +12,10 @@ func TestSessionRecorder_Record_AutoSequence(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
-	recorder := eventsource.NewSessionRecorder(store, "session-1")
+	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
 
 	// when
 	if err := recorder.Record(sightjack.EventSessionStarted, nil); err != nil {
@@ -42,7 +45,10 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
-	recorder := eventsource.NewSessionRecorder(store, "session-1")
+	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
 
 	payload := sightjack.SessionStartedPayload{
 		Project:         "my-project",
@@ -70,7 +76,10 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
-	recorder := eventsource.NewSessionRecorder(store, "session-42")
+	recorder, err := eventsource.NewSessionRecorder(store, "session-42")
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
 
 	// when
 	recorder.Record(sightjack.EventSessionStarted, nil)
@@ -92,7 +101,10 @@ func TestSessionRecorder_CausationID_ChainsPreviousSequence(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
-	recorder := eventsource.NewSessionRecorder(store, "session-1")
+	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
 
 	// when
 	recorder.Record(sightjack.EventSessionStarted, nil)
@@ -130,7 +142,10 @@ func TestSessionRecorder_Resume_CausationID_ContinuesChain(t *testing.T) {
 	}
 
 	// when: new recorder resumes from existing store, records event 4
-	recorder := eventsource.NewSessionRecorder(store, "session-1")
+	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
 	recorder.Record(sightjack.EventWavesGenerated, nil)
 
 	// then: event 4 should have CausationID == "3" (continuing chain)
@@ -158,7 +173,10 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	}
 
 	// when: create new recorder from same store
-	recorder := eventsource.NewSessionRecorder(store, "session-1")
+	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
 	if err := recorder.Record(sightjack.EventWavesGenerated, nil); err != nil {
 		t.Fatalf("Record: %v", err)
 	}

@@ -117,7 +117,8 @@ func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) err
 	if strictness == "" {
 		strictness = "fog"
 	}
-	nav := session.RenderMatrixNavigator(result, state.Project, waves, state.ADRCount, (*time.Time)(nil), strictness, state.ShibitoCount)
+	adrCount := session.CountADRFiles(session.ADRDir(baseDir))
+	nav := session.RenderMatrixNavigator(result, state.Project, waves, adrCount, (*time.Time)(nil), strictness, state.ShibitoCount)
 	fmt.Fprintln(w)
 	fmt.Fprint(w, nav)
 	logger.Info("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))

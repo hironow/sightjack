@@ -60,7 +60,7 @@ if event data is found in .siren/events/.`,
 			}
 			// Check for existing state (resume detection)
 			if !dryRun {
-				existingState, _, stateErr := eventsource.LoadLatestState(baseDir)
+				existingState, existingSessionID, stateErr := eventsource.LoadLatestState(baseDir)
 				if stateErr == nil {
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
@@ -78,13 +78,19 @@ if event data is found in .siren/events/.`,
 								logger.Warn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}
-							resumeStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, existingState.SessionID))
-							resumeRecorder := eventsource.NewSessionRecorder(resumeStore, existingState.SessionID)
+							resumeStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, existingSessionID))
+							resumeRecorder, recErr := eventsource.NewSessionRecorder(resumeStore, existingSessionID)
+							if recErr != nil {
+								return fmt.Errorf("resume recorder: %w", recErr)
+							}
 							return session.RunResumeSession(cmd.Context(), cfg, baseDir, existingState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 							rescanStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, rescanID))
-							rescanRecorder := eventsource.NewSessionRecorder(rescanStore, rescanID)
+							rescanRecorder, recErr := eventsource.NewSessionRecorder(rescanStore, rescanID)
+							if recErr != nil {
+								return fmt.Errorf("rescan recorder: %w", recErr)
+							}
 							return session.RunRescanSession(cmd.Context(), cfg, baseDir, existingState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
@@ -100,7 +106,11 @@ if event data is found in .siren/events/.`,
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
 				sessionStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
-				recorder = eventsource.NewSessionRecorder(sessionStore, sessionID)
+				rec, recErr := eventsource.NewSessionRecorder(sessionStore, sessionID)
+				if recErr != nil {
+					return fmt.Errorf("session recorder: %w", recErr)
+				}
+				recorder = rec
 			}
 			return session.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
 		},
