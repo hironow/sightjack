@@ -79,6 +79,7 @@ State is reconstructed by replaying all events via `ProjectState()`. There is no
 the event log is the single source of truth. See ADR 0008 for design rationale.
 
 Key functions:
+
 - `LoadState(store)` — replay events from a specific EventStore
 - `LoadLatestState(baseDir)` — find newest `.jsonl` in events/, replay to get current state
 

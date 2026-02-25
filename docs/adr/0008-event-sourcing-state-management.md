@@ -27,6 +27,7 @@ Event Sourcing パターンを導入する。
 - Pipe パターン（UNIX pipe chain）は維持する（JSON wire format は不変）
 
 主要コンポーネント：
+
 - `Event` 封筒型 + 17 種類の `EventType`（session_started, scan_completed, waves_generated 等）
 - `FileEventStore` — JSONL append-only、`O_APPEND|O_CREATE|O_WRONLY` + `fsync`
 - `SessionRecorder` — EventStore ラッパー、自動連番管理
@@ -35,16 +36,19 @@ Event Sourcing パターンを導入する。
 ## Consequences
 
 ### Positive
+
 - 完全な操作履歴が残り、セッションの意思決定過程を後から追跡可能
 - append-only によりクラッシュ耐性が向上（部分書き込みはスキップ可能）
 - Point-in-time recovery が可能（任意の sequence までリプレイ）
 - デバッグ・監査が容易（`cat events/*.jsonl | jq` で全履歴参照）
 
 ### Negative
+
 - 状態の取得にフルリプレイが必要（ただしイベント数が少ないため実質的なコストは無視できる）
 - `WriteState` / `ReadState` に依存する全てのコードパスを更新する必要がある
 - 既存の `state.json` との後方互換がなくなる（移行パスなし）
 
 ### Neutral
+
 - Pipe コマンドの JSON wire format は不変のため、pipe ユーザーへの影響はない
 - scan キャッシュ（`.siren/.run/` 配下の `scan_result.json`）は引き続き独立して機能する

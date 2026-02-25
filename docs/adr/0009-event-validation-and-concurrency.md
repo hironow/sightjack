@@ -59,15 +59,18 @@ adds complexity with no benefit.
 ## Consequences
 
 ### Positive
+
 - Invalid events cannot be persisted (data integrity)
 - Sequence bugs are detected immediately at write time
 - Old event files are cleaned up alongside d-mail archives
 - No new interfaces or abstractions added (minimal complexity)
 
 ### Negative
+
 - Concurrent random-order writes to `FileEventStore` are no longer possible (by design)
 - Lazy init reads the entire file on first `Append()` (negligible for < 100 events)
 
 ### Neutral
+
 - `SessionRecorder` remains the primary write path and manages sequences automatically
 - The monotonicity check is a safety net, not a concurrency control mechanism

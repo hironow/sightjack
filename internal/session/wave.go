@@ -185,4 +185,3 @@ func RunReadyLabel(ctx context.Context, cfg *sightjack.Config, readyIssueIDs str
 	}
 	return nil
 }
-

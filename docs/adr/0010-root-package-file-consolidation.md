@@ -48,6 +48,7 @@ and `go test`.
 ## Consequences
 
 ### Positive
+
 - Source file count reduced from 30 to 26 (test files from 30 to 28)
 - `session.go` reduced from 1,082 to ~850 lines
 - `cli.go` reduced from 347 to ~250 lines (input-only)
@@ -55,9 +56,11 @@ and `go test`.
 - Each file has a clearer single responsibility
 
 ### Negative
+
 - `event.go` and `wave.go` grew larger (but remain cohesive)
 - `scanner.go` gained the `pond` import (acceptable: RunParallel is scanner-specific)
 
 ### Neutral
+
 - No API changes; all exports remain at the same package path
 - Test coverage unchanged (tests moved alongside their subjects)

@@ -43,16 +43,19 @@ Implement fake-Claude as a standalone Go binary with fixture-based responses:
 ## Consequences
 
 ### Positive
+
 - Zero production code modification for testability
 - Deterministic, fast E2E tests (no API calls, no rate limits)
 - Fixture table is trivially extensible for new scan phases
 - Prompt logging enables assertion on prompt construction without parsing stdout
 
 ### Negative
+
 - Fixture responses are static; cannot test dynamic Claude behavior
 - Adding new scan phases requires updating both fixture table and E2E test expectations
 - Binary must be rebuilt when fixture content changes
 
 ### Neutral
+
 - fake-Claude fixtures are ported from `lifecycle_test.go` canned responses,
   maintaining consistency between unit and E2E test expectations

@@ -30,16 +30,19 @@ Migration was bottom-up: interfaces first (ADR 0010), then session extraction, t
 ## Consequences
 
 ### Positive
+
 - Clear dependency DAG prevents circular imports
 - Pure functions in domain are independently testable without mocks
 - Session layer changes don't affect domain logic
 - go:embed constraints satisfied (templates stay in root)
 
 ### Negative
+
 - Cross-package function calls require explicit import and prefix (`domain.WaveKey()` vs bare `WaveKey()`)
 - Test files for domain functions currently remain in session_test (functional but not ideal organization)
 - config.go pure functions (ResolveStrictness, DefaultConfig) cannot move to domain due to circular import (domain → root → domain)
 
 ### Neutral
+
 - Root package test files (`_test.go` with external test package) can still import internal/ packages without creating cycles
 - `OverrideNewCmd` and `OverrideTracer` exposed as regular exported functions in session for cross-package test injection (export_test.go bridge pattern insufficient for cross-package access)
