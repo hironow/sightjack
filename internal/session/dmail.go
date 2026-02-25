@@ -40,7 +40,6 @@ const (
 	DMailConvergence   DMailKind = "convergence"
 )
 
-
 // Filename returns the canonical filename: "<name>.md".
 func (d *DMail) Filename() string {
 	return d.Name + ".md"
@@ -335,12 +334,7 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier sightjack.Noti
 	if ch != nil {
 		go func() {
 			for mail := range ch {
-				c.mu.Lock()
-				c.items = append(c.items, mail)
-				if mail.Kind == DMailConvergence {
-					c.convergenceNames = append(c.convergenceNames, mail.Name)
-				}
-				c.mu.Unlock()
+				c.addMail(mail)
 
 				if mail.Kind == DMailConvergence {
 					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
@@ -364,6 +358,16 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier sightjack.Noti
 		}()
 	}
 	return c
+}
+
+// addMail appends a d-mail to the collector under the mutex.
+func (c *FeedbackCollector) addMail(mail *DMail) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.items = append(c.items, mail)
+	if mail.Kind == DMailConvergence {
+		c.convergenceNames = append(c.convergenceNames, mail.Name)
+	}
 }
 
 // ConvergenceNames returns a copy of convergence d-mail names received

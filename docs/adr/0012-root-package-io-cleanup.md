@@ -35,15 +35,18 @@ Move all I/O functions out of the root package in four incremental steps, each i
 ## Consequences
 
 ### Positive
+
 - Root package now contains only types, interfaces, constants, go:embed templates, and pure functions
 - I/O is consolidated in internal/session/ making the filesystem dependency boundary explicit
 - telemetry functions are unexported in internal/cmd/ (smallest possible visibility)
 - Each step was a [STRUCTURAL] commit with zero behavioral changes
 
 ### Negative
+
 - 60+ call sites required mechanical updates (sightjack.X -> session.X or prefix removal)
 - Test files split across root and internal/ (I/O tests moved with their functions, pure tests stay in root)
 
 ### Neutral
+
 - Three go:embed-bound items remain as accepted ADR 0011 violations (InstallSkills, Render* prompts, Logger)
 - root package still exports ~70 types and ~10 pure functions, which is appropriate for a Go library package
