@@ -74,7 +74,7 @@ if event data is found in .siren/events/.`,
 						}
 						switch choice {
 						case sightjack.ResumeChoiceResume:
-							if !sightjack.CanResume(existingState) {
+							if !session.CanResume(existingState) {
 								logger.Warn("Cached scan data missing — starting fresh session instead.")
 								goto freshSession
 							}

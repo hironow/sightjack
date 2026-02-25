@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/pflag"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 // version, commit, date are set by -ldflags at build time (GoReleaser).
@@ -58,13 +59,13 @@ func NewRootCommand() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			logger := sightjack.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
-			shutdownTracer = sightjack.InitTracer("sightjack", version)
-			spanCtx := sightjack.StartRootSpan(ctx, cmd.Name())
+			shutdownTracer = initTracer("sightjack", version)
+			spanCtx := startRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-			sightjack.EndRootSpan(cmd.Context())
+			endRootSpan(cmd.Context())
 			return nil
 		},
 		SilenceUsage:  true,
@@ -219,7 +220,7 @@ func resolveBaseDir(args []string) (string, error) {
 // loadConfig loads the sightjack config, applying lang override if set.
 func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
 	resolved := resolveConfigPath(cmd, baseDir)
-	cfg, err := sightjack.LoadConfig(resolved)
+	cfg, err := session.LoadConfig(resolved)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("config not found: %s\nRun 'sightjack init' to create one", resolved)

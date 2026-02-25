@@ -45,7 +45,7 @@ func (s CheckStatus) StatusLabel() string {
 
 // CheckConfig validates that the config file exists and can be loaded.
 func CheckConfig(configPath string) CheckResult {
-	_, err := sightjack.LoadConfig(configPath)
+	_, err := LoadConfig(configPath)
 	if err != nil {
 		return CheckResult{
 			Name:    "Config",
@@ -236,7 +236,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *s
 	var cfg *sightjack.Config
 	if cfgResult.Status == CheckOK {
 		// Re-load to use for subsequent checks (checkConfig already validated).
-		cfg, _ = sightjack.LoadConfig(configPath)
+		cfg, _ = LoadConfig(configPath)
 	}
 
 	// 3. claude binary check

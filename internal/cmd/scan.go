@@ -79,7 +79,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 
 			// Cache scan result for pipe replay: cat .siren/.run/<id>/scan_result.json | sightjack waves
 			scanResultPath := filepath.Join(sightjack.ScanDir(baseDir, sessionID), "scan_result.json")
-			if err := sightjack.WriteScanResult(scanResultPath, result); err != nil {
+			if err := session.WriteScanResult(scanResultPath, result); err != nil {
 				logger.Warn("Failed to cache scan result: %v", err)
 			}
 

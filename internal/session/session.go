@@ -39,7 +39,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 	}
 
 	// Ensure D-Mail directories exist before any mail operations
-	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
+	if err := EnsureMailDirs(baseDir); err != nil {
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
@@ -71,7 +71,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		fbCollector = CollectFeedback(allDmails, inboxCh, notifier, logger)
 	}
 
-	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
+	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 
 	// Cache ScanResult for resume
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to cache scan result: %v", err)
 	}
 
@@ -572,7 +572,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	}
 
 	// Save scan result cache (crash resilience)
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to update cached scan result: %v", err)
 	}
 }
@@ -639,7 +639,7 @@ outerLoop:
 	}
 
 	// Save scan result cache
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to update cached scan result: %v", err)
 	}
 
@@ -653,7 +653,7 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 	if state.ScanResultPath == "" {
 		return nil, nil, nil, 0, fmt.Errorf("no cached scan result path in state")
 	}
-	scanResult, err := sightjack.LoadScanResult(state.ScanResultPath)
+	scanResult, err := LoadScanResult(state.ScanResultPath)
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
 	}
@@ -686,7 +686,7 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	}
 
 	// Ensure D-Mail directories exist before any mail operations
-	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
+	if err := EnsureMailDirs(baseDir); err != nil {
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
@@ -746,7 +746,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	}
 
 	// Ensure D-Mail directories exist before any mail operations
-	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
+	if err := EnsureMailDirs(baseDir); err != nil {
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
@@ -774,7 +774,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 
 	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
-	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
+	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
 	}
@@ -787,7 +787,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	}
 	scanTime := time.Now()
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
 		logger.Warn("Failed to cache scan result: %v", err)
 	}
 	waves, rescanWarnings, failedNames, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)

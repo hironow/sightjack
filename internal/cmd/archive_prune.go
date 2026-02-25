@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newArchivePruneCmd() *cobra.Command {
@@ -39,7 +39,7 @@ Pass --execute to actually remove the files.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 			logger := loggerFrom(cmd)
-			files, err := sightjack.ListExpiredArchive(baseDir, days, logger)
+			files, err := session.ListExpiredArchive(baseDir, days, logger)
 			if err != nil {
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
@@ -83,7 +83,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			if len(files) > 0 {
-				deleted, delErr := sightjack.DeleteArchiveFiles(baseDir, files)
+				deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
 				if delErr != nil {
 					return fmt.Errorf("archive prune failed: %w", delErr)
 				}

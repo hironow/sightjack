@@ -81,7 +81,7 @@ func TestMarshalDMail_SchemaVersion(t *testing.T) {
 func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "gate",
@@ -106,7 +106,7 @@ func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
 func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "gate",
@@ -313,7 +313,7 @@ func TestMailDir(t *testing.T) {
 
 func TestEnsureMailDirs_CreatesAll(t *testing.T) {
 	dir := t.TempDir()
-	if err := sightjack.EnsureMailDirs(dir); err != nil {
+	if err := session.EnsureMailDirs(dir); err != nil {
 		t.Fatalf("EnsureMailDirs: %v", err)
 	}
 	for _, sub := range []string{"inbox", "outbox", "archive"} {
@@ -331,17 +331,17 @@ func TestEnsureMailDirs_CreatesAll(t *testing.T) {
 
 func TestEnsureMailDirs_Idempotent(t *testing.T) {
 	dir := t.TempDir()
-	if err := sightjack.EnsureMailDirs(dir); err != nil {
+	if err := session.EnsureMailDirs(dir); err != nil {
 		t.Fatalf("first: %v", err)
 	}
-	if err := sightjack.EnsureMailDirs(dir); err != nil {
+	if err := session.EnsureMailDirs(dir); err != nil {
 		t.Fatalf("second: %v", err)
 	}
 }
 
 func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 	dir := t.TempDir()
-	if err := sightjack.EnsureMailDirs(dir); err != nil {
+	if err := session.EnsureMailDirs(dir); err != nil {
 		t.Fatalf("ensure: %v", err)
 	}
 	mail := &session.DMail{
@@ -380,7 +380,7 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 
 func TestComposeDMail_ValidationError(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	mail := &session.DMail{Name: "", Kind: session.DMailSpecification, Description: "bad"}
 	if err := session.ComposeDMail(dir, mail); err == nil {
 		t.Error("expected validation error for empty name")
@@ -389,7 +389,7 @@ func TestComposeDMail_ValidationError(t *testing.T) {
 
 func TestListDMail_Empty(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	files, err := session.ListDMail(dir, "inbox")
 	if err != nil {
 		t.Fatalf("list: %v", err)
@@ -401,7 +401,7 @@ func TestListDMail_Empty(t *testing.T) {
 
 func TestListDMail_FindsFiles(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), "a.md"), []byte("x"), 0644)
 	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), "b.md"), []byte("y"), 0644)
 	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), "not-md.txt"), []byte("z"), 0644)
@@ -416,7 +416,7 @@ func TestListDMail_FindsFiles(t *testing.T) {
 
 func TestReceiveDMail_MovesToArchive(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	mail := &session.DMail{
 		Name:        "feedback-d-001",
 		Kind:        session.DMailFeedback,
@@ -454,7 +454,7 @@ func TestReceiveDMail_MovesToArchive(t *testing.T) {
 
 func TestReceiveDMail_FileNotFound(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	_, err := session.ReceiveDMail(dir, "nonexistent.md")
 	if err == nil {
 		t.Error("expected error for missing file")
@@ -477,7 +477,7 @@ func TestDMailName_HandlesSpecialChars(t *testing.T) {
 
 func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	wave := sightjack.Wave{
 		ID:          "w1",
@@ -534,7 +534,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 
 func TestComposeReport_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	wave := sightjack.Wave{
 		ID:          "w1",
@@ -587,7 +587,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 
 func TestComposeReport_NoRipples(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	wave := sightjack.Wave{
 		ID:          "w2",
@@ -617,7 +617,7 @@ func TestComposeReport_NoRipples(t *testing.T) {
 
 func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	// Place feedback in inbox before starting monitor
 	fb := &session.DMail{
@@ -669,7 +669,7 @@ func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 
 func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	// Place a specification d-mail in inbox
 	spec := &session.DMail{
@@ -706,7 +706,7 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 
 func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	// Place feedback in both inbox and archive (already processed)
 	fb := &session.DMail{
@@ -744,7 +744,7 @@ func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 
 func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -784,7 +784,7 @@ func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 
 func TestMonitorInbox_StopsOnCancel(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
@@ -806,7 +806,7 @@ func TestMonitorInbox_StopsOnCancel(t *testing.T) {
 
 func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	// Place feedback in inbox
 	fb := &session.DMail{
@@ -845,7 +845,7 @@ func TestDrainInboxFeedback_NilChannel(t *testing.T) {
 
 func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	// Pre-place feedback in inbox (initial)
 	initialFb := &session.DMail{
@@ -1049,7 +1049,7 @@ func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 func TestReceiveDMail_MalformedContent(t *testing.T) {
 	// given: a file in inbox that is not valid d-mail format
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	inboxPath := filepath.Join(sightjack.MailDir(dir, "inbox"), "bad.md")
 	os.WriteFile(inboxPath, []byte("not a d-mail"), 0644)
 
@@ -1072,7 +1072,7 @@ func TestReceiveDMail_MalformedContent(t *testing.T) {
 func TestReceiveDMail_PreservesAllFields(t *testing.T) {
 	// given: a d-mail with all fields populated
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	original := &session.DMail{
 		Name:        "feedback-full",
 		Kind:        session.DMailFeedback,
@@ -1118,7 +1118,7 @@ func TestReceiveDMail_PreservesAllFields(t *testing.T) {
 func TestMonitorInbox_MultipleFeedbackInitialDrain(t *testing.T) {
 	// given: 3 feedback files in inbox before monitor starts
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	for _, name := range []string{"feedback-a", "feedback-b", "feedback-c"} {
 		fb := &session.DMail{
 			Name:        name,
@@ -1158,7 +1158,7 @@ func TestMonitorInbox_MultipleFeedbackInitialDrain(t *testing.T) {
 func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 	// given: mixed feedback + specification + report in inbox
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	mails := []*session.DMail{
 		{Name: "feedback-mix-1", Kind: session.DMailFeedback, Description: "feedback 1"},
 		{Name: "spec-mix-1", Kind: session.DMailSpecification, Description: "spec 1"},
@@ -1320,7 +1320,7 @@ func TestMarshalDMail_NoBody(t *testing.T) {
 func TestComposeDMail_NilMail(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	// when
 	err := session.ComposeDMail(dir, nil)
@@ -1334,7 +1334,7 @@ func TestComposeDMail_NilMail(t *testing.T) {
 func TestComposeReport_WithErrors(t *testing.T) {
 	// given: apply result with errors
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "api",
@@ -1371,7 +1371,7 @@ func TestComposeReport_WithErrors(t *testing.T) {
 func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
 	// given: apply result with both errors and ripples
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w3",
 		ClusterName: "infra",
@@ -1414,7 +1414,7 @@ func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
 func TestComposeSpecification_WaveWithDescription(t *testing.T) {
 	// given: wave with non-empty description
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "db",
@@ -1446,7 +1446,7 @@ func TestComposeSpecification_WaveWithDescription(t *testing.T) {
 func TestComposeSpecification_EmptyActions(t *testing.T) {
 	// given: wave with no actions (edge case)
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "misc",
@@ -1472,7 +1472,7 @@ func TestComposeSpecification_EmptyActions(t *testing.T) {
 func TestComposeSpecification_IssueDedup(t *testing.T) {
 	// given: wave with duplicate issue IDs across actions
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "auth",
@@ -1502,7 +1502,7 @@ func TestComposeSpecification_IssueDedup(t *testing.T) {
 func TestComposeReport_IssuesSorted(t *testing.T) {
 	// given: wave with unsorted issue IDs
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "sort",
@@ -1839,7 +1839,7 @@ func TestCollectFeedback_HangingNotifierDoesNotBlockDrain(t *testing.T) {
 func TestMonitorInbox_DeliversConvergence(t *testing.T) {
 	// given: convergence d-mail in inbox
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	conv := &session.DMail{
 		Name:        "convergence-mon-001",
@@ -1877,7 +1877,7 @@ func TestMonitorInbox_DeliversConvergence(t *testing.T) {
 func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 	// given: both feedback and convergence d-mails in inbox
 	dir := t.TempDir()
-	sightjack.EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 
 	mails := []*session.DMail{
 		{Name: "feedback-mix-conv-1", Kind: session.DMailFeedback, Description: "feedback"},

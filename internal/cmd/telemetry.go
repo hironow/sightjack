@@ -1,4 +1,4 @@
-package sightjack
+package cmd
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 
 var tracer trace.Tracer = noop.NewTracerProvider().Tracer("sightjack")
 
-func InitTracer(serviceName, ver string) func(context.Context) error {
+func initTracer(serviceName, ver string) func(context.Context) error {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
@@ -53,9 +53,9 @@ func InitTracer(serviceName, ver string) func(context.Context) error {
 	}
 }
 
-// StartRootSpan creates the top-level span for a sightjack subcommand and
-// returns a new context carrying it. Call EndRootSpan to close the span.
-func StartRootSpan(ctx context.Context, command string) context.Context {
+// startRootSpan creates the top-level span for a sightjack subcommand and
+// returns a new context carrying it. Call endRootSpan to close the span.
+func startRootSpan(ctx context.Context, command string) context.Context {
 	ctx, _ = tracer.Start(ctx, "sightjack."+command,
 		trace.WithAttributes(
 			attribute.String("sightjack.command", command),
@@ -64,8 +64,8 @@ func StartRootSpan(ctx context.Context, command string) context.Context {
 	return ctx
 }
 
-// EndRootSpan ends the span embedded in ctx (created by StartRootSpan).
-func EndRootSpan(ctx context.Context) {
+// endRootSpan ends the span embedded in ctx (created by startRootSpan).
+func endRootSpan(ctx context.Context) {
 	span := trace.SpanFromContext(ctx)
 	span.End()
 }

@@ -1025,7 +1025,7 @@ func TestResumeSession_RestoresWavesFromState(t *testing.T) {
 		TotalIssues:  1,
 		Completeness: 0.50,
 	}
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := session.WriteScanResult(scanResultPath, scanResult); err != nil {
 		t.Fatalf("write scan result: %v", err)
 	}
 
@@ -1177,7 +1177,7 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 		Completeness: 0.50,
 	}
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := session.WriteScanResult(scanResultPath, scanResult); err != nil {
 		t.Fatalf("write scan result: %v", err)
 	}
 
@@ -1221,7 +1221,7 @@ func TestCanResume_ValidState(t *testing.T) {
 	}
 
 	// when / then
-	if !sightjack.CanResume(state) {
+	if !session.CanResume(state) {
 		t.Error("expected CanResume true for valid state with waves")
 	}
 }
@@ -1237,7 +1237,7 @@ func TestCanResume_EmptyWaves(t *testing.T) {
 	state := &sightjack.SessionState{ScanResultPath: path, Waves: nil}
 
 	// when / then
-	if sightjack.CanResume(state) {
+	if session.CanResume(state) {
 		t.Error("expected CanResume false when waves are empty")
 	}
 }
@@ -1247,7 +1247,7 @@ func TestCanResume_EmptyPath(t *testing.T) {
 	state := &sightjack.SessionState{ScanResultPath: ""}
 
 	// when / then
-	if sightjack.CanResume(state) {
+	if session.CanResume(state) {
 		t.Error("expected CanResume false for empty path")
 	}
 }
@@ -1318,7 +1318,7 @@ func TestCanResume_MissingFile(t *testing.T) {
 	state := &sightjack.SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
 
 	// when / then
-	if sightjack.CanResume(state) {
+	if session.CanResume(state) {
 		t.Error("expected CanResume false for missing file")
 	}
 }
@@ -1336,7 +1336,7 @@ func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
 		TotalIssues:  1,
 		Completeness: 0.40,
 	}
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := session.WriteScanResult(scanResultPath, scanResult); err != nil {
 		t.Fatalf("write scan result: %v", err)
 	}
 

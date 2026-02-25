@@ -68,7 +68,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 	)
 	defer scanSpan.End()
 
-	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
+	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return nil, err
 	}

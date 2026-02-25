@@ -1,4 +1,4 @@
-package sightjack_test
+package cmd
 
 import (
 	"context"
@@ -23,13 +23,14 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	cleanupRootTracer := sightjack.SetTracer(tp.Tracer("sightjack-test"))
+	oldTracer := tracer
+	tracer = tp.Tracer("sightjack-test")
 	cleanupSessionTracer := session.OverrideTracer(tp.Tracer("session-test"))
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
 		cleanupSessionTracer()
-		cleanupRootTracer()
+		tracer = oldTracer
 	})
 	return exp
 }
@@ -37,10 +38,10 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
-	shutdown := sightjack.InitTracer("test-svc", "0.0.1")
+	shutdown := initTracer("test-svc", "0.0.1")
 	defer shutdown(context.Background())
 
-	// After InitTracer with no endpoint, tracer is noop. We can only verify
+	// After initTracer with no endpoint, tracer is noop. We can only verify
 	// that the function returns without error and shutdown is callable.
 }
 
@@ -137,8 +138,8 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	ctx := sightjack.StartRootSpan(context.Background(), "scan")
-	sightjack.EndRootSpan(ctx)
+	ctx := startRootSpan(context.Background(), "scan")
+	endRootSpan(ctx)
 
 	spans := exp.GetSpans()
 	if len(spans) == 0 {

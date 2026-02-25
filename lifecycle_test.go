@@ -482,13 +482,13 @@ func TestLifecycle_RunScan_SavesScanResultJson(t *testing.T) {
 	// Simulate what scan.go does: save scan_result.json
 	scanDir := sightjack.ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	if err := sightjack.WriteScanResult(scanResultPath, result); err != nil {
+	if err := session.WriteScanResult(scanResultPath, result); err != nil {
 		t.Fatalf("WriteScanResult failed: %v", err)
 	}
 
 	// then: scan_result.json exists and is loadable
 	assertFileExists(t, scanResultPath)
-	loaded, err := sightjack.LoadScanResult(scanResultPath)
+	loaded, err := session.LoadScanResult(scanResultPath)
 	if err != nil {
 		t.Fatalf("LoadScanResult failed: %v", err)
 	}
@@ -683,7 +683,7 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 	sessionID := "test-resume"
 
 	// Set up scan directory and cache scan result
-	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
+	scanDir, err := session.EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		t.Fatalf("EnsureScanDir: %v", err)
 	}
@@ -702,7 +702,7 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 		},
 		TotalIssues: 2,
 	}
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := session.WriteScanResult(scanResultPath, scanResult); err != nil {
 		t.Fatalf("WriteScanResult: %v", err)
 	}
 
@@ -932,7 +932,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	sessionID := "test-dmail-full"
 
 	// Set up mail directories and pre-place feedback
-	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
+	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
 	feedbackMail := &session.DMail{
@@ -1068,7 +1068,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	sessionID := "test-dmail-resume"
 
 	// Set up scan directory and cache scan result
-	scanDir, err := sightjack.EnsureScanDir(baseDir, sessionID)
+	scanDir, err := session.EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		t.Fatalf("EnsureScanDir: %v", err)
 	}
@@ -1086,7 +1086,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 		},
 		TotalIssues: 2,
 	}
-	if err := sightjack.WriteScanResult(scanResultPath, scanResult); err != nil {
+	if err := session.WriteScanResult(scanResultPath, scanResult); err != nil {
 		t.Fatalf("WriteScanResult: %v", err)
 	}
 
@@ -1115,7 +1115,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	writeTestEvents(t, baseDir, sessionID, state)
 
 	// Set up mail directories and pre-place feedback
-	if err := sightjack.EnsureMailDirs(baseDir); err != nil {
+	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
 	feedbackMail := &session.DMail{
