@@ -37,15 +37,18 @@ func (r *SessionRecorder) Record(eventType sightjack.EventType, payload any) err
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	prevSeq := r.seq
-	r.seq++
-	event, err := sightjack.NewEvent(eventType, r.sessionID, r.seq, payload)
+	nextSeq := r.seq + 1
+	event, err := sightjack.NewEvent(eventType, r.sessionID, nextSeq, payload)
 	if err != nil {
 		return fmt.Errorf("recorder new event: %w", err)
 	}
 	event.CorrelationID = r.sessionID
-	if prevSeq > 0 {
-		event.CausationID = fmt.Sprintf("%d", prevSeq)
+	if r.seq > 0 {
+		event.CausationID = fmt.Sprintf("%d", r.seq)
 	}
-	return r.store.Append(event)
+	if err := r.store.Append(event); err != nil {
+		return err
+	}
+	r.seq = nextSeq
+	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	sightjack "github.com/hironow/sightjack"
@@ -34,23 +33,31 @@ func LoadLatestState(baseDir string) (*sightjack.SessionState, string, error) {
 		return nil, "", fmt.Errorf("load latest state: %w", err)
 	}
 
-	var files []string
+	type candidate struct {
+		name    string
+		modTime int64
+	}
+	var candidates []candidate
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".jsonl") {
-			files = append(files, e.Name())
+			info, infoErr := e.Info()
+			if infoErr != nil {
+				continue
+			}
+			candidates = append(candidates, candidate{name: e.Name(), modTime: info.ModTime().UnixNano()})
 		}
 	}
-	if len(files) == 0 {
+	if len(candidates) == 0 {
 		return nil, "", fmt.Errorf("load latest state: no event files in %s", eventsDir)
 	}
 
-	// Sort by embedded timestamp descending so newest session is tried first.
-	sort.Slice(files, func(i, j int) bool {
-		return eventFileTimestamp(files[i]) > eventFileTimestamp(files[j])
+	// Sort by file modification time descending so the most recently active session is tried first.
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].modTime > candidates[j].modTime
 	})
 
-	for _, f := range files {
-		sessionID := strings.TrimSuffix(f, ".jsonl")
+	for _, c := range candidates {
+		sessionID := strings.TrimSuffix(c.name, ".jsonl")
 		store := NewFileEventStore(EventStorePath(baseDir, sessionID))
 		state, loadErr := LoadState(store)
 		if loadErr == nil {
@@ -60,14 +67,3 @@ func LoadLatestState(baseDir string) (*sightjack.SessionState, string, error) {
 	return nil, "", fmt.Errorf("load latest state: no valid event data in %s", eventsDir)
 }
 
-// eventFileTimestamp extracts the Unix-milli timestamp from a session JSONL filename.
-// Format: "{prefix}-{unixmilli}-{pid}.jsonl". Returns 0 for unparseable names.
-func eventFileTimestamp(name string) int64 {
-	name = strings.TrimSuffix(name, ".jsonl")
-	parts := strings.SplitN(name, "-", 3)
-	if len(parts) < 2 {
-		return 0
-	}
-	ts, _ := strconv.ParseInt(parts[1], 10, 64)
-	return ts
-}
