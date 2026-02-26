@@ -87,8 +87,9 @@ func ParseDMail(data []byte) (*DMail, error) {
 	return &mail, nil
 }
 
-// ComposeDMail writes a d-mail to both outbox/ and archive/.
-func ComposeDMail(baseDir string, mail *DMail) error {
+// ComposeDMail stages a d-mail via the transactional outbox store, then
+// flushes it to archive/ and outbox/ using atomic file writes.
+func ComposeDMail(store sightjack.OutboxStore, mail *DMail) error {
 	if err := ValidateDMail(mail); err != nil {
 		return err
 	}
@@ -96,12 +97,11 @@ func ComposeDMail(baseDir string, mail *DMail) error {
 	if err != nil {
 		return err
 	}
-	filename := mail.Filename()
-	for _, sub := range []string{sightjack.ArchiveDir, sightjack.OutboxDir} {
-		path := filepath.Join(sightjack.MailDir(baseDir, sub), filename)
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			return fmt.Errorf("dmail compose to %s: %w", sub, err)
-		}
+	if err := store.Stage(mail.Filename(), data); err != nil {
+		return fmt.Errorf("dmail stage: %w", err)
+	}
+	if _, err := store.Flush(); err != nil {
+		return fmt.Errorf("dmail flush: %w", err)
 	}
 	return nil
 }
@@ -505,7 +505,7 @@ func ReportBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string {
 }
 
 // ComposeReport creates and sends a report d-mail for a completed wave.
-func ComposeReport(baseDir string, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
+func ComposeReport(store sightjack.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
@@ -515,11 +515,11 @@ func ComposeReport(baseDir string, wave sightjack.Wave, result *sightjack.WaveAp
 		Issues:        WaveIssueIDs(wave),
 		Body:          ReportBody(wave, result),
 	}
-	return ComposeDMail(baseDir, mail)
+	return ComposeDMail(store, mail)
 }
 
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
-func ComposeSpecification(baseDir string, wave sightjack.Wave) error {
+func ComposeSpecification(store sightjack.OutboxStore, wave sightjack.Wave) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),
@@ -529,5 +529,5 @@ func ComposeSpecification(baseDir string, wave sightjack.Wave) error {
 		Issues:        WaveIssueIDs(wave),
 		Body:          SpecificationBody(wave),
 	}
-	return ComposeDMail(baseDir, mail)
+	return ComposeDMail(store, mail)
 }
