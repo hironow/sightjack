@@ -33,7 +33,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier sightjack
 		return true, nil
 	}
 
-	ctx, gateSpan := tracer.Start(ctx, "gate.convergence",
+	ctx, gateSpan := sightjack.Tracer.Start(ctx, "gate.convergence",
 		trace.WithAttributes(
 			attribute.Int("gate.convergence.count", len(convergence)),
 		),
@@ -53,7 +53,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier sightjack
 	if notifier != nil {
 		notifySpanCtx := trace.ContextWithSpan(context.Background(), trace.SpanFromContext(ctx))
 		go func(spanCtx context.Context, title, msg string) {
-			_, notifySpan := tracer.Start(spanCtx, "notify.convergence")
+			_, notifySpan := sightjack.Tracer.Start(spanCtx, "notify.convergence")
 			defer notifySpan.End()
 			notifyCtx, cancel := context.WithTimeout(spanCtx, 30*time.Second)
 			defer cancel()

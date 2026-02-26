@@ -63,7 +63,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 	if logger == nil {
 		logger = sightjack.NewLogger(nil, false)
 	}
-	ctx, scanSpan := tracer.Start(ctx, "scan",
+	ctx, scanSpan := sightjack.Tracer.Start(ctx, "scan",
 		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
 	)
 	defer scanSpan.End()
@@ -75,7 +75,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 
 	// --- Pass 1: Classify ---
 	logger.Scan("Pass 1: Classifying issues...")
-	classifyCtx, classifySpan := tracer.Start(ctx, "classify")
+	classifyCtx, classifySpan := sightjack.Tracer.Start(ctx, "classify")
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
 	classifyPrompt, err := sightjack.RenderClassifyPrompt(cfg.Lang, sightjack.ClassifyPromptData{
@@ -145,7 +145,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 	)
 
 	// --- Pass 2: Deep scan per cluster (parallel) ---
-	deepscanCtx, deepscanSpan := tracer.Start(ctx, "deepscan")
+	deepscanCtx, deepscanSpan := sightjack.Tracer.Start(ctx, "deepscan")
 	logger.Scan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
 	// Build scan cluster list from classify results. The index parameter in
@@ -157,7 +157,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 	}
 
 	deepScanFn := func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
-		ctx, clusterSpan := tracer.Start(ctx, "deepscan.cluster",
+		ctx, clusterSpan := sightjack.Tracer.Start(ctx, "deepscan.cluster",
 			trace.WithAttributes(attribute.String("cluster.name", cluster.Name)),
 		)
 		defer clusterSpan.End()
@@ -222,7 +222,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 // fault-tolerance pattern of RunParallelDeepScan. Returns an error only when
 // ALL clusters fail.
 func RunWaveGenerate(ctx context.Context, cfg *sightjack.Config, scanDir string, clusters []sightjack.ClusterScanResult, dryRun bool, logger *sightjack.Logger) ([]sightjack.Wave, []string, map[string]bool, error) {
-	ctx, waveGenSpan := tracer.Start(ctx, "wave.generate",
+	ctx, waveGenSpan := sightjack.Tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
 	defer waveGenSpan.End()

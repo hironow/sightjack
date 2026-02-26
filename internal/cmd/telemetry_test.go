@@ -23,14 +23,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := tracer
-	tracer = tp.Tracer("sightjack-test")
-	cleanupSessionTracer := session.OverrideTracer(tp.Tracer("session-test"))
+	oldTracer := sightjack.Tracer
+	sightjack.Tracer = tp.Tracer("sightjack-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		cleanupSessionTracer()
-		tracer = oldTracer
+		sightjack.Tracer = oldTracer
 	})
 	return exp
 }

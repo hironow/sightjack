@@ -52,7 +52,7 @@ func WithAllowedTools(tools ...string) RunOption {
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
 func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *sightjack.Logger, opts ...RunOption) (string, error) {
-	ctx, span := tracer.Start(ctx, "claude.invoke",
+	ctx, span := sightjack.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("claude.model", cfg.Claude.Model),
 			attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec),

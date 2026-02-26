@@ -86,7 +86,7 @@ func GenerateNextWavesDryRun(cfg *sightjack.Config, scanDir string, completedWav
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
 func GenerateNextWaves(ctx context.Context, cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail, logger *sightjack.Logger) ([]sightjack.Wave, error) {
-	ctx, nextgenSpan := tracer.Start(ctx, "wave.nextgen",
+	ctx, nextgenSpan := sightjack.Tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", completedWave.ClusterName),
 		),

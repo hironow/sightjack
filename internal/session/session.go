@@ -9,24 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
-
-// tracer is the package-level OTel tracer for session operations.
-var tracer = otel.Tracer("session")
-
-// OverrideTracer replaces the session package-level tracer for testing and
-// returns a cleanup function. Exported for cross-package test injection.
-func OverrideTracer(t trace.Tracer) func() {
-	old := tracer
-	tracer = t
-	return func() { tracer = old }
-}
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder sightjack.Recorder, logger *sightjack.Logger) error {
@@ -594,7 +582,7 @@ func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, ses
 	scanResult *sightjack.ScanResult, waves []sightjack.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector, recorder sightjack.Recorder, out io.Writer, logger *sightjack.Logger) error {
 
-	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
+	ctx, loopSpan := sightjack.Tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
 			attribute.String("sightjack.session_id", sessionID),
 		),
