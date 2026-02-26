@@ -44,12 +44,12 @@ rules:
 
   # --- Rule 2: Session must not import cmd ---
 
-  - id: layer-session-no-import-cmd
+  - id: layer-session-no-import-cmd-or-eventsource
     languages: [go]
     message: |
-      session 層から cmd 層への import は禁止です。
-      依存方向: cmd → session（逆方向不可）
-      session は root と domain/eventsource のみ import できます。
+      session 層から cmd 層または eventsource 層への import は禁止です。
+      依存方向: cmd → session → eventsource/domain → root（逆方向不可）
+      session は root と domain のみ import できます（eventsource は port interface 経由で DI）。
       Ref: docs/adr/0011-es-layer-first-refactoring.md
     severity: ERROR
     patterns:
@@ -60,7 +60,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/cmd"
+          regex: ".*/internal/(cmd|eventsource)"
     paths:
       include:
         - "/internal/session/**"
