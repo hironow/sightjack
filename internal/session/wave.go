@@ -151,7 +151,7 @@ func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 	}
 
 	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
-	logger.Scan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
+	logger.Info("Applying wave: %s - %s", wave.ClusterName, wave.Title)
 	if _, err := RunClaudeOnce(ctx, cfg, prompt, applyOut, logger, linearTools); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
@@ -179,7 +179,7 @@ func RunReadyLabel(ctx context.Context, cfg *sightjack.Config, readyIssueIDs str
 		return fmt.Errorf("render ready label prompt: %w", err)
 	}
 
-	logger.Scan("Applying ready labels to: %s", readyIssueIDs)
+	logger.Info("Applying ready labels to: %s", readyIssueIDs)
 	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return fmt.Errorf("ready label: %w", err)
 	}

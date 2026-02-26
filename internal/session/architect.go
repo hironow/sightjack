@@ -167,7 +167,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *sightjack.Config, scanDir str
 		logger.Warn("create architect log: %v", discussLogErr)
 	}
 
-	logger.Scan("Architect discussing: %s - %s", wave.ClusterName, topic)
+	logger.Info("Architect discussing: %s - %s", wave.ClusterName, topic)
 	if _, err := RunClaude(ctx, cfg, prompt, discussOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}

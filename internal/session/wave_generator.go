@@ -115,7 +115,7 @@ func GenerateNextWaves(ctx context.Context, cfg *sightjack.Config, scanDir strin
 		logger.Warn("create nextgen log: %v", nextgenLogErr)
 	}
 
-	logger.Scan("Generating next waves: %s", completedWave.ClusterName)
+	logger.Info("Generating next waves: %s", completedWave.ClusterName)
 	if _, err := RunClaude(ctx, cfg, prompt, nextgenOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}

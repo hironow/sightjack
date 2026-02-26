@@ -38,8 +38,6 @@ func (l *Logger) Info(format string, args ...any)  { l.logLine("INFO", format, a
 func (l *Logger) OK(format string, args ...any)    { l.logLine(" OK ", format, args...) }
 func (l *Logger) Warn(format string, args ...any)  { l.logLine("WARN", format, args...) }
 func (l *Logger) Error(format string, args ...any) { l.logLine(" ERR", format, args...) }
-func (l *Logger) Scan(format string, args ...any)  { l.logLine("SCAN", format, args...) }
-func (l *Logger) Nav(format string, args ...any)   { l.logLine(" NAV", format, args...) }
 
 func (l *Logger) Debug(format string, args ...any) {
 	if l.verbose {

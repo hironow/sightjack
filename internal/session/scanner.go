@@ -74,7 +74,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 	}
 
 	// --- Pass 1: Classify ---
-	logger.Scan("Pass 1: Classifying issues...")
+	logger.Info("Pass 1: Classifying issues...")
 	classifyCtx, classifySpan := sightjack.Tracer.Start(ctx, "classify")
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
@@ -146,7 +146,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 
 	// --- Pass 2: Deep scan per cluster (parallel) ---
 	deepscanCtx, deepscanSpan := sightjack.Tracer.Start(ctx, "deepscan")
-	logger.Scan("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
+	logger.Info("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
 	// Build scan cluster list from classify results. The index parameter in
 	// DeepScanFunc maps directly to classify.Clusters, so duplicate cluster
@@ -181,7 +181,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 			promptBase := fmt.Sprintf("cluster_%02d_%s_c%02d", index, domain.SanitizeName(cc.Name), j)
 			chunkOut, closeChunkLog := savePromptAndCreateLog(scanDir, promptBase, prompt, logger)
 
-			logger.Scan("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
+			logger.Info("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
 			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools)
 			closeChunkLog()
 			if runErr != nil {
@@ -227,7 +227,7 @@ func RunWaveGenerate(ctx context.Context, cfg *sightjack.Config, scanDir string,
 	)
 	defer waveGenSpan.End()
 
-	logger.Scan("Pass 3: Generating waves for %d clusters...", len(clusters))
+	logger.Info("Pass 3: Generating waves for %d clusters...", len(clusters))
 
 	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
 
@@ -313,7 +313,7 @@ func generateWaveForCluster(ctx context.Context, cfg *sightjack.Config, scanDir 
 	logOut, closeLog := savePromptAndCreateLog(scanDir, base, prompt, logger)
 	defer closeLog()
 
-	logger.Scan("Generating waves: %s", cluster.Name)
+	logger.Info("Generating waves: %s", cluster.Name)
 	if _, err := RunClaude(ctx, cfg, prompt, logOut, logger, linearTools); err != nil {
 		return sightjack.WaveGenerateResult{}, fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 	}

@@ -45,21 +45,21 @@ func TestLogger_Error(t *testing.T) {
 	}
 }
 
-func TestLogger_Scan(t *testing.T) {
+func TestLogger_Info_FormerScan(t *testing.T) {
 	var buf bytes.Buffer
 	logger := sightjack.NewLogger(&buf, false)
-	logger.Scan("classifying")
-	if !strings.Contains(buf.String(), "SCAN classifying") {
-		t.Errorf("expected SCAN prefix, got %q", buf.String())
+	logger.Info("classifying")
+	if !strings.Contains(buf.String(), "INFO classifying") {
+		t.Errorf("expected INFO prefix, got %q", buf.String())
 	}
 }
 
-func TestLogger_Nav(t *testing.T) {
+func TestLogger_Info_FormerNav(t *testing.T) {
 	var buf bytes.Buffer
 	logger := sightjack.NewLogger(&buf, false)
-	logger.Nav("rendering")
-	if !strings.Contains(buf.String(), " NAV rendering") {
-		t.Errorf("expected NAV prefix, got %q", buf.String())
+	logger.Info("rendering")
+	if !strings.Contains(buf.String(), "INFO rendering") {
+		t.Errorf("expected INFO prefix, got %q", buf.String())
 	}
 }
 

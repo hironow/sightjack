@@ -197,7 +197,7 @@ func RunScribeADRDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wa
 func NormalizeScribeResult(result *sightjack.ScribeResponse, adrID string, logger *sightjack.Logger) {
 	if result.ADRID != adrID {
 		if result.ADRID != "" {
-			logger.Scan("Scribe ADR ID mismatch: generated %s, parsed %s; using %s", adrID, result.ADRID, adrID)
+			logger.Info("Scribe ADR ID mismatch: generated %s, parsed %s; using %s", adrID, result.ADRID, adrID)
 		}
 		result.ADRID = adrID
 	}
@@ -266,7 +266,7 @@ func RunScribeADR(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 		logger.Warn("create scribe log: %v", scribeLogErr)
 	}
 
-	logger.Scan("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
+	logger.Info("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
 	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
