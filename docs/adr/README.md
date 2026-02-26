@@ -19,6 +19,7 @@
 | S0001 | Logger as root package exception |
 | S0002 | JSONL append-only event sourcing pattern |
 | S0003 | Three-way approval contract |
+| S0004 | Layer architecture naming and telemetry conventions |
 
 ## sightjack-specific ADRs (0006~)
 
