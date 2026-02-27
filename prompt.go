@@ -92,6 +92,7 @@ type NextGenPromptData struct {
 	ExistingADRs    []ExistingADR
 	RejectedActions string
 	FeedbackSection string
+	ReportSection   string
 	DoDSection      string
 	OutputPath      string
 	StrictnessLevel string

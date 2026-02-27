@@ -44,12 +44,12 @@ rules:
 
   # --- Rule 2: Session must not import cmd ---
 
-  - id: layer-session-no-import-cmd-or-eventsource
+  - id: layer-session-no-import-cmd
     languages: [go]
     message: |
-      session 層から cmd 層または eventsource 層への import は禁止です。
+      session 層から cmd 層への import は禁止です。
       依存方向: cmd → session → eventsource/domain → root（逆方向不可）
-      session は root と domain のみ import できます（eventsource は port interface 経由で DI）。
+      session は eventsource, domain, root を import できます。
       Ref: docs/adr/0011-es-layer-first-refactoring.md
     severity: ERROR
     patterns:
@@ -60,7 +60,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/(cmd|eventsource)"
+          regex: ".*/internal/cmd"
     paths:
       include:
         - "/internal/session/**"
@@ -112,3 +112,26 @@ rules:
     paths:
       include:
         - "/internal/eventsource/**"
+
+  # --- Rule 5: cmd must not import eventsource (ADR S0008) ---
+
+  - id: s0008-cmd-no-import-eventsource
+    languages: [go]
+    message: |
+      cmd 層から eventsource 層への直接 import は禁止です。
+      session 層のファクトリ関数を経由してください。
+      依存方向: cmd → session → eventsource（cmd → eventsource は禁止）
+      Ref: phonewave docs/adr/S0008-cmd-eventsource-import-prohibition.md
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/eventsource"
+    paths:
+      include:
+        - "/internal/cmd/**"

@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
-	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -58,14 +57,17 @@ if event data is found in .siren/events/.`,
 			if cmd.Flags().Changed("auto-approve") {
 				cfg.Gate.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 			}
+			if cmd.Flags().Changed("review-cmd") {
+				cfg.Gate.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
+			}
 			// Check for existing state (resume detection)
 			// First try to find a resumable session; fall back to the latest
 			// state for rescan/new choices.
 			if !dryRun {
 				// Find best resumable session (may differ from the latest)
-				resumableState, resumableSessionID, _ := eventsource.LoadLatestResumableState(baseDir, session.CanResume)
+				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(baseDir, session.CanResume)
 				// Find latest state for display and rescan (regardless of resumability)
-				displayState, _, stateErr := eventsource.LoadLatestState(baseDir)
+				displayState, _, stateErr := session.LoadLatestState(baseDir)
 				if stateErr == nil {
 					// If a resumable session exists, prefer it for the prompt display
 					promptState := displayState
@@ -88,16 +90,16 @@ if event data is found in .siren/events/.`,
 								logger.Warn("No resumable session found — starting fresh session instead.")
 								goto freshSession
 							}
-							resumeStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, resumableSessionID))
-							resumeRecorder, recErr := eventsource.NewSessionRecorder(resumeStore, resumableSessionID)
+							resumeStore := session.NewEventStore(baseDir, resumableSessionID)
+							resumeRecorder, recErr := session.NewSessionRecorder(resumeStore, resumableSessionID)
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
 							return session.RunResumeSession(cmd.Context(), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
-							rescanStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, rescanID))
-							rescanRecorder, recErr := eventsource.NewSessionRecorder(rescanStore, rescanID)
+							rescanStore := session.NewEventStore(baseDir, rescanID)
+							rescanRecorder, recErr := session.NewSessionRecorder(rescanStore, rescanID)
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
@@ -115,8 +117,8 @@ if event data is found in .siren/events/.`,
 			var recorder sightjack.Recorder = session.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
-				sessionStore := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, sessionID))
-				rec, recErr := eventsource.NewSessionRecorder(sessionStore, sessionID)
+				sessionStore := session.NewEventStore(baseDir, sessionID)
+				rec, recErr := session.NewSessionRecorder(sessionStore, sessionID)
 				if recErr != nil {
 					return fmt.Errorf("session recorder: %w", recErr)
 				}
@@ -129,6 +131,7 @@ if event data is found in .siren/events/.`,
 	cmd.Flags().String("notify-cmd", "", "Notification command ({title}, {message} placeholders)")
 	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
 	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for convergence D-Mail")
+	cmd.Flags().String("review-cmd", "", "Review command (exit 0 = pass, non-zero = comments found)")
 
 	return cmd
 }

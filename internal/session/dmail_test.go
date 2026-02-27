@@ -1197,19 +1197,19 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// then: only 2 feedback come through channel
+	// then: 3 items come through channel (2 feedback + 1 report; spec excluded)
 	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
-	if len(feedback) != 2 {
-		t.Fatalf("expected 2 feedback, got %d", len(feedback))
+	if len(feedback) != 3 {
+		t.Fatalf("expected 3 items (2 feedback + 1 report), got %d", len(feedback))
 	}
 	names := make(map[string]bool)
 	for _, fb := range feedback {
 		names[fb.Name] = true
 	}
-	if !names["feedback-mix-1"] || !names["feedback-mix-2"] {
-		t.Errorf("expected both feedback names, got %v", names)
+	if !names["feedback-mix-1"] || !names["feedback-mix-2"] || !names["report-mix-1"] {
+		t.Errorf("expected feedback-mix-1, feedback-mix-2, report-mix-1, got %v", names)
 	}
-	// all 4 should be archived (spec and report are received but not channeled)
+	// all 4 should be archived (spec is received but not channeled)
 	archiveFiles, _ := session.ListDMail(dir, "archive")
 	if len(archiveFiles) != 4 {
 		t.Errorf("expected 4 archived files, got %d", len(archiveFiles))
@@ -1942,5 +1942,61 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 	archiveFiles, _ := session.ListDMail(dir, "archive")
 	if len(archiveFiles) != 3 {
 		t.Errorf("expected 3 archived, got %d", len(archiveFiles))
+	}
+}
+
+func TestFeedbackCollector_ReportsOnly(t *testing.T) {
+	// given: collector with mixed feedback, report, and convergence d-mails
+	initial := []*session.DMail{
+		{Name: "fb-001", Kind: session.DMailFeedback, Description: "Feedback item"},
+		{Name: "rp-001", Kind: session.DMailReport, Description: "Report from amadeus"},
+		{Name: "cv-001", Kind: session.DMailConvergence, Description: "Convergence"},
+		{Name: "rp-002", Kind: session.DMailReport, Description: "Another report"},
+	}
+	c := session.CollectFeedback(initial, nil, nil, nil)
+
+	// when
+	reports := c.ReportsOnly()
+
+	// then
+	if len(reports) != 2 {
+		t.Fatalf("expected 2 reports, got %d", len(reports))
+	}
+	if reports[0].Name != "rp-001" {
+		t.Errorf("expected rp-001, got %q", reports[0].Name)
+	}
+	if reports[1].Name != "rp-002" {
+		t.Errorf("expected rp-002, got %q", reports[1].Name)
+	}
+}
+
+func TestFormatReportsForPrompt_Empty(t *testing.T) {
+	// when
+	got := session.FormatReportsForPrompt(nil)
+
+	// then
+	if got != "" {
+		t.Errorf("expected empty string for nil, got %q", got)
+	}
+}
+
+func TestFormatReportsForPrompt_Single(t *testing.T) {
+	// given
+	reports := []*session.DMail{
+		{Name: "rp-001", Kind: session.DMailReport, Description: "Drift detected in auth module", Body: "Details of the drift."},
+	}
+
+	// when
+	got := session.FormatReportsForPrompt(reports)
+
+	// then
+	if !strings.Contains(got, "rp-001") {
+		t.Error("expected report name")
+	}
+	if !strings.Contains(got, "Drift detected") {
+		t.Error("expected description")
+	}
+	if !strings.Contains(got, "Details of the drift.") {
+		t.Error("expected body")
 	}
 }

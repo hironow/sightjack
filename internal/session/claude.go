@@ -56,6 +56,9 @@ func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w 
 		trace.WithAttributes(
 			attribute.String("claude.model", cfg.Claude.Model),
 			attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec),
+			attribute.String("gen_ai.operation.name", "chat"),
+			attribute.String("gen_ai.system", "anthropic"),
+			attribute.String("gen_ai.request.model", cfg.Claude.Model),
 		),
 	)
 	defer span.End()

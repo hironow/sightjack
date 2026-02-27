@@ -11,7 +11,6 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -94,7 +93,7 @@ func runShowFromStdin(w io.Writer) error {
 }
 
 func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) error {
-	state, _, err := eventsource.LoadLatestState(baseDir)
+	state, _, err := session.LoadLatestState(baseDir)
 	if err != nil {
 		logger.Info("Run 'sightjack scan' first.")
 		return fmt.Errorf("no previous scan found: %w", err)

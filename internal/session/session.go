@@ -111,7 +111,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		// Also generate nextgen prompt for dry-run
 		sampleCompletedWaves := []sightjack.Wave{sampleWave}
 		sampleCluster := sightjack.ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
-		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil, logger); err != nil {
+		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil, nil, logger); err != nil {
 			return fmt.Errorf("nextgen dry-run: %w", err)
 		}
 		logger.OK("Dry-run complete. Check .siren/.run/ for generated prompts.")
@@ -448,6 +448,18 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 	})
 
+	// Review gate: run review before composing report (outbox is read immediately by phonewave)
+	if cfg.Gate.ReviewCmd != "" {
+		passed, reviewErr := RunReviewGate(ctx, cfg, scanDir, logger)
+		if reviewErr != nil {
+			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
+		}
+		if !passed {
+			logger.Warn("Review gate: not passed — skipping ComposeReport for wave %s", domain.WaveKey(selected))
+			return
+		}
+	}
+
 	// Compose report d-mail for the completed wave
 	if err := ComposeReport(store, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
@@ -534,10 +546,12 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		}
 		rejectedForWave := sessionRejected[domain.WaveKey(selected)]
 		var feedback []*DMail
+		var reports []*DMail
 		if fbCollector != nil {
 			feedback = fbCollector.FeedbackOnly()
+			reports = fbCollector.ReportsOnly()
 		}
-		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, logger)
+		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, reports, logger)
 		if nextgenErr != nil {
 			logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
 		} else if len(newWaves) > 0 {

@@ -271,3 +271,59 @@ func TestRunInit_CreatesMailDirs(t *testing.T) {
 		}
 	}
 }
+
+// === P1-5: Flag-based init (no interactive prompts) ===
+
+func TestInitCmd_FlagsOnly(t *testing.T) {
+	// given — init via cobra command with flags, no stdin
+	dir := t.TempDir()
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader("")) // empty stdin — must NOT hang
+	cmd.SetArgs([]string{"init", "--team", "Engineering", "--project", "Hades", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init with flags failed: %v", err)
+	}
+	cfgPath := sightjack.ConfigPath(dir)
+	data, readErr := os.ReadFile(cfgPath)
+	if readErr != nil {
+		t.Fatalf("config not created: %v", readErr)
+	}
+	content := string(data)
+	if !strings.Contains(content, "Engineering") {
+		t.Errorf("expected team in config, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Hades") {
+		t.Errorf("expected project in config, got:\n%s", content)
+	}
+}
+
+func TestInitCmd_MissingTeamFlag_UsesDefault(t *testing.T) {
+	// given — init with no --team flag, should use default (empty or DefaultConfig value)
+	dir := t.TempDir()
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader("")) // empty stdin
+	cmd.SetArgs([]string{"init", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then — should succeed with defaults (no interactive prompt, no hang)
+	if err != nil {
+		t.Fatalf("init with defaults failed: %v", err)
+	}
+	cfgPath := sightjack.ConfigPath(dir)
+	if _, readErr := os.Stat(cfgPath); readErr != nil {
+		t.Fatalf("config not created: %v", readErr)
+	}
+}

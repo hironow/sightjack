@@ -117,7 +117,7 @@ func (a *CmdApprover) RequestApproval(ctx context.Context, message string) (bool
 		return false, fmt.Errorf("approve: empty command template")
 	}
 	expanded := strings.ReplaceAll(a.template, "{message}", ShellQuote(message))
-	cmd := a.factory()(ctx, "sh", "-c", expanded)
+	cmd := a.factory()(ctx, shellName(), shellFlag(), expanded)
 	err := cmd.Run()
 	if err == nil {
 		return true, nil

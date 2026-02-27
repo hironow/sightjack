@@ -35,6 +35,7 @@ type GateConfig struct {
 	NotifyCmd   string `yaml:"notify_cmd"`
 	ApproveCmd  string `yaml:"approve_cmd"`
 	AutoApprove bool   `yaml:"auto_approve"`
+	ReviewCmd   string `yaml:"review_cmd"`
 }
 
 // Config holds the top-level sightjack configuration loaded from YAML.

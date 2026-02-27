@@ -75,7 +75,7 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	}
 	expanded := strings.ReplaceAll(n.template, "{title}", ShellQuote(title))
 	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
-	cmd := n.factory()(ctx, "sh", "-c", expanded)
+	cmd := n.factory()(ctx, shellName(), shellFlag(), expanded)
 	return cmd.Run()
 }
 

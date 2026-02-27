@@ -12,7 +12,6 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -98,7 +97,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				cluster.Completeness = applyResult.NewCompleteness
 				allWaves = append([]sightjack.Wave{completedWave}, applyResult.RemainingWaves...)
 			} else {
-				state, _, stateErr := eventsource.LoadLatestState(baseDir)
+				state, _, stateErr := session.LoadLatestState(baseDir)
 				if stateErr != nil {
 					return fmt.Errorf("cannot resolve wave context: no CompletedWave in ApplyResult and no event data.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first")
 				}
@@ -147,14 +146,14 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 			if dryRun {
-				if err := session.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, logger); err != nil {
+				if err := session.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger); err != nil {
 					return fmt.Errorf("dry-run failed: %w", err)
 				}
 				logger.OK("Dry-run complete. Check %s for generated prompt.", scanDir)
 				return nil
 			}
 
-			newWaves, err := session.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, logger)
+			newWaves, err := session.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger)
 			if err != nil {
 				return fmt.Errorf("nextgen failed: %w", err)
 			}

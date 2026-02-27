@@ -118,7 +118,7 @@ func TestBuildNextGenPrompt_WithDoDTemplates(t *testing.T) {
 	}
 
 	// when
-	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil, nil)
 
 	// then
 	if err != nil {
@@ -150,7 +150,7 @@ func TestBuildNextGenPrompt_WithRejectedActions(t *testing.T) {
 	}
 
 	// when
-	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected, "fog", nil)
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, rejected, "fog", nil, nil)
 
 	// then
 	if err != nil {
@@ -179,7 +179,7 @@ func TestBuildNextGenPrompt_NilOptionals(t *testing.T) {
 	}
 
 	// when: nil DoD, nil ADRs, nil rejected, nil completedWaves
-	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil, nil)
 
 	// then: should not panic and should produce valid prompt
 	if err != nil {
@@ -211,7 +211,7 @@ func TestBuildNextGenPrompt_WithExistingADRs(t *testing.T) {
 	}
 
 	// when
-	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil, "fog", nil)
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, adrs, nil, "fog", nil, nil)
 
 	// then
 	if err != nil {
@@ -243,7 +243,7 @@ func TestBuildNextGenPrompt_WithFeedback(t *testing.T) {
 	}
 
 	// when
-	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", feedback)
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", feedback, nil)
 
 	// then
 	if err != nil {
@@ -278,7 +278,7 @@ func TestBuildNextGenPrompt_NilFeedback(t *testing.T) {
 	}
 
 	// when
-	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil)
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil, nil)
 
 	// then
 	if err != nil {
@@ -286,6 +286,67 @@ func TestBuildNextGenPrompt_NilFeedback(t *testing.T) {
 	}
 	if strings.Contains(prompt, "受信フィードバック") || strings.Contains(prompt, "Received Feedback") {
 		t.Error("feedback section should be omitted when nil")
+	}
+}
+
+func TestBuildNextGenPrompt_WithReports(t *testing.T) {
+	// given: reports from cross-tool analysis
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.5,
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+	}
+	reports := []*session.DMail{
+		{Name: "rp-amadeus-001", Kind: session.DMailReport, Description: "Drift detected in auth module", Body: "Scoring threshold exceeded."},
+	}
+
+	// when
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil, reports)
+
+	// then
+	if err != nil {
+		t.Fatalf("BuildNextGenPrompt: %v", err)
+	}
+	if !strings.Contains(prompt, "rp-amadeus-001") {
+		t.Error("expected report name in prompt")
+	}
+	if !strings.Contains(prompt, "Drift detected in auth module") {
+		t.Error("expected report description in prompt")
+	}
+	if !strings.Contains(prompt, "Scoring threshold exceeded.") {
+		t.Error("expected report body in prompt")
+	}
+}
+
+func TestBuildNextGenPrompt_NilReports(t *testing.T) {
+	// given: no reports
+	dir := t.TempDir()
+	scanDir := filepath.Join(dir, "scans")
+	os.MkdirAll(scanDir, 0755)
+
+	cfg := sightjack.DefaultConfig()
+	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := sightjack.ClusterScanResult{
+		Name:         "Auth",
+		Completeness: 0.5,
+		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+	}
+
+	// when
+	prompt, err := session.BuildNextGenPrompt(&cfg, scanDir, wave, cluster, nil, nil, nil, "fog", nil, nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("BuildNextGenPrompt: %v", err)
+	}
+	if strings.Contains(prompt, "クロスツールレポート") || strings.Contains(prompt, "Cross-Tool Reports") {
+		t.Error("report section should be omitted when nil")
 	}
 }
 
@@ -408,7 +469,7 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 	}
 	completedWaves := []sightjack.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
 
-	err := session.GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, sightjack.NewLogger(io.Discard, false))
+	err := session.GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, nil, sightjack.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}
