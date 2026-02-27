@@ -47,6 +47,14 @@ if event data is found in .siren/events/.`,
 			if err != nil {
 				return err
 			}
+			// Preflight: verify required binaries exist
+			bins := []string{"git"}
+			if !dryRun {
+				bins = append(bins, cfg.Claude.Command)
+			}
+			if err := session.PreflightCheck(bins...); err != nil {
+				return err
+			}
 			// Override gate config from flags (Changed = user explicitly set the flag)
 			if cmd.Flags().Changed("notify-cmd") {
 				cfg.Gate.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")
