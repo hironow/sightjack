@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -92,74 +90,3 @@ func initProject(baseDir, team, project, lang, strictness string, w io.Writer) e
 	return nil
 }
 
-// runInit runs init interactively, prompting on r and writing to w.
-// Used by existing interactive tests; the cobra command uses initProject directly.
-func runInit(baseDir string, r io.Reader, w io.Writer) error {
-	cfgPath := sightjack.ConfigPath(baseDir)
-	if _, err := os.Stat(cfgPath); err == nil {
-		return fmt.Errorf(".siren/config.yaml already exists in %s", baseDir)
-	}
-
-	scanner := bufio.NewScanner(r)
-
-	fmt.Fprintln(w, "sightjack init — create .siren/config.yaml")
-	fmt.Fprintln(w)
-
-	var team string
-	for team == "" {
-		fmt.Fprint(w, "Linear team name: ")
-		if !scanner.Scan() {
-			return fmt.Errorf("unexpected end of input")
-		}
-		team = strings.TrimSpace(scanner.Text())
-	}
-
-	var project string
-	for project == "" {
-		fmt.Fprint(w, "Linear project name: ")
-		if !scanner.Scan() {
-			return fmt.Errorf("unexpected end of input")
-		}
-		project = strings.TrimSpace(scanner.Text())
-	}
-
-	lang := "ja"
-	for {
-		fmt.Fprint(w, "Language (ja/en) [ja]: ")
-		if !scanner.Scan() {
-			break
-		}
-		v := strings.TrimSpace(scanner.Text())
-		if v == "" {
-			break
-		}
-		if sightjack.ValidLang(v) {
-			lang = v
-			break
-		}
-		fmt.Fprintf(w, "  invalid language %q (valid: ja, en)\n", v)
-	}
-
-	strictness := "fog"
-	for {
-		fmt.Fprint(w, "Strictness (fog/alert/lockdown) [fog]: ")
-		if !scanner.Scan() {
-			break
-		}
-		v := strings.TrimSpace(scanner.Text())
-		if v == "" {
-			break
-		}
-		if _, err := sightjack.ParseStrictnessLevel(v); err == nil {
-			strictness = strings.ToLower(v)
-			break
-		}
-		fmt.Fprintf(w, "  invalid strictness %q (valid: fog, alert, lockdown)\n", v)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read input: %w", err)
-	}
-
-	return initProject(baseDir, team, project, lang, strictness, w)
-}
