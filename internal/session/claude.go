@@ -84,6 +84,8 @@ func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w 
 	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, cfg.Claude.Command, args...)
+	cmd.Cancel = cancelFunc(cmd)
+	cmd.WaitDelay = 3 * time.Second
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

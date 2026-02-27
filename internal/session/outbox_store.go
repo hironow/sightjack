@@ -28,8 +28,10 @@ type SQLiteOutboxStore struct {
 // initialises the schema. archiveDir and outboxDir are the target directories
 // for flushed D-Mail files.
 func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxStore, error) {
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-		return nil, fmt.Errorf("outbox store: create db dir: %w", err)
+	for _, dir := range []string{filepath.Dir(dbPath), archiveDir, outboxDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("outbox store: create dir %s: %w", dir, err)
+		}
 	}
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
@@ -44,6 +46,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 	// underscore-prefixed query parameters like mattn/go-sqlite3.
 	for _, pragma := range []string{
 		"PRAGMA journal_mode=WAL",
+		"PRAGMA synchronous=NORMAL",
 		"PRAGMA busy_timeout=5000",
 	} {
 		if _, err := db.Exec(pragma); err != nil {

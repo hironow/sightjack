@@ -12,6 +12,55 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
+func TestSQLiteOutboxStore_PragmaSynchronousNormal(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// when: query PRAGMA on the store's own connection
+	var synchronous string
+	if err := store.DBForTest().QueryRow("PRAGMA synchronous").Scan(&synchronous); err != nil {
+		t.Fatalf("query PRAGMA synchronous: %v", err)
+	}
+
+	// then: synchronous = 1 (NORMAL)
+	if synchronous != "1" {
+		t.Errorf("PRAGMA synchronous: got %q, want %q (NORMAL)", synchronous, "1")
+	}
+}
+
+func TestNewSQLiteOutboxStore_CreatesAllDirectories(t *testing.T) {
+	// given: non-existent archive and outbox directories
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "db", "outbox.db")
+	archiveDir := filepath.Join(dir, "nonexistent", "archive")
+	outboxDir := filepath.Join(dir, "nonexistent", "outbox")
+
+	// when: construct store
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("NewSQLiteOutboxStore: %v", err)
+	}
+	defer store.Close()
+
+	// then: all directories exist
+	for _, d := range []string{filepath.Dir(dbPath), archiveDir, outboxDir} {
+		info, statErr := os.Stat(d)
+		if statErr != nil {
+			t.Errorf("directory %q not created: %v", d, statErr)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("%q is not a directory", d)
+		}
+	}
+}
+
 func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	// given
 	dir := t.TempDir()

@@ -647,14 +647,14 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 				classifyResult, classifyJSON,
 			)
 			_ = prompt
-			return exec.Command("sh", "-c", script)
+			return exec.CommandContext(ctx, "sh", "-c", script)
 		}
 		// Deep scan / wave: write result to the output path found in prompt.
 		if outPath := findJSONPath(prompt); outPath != "" {
 			script := fmt.Sprintf(`printf '%s' > '%s' && echo "done"`, deepScanResult, outPath)
-			return exec.Command("sh", "-c", script)
+			return exec.CommandContext(ctx, "sh", "-c", script)
 		}
-		return exec.Command("echo", "ok")
+		return exec.CommandContext(ctx, "echo", "ok")
 	})
 	defer cleanup()
 
@@ -756,12 +756,12 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 				classifyResult, classifyJSON,
 			)
 			_ = prompt
-			return exec.Command("sh", "-c", script)
+			return exec.CommandContext(ctx, "sh", "-c", script)
 		}
 		if outPath := findJSONPath(prompt); outPath != "" {
-			return exec.Command("sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, deepScanResult, outPath))
+			return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, deepScanResult, outPath))
 		}
-		return exec.Command("echo", "ok")
+		return exec.CommandContext(ctx, "echo", "ok")
 	})
 	defer cleanup()
 
@@ -863,7 +863,7 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 
 		// Cluster "Bad" → exit 1 (simulate signal:killed / OOM).
 		if strings.Contains(prompt, "Bad") {
-			return exec.Command("false")
+			return exec.CommandContext(ctx, "false")
 		}
 		// Other clusters → write wave result.
 		outPath := findJSONPath(prompt)
@@ -874,9 +874,9 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 			} else {
 				content = apiResult
 			}
-			return exec.Command("sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, content, outPath))
+			return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, content, outPath))
 		}
-		return exec.Command("echo", "ok")
+		return exec.CommandContext(ctx, "echo", "ok")
 	})
 	defer cleanup()
 
@@ -918,7 +918,7 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 	scanDir := t.TempDir()
 
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.Command("false")
+		return exec.CommandContext(ctx, "false")
 	})
 	defer cleanup()
 

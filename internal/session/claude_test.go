@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/session"
@@ -17,7 +18,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		capturedArgs = args
-		return exec.Command("echo", "ok")
+		return exec.CommandContext(ctx, "echo", "ok")
 	})
 	defer cleanup()
 
@@ -46,7 +47,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		capturedArgs = args
-		return exec.Command("echo", "ok")
+		return exec.CommandContext(ctx, "echo", "ok")
 	})
 	defer cleanup()
 
@@ -126,7 +127,7 @@ func TestRunClaudeOnceNoRetry(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
-		return exec.Command("false") // exits non-zero
+		return exec.CommandContext(ctx, "false") // exits non-zero
 	})
 	defer cleanup()
 
@@ -152,9 +153,9 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
 		if callCount < 3 {
-			return exec.Command("false") // exits non-zero
+			return exec.CommandContext(ctx, "false") // exits non-zero
 		}
-		return exec.Command("echo", "success")
+		return exec.CommandContext(ctx, "echo", "success")
 	})
 	defer cleanup()
 
@@ -178,7 +179,7 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
-		return exec.Command("false")
+		return exec.CommandContext(ctx, "false")
 	})
 	defer cleanup()
 
@@ -203,7 +204,7 @@ func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		capturedArgs = args
-		return exec.Command("echo", "ok")
+		return exec.CommandContext(ctx, "echo", "ok")
 	})
 	defer cleanup()
 
@@ -238,7 +239,7 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		capturedArgs = args
-		return exec.Command("echo", "ok")
+		return exec.CommandContext(ctx, "echo", "ok")
 	})
 	defer cleanup()
 
@@ -267,11 +268,45 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 	}
 }
 
+func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
+	// given: a command that runs for a long time (sleep 30)
+	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "sleep", "30")
+	})
+	defer cleanup()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := &sightjack.Config{
+		Claude: sightjack.ClaudeConfig{Command: "sleep", TimeoutSec: 30},
+		Retry:  sightjack.RetryConfig{MaxAttempts: 1},
+	}
+
+	// when: cancel context after 100ms
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	_, err := session.RunClaudeOnce(ctx, cfg, "test", io.Discard, sightjack.NewLogger(io.Discard, false))
+	elapsed := time.Since(start)
+
+	// then: should terminate with error (context cancelled)
+	if err == nil {
+		t.Fatal("expected error from cancelled context")
+	}
+
+	// then: should terminate within 10 seconds (not hang forever)
+	if elapsed > 10*time.Second {
+		t.Errorf("command took too long to terminate: %v (expected < 10s)", elapsed)
+	}
+}
+
 func TestRunClaudeExhaustsRetries(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
-		return exec.Command("false")
+		return exec.CommandContext(ctx, "false")
 	})
 	defer cleanup()
 

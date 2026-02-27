@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"syscall"
 
 	cmd "github.com/hironow/sightjack/internal/cmd"
 )
@@ -21,7 +20,7 @@ func main() {
 	args := cmd.DefaultToScan(rootCmd, os.Args[1:])
 	rootCmd.SetArgs(args)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer cancel()
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {

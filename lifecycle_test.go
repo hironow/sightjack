@@ -157,7 +157,7 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 		d.mu.Unlock()
 	}
 
-	return exec.Command("echo", "ok")
+	return exec.CommandContext(ctx, "echo", "ok")
 }
 
 // extractPromptFromArgs finds the value of the -p flag in Claude CLI args.

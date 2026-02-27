@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"database/sql"
 	"os/exec"
 )
 
@@ -27,3 +28,7 @@ func NewCmdNotifierForTest(template string, factory func(ctx context.Context, na
 func NewCmdApproverForTest(template string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *CmdApprover {
 	return &CmdApprover{template: template, cmdFactory: factory}
 }
+
+// DBForTest returns the underlying database connection for testing.
+// Only available in test builds.
+func (s *SQLiteOutboxStore) DBForTest() *sql.DB { return s.db }

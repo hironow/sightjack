@@ -100,6 +100,7 @@ func NewRootCommand() *cobra.Command {
 		newApplyCmd(),
 		newNextgenCmd(),
 		newRunCmd(),
+		newCleanCmd(),
 		newVersionCmd(),
 		newUpdateCmd(),
 	)
