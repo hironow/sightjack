@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -59,7 +58,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			// --- Event file pruning ---
-			eventFiles, eventErr := eventsource.ListExpiredEventFiles(baseDir, days)
+			eventFiles, eventErr := session.ListExpiredEventFiles(baseDir, days)
 			if eventErr != nil {
 				logger.Warn("Failed to list expired events: %v", eventErr)
 			}
@@ -91,7 +90,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			if len(eventFiles) > 0 {
-				deleted, delErr := eventsource.PruneEventFiles(baseDir, eventFiles)
+				deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
 				if delErr != nil {
 					return fmt.Errorf("event prune failed: %w", delErr)
 				}

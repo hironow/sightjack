@@ -100,6 +100,7 @@ func NewRootCommand() *cobra.Command {
 		newApplyCmd(),
 		newNextgenCmd(),
 		newRunCmd(),
+		newCleanCmd(),
 		newVersionCmd(),
 		newUpdateCmd(),
 	)
@@ -210,9 +211,21 @@ func openTTY() (*os.File, error) {
 }
 
 // resolveBaseDir returns the absolute path from the first arg or cwd.
+// Validates that the path exists and is a directory.
 func resolveBaseDir(args []string) (string, error) {
 	if len(args) > 0 {
-		return filepath.Abs(args[0])
+		abs, err := filepath.Abs(args[0])
+		if err != nil {
+			return "", fmt.Errorf("resolve path: %w", err)
+		}
+		info, err := os.Stat(abs)
+		if err != nil {
+			return "", fmt.Errorf("path not found: %w", err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("not a directory: %s", abs)
+		}
+		return abs, nil
 	}
 	return os.Getwd()
 }

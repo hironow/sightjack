@@ -87,8 +87,9 @@ func ParseDMail(data []byte) (*DMail, error) {
 	return &mail, nil
 }
 
-// ComposeDMail writes a d-mail to both outbox/ and archive/.
-func ComposeDMail(baseDir string, mail *DMail) error {
+// ComposeDMail stages a d-mail via the transactional outbox store, then
+// flushes it to archive/ and outbox/ using atomic file writes.
+func ComposeDMail(store sightjack.OutboxStore, mail *DMail) error {
 	if err := ValidateDMail(mail); err != nil {
 		return err
 	}
@@ -96,12 +97,11 @@ func ComposeDMail(baseDir string, mail *DMail) error {
 	if err != nil {
 		return err
 	}
-	filename := mail.Filename()
-	for _, sub := range []string{sightjack.ArchiveDir, sightjack.OutboxDir} {
-		path := filepath.Join(sightjack.MailDir(baseDir, sub), filename)
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			return fmt.Errorf("dmail compose to %s: %w", sub, err)
-		}
+	if err := store.Stage(mail.Filename(), data); err != nil {
+		return fmt.Errorf("dmail stage: %w", err)
+	}
+	if _, err := store.Flush(); err != nil {
+		return fmt.Errorf("dmail flush: %w", err)
 	}
 	return nil
 }
@@ -167,7 +167,7 @@ func receiveDMailIfNew(baseDir, filename string, logger *sightjack.Logger) *DMai
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != DMailFeedback && mail.Kind != DMailConvergence {
+	if mail.Kind != DMailFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
 		return nil
 	}
 	return mail
@@ -175,8 +175,8 @@ func receiveDMailIfNew(baseDir, filename string, logger *sightjack.Logger) *DMai
 
 // MonitorInbox starts monitoring the inbox directory for feedback and convergence d-mails.
 // It first drains existing files (initial scan), then watches for new files via fsnotify.
-// Each d-mail is received (archived + removed from inbox). Only feedback and convergence
-// d-mails are sent to the returned channel. Consumer-side dedup is applied (MY-271).
+// Each d-mail is received (archived + removed from inbox). Feedback, convergence,
+// and report d-mails are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
 func MonitorInbox(ctx context.Context, baseDir string, logger *sightjack.Logger) (<-chan *DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
@@ -306,6 +306,26 @@ func FormatFeedbackForPrompt(feedback []*DMail) string {
 	return b.String()
 }
 
+// FormatReportsForPrompt formats report d-mails as a Markdown section
+// suitable for injection into wave generation prompts. Reports come from
+// other tools (e.g. amadeus check results) and provide cross-tool context.
+// Returns "" for nil or empty input.
+func FormatReportsForPrompt(reports []*DMail) string {
+	if len(reports) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, rpt := range reports {
+		fmt.Fprintf(&b, "### %s\n", rpt.Name)
+		fmt.Fprintf(&b, "%s\n", rpt.Description)
+		if rpt.Body != "" {
+			fmt.Fprintf(&b, "\n%s\n", rpt.Body)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
 // FeedbackCollector accumulates feedback d-mails from both the initial
 // drain and late-arriving items on the monitor channel. It replaces
 // LogInboxFeedbackAsync by both displaying AND storing late arrivals,
@@ -392,6 +412,21 @@ func (c *FeedbackCollector) FeedbackOnly() []*DMail {
 	var result []*DMail
 	for _, m := range c.items {
 		if m.Kind == DMailFeedback {
+			result = append(result, m)
+		}
+	}
+	return result
+}
+
+// ReportsOnly returns a copy of accumulated d-mails filtered to report kind
+// only (excludes feedback and convergence). Use this for nextgen prompt injection
+// where cross-tool reports (e.g. amadeus check results) should inform wave planning.
+func (c *FeedbackCollector) ReportsOnly() []*DMail {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var result []*DMail
+	for _, m := range c.items {
+		if m.Kind == DMailReport {
 			result = append(result, m)
 		}
 	}
@@ -505,7 +540,7 @@ func ReportBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string {
 }
 
 // ComposeReport creates and sends a report d-mail for a completed wave.
-func ComposeReport(baseDir string, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
+func ComposeReport(store sightjack.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
@@ -515,11 +550,11 @@ func ComposeReport(baseDir string, wave sightjack.Wave, result *sightjack.WaveAp
 		Issues:        WaveIssueIDs(wave),
 		Body:          ReportBody(wave, result),
 	}
-	return ComposeDMail(baseDir, mail)
+	return ComposeDMail(store, mail)
 }
 
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
-func ComposeSpecification(baseDir string, wave sightjack.Wave) error {
+func ComposeSpecification(store sightjack.OutboxStore, wave sightjack.Wave) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),
@@ -529,5 +564,5 @@ func ComposeSpecification(baseDir string, wave sightjack.Wave) error {
 		Issues:        WaveIssueIDs(wave),
 		Body:          SpecificationBody(wave),
 	}
-	return ComposeDMail(baseDir, mail)
+	return ComposeDMail(store, mail)
 }

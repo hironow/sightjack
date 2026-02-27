@@ -80,7 +80,7 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	err := sightjack.InstallSkills(baseDir)
+	err := session.InstallSkills(baseDir, sightjack.SkillsFS)
 
 	// then: no error
 	if err != nil {
@@ -130,12 +130,12 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 func TestInstallSkills_Idempotent(t *testing.T) {
 	// given: install once
 	baseDir := t.TempDir()
-	if err := sightjack.InstallSkills(baseDir); err != nil {
+	if err := session.InstallSkills(baseDir, sightjack.SkillsFS); err != nil {
 		t.Fatalf("first install: %v", err)
 	}
 
 	// when: install again
-	err := sightjack.InstallSkills(baseDir)
+	err := session.InstallSkills(baseDir, sightjack.SkillsFS)
 
 	// then: no error, files still correct
 	if err != nil {

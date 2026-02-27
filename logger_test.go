@@ -45,21 +45,21 @@ func TestLogger_Error(t *testing.T) {
 	}
 }
 
-func TestLogger_Scan(t *testing.T) {
+func TestLogger_Info_FormerScan(t *testing.T) {
 	var buf bytes.Buffer
 	logger := sightjack.NewLogger(&buf, false)
-	logger.Scan("classifying")
-	if !strings.Contains(buf.String(), "SCAN classifying") {
-		t.Errorf("expected SCAN prefix, got %q", buf.String())
+	logger.Info("classifying")
+	if !strings.Contains(buf.String(), "INFO classifying") {
+		t.Errorf("expected INFO prefix, got %q", buf.String())
 	}
 }
 
-func TestLogger_Nav(t *testing.T) {
+func TestLogger_Info_FormerNav(t *testing.T) {
 	var buf bytes.Buffer
 	logger := sightjack.NewLogger(&buf, false)
-	logger.Nav("rendering")
-	if !strings.Contains(buf.String(), " NAV rendering") {
-		t.Errorf("expected NAV prefix, got %q", buf.String())
+	logger.Info("rendering")
+	if !strings.Contains(buf.String(), "INFO rendering") {
+		t.Errorf("expected INFO prefix, got %q", buf.String())
 	}
 }
 
@@ -91,49 +91,53 @@ func TestLogger_TimestampFormat(t *testing.T) {
 	}
 }
 
-func TestLogger_SetLogFile_RotatesCorrectly(t *testing.T) {
+func TestLogger_SetExtraWriter_DualWrite(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	path1 := dir + "/log1.txt"
-	path2 := dir + "/log2.txt"
+	path := dir + "/extra.log"
 
 	var buf bytes.Buffer
 	logger := sightjack.NewLogger(&buf, false)
 
-	if err := logger.SetLogFile(path1); err != nil {
-		t.Fatalf("first SetLogFile failed: %v", err)
-	}
-
-	// when: log to first file, then rotate
-	logger.Info("first-message")
-
-	if err := logger.SetLogFile(path2); err != nil {
-		t.Fatalf("second SetLogFile failed: %v", err)
-	}
-	defer logger.CloseLogFile()
-
-	logger.Info("second-message")
-
-	// then: first file should have first-message but not second-message
-	data1, err := os.ReadFile(path1)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		t.Fatalf("read path1: %v", err)
-	}
-	if !strings.Contains(string(data1), "first-message") {
-		t.Errorf("path1 should contain first-message, got: %s", string(data1))
-	}
-	if strings.Contains(string(data1), "second-message") {
-		t.Errorf("path1 should NOT contain second-message (rotation failed)")
+		t.Fatalf("open temp file: %v", err)
 	}
 
-	// second file should have second-message
-	data2, err := os.ReadFile(path2)
+	// when: set extra writer and log a message
+	logger.SetExtraWriter(f)
+	logger.Info("dual-message")
+
+	// then: both buffer and file contain the message
+	if !strings.Contains(buf.String(), "dual-message") {
+		t.Errorf("buffer should contain dual-message, got: %s", buf.String())
+	}
+	fileData, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read path2: %v", err)
+		t.Fatalf("read file: %v", err)
 	}
-	if !strings.Contains(string(data2), "second-message") {
-		t.Errorf("path2 should contain second-message, got: %s", string(data2))
+	if !strings.Contains(string(fileData), "dual-message") {
+		t.Errorf("file should contain dual-message, got: %s", string(fileData))
 	}
+
+	// when: set extra writer to nil and log another message
+	logger.SetExtraWriter(nil)
+	logger.Info("buffer-only-message")
+
+	// then: buffer has the new message, file does not
+	if !strings.Contains(buf.String(), "buffer-only-message") {
+		t.Errorf("buffer should contain buffer-only-message, got: %s", buf.String())
+	}
+	fileData2, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file after nil: %v", err)
+	}
+	if strings.Contains(string(fileData2), "buffer-only-message") {
+		t.Errorf("file should NOT contain buffer-only-message after SetExtraWriter(nil)")
+	}
+
+	// cleanup: caller is responsible for closing
+	f.Close()
 }
 
 func TestLogger_Writer(t *testing.T) {

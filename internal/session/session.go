@@ -9,24 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
-
-// tracer is the package-level OTel tracer for session operations.
-var tracer = otel.Tracer("session")
-
-// OverrideTracer replaces the session package-level tracer for testing and
-// returns a cleanup function. Exported for cross-package test injection.
-func OverrideTracer(t trace.Tracer) func() {
-	old := tracer
-	tracer = t
-	return func() { tracer = old }
-}
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
 func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder sightjack.Recorder, logger *sightjack.Logger) error {
@@ -42,6 +30,13 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 	if err := EnsureMailDirs(baseDir); err != nil {
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
+
+	// Transactional outbox: SQLite-backed stage → atomic flush to archive/ + outbox/
+	outboxStore, err := NewOutboxStoreForBase(baseDir)
+	if err != nil {
+		return fmt.Errorf("outbox store: %w", err)
+	}
+	defer outboxStore.Close()
 
 	// Start inbox monitor (fsnotify-based) for feedback d-mails.
 	// CollectFeedback accumulates initial + late-arriving feedback so
@@ -116,7 +111,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		// Also generate nextgen prompt for dry-run
 		sampleCompletedWaves := []sightjack.Wave{sampleWave}
 		sampleCluster := sightjack.ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
-		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil, logger); err != nil {
+		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil, nil, logger); err != nil {
 			return fmt.Errorf("nextgen dry-run: %w", err)
 		}
 		logger.OK("Dry-run complete. Check .siren/.run/ for generated prompts.")
@@ -176,7 +171,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, recorder, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, out, logger)
 }
 
 // selectPhaseResult describes the outcome of the wave selection phase.
@@ -252,10 +247,10 @@ const (
 // existing elements via PropagateWaveUpdate — it never appends or reassigns.
 // Returns the (possibly modified) wave and whether it was approved.
 func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
-	cfg *sightjack.Config, scanDir, baseDir string, selected sightjack.Wave, resolvedStrictness string,
+	cfg *sightjack.Config, scanDir string, selected sightjack.Wave, resolvedStrictness string,
 	waves []sightjack.Wave, completed map[string]bool,
 	sessionRejected map[string][]sightjack.WaveAction, adrDir string, adrCount *int,
-	recorder sightjack.Recorder,
+	store sightjack.OutboxStore, recorder sightjack.Recorder,
 	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, approvalPhaseResult) {
 
 	for {
@@ -280,7 +275,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			recorder.Record(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
-			if err := ComposeSpecification(baseDir, selected); err != nil {
+			if err := ComposeSpecification(store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
@@ -375,7 +370,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			recorder.Record(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
-			if err := ComposeSpecification(baseDir, selected); err != nil {
+			if err := ComposeSpecification(store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
@@ -393,12 +388,12 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 // ready labels, and mid-session state save.
 // waves is passed as *[]Wave because append/EvaluateUnlocks may reallocate the slice.
 func applyPhase(ctx context.Context, cfg *sightjack.Config,
-	scanDir, scanResultPath, baseDir, adrDir string,
+	scanDir, scanResultPath, adrDir string,
 	selected sightjack.Wave, resolvedStrictness string,
 	waves *[]sightjack.Wave, completed map[string]bool,
 	scanResult *sightjack.ScanResult, sessionRejected map[string][]sightjack.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, recorder sightjack.Recorder, out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) {
+	fbCollector *FeedbackCollector, store sightjack.OutboxStore, recorder sightjack.Recorder, out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) {
 
 	// --- Pass 4: Wave Apply ---
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
@@ -453,8 +448,20 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 	})
 
+	// Review gate: run review before composing report (outbox is read immediately by phonewave)
+	if cfg.Gate.ReviewCmd != "" {
+		passed, reviewErr := RunReviewGate(ctx, cfg, scanDir, logger)
+		if reviewErr != nil {
+			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
+		}
+		if !passed {
+			logger.Warn("Review gate: not passed — skipping ComposeReport for wave %s", domain.WaveKey(selected))
+			return
+		}
+	}
+
 	// Compose report d-mail for the completed wave
-	if err := ComposeReport(baseDir, selected, applyResult); err != nil {
+	if err := ComposeReport(store, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
 		recorder.Record(sightjack.EventReportSent, sightjack.WaveIdentityPayload{
@@ -539,10 +546,12 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		}
 		rejectedForWave := sessionRejected[domain.WaveKey(selected)]
 		var feedback []*DMail
+		var reports []*DMail
 		if fbCollector != nil {
 			feedback = fbCollector.FeedbackOnly()
+			reports = fbCollector.ReportsOnly()
 		}
-		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, logger)
+		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, reports, logger)
 		if nextgenErr != nil {
 			logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
 		} else if len(newWaves) > 0 {
@@ -592,9 +601,10 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
 func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *sightjack.ScanResult, waves []sightjack.Wave, completed map[string]bool, adrCount int,
-	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector, recorder sightjack.Recorder, out io.Writer, logger *sightjack.Logger) error {
+	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
+	store sightjack.OutboxStore, recorder sightjack.Recorder, out io.Writer, logger *sightjack.Logger) error {
 
-	ctx, loopSpan := tracer.Start(ctx, "interactive.loop",
+	ctx, loopSpan := sightjack.Tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
 			attribute.String("sightjack.session_id", sessionID),
 		),
@@ -630,15 +640,15 @@ outerLoop:
 
 		resolvedStrictness := string(sightjack.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, baseDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, recorder, out, loopSpan, logger)
+		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, store, recorder, out, loopSpan, logger)
 		if approvalResult != approvalApproved {
 			continue
 		}
 
-		applyPhase(ctx, cfg, scanDir, scanResultPath, baseDir, adrDir,
+		applyPhase(ctx, cfg, scanDir, scanResultPath, adrDir,
 			selected, resolvedStrictness,
 			&waves, completed, scanResult, sessionRejected,
-			labeledReady, fbCollector, recorder, out, loopSpan, logger)
+			labeledReady, fbCollector, store, recorder, out, loopSpan, logger)
 	}
 
 	// Final consistency check
@@ -699,6 +709,13 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
 
+	// Transactional outbox: SQLite-backed stage → atomic flush to archive/ + outbox/
+	outboxStore, err := NewOutboxStoreForBase(baseDir)
+	if err != nil {
+		return fmt.Errorf("outbox store: %w", err)
+	}
+	defer outboxStore.Close()
+
 	// Start inbox monitor (fsnotify-based) for feedback d-mails.
 	// CollectFeedback accumulates initial + late-arriving feedback.
 	monitorCtx, monitorCancel := context.WithCancel(ctx)
@@ -741,7 +758,7 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	logger.OK("Resumed session: %d waves, %d completed", len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, recorder, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, recorder, out, logger)
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
@@ -758,6 +775,13 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 	if err := EnsureMailDirs(baseDir); err != nil {
 		return fmt.Errorf("ensure mail dirs: %w", err)
 	}
+
+	// Transactional outbox: SQLite-backed stage → atomic flush to archive/ + outbox/
+	outboxStore, err := NewOutboxStoreForBase(baseDir)
+	if err != nil {
+		return fmt.Errorf("outbox store: %w", err)
+	}
+	defer outboxStore.Close()
 
 	// Start inbox monitor (fsnotify-based) for feedback d-mails.
 	// CollectFeedback accumulates initial + late-arriving feedback.
@@ -853,5 +877,5 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		len(scanResult.Clusters), len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, recorder, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, out, logger)
 }

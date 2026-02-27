@@ -124,7 +124,7 @@ func ClearArchitectOutput(scanDir string, wave sightjack.Wave) {
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
 func RunArchitectDiscuss(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, topic string, strictness string, out io.Writer, logger *sightjack.Logger) (*sightjack.ArchitectResponse, error) {
-	ctx, discussSpan := tracer.Start(ctx, "architect.discuss",
+	ctx, discussSpan := sightjack.Tracer.Start(ctx, "architect.discuss",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", wave.ClusterName),
 			attribute.String("wave.id", wave.ID),
@@ -167,7 +167,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *sightjack.Config, scanDir str
 		logger.Warn("create architect log: %v", discussLogErr)
 	}
 
-	logger.Scan("Architect discussing: %s - %s", wave.ClusterName, topic)
+	logger.Info("Architect discussing: %s - %s", wave.ClusterName, topic)
 	if _, err := RunClaude(ctx, cfg, prompt, discussOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}

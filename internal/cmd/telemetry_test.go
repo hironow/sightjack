@@ -23,14 +23,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := tracer
-	tracer = tp.Tracer("sightjack-test")
-	cleanupSessionTracer := session.OverrideTracer(tp.Tracer("session-test"))
+	oldTracer := sightjack.Tracer
+	sightjack.Tracer = tp.Tracer("sightjack-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		cleanupSessionTracer()
-		tracer = oldTracer
+		sightjack.Tracer = oldTracer
 	})
 	return exp
 }
@@ -85,6 +83,38 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 	for _, s := range spans {
 		if s.Name == "claude.invoke" {
 			found = true
+
+			// Verify gen_ai.* semantic convention attributes (P1-3)
+			requiredAttrs := map[string]string{
+				"gen_ai.operation.name": "chat",
+				"gen_ai.system":        "anthropic",
+			}
+			for key, want := range requiredAttrs {
+				var attrFound bool
+				for _, attr := range s.Attributes {
+					if string(attr.Key) == key {
+						attrFound = true
+						if got := attr.Value.AsString(); got != want {
+							t.Errorf("attr %s = %q, want %q", key, got, want)
+						}
+					}
+				}
+				if !attrFound {
+					t.Errorf("missing gen_ai attribute %q on claude.invoke span", key)
+				}
+			}
+
+			// gen_ai.request.model should be present (value varies per config)
+			var modelFound bool
+			for _, attr := range s.Attributes {
+				if string(attr.Key) == "gen_ai.request.model" {
+					modelFound = true
+				}
+			}
+			if !modelFound {
+				t.Error("missing gen_ai.request.model attribute on claude.invoke span")
+			}
+
 			break
 		}
 	}

@@ -103,7 +103,7 @@ func WaveApplyFileName(wave sightjack.Wave) string {
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
 func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, strictness string, out io.Writer, logger *sightjack.Logger) (*sightjack.WaveApplyResult, error) {
-	ctx, applySpan := tracer.Start(ctx, "wave.apply",
+	ctx, applySpan := sightjack.Tracer.Start(ctx, "wave.apply",
 		trace.WithAttributes(
 			attribute.String("wave.id", wave.ID),
 			attribute.String("wave.cluster_name", wave.ClusterName),
@@ -151,7 +151,7 @@ func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 	}
 
 	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
-	logger.Scan("Applying wave: %s - %s", wave.ClusterName, wave.Title)
+	logger.Info("Applying wave: %s - %s", wave.ClusterName, wave.Title)
 	if _, err := RunClaudeOnce(ctx, cfg, prompt, applyOut, logger, linearTools); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)
 	}
@@ -179,7 +179,7 @@ func RunReadyLabel(ctx context.Context, cfg *sightjack.Config, readyIssueIDs str
 		return fmt.Errorf("render ready label prompt: %w", err)
 	}
 
-	logger.Scan("Applying ready labels to: %s", readyIssueIDs)
+	logger.Info("Applying ready labels to: %s", readyIssueIDs)
 	if _, err := RunClaudeOnce(ctx, cfg, prompt, out, logger, WithAllowedTools(LinearMCPAllowedTools...)); err != nil {
 		return fmt.Errorf("ready label: %w", err)
 	}

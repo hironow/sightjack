@@ -12,15 +12,15 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
-)
 
-var tracer trace.Tracer = noop.NewTracerProvider().Tracer("sightjack")
+	"github.com/hironow/sightjack"
+)
 
 func initTracer(serviceName, ver string) func(context.Context) error {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
-		tracer = np.Tracer(serviceName)
+		sightjack.Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -28,7 +28,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 	if err != nil {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
-		tracer = np.Tracer(serviceName)
+		sightjack.Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -46,7 +46,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(tp)
-	tracer = tp.Tracer(serviceName)
+	sightjack.Tracer = tp.Tracer(serviceName)
 
 	return func(ctx context.Context) error {
 		return tp.Shutdown(ctx)
@@ -56,7 +56,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 // startRootSpan creates the top-level span for a sightjack subcommand and
 // returns a new context carrying it. Call endRootSpan to close the span.
 func startRootSpan(ctx context.Context, command string) context.Context {
-	ctx, _ = tracer.Start(ctx, "sightjack."+command,
+	ctx, _ = sightjack.Tracer.Start(ctx, "sightjack."+command,
 		trace.WithAttributes(
 			attribute.String("sightjack.command", command),
 		),

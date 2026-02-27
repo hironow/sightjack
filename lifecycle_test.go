@@ -157,7 +157,7 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 		d.mu.Unlock()
 	}
 
-	return exec.Command("echo", "ok")
+	return exec.CommandContext(ctx, "echo", "ok")
 }
 
 // extractPromptFromArgs finds the value of the -p flag in Claude CLI args.
@@ -1501,7 +1501,7 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 	completedWaves := domain.CompletedWavesForCluster(waves, cluster.Name)
 	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
-	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, sightjack.NewLogger(io.Discard, false))
+	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, sightjack.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("GenerateNextWaves failed: %v", err)
 	}

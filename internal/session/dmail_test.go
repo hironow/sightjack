@@ -78,10 +78,22 @@ func TestMarshalDMail_SchemaVersion(t *testing.T) {
 	}
 }
 
+// testOutboxStore creates a SQLiteOutboxStore for testing and registers cleanup.
+func testOutboxStore(t *testing.T, dir string) sightjack.OutboxStore {
+	t.Helper()
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+	return store
+}
+
 func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "gate",
@@ -90,7 +102,7 @@ func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(dir, wave)
+	err := session.ComposeSpecification(store, wave)
 
 	// then
 	if err != nil {
@@ -107,6 +119,7 @@ func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "gate",
@@ -116,7 +129,7 @@ func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 	result := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 1}
 
 	// when
-	err := session.ComposeReport(dir, wave, result)
+	err := session.ComposeReport(store, wave, result)
 
 	// then
 	if err != nil {
@@ -344,6 +357,7 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 	if err := session.EnsureMailDirs(dir); err != nil {
 		t.Fatalf("ensure: %v", err)
 	}
+	store := testOutboxStore(t, dir)
 	mail := &session.DMail{
 		Name:          "spec-my-42",
 		Kind:          session.DMailSpecification,
@@ -351,7 +365,7 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 		SchemaVersion: "1",
 		Body:          "# DoD\n- item 1\n",
 	}
-	if err := session.ComposeDMail(dir, mail); err != nil {
+	if err := session.ComposeDMail(store, mail); err != nil {
 		t.Fatalf("compose: %v", err)
 	}
 
@@ -381,8 +395,9 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 func TestComposeDMail_ValidationError(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	mail := &session.DMail{Name: "", Kind: session.DMailSpecification, Description: "bad"}
-	if err := session.ComposeDMail(dir, mail); err == nil {
+	if err := session.ComposeDMail(store, mail); err == nil {
 		t.Error("expected validation error for empty name")
 	}
 }
@@ -478,6 +493,7 @@ func TestDMailName_HandlesSpecialChars(t *testing.T) {
 func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 
 	wave := sightjack.Wave{
 		ID:          "w1",
@@ -491,7 +507,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 		},
 	}
 
-	err := session.ComposeSpecification(dir, wave)
+	err := session.ComposeSpecification(store, wave)
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
@@ -535,6 +551,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 func TestComposeReport_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 
 	wave := sightjack.Wave{
 		ID:          "w1",
@@ -552,7 +569,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 		},
 	}
 
-	err := session.ComposeReport(dir, wave, applyResult)
+	err := session.ComposeReport(store, wave, applyResult)
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
@@ -588,6 +605,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 func TestComposeReport_NoRipples(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 
 	wave := sightjack.Wave{
 		ID:          "w2",
@@ -602,7 +620,7 @@ func TestComposeReport_NoRipples(t *testing.T) {
 		Applied: 1,
 	}
 
-	err := session.ComposeReport(dir, wave, applyResult)
+	err := session.ComposeReport(store, wave, applyResult)
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
@@ -1179,19 +1197,19 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// then: only 2 feedback come through channel
+	// then: 3 items come through channel (2 feedback + 1 report; spec excluded)
 	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
-	if len(feedback) != 2 {
-		t.Fatalf("expected 2 feedback, got %d", len(feedback))
+	if len(feedback) != 3 {
+		t.Fatalf("expected 3 items (2 feedback + 1 report), got %d", len(feedback))
 	}
 	names := make(map[string]bool)
 	for _, fb := range feedback {
 		names[fb.Name] = true
 	}
-	if !names["feedback-mix-1"] || !names["feedback-mix-2"] {
-		t.Errorf("expected both feedback names, got %v", names)
+	if !names["feedback-mix-1"] || !names["feedback-mix-2"] || !names["report-mix-1"] {
+		t.Errorf("expected feedback-mix-1, feedback-mix-2, report-mix-1, got %v", names)
 	}
-	// all 4 should be archived (spec and report are received but not channeled)
+	// all 4 should be archived (spec is received but not channeled)
 	archiveFiles, _ := session.ListDMail(dir, "archive")
 	if len(archiveFiles) != 4 {
 		t.Errorf("expected 4 archived files, got %d", len(archiveFiles))
@@ -1321,9 +1339,10 @@ func TestComposeDMail_NilMail(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 
 	// when
-	err := session.ComposeDMail(dir, nil)
+	err := session.ComposeDMail(store, nil)
 
 	// then
 	if err == nil {
@@ -1335,6 +1354,7 @@ func TestComposeReport_WithErrors(t *testing.T) {
 	// given: apply result with errors
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "api",
@@ -1351,7 +1371,7 @@ func TestComposeReport_WithErrors(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeReport(dir, wave, result)
+	err := session.ComposeReport(store, wave, result)
 
 	// then
 	if err != nil {
@@ -1372,6 +1392,7 @@ func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
 	// given: apply result with both errors and ripples
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w3",
 		ClusterName: "infra",
@@ -1391,7 +1412,7 @@ func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeReport(dir, wave, result)
+	err := session.ComposeReport(store, wave, result)
 
 	// then
 	if err != nil {
@@ -1415,6 +1436,7 @@ func TestComposeSpecification_WaveWithDescription(t *testing.T) {
 	// given: wave with non-empty description
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "db",
@@ -1426,7 +1448,7 @@ func TestComposeSpecification_WaveWithDescription(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(dir, wave)
+	err := session.ComposeSpecification(store, wave)
 
 	// then
 	if err != nil {
@@ -1447,6 +1469,7 @@ func TestComposeSpecification_EmptyActions(t *testing.T) {
 	// given: wave with no actions (edge case)
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "misc",
@@ -1455,7 +1478,7 @@ func TestComposeSpecification_EmptyActions(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(dir, wave)
+	err := session.ComposeSpecification(store, wave)
 
 	// then: should succeed (empty actions section)
 	if err != nil {
@@ -1473,6 +1496,7 @@ func TestComposeSpecification_IssueDedup(t *testing.T) {
 	// given: wave with duplicate issue IDs across actions
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "auth",
@@ -1485,7 +1509,7 @@ func TestComposeSpecification_IssueDedup(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(dir, wave)
+	err := session.ComposeSpecification(store, wave)
 
 	// then: issues list should be deduplicated
 	if err != nil {
@@ -1503,6 +1527,7 @@ func TestComposeReport_IssuesSorted(t *testing.T) {
 	// given: wave with unsorted issue IDs
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
 	wave := sightjack.Wave{
 		ID:          "w1",
 		ClusterName: "sort",
@@ -1516,7 +1541,7 @@ func TestComposeReport_IssuesSorted(t *testing.T) {
 	result := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 3}
 
 	// when
-	err := session.ComposeReport(dir, wave, result)
+	err := session.ComposeReport(store, wave, result)
 
 	// then: issues are sorted
 	if err != nil {
@@ -1917,5 +1942,61 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 	archiveFiles, _ := session.ListDMail(dir, "archive")
 	if len(archiveFiles) != 3 {
 		t.Errorf("expected 3 archived, got %d", len(archiveFiles))
+	}
+}
+
+func TestFeedbackCollector_ReportsOnly(t *testing.T) {
+	// given: collector with mixed feedback, report, and convergence d-mails
+	initial := []*session.DMail{
+		{Name: "fb-001", Kind: session.DMailFeedback, Description: "Feedback item"},
+		{Name: "rp-001", Kind: session.DMailReport, Description: "Report from amadeus"},
+		{Name: "cv-001", Kind: session.DMailConvergence, Description: "Convergence"},
+		{Name: "rp-002", Kind: session.DMailReport, Description: "Another report"},
+	}
+	c := session.CollectFeedback(initial, nil, nil, nil)
+
+	// when
+	reports := c.ReportsOnly()
+
+	// then
+	if len(reports) != 2 {
+		t.Fatalf("expected 2 reports, got %d", len(reports))
+	}
+	if reports[0].Name != "rp-001" {
+		t.Errorf("expected rp-001, got %q", reports[0].Name)
+	}
+	if reports[1].Name != "rp-002" {
+		t.Errorf("expected rp-002, got %q", reports[1].Name)
+	}
+}
+
+func TestFormatReportsForPrompt_Empty(t *testing.T) {
+	// when
+	got := session.FormatReportsForPrompt(nil)
+
+	// then
+	if got != "" {
+		t.Errorf("expected empty string for nil, got %q", got)
+	}
+}
+
+func TestFormatReportsForPrompt_Single(t *testing.T) {
+	// given
+	reports := []*session.DMail{
+		{Name: "rp-001", Kind: session.DMailReport, Description: "Drift detected in auth module", Body: "Details of the drift."},
+	}
+
+	// when
+	got := session.FormatReportsForPrompt(reports)
+
+	// then
+	if !strings.Contains(got, "rp-001") {
+		t.Error("expected report name")
+	}
+	if !strings.Contains(got, "Drift detected") {
+		t.Error("expected description")
+	}
+	if !strings.Contains(got, "Details of the drift.") {
+		t.Error("expected body")
 	}
 }
