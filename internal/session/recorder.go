@@ -1,6 +1,11 @@
 package session
 
-import sightjack "github.com/hironow/sightjack"
+import (
+	"context"
+	"time"
+
+	sightjack "github.com/hironow/sightjack"
+)
 
 // NopRecorder is a no-op Recorder for dry-run mode and testing.
 type NopRecorder struct{}
@@ -28,6 +33,42 @@ func NewLoggingRecorder(inner sightjack.Recorder, logger *sightjack.Logger) *Log
 func (r *LoggingRecorder) Record(eventType sightjack.EventType, payload any) error {
 	if err := r.inner.Record(eventType, payload); err != nil {
 		r.logger.Warn("record event %s: %v", eventType, err)
+	}
+	return nil
+}
+
+// DispatchingRecorder wraps a Recorder and dispatches events to an EventDispatcher.
+// Record is delegated to inner first; then an Event is constructed and dispatched best-effort.
+type DispatchingRecorder struct {
+	inner      sightjack.Recorder
+	dispatcher sightjack.EventDispatcher
+	logger     *sightjack.Logger
+}
+
+// NewDispatchingRecorder creates a DispatchingRecorder.
+// If dispatcher is nil, Record simply delegates to inner.
+func NewDispatchingRecorder(inner sightjack.Recorder, dispatcher sightjack.EventDispatcher, logger *sightjack.Logger) *DispatchingRecorder {
+	return &DispatchingRecorder{inner: inner, dispatcher: dispatcher, logger: logger}
+}
+
+// Record delegates to the inner Recorder, then dispatches the event best-effort.
+func (r *DispatchingRecorder) Record(eventType sightjack.EventType, payload any) error {
+	if err := r.inner.Record(eventType, payload); err != nil {
+		return err
+	}
+	if r.dispatcher != nil {
+		ev, err := sightjack.NewEvent(eventType, payload, time.Now().UTC())
+		if err != nil {
+			if r.logger != nil {
+				r.logger.Warn("policy dispatch build event %s: %v", eventType, err)
+			}
+			return nil
+		}
+		if dispatchErr := r.dispatcher.Dispatch(context.Background(), ev); dispatchErr != nil {
+			if r.logger != nil {
+				r.logger.Warn("policy dispatch %s: %v", eventType, dispatchErr)
+			}
+		}
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newRunCmd() *cobra.Command {
@@ -105,7 +106,10 @@ if event data is found in .siren/events/.`,
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
-							return session.RunResumeSession(cmd.Context(), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
+							return usecase.ResumeSession(cmd.Context(), sightjack.ResumeSessionCommand{
+							RepoPath:  baseDir,
+							SessionID: resumableSessionID,
+						}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 							rescanStore := session.NewEventStore(baseDir, rescanID)
@@ -113,7 +117,10 @@ if event data is found in .siren/events/.`,
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
-							return session.RunRescanSession(cmd.Context(), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
+							return usecase.RescanSession(cmd.Context(), sightjack.RunSessionCommand{
+							RepoPath: baseDir,
+							DryRun:   dryRun,
+						}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -134,7 +141,10 @@ if event data is found in .siren/events/.`,
 				}
 				recorder = rec
 			}
-			return session.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
+			return usecase.RunSession(cmd.Context(), sightjack.RunSessionCommand{
+				RepoPath: baseDir,
+				DryRun:   dryRun,
+			}, cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
 		},
 	}
 

@@ -1,6 +1,7 @@
 package sightjack
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,18 @@ import (
 
 	"github.com/google/uuid"
 )
+
+// EventDispatcher dispatches domain events to policy handlers.
+// Implemented by usecase.PolicyEngine; injected into session via struct field.
+type EventDispatcher interface {
+	Dispatch(ctx context.Context, event Event) error
+}
+
+// EventApplier applies domain events to update materialized projections.
+type EventApplier interface {
+	Apply(event Event) error
+	Rebuild(events []Event) error
+}
 
 // EventStore is the interface for an append-only event log.
 type EventStore interface {

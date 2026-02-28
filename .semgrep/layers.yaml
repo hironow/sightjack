@@ -1,18 +1,20 @@
 rules:
   # ==========================================================================
   # Layer dependency direction enforcement
-  # 依存方向: cmd → session → eventsource/domain → root (逆方向禁止)
+  # 依存方向: cmd → usecase → session → eventsource/domain → root (逆方向禁止)
   #
-  # sightjack は 4 層構造:
-  #   internal/cmd       — cobra CLI (top layer)
-  #   internal/session   — I/O orchestration, adapter implementations
+  # sightjack は 5 層構造:
+  #   internal/cmd         — cobra CLI (top layer)
+  #   internal/usecase     — orchestration (COMMAND, Aggregate, POLICY dispatch)
+  #   internal/session     — I/O orchestration, adapter implementations
   #   internal/eventsource — event store infrastructure
-  #   internal/domain    — pure functions (no I/O, no context)
-  #   sightjack (root)   — types, interfaces, constants, go:embed
+  #   internal/domain      — pure functions (no I/O, no context)
+  #   sightjack (root)     — types, interfaces, constants, go:embed, aggregates
   #
   # Ref: docs/adr/0011-es-layer-first-refactoring.md
   #      docs/adr/0012-root-package-io-cleanup.md
   #      phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
+  #      phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
   # ==========================================================================
 
   # --- Rule 1: Root package must not import internal/ ---
@@ -159,3 +161,72 @@ rules:
     paths:
       include:
         - "/internal/cmd/**"
+
+  # --- Rule 7: usecase must not import cmd (ADR S0017) ---
+
+  - id: layer-usecase-no-import-cmd
+    languages: [go]
+    message: |
+      usecase 層から cmd 層への import は禁止です。
+      依存方向: cmd → usecase → session → eventsource/domain → root（逆方向不可）
+      usecase は session, domain, root を import できます。
+      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/cmd"
+    paths:
+      include:
+        - "/internal/usecase/**"
+
+  # --- Rule 8: usecase must not import eventsource directly (ADR S0017) ---
+
+  - id: layer-usecase-no-import-eventsource
+    languages: [go]
+    message: |
+      usecase 層から eventsource 層への直接 import は禁止です。
+      session 層のファクトリ関数を経由してください。
+      依存方向: usecase → session → eventsource（usecase → eventsource は禁止）
+      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/eventsource"
+    paths:
+      include:
+        - "/internal/usecase/**"
+
+  # --- Rule 9: session must not import usecase (ADR S0017) ---
+
+  - id: layer-session-no-import-usecase
+    languages: [go]
+    message: |
+      session 層から usecase 層への import は禁止です。
+      依存方向: cmd → usecase → session → eventsource/domain → root（逆方向不可）
+      session は eventsource, domain, root のみ import できます。
+      Ref: phonewave docs/adr/S0017-aggregate-root-and-usecase-layer.md
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/usecase"
+    paths:
+      include:
+        - "/internal/session/**"
