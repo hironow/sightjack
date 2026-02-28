@@ -24,8 +24,10 @@ func (s *failOnceStore) Append(events ...sightjack.Event) error {
 	return s.real.Append(events...)
 }
 
-func (s *failOnceStore) LoadAll() ([]sightjack.Event, error)              { return s.real.LoadAll() }
-func (s *failOnceStore) LoadSince(after time.Time) ([]sightjack.Event, error) { return s.real.LoadSince(after) }
+func (s *failOnceStore) LoadAll() ([]sightjack.Event, error) { return s.real.LoadAll() }
+func (s *failOnceStore) LoadSince(after time.Time) ([]sightjack.Event, error) {
+	return s.real.LoadSince(after)
+}
 
 func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	// given

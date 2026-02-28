@@ -90,4 +90,3 @@ func runShowFromStdin(w io.Writer) error {
 	}
 	return nil
 }
-

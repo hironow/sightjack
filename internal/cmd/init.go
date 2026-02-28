@@ -89,4 +89,3 @@ func initProject(baseDir, team, project, lang, strictness string, w io.Writer) e
 	fmt.Fprintf(w, "Created .siren/config.yaml\n")
 	return nil
 }
-

@@ -96,4 +96,3 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	cmd := n.factory()(ctx, shellName(), shellFlag(), expanded)
 	return cmd.Run()
 }
-

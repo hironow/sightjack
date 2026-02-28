@@ -107,9 +107,9 @@ if event data is found in .siren/events/.`,
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
 							return usecase.ResumeSession(cmd.Context(), sightjack.ResumeSessionCommand{
-							RepoPath:  baseDir,
-							SessionID: resumableSessionID,
-						}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
+								RepoPath:  baseDir,
+								SessionID: resumableSessionID,
+							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case sightjack.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 							rescanStore := session.NewEventStore(baseDir, rescanID)
@@ -118,9 +118,9 @@ if event data is found in .siren/events/.`,
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
 							return usecase.RescanSession(cmd.Context(), sightjack.RunSessionCommand{
-							RepoPath: baseDir,
-							DryRun:   dryRun,
-						}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
+								RepoPath: baseDir,
+								DryRun:   dryRun,
+							}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
 						case sightjack.ResumeChoiceNew:
 							goto freshSession
 						}
