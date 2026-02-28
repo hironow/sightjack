@@ -364,9 +364,9 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, sightjack.NewLogger(io.Discard, false))
 
-	// then: should have 7 results
-	if len(results) != 7 {
-		t.Fatalf("expected 7 results, got %d", len(results))
+	// then: should have 8 results
+	if len(results) != 8 {
+		t.Fatalf("expected 8 results, got %d", len(results))
 	}
 	// Config should fail
 	if results[0].Status != session.CheckFail {
@@ -413,8 +413,8 @@ claude:
 	results := session.RunDoctor(ctx, cfgPath, dir, sightjack.NewLogger(io.Discard, false))
 
 	// then
-	if len(results) != 7 {
-		t.Fatalf("expected 7 results, got %d", len(results))
+	if len(results) != 8 {
+		t.Fatalf("expected 8 results, got %d", len(results))
 	}
 	// Config should pass
 	if results[0].Status != session.CheckOK {
@@ -459,9 +459,9 @@ linear:
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, sightjack.NewLogger(io.Discard, false))
 
-	// then: should have 7 results (config, state dir, claude, git, skills, claude auth, linear mcp)
-	if len(results) != 7 {
-		t.Fatalf("expected 7 results, got %d: %v", len(results), results)
+	// then: should have 8 results (config, state dir, claude, git, skills, claude auth, linear mcp, success-rate)
+	if len(results) != 8 {
+		t.Fatalf("expected 8 results, got %d: %v", len(results), results)
 	}
 	if results[0].Name != "Config" || results[0].Status != session.CheckOK {
 		t.Errorf("Config check: expected OK, got %v: %s", results[0].Status, results[0].Message)
@@ -474,5 +474,66 @@ linear:
 	}
 	if results[6].Name != "Linear MCP" || results[6].Status != session.CheckOK {
 		t.Errorf("Linear MCP check: expected OK, got %v: %s", results[6].Status, results[6].Message)
+	}
+	// success-rate should be last result, OK with "no events" (no events dir in temp)
+	sr := results[7]
+	if sr.Name != "success-rate" {
+		t.Errorf("expected 'success-rate', got %q", sr.Name)
+	}
+	if sr.Status != session.CheckOK {
+		t.Errorf("success-rate: expected OK, got %v: %s", sr.Status, sr.Message)
+	}
+	if sr.Message != "no events" {
+		t.Errorf("success-rate: expected 'no events', got %q", sr.Message)
+	}
+}
+
+func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
+	// given: mock claude, valid config, and event data in .siren/events/{session-id}/
+	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "echo", "ok")
+	})
+	defer cleanup()
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(cfgPath, []byte(`
+linear:
+  team: "Test"
+  project: "Project"
+`), 0644)
+
+	// Create event store with 2 applied and 1 rejected wave events
+	sessionDir := filepath.Join(dir, ".siren", "events", "test-session-001")
+	os.MkdirAll(sessionDir, 0755)
+	events := strings.Join([]string{
+		`{"id":"e1","type":"wave_applied","timestamp":"2026-03-01T10:00:00Z","data":{"wave_id":"w1","cluster_name":"c1","applied":1,"total_count":1},"session_id":"test-session-001"}`,
+		`{"id":"e2","type":"wave_applied","timestamp":"2026-03-01T10:01:00Z","data":{"wave_id":"w2","cluster_name":"c1","applied":1,"total_count":1},"session_id":"test-session-001"}`,
+		`{"id":"e3","type":"wave_rejected","timestamp":"2026-03-01T10:02:00Z","data":{"wave_id":"w3","cluster_name":"c1"},"session_id":"test-session-001"}`,
+	}, "\n") + "\n"
+	os.WriteFile(filepath.Join(sessionDir, "2026-03-01.jsonl"), []byte(events), 0644)
+
+	ctx := context.Background()
+
+	// when
+	results := session.RunDoctor(ctx, cfgPath, dir, sightjack.NewLogger(io.Discard, false))
+
+	// then: find success-rate result
+	var found bool
+	for _, r := range results {
+		if r.Name == "success-rate" {
+			found = true
+			if r.Status != session.CheckOK {
+				t.Errorf("success-rate: expected OK, got %v", r.Status)
+			}
+			want := "66.7% (2/3)"
+			if r.Message != want {
+				t.Errorf("success-rate: got %q, want %q", r.Message, want)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("success-rate check not found in results (got %d results)", len(results))
 	}
 }

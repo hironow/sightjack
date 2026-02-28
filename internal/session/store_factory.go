@@ -31,6 +31,11 @@ func LoadLatestResumableState(baseDir string, match func(*sightjack.SessionState
 	return eventsource.LoadLatestResumableState(baseDir, match)
 }
 
+// LoadAllEvents aggregates events from all session stores.
+func LoadAllEvents(baseDir string) ([]sightjack.Event, error) {
+	return eventsource.LoadAllEventsAcrossSessions(baseDir)
+}
+
 // ListExpiredEventFiles returns event files older than the retention threshold.
 func ListExpiredEventFiles(baseDir string, days int) ([]string, error) {
 	return eventsource.ListExpiredEventFiles(baseDir, days)

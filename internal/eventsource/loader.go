@@ -76,6 +76,29 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 	return candidates, nil
 }
 
+// LoadAllEventsAcrossSessions aggregates events from all session stores under
+// .siren/events/. Returns nil, nil when the events directory does not exist.
+func LoadAllEventsAcrossSessions(baseDir string) ([]sightjack.Event, error) {
+	eventsDir := EventsDir(baseDir)
+	candidates, err := sortedEventCandidates(eventsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load all events: %w", err)
+	}
+	var all []sightjack.Event
+	for _, c := range candidates {
+		store := NewFileEventStore(EventStorePath(baseDir, c.name))
+		events, loadErr := store.LoadAll()
+		if loadErr != nil {
+			continue
+		}
+		all = append(all, events...)
+	}
+	return all, nil
+}
+
 // loadLatestStateMatching iterates event stores by modtime descending and
 // returns the first state that satisfies match (nil match accepts any).
 func loadLatestStateMatching(baseDir string, match func(*sightjack.SessionState) bool) (*sightjack.SessionState, string, error) {

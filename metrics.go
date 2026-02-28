@@ -1,5 +1,16 @@
 package sightjack
 
+import "fmt"
+
+// FormatSuccessRate returns a human-readable string for the given success rate.
+// Returns "no events" when total is zero.
+func FormatSuccessRate(rate float64, success, total int) string {
+	if total == 0 {
+		return "no events"
+	}
+	return fmt.Sprintf("%.1f%% (%d/%d)", rate*100, success, total)
+}
+
 // SuccessRate calculates the wave success rate from a list of events.
 // It counts EventWaveApplied as success and EventWaveRejected as failure.
 // Returns 0.0 if there are no relevant events.

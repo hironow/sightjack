@@ -280,5 +280,32 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *s
 		results = append(results, CheckLinearMCP(ctx, cfg, logger))
 	}
 
+	// 8. Success rate (informational, never fails)
+	allEvents, evErr := LoadAllEvents(baseDir)
+	if evErr != nil || len(allEvents) == 0 {
+		results = append(results, CheckResult{
+			Name:    "success-rate",
+			Status:  CheckOK,
+			Message: "no events",
+		})
+	} else {
+		rate := sightjack.SuccessRate(allEvents)
+		var success, total int
+		for _, ev := range allEvents {
+			switch ev.Type {
+			case sightjack.EventWaveApplied:
+				success++
+				total++
+			case sightjack.EventWaveRejected:
+				total++
+			}
+		}
+		results = append(results, CheckResult{
+			Name:    "success-rate",
+			Status:  CheckOK,
+			Message: sightjack.FormatSuccessRate(rate, success, total),
+		})
+	}
+
 	return results
 }
