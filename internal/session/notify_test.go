@@ -79,9 +79,42 @@ func TestLocalNotifier_Linux(t *testing.T) {
 	}
 }
 
+func TestLocalNotifier_Windows(t *testing.T) {
+	// given: LocalNotifier forced to windows, with captured command
+	var captured []string
+	n := session.NewLocalNotifierForTest("windows",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			captured = append(captured, name)
+			captured = append(captured, args...)
+			return exec.Command("true")
+		},
+	)
+
+	// when
+	err := n.Notify(context.Background(), "Test Title", "Test Message")
+
+	// then
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(captured) == 0 {
+		t.Fatal("expected command to be captured")
+	}
+	if captured[0] != "powershell" {
+		t.Errorf("expected powershell, got %s", captured[0])
+	}
+	joined := strings.Join(captured, " ")
+	if !strings.Contains(joined, "Test Title") {
+		t.Error("expected title in powershell args")
+	}
+	if !strings.Contains(joined, "Test Message") {
+		t.Error("expected message in powershell args")
+	}
+}
+
 func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	// given: unsupported OS
-	n := session.NewLocalNotifierForTest("windows",
+	n := session.NewLocalNotifierForTest("freebsd",
 		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			return exec.Command("true")
 		},

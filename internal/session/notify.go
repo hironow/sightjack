@@ -46,9 +46,27 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 	case "linux":
 		cmd := factory(ctx, "notify-send", title, message)
 		return cmd.Run()
+	case "windows":
+		script := fmt.Sprintf(
+			`Add-Type -AssemblyName System.Windows.Forms; `+
+				`$n = New-Object System.Windows.Forms.NotifyIcon; `+
+				`$n.Icon = [System.Drawing.SystemIcons]::Information; `+
+				`$n.BalloonTipTitle = '%s'; `+
+				`$n.BalloonTipText = '%s'; `+
+				`$n.Visible = $true; `+
+				`$n.ShowBalloonTip(5000)`,
+			psEscapeSingleQuote(title), psEscapeSingleQuote(message),
+		)
+		cmd := factory(ctx, "powershell", "-NoProfile", "-Command", script)
+		return cmd.Run()
 	default:
 		return fmt.Errorf("notify: unsupported OS %q", n.os())
 	}
+}
+
+// psEscapeSingleQuote escapes single quotes for PowerShell single-quoted strings.
+func psEscapeSingleQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
 
 // CmdNotifier runs a user-provided shell command with {title} and {message} placeholders.

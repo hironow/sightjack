@@ -73,7 +73,9 @@ if event data is found in .siren/events/.`,
 			// state for rescan/new choices.
 			if !dryRun {
 				// Find best resumable session (may differ from the latest)
-				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(baseDir, session.CanResume)
+				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(baseDir, func(s *sightjack.SessionState) bool {
+					return session.CanResume(baseDir, s)
+				})
 				// Find latest state for display and rescan (regardless of resumability)
 				displayState, _, stateErr := session.LoadLatestState(baseDir)
 				if stateErr == nil {
@@ -84,7 +86,7 @@ if event data is found in .siren/events/.`,
 					}
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
-						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, promptState)
+						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, baseDir, promptState)
 						if promptErr == session.ErrQuit {
 							return nil
 						}

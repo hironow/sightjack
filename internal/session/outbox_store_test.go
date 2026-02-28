@@ -560,3 +560,28 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 		}
 	}
 }
+
+func TestSQLiteOutboxStore_IncrementalVacuum(t *testing.T) {
+	// given: store with auto_vacuum=INCREMENTAL
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// when: call IncrementalVacuum (should not error even on empty DB)
+	if err := store.IncrementalVacuum(); err != nil {
+		t.Fatalf("IncrementalVacuum: %v", err)
+	}
+
+	// then: verify auto_vacuum is set to INCREMENTAL (2)
+	var autoVacuum string
+	if err := store.DBForTest().QueryRow("PRAGMA auto_vacuum").Scan(&autoVacuum); err != nil {
+		t.Fatalf("query PRAGMA auto_vacuum: %v", err)
+	}
+	if autoVacuum != "2" {
+		t.Errorf("PRAGMA auto_vacuum: got %q, want %q (INCREMENTAL)", autoVacuum, "2")
+	}
+}

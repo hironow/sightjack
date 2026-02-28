@@ -146,7 +146,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		Clusters:       clusterStates,
 		Completeness:   scanResult.Completeness,
 		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: scanResultPath,
+		ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
 		LastScanned:    scanTime,
 	})
 
@@ -672,7 +672,8 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 	if state.ScanResultPath == "" {
 		return nil, nil, nil, 0, fmt.Errorf("no cached scan result path in state")
 	}
-	scanResult, err := LoadScanResult(state.ScanResultPath)
+	resolvedPath := sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath)
+	scanResult, err := LoadScanResult(resolvedPath)
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
 	}
@@ -689,7 +690,7 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 // ScanResultPath is empty.
 func ResumeScanDir(state *sightjack.SessionState, baseDir string) string {
 	if state.ScanResultPath != "" {
-		return filepath.Dir(state.ScanResultPath)
+		return filepath.Dir(sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath))
 	}
 	return sightjack.ScanDir(baseDir, state.SessionID)
 }
@@ -866,7 +867,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		Clusters:       clusterStates,
 		Completeness:   scanResult.Completeness,
 		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: scanResultPath,
+		ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
 		LastScanned:    scanTime,
 	})
 	recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{

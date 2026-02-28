@@ -3,6 +3,8 @@ package session
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,13 +49,37 @@ func (d *DMail) Filename() string {
 
 const frontmatterDelim = "---"
 
+// DMailIdempotencyKey computes a SHA256 content-based idempotency key from
+// the core fields of a DMail (name, kind, description, body).
+func DMailIdempotencyKey(mail *DMail) string {
+	h := sha256.New()
+	h.Write([]byte(mail.Name))
+	h.Write([]byte{0})
+	h.Write([]byte(string(mail.Kind)))
+	h.Write([]byte{0})
+	h.Write([]byte(mail.Description))
+	h.Write([]byte{0})
+	h.Write([]byte(mail.Body))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // MarshalDMail serializes a DMail to YAML frontmatter + Markdown body.
+// Automatically injects an idempotency_key into metadata based on content hash.
 func MarshalDMail(mail *DMail) ([]byte, error) {
+	// Create a shallow copy to avoid mutating the caller's DMail.
+	cp := *mail
+	meta := make(map[string]string, len(mail.Metadata)+1)
+	for k, v := range mail.Metadata {
+		meta[k] = v
+	}
+	meta["idempotency_key"] = DMailIdempotencyKey(mail)
+	cp.Metadata = meta
+
 	var buf bytes.Buffer
 	buf.WriteString(frontmatterDelim + "\n")
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
-	if err := enc.Encode(mail); err != nil {
+	if err := enc.Encode(&cp); err != nil {
 		return nil, fmt.Errorf("dmail marshal frontmatter: %w", err)
 	}
 	enc.Close()

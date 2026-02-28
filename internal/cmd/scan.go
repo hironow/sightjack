@@ -106,7 +106,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				Clusters:       clusters,
 				Completeness:   result.Completeness,
 				ShibitoCount:   len(result.ShibitoWarnings),
-				ScanResultPath: scanResultPath,
+				ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
 				LastScanned:    time.Now(),
 			}); err != nil {
 				logger.Warn("Failed to record scan completed: %v", err)

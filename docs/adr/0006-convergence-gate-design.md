@@ -1,7 +1,7 @@
 # 0006. Convergence Gate Design
 
 **Date:** 2026-02-23
-**Status:** Accepted — approval contract generalized in shared ADR S0003
+**Status:** Accepted
 
 ## Context
 

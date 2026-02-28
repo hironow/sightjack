@@ -540,7 +540,7 @@ func TestPromptResume_ChooseResume(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := session.PromptResume(ctx, &output, scanner, state)
+	choice, err := session.PromptResume(ctx, &output, scanner, t.TempDir(), state)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -563,7 +563,7 @@ func TestPromptResume_ChooseNew(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := session.PromptResume(ctx, &output, scanner, state)
+	choice, err := session.PromptResume(ctx, &output, scanner, t.TempDir(), state)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -580,7 +580,7 @@ func TestPromptResume_ChooseRescan(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	choice, err := session.PromptResume(ctx, &output, scanner, state)
+	choice, err := session.PromptResume(ctx, &output, scanner, t.TempDir(), state)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -597,7 +597,7 @@ func TestPromptResume_ChooseQuit(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	_, err := session.PromptResume(ctx, &output, scanner, state)
+	_, err := session.PromptResume(ctx, &output, scanner, t.TempDir(), state)
 
 	if err != session.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
@@ -611,7 +611,7 @@ func TestPromptResume_InvalidInput(t *testing.T) {
 	var output bytes.Buffer
 	ctx := context.Background()
 
-	_, err := session.PromptResume(ctx, &output, scanner, state)
+	_, err := session.PromptResume(ctx, &output, scanner, t.TempDir(), state)
 
 	if err == nil {
 		t.Fatal("expected error for invalid input")

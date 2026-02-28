@@ -2000,3 +2000,75 @@ func TestFormatReportsForPrompt_Single(t *testing.T) {
 		t.Error("expected body")
 	}
 }
+
+func TestDMailIdempotencyKey_Deterministic(t *testing.T) {
+	// given
+	mail := &session.DMail{
+		Name:        "spec-001",
+		Kind:        session.DMailSpecification,
+		Description: "test spec",
+		Body:        "body content\n",
+	}
+
+	// when
+	key1 := session.DMailIdempotencyKey(mail)
+	key2 := session.DMailIdempotencyKey(mail)
+
+	// then
+	if key1 != key2 {
+		t.Errorf("not deterministic: %q != %q", key1, key2)
+	}
+	if len(key1) != 64 {
+		t.Errorf("expected 64-char hex, got %d: %q", len(key1), key1)
+	}
+}
+
+func TestMarshalDMail_IdempotencyKey(t *testing.T) {
+	// given
+	mail := &session.DMail{
+		Name:        "spec-001",
+		Kind:        session.DMailSpecification,
+		Description: "test spec",
+		Body:        "body content\n",
+	}
+
+	// when
+	data, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+
+	// then
+	parsed, err := session.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail: %v", err)
+	}
+	key, ok := parsed.Metadata["idempotency_key"]
+	if !ok {
+		t.Fatal("expected idempotency_key in metadata")
+	}
+	expected := session.DMailIdempotencyKey(mail)
+	if key != expected {
+		t.Errorf("got %q, want %q", key, expected)
+	}
+}
+
+func TestMarshalDMail_IdempotencyKey_DoesNotMutateOriginal(t *testing.T) {
+	// given: DMail with no metadata
+	mail := &session.DMail{
+		Name:        "spec-001",
+		Kind:        session.DMailSpecification,
+		Description: "test",
+	}
+
+	// when
+	_, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+
+	// then: original metadata should not be modified
+	if mail.Metadata != nil {
+		t.Errorf("original metadata mutated: %v", mail.Metadata)
+	}
+}
