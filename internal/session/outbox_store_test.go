@@ -561,6 +561,101 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 	}
 }
 
+func TestSQLiteOutboxStore_PruneFlushed(t *testing.T) {
+	// given: store with staged + flushed items
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage 3 items
+	for i := 0; i < 3; i++ {
+		name := fmt.Sprintf("test-%d.dmail", i)
+		if err := store.Stage(name, []byte(`{"kind":"feedback"}`)); err != nil {
+			t.Fatalf("stage %s: %v", name, err)
+		}
+	}
+
+	// Flush to mark items as flushed=1
+	flushed, err := store.Flush()
+	if err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	if flushed != 3 {
+		t.Fatalf("flush count: got %d, want 3", flushed)
+	}
+
+	// when: prune flushed items
+	pruned, err := store.PruneFlushed()
+	if err != nil {
+		t.Fatalf("PruneFlushed: %v", err)
+	}
+
+	// then: all flushed items removed
+	if pruned != 3 {
+		t.Errorf("PruneFlushed count: got %d, want 3", pruned)
+	}
+
+	// Verify DB has no rows
+	var count int
+	if err := store.DBForTest().QueryRow("SELECT COUNT(*) FROM staged").Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("remaining rows: got %d, want 0", count)
+	}
+}
+
+func TestSQLiteOutboxStore_PruneFlushed_KeepsUnflushed(t *testing.T) {
+	// given: store with mix of flushed and unflushed items
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage 2 items, flush them
+	for i := 0; i < 2; i++ {
+		name := fmt.Sprintf("flushed-%d.dmail", i)
+		if err := store.Stage(name, []byte(`{"kind":"feedback"}`)); err != nil {
+			t.Fatalf("stage %s: %v", name, err)
+		}
+	}
+	if _, err := store.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+
+	// Stage 1 more item (unflushed)
+	if err := store.Stage("unflushed.dmail", []byte(`{"kind":"report"}`)); err != nil {
+		t.Fatalf("stage unflushed: %v", err)
+	}
+
+	// when
+	pruned, err := store.PruneFlushed()
+	if err != nil {
+		t.Fatalf("PruneFlushed: %v", err)
+	}
+
+	// then: only flushed items removed
+	if pruned != 2 {
+		t.Errorf("PruneFlushed count: got %d, want 2", pruned)
+	}
+
+	// Verify 1 unflushed row remains
+	var count int
+	if err := store.DBForTest().QueryRow("SELECT COUNT(*) FROM staged").Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("remaining rows: got %d, want 1", count)
+	}
+}
+
 func TestSQLiteOutboxStore_IncrementalVacuum(t *testing.T) {
 	// given: store with auto_vacuum=INCREMENTAL
 	dir := t.TempDir()

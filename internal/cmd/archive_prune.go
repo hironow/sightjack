@@ -97,6 +97,14 @@ Pass --execute to actually remove the files.`,
 				fmt.Fprintf(errW, "Pruned %d event file(s).\n", len(deleted))
 			}
 
+			// Prune flushed outbox DB rows + incremental vacuum.
+			pruned, pruneErr := session.PruneFlushedOutbox(baseDir)
+			if pruneErr != nil {
+				logger.Warn("Failed to prune outbox DB: %v", pruneErr)
+			} else if pruned > 0 {
+				fmt.Fprintf(errW, "Pruned %d flushed outbox row(s).\n", pruned)
+			}
+
 			return nil
 		},
 	}
