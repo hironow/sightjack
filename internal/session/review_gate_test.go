@@ -84,3 +84,45 @@ func TestRunReviewGate_FailingReviewExhaustedCycles(t *testing.T) {
 		t.Error("expected passed=false after exhausting review cycles")
 	}
 }
+
+func TestRunReviewGate_BudgetExceeded(t *testing.T) {
+	// given — budget=1, review always fails
+	ctx := context.Background()
+	cfg := &sightjack.Config{
+		Gate:   sightjack.GateConfig{ReviewCmd: "echo 'error' && exit 1", ReviewBudget: 1},
+		Claude: sightjack.ClaudeConfig{Command: "true", TimeoutSec: 30},
+	}
+	dir := t.TempDir()
+	initGitRepo(t, dir)
+
+	// when
+	passed, err := session.RunReviewGate(ctx, cfg, dir, nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if passed {
+		t.Error("expected passed=false with budget=1 and failing review")
+	}
+}
+
+func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
+	// given — budget=0 means use default (3)
+	ctx := context.Background()
+	cfg := &sightjack.Config{
+		Gate:   sightjack.GateConfig{ReviewCmd: "echo ok"},
+		Claude: sightjack.ClaudeConfig{TimeoutSec: 30},
+	}
+
+	// when
+	passed, err := session.RunReviewGate(ctx, cfg, t.TempDir(), nil)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !passed {
+		t.Error("expected passed=true for passing review")
+	}
+}

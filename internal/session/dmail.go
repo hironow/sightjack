@@ -100,8 +100,12 @@ func ComposeDMail(store sightjack.OutboxStore, mail *DMail) error {
 	if err := store.Stage(mail.Filename(), data); err != nil {
 		return fmt.Errorf("dmail stage: %w", err)
 	}
-	if _, err := store.Flush(); err != nil {
+	n, err := store.Flush()
+	if err != nil {
 		return fmt.Errorf("dmail flush: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("dmail flush: item not delivered (write failure, will retry)")
 	}
 	return nil
 }

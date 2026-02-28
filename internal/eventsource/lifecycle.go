@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
-// ListExpiredEventFiles returns .jsonl filenames in .siren/events/ whose
+// ListExpiredEventFiles returns session names in .siren/events/ whose
 // mtime exceeds the given number of days.
+// Supports both directories (new format) and .jsonl files (legacy).
 // Returns an empty slice (not error) when the events directory does not exist.
 func ListExpiredEventFiles(baseDir string, days int) ([]string, error) {
 	if days < 0 {
@@ -28,11 +28,8 @@ func ListExpiredEventFiles(baseDir string, days int) ([]string, error) {
 	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
 	var expired []string
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
+		info, infoErr := e.Info()
+		if infoErr != nil {
 			continue
 		}
 		if info.ModTime().Before(cutoff) {
@@ -42,15 +39,16 @@ func ListExpiredEventFiles(baseDir string, days int) ([]string, error) {
 	return expired, nil
 }
 
-// PruneEventFiles deletes the named .jsonl files from .siren/events/.
-// Files that no longer exist are silently skipped.
-// Returns the list of filenames that were processed.
+// PruneEventFiles deletes the named entries from .siren/events/.
+// Supports both directories and files.
+// Entries that no longer exist are silently skipped.
+// Returns the list of names that were processed.
 func PruneEventFiles(baseDir string, files []string) ([]string, error) {
 	dir := EventsDir(baseDir)
 	var deleted []string
 	for _, name := range files {
 		path := filepath.Join(dir, name)
-		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := os.RemoveAll(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return deleted, err
 		}
 		deleted = append(deleted, name)

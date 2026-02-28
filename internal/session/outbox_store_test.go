@@ -360,6 +360,175 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	}
 }
 
+func TestSQLiteOutboxStore_FilePermission(t *testing.T) {
+	if os.Getenv("CI") != "" && strings.Contains(strings.ToLower(os.Getenv("RUNNER_OS")), "windows") {
+		t.Skip("NTFS does not support Unix file permissions")
+	}
+
+	// given
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// when
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		t.Fatalf("stat db: %v", err)
+	}
+
+	// then: permission should be 0o600 (owner read/write only)
+	perm := info.Mode().Perm()
+	if perm != 0o600 {
+		t.Errorf("db permission: got %o, want %o", perm, 0o600)
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
+	// given: store with archive dir that will be made unwritable
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
+	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage an item
+	if err := store.Stage("fail.md", []byte("data")); err != nil {
+		t.Fatalf("Stage: %v", err)
+	}
+
+	// Make archive dir read-only so atomicWrite fails
+	os.Chmod(archiveDir, 0o444)
+	defer os.Chmod(archiveDir, 0o755)
+
+	// when: flush 3 times (each fails, incrementing retry_count to 3)
+	for i := range 3 {
+		n, _ := store.Flush()
+		if n != 0 {
+			t.Errorf("flush %d: expected 0 flushed (write should fail), got %d", i+1, n)
+		}
+	}
+
+	// Restore permissions — writes would now succeed
+	os.Chmod(archiveDir, 0o755)
+
+	// when: flush again — item should be dead-letter (retry_count >= 3, skipped)
+	n, err := store.Flush()
+
+	// then: no items flushed
+	if err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 flushed (dead-letter), got %d", n)
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
+	// given: store that fails once, then succeeds
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
+	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage an item
+	store.Stage("retry.md", []byte("retry-data"))
+
+	// Make archive dir read-only for first flush
+	os.Chmod(archiveDir, 0o444)
+
+	// when: first flush fails
+	n, _ := store.Flush()
+	if n != 0 {
+		t.Errorf("first flush: expected 0 flushed, got %d", n)
+	}
+
+	// Restore permissions — next flush should succeed
+	os.Chmod(archiveDir, 0o755)
+
+	// when: second flush should succeed (retry_count = 1, below max)
+	n, err = store.Flush()
+	if err != nil {
+		t.Fatalf("second Flush: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("second flush: expected 1 flushed, got %d", n)
+	}
+
+	// then: file exists
+	archivePath := filepath.Join(archiveDir, "retry.md")
+	data, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatalf("read archive: %v", err)
+	}
+	if string(data) != "retry-data" {
+		t.Errorf("content: got %q, want %q", string(data), "retry-data")
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_MixedItems(t *testing.T) {
+	// given: two items — one always fails (dead-letter), one always succeeds
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
+	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage first item, make it exhaust retries
+	store.Stage("bad.md", []byte("bad"))
+	os.Chmod(archiveDir, 0o444)
+	for range 3 {
+		store.Flush()
+	}
+	os.Chmod(archiveDir, 0o755)
+
+	// Stage second item (good)
+	store.Stage("good.md", []byte("good"))
+
+	// when: flush
+	n, err := store.Flush()
+
+	// then: only the good item flushed (bad is dead-letter)
+	if err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 flushed (only good.md), got %d", n)
+	}
+
+	// then: good.md exists
+	goodPath := filepath.Join(archiveDir, "good.md")
+	if _, err := os.Stat(goodPath); err != nil {
+		t.Errorf("good.md missing: %v", err)
+	}
+}
+
 func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 	// given: stage multiple items before flush
 	dir := t.TempDir()

@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -10,7 +12,7 @@ import (
 )
 
 func newDoctorCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "doctor [path]",
 		Short: "Check environment and tool availability",
 		Long: `Check environment health and tool availability.
@@ -30,45 +32,90 @@ is working. Reports pass/fail/skip for each check.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 			resolved := resolveConfigPath(cmd, baseDir)
-			w := cmd.ErrOrStderr()
-
-			fmt.Fprintln(w, "sightjack doctor — environment health check")
-			fmt.Fprintln(w)
+			jsonOut, _ := cmd.Flags().GetBool("json")
 
 			logger := loggerFrom(cmd)
 			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger)
 
-			var fails, skips int
-			for _, r := range results {
-				fmt.Fprintf(w, "[%s] %s: %s\n", r.Status.StatusLabel(), r.Name, r.Message)
-				if r.Hint != "" {
-					fmt.Fprintf(w, "  hint: %s\n", r.Hint)
-				}
-				switch r.Status {
-				case session.CheckFail:
-					fails++
-				case session.CheckSkip:
-					skips++
-				}
+			if jsonOut {
+				return printDoctorJSON(cmd.OutOrStdout(), results)
 			}
-
-			fmt.Fprintln(w)
-			if fails == 0 && skips == 0 {
-				fmt.Fprintln(w, "All checks passed.")
-				return nil
-			}
-			var parts []string
-			if fails > 0 {
-				parts = append(parts, fmt.Sprintf("%d check(s) failed", fails))
-			}
-			if skips > 0 {
-				parts = append(parts, fmt.Sprintf("%d skipped", skips))
-			}
-			fmt.Fprintln(w, strings.Join(parts, ", ")+".")
-			if fails > 0 {
-				return fmt.Errorf("%d check(s) failed", fails)
-			}
-			return nil
+			return printDoctorText(cmd.ErrOrStderr(), results)
 		},
 	}
+
+	cmd.Flags().BoolP("json", "j", false, "output as JSON")
+
+	return cmd
+}
+
+type doctorJSONCheck struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Hint    string `json:"hint,omitempty"`
+}
+
+func printDoctorJSON(w io.Writer, results []session.CheckResult) error {
+	checks := make([]doctorJSONCheck, len(results))
+	hasFail := false
+	for i, r := range results {
+		checks[i] = doctorJSONCheck{
+			Name:    r.Name,
+			Status:  r.Status.StatusLabel(),
+			Message: r.Message,
+			Hint:    r.Hint,
+		}
+		if r.Status == session.CheckFail {
+			hasFail = true
+		}
+	}
+	data, err := json.MarshalIndent(struct {
+		Checks []doctorJSONCheck `json:"checks"`
+	}{Checks: checks}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal doctor checks: %w", err)
+	}
+	fmt.Fprintln(w, string(data))
+	if hasFail {
+		return fmt.Errorf("some checks failed")
+	}
+	return nil
+}
+
+func printDoctorText(w io.Writer, results []session.CheckResult) error {
+	fmt.Fprintln(w, "sightjack doctor — environment health check")
+	fmt.Fprintln(w)
+
+	var fails, skips int
+	for _, r := range results {
+		fmt.Fprintf(w, "[%s] %s: %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		if r.Hint != "" {
+			fmt.Fprintf(w, "  hint: %s\n", r.Hint)
+		}
+		switch r.Status {
+		case session.CheckFail:
+			fails++
+		case session.CheckSkip:
+			skips++
+		}
+	}
+
+	fmt.Fprintln(w)
+	if fails == 0 && skips == 0 {
+		fmt.Fprintln(w, "All checks passed.")
+		return nil
+	}
+	var parts []string
+	if fails > 0 {
+		parts = append(parts, fmt.Sprintf("%d check(s) failed", fails))
+	}
+	if skips > 0 {
+		parts = append(parts, fmt.Sprintf("%d skipped", skips))
+	}
+	fmt.Fprintln(w, strings.Join(parts, ", ")+".")
+	if fails > 0 {
+		return fmt.Errorf("%d check(s) failed", fails)
+	}
+	return nil
 }

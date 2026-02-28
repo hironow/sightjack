@@ -79,9 +79,3 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	return cmd.Run()
 }
 
-// ShellQuote wraps a string in single quotes with proper escaping
-// to prevent shell injection. Single quotes within the string are
-// escaped by splitting: quote -> quote-backslash-quote-quote (see implementation).
-func ShellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-}

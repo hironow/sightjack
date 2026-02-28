@@ -11,7 +11,7 @@ func EventsDir(baseDir string) string {
 	return filepath.Join(baseDir, sightjack.StateDir, "events")
 }
 
-// EventStorePath returns the JSONL file path for a given session.
+// EventStorePath returns the directory path for a given session's event store.
 func EventStorePath(baseDir, sessionID string) string {
-	return filepath.Join(EventsDir(baseDir), sessionID+".jsonl")
+	return filepath.Join(EventsDir(baseDir), sessionID)
 }

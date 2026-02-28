@@ -113,7 +113,31 @@ rules:
       include:
         - "/internal/eventsource/**"
 
-  # --- Rule 5: cmd must not import eventsource (ADR S0008) ---
+  # --- Rule 5: cmd must not import domain ---
+
+  - id: layer-cmd-no-import-domain
+    languages: [go]
+    message: |
+      cmd 層から domain 層への直接 import は禁止です。
+      session 層の wrapper 関数を経由してください。
+      依存方向: cmd → session → domain（cmd → domain は禁止）
+      domain の pure functions は session 経由でアクセスしてください。
+      Ref: docs/adr/0011-es-layer-first-refactoring.md
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/domain"
+    paths:
+      include:
+        - "/internal/cmd/**"
+
+  # --- Rule 6: cmd must not import eventsource (ADR S0008) ---
 
   - id: s0008-cmd-no-import-eventsource
     languages: [go]

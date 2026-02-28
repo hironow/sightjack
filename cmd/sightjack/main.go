@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 
+	sightjack "github.com/hironow/sightjack"
 	cmd "github.com/hironow/sightjack/internal/cmd"
 )
 
@@ -25,6 +26,6 @@ func main() {
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(sightjack.ExitCode(err))
 	}
 }

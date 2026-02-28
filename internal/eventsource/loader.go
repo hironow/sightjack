@@ -13,7 +13,7 @@ import (
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
 func LoadState(store sightjack.EventStore) (*sightjack.SessionState, error) {
-	events, err := store.ReadAll()
+	events, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)
 	}
@@ -42,7 +42,8 @@ type eventCandidate struct {
 	modTime int64
 }
 
-// sortedEventCandidates returns .jsonl files in eventsDir sorted by modtime descending.
+// sortedEventCandidates returns session directories (or legacy .jsonl files)
+// in eventsDir sorted by modtime descending.
 func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 	entries, err := os.ReadDir(eventsDir)
 	if err != nil {
@@ -50,12 +51,23 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 	}
 	var candidates []eventCandidate
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".jsonl") {
+		// Session directories contain daily JSONL files.
+		if e.IsDir() {
 			info, infoErr := e.Info()
 			if infoErr != nil {
 				continue
 			}
 			candidates = append(candidates, eventCandidate{name: e.Name(), modTime: info.ModTime().UnixNano()})
+			continue
+		}
+		// Legacy: single .jsonl files (backwards compat during migration).
+		if strings.HasSuffix(e.Name(), ".jsonl") {
+			info, infoErr := e.Info()
+			if infoErr != nil {
+				continue
+			}
+			name := strings.TrimSuffix(e.Name(), ".jsonl")
+			candidates = append(candidates, eventCandidate{name: name, modTime: info.ModTime().UnixNano()})
 		}
 	}
 	sort.Slice(candidates, func(i, j int) bool {
@@ -64,7 +76,7 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 	return candidates, nil
 }
 
-// loadLatestStateMatching iterates event files by modtime descending and
+// loadLatestStateMatching iterates event stores by modtime descending and
 // returns the first state that satisfies match (nil match accepts any).
 func loadLatestStateMatching(baseDir string, match func(*sightjack.SessionState) bool) (*sightjack.SessionState, string, error) {
 	eventsDir := EventsDir(baseDir)
@@ -77,7 +89,7 @@ func loadLatestStateMatching(baseDir string, match func(*sightjack.SessionState)
 	}
 
 	for _, c := range candidates {
-		sessionID := strings.TrimSuffix(c.name, ".jsonl")
+		sessionID := c.name
 		store := NewFileEventStore(EventStorePath(baseDir, sessionID))
 		state, loadErr := LoadState(store)
 		if loadErr != nil {
@@ -89,4 +101,3 @@ func loadLatestStateMatching(baseDir string, match func(*sightjack.SessionState)
 	}
 	return nil, "", fmt.Errorf("load latest state: no valid event data in %s", eventsDir)
 }
-

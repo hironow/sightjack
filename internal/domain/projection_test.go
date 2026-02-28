@@ -2,19 +2,21 @@ package domain_test
 
 import (
 	"testing"
+	"time"
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-// mustEvent creates an Event with the given type, session ID, sequence, and payload.
-// Panics on marshal failure.
-func mustEvent(t *testing.T, eventType sightjack.EventType, sessionID string, seq int64, payload any) sightjack.Event {
+// mustEvent creates an Event with the given type, session ID, and payload.
+// SessionID is set on the returned event. Panics on marshal failure.
+func mustEvent(t *testing.T, eventType sightjack.EventType, sessionID string, _ int64, payload any) sightjack.Event {
 	t.Helper()
-	e, err := sightjack.NewEvent(eventType, sessionID, seq, payload)
+	e, err := sightjack.NewEvent(eventType, payload, time.Now())
 	if err != nil {
 		t.Fatalf("mustEvent: %v", err)
 	}
+	e.SessionID = sessionID
 	return e
 }
 
@@ -284,7 +286,7 @@ func TestProjectState_AuditOnlyEventsNoMutation(t *testing.T) {
 func TestProjectState_UnknownEventSkipped(t *testing.T) {
 	t.Parallel()
 	// given — craft an event with unknown type
-	e, err := sightjack.NewEvent("unknown_future_event", "sess-1", 1, map[string]string{"key": "value"})
+	e, err := sightjack.NewEvent("unknown_future_event", map[string]string{"key": "value"}, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

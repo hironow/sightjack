@@ -4,6 +4,8 @@ dist/
 coverage.out
 # sightjack runtime state on target repository
 .siren/
+# environment-specific local files (must not contain full paths)
+*.local.*
 # claude local settings
 .claude/*.local.*
 # git worktrees

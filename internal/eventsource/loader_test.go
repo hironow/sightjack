@@ -560,11 +560,13 @@ func TestProjectState_ADRGenerated_Idempotent(t *testing.T) {
 }
 
 // mustNewEvent is a test helper that creates an event and fails on error.
-func mustNewEvent(t *testing.T, eventType sightjack.EventType, sessionID string, seq int64, payload any) sightjack.Event {
+// SessionID is set on the returned event. The seq parameter is ignored (kept for call-site compat).
+func mustNewEvent(t *testing.T, eventType sightjack.EventType, sessionID string, _ int64, payload any) sightjack.Event {
 	t.Helper()
-	event, err := sightjack.NewEvent(eventType, sessionID, seq, payload)
+	event, err := sightjack.NewEvent(eventType, payload, time.Now())
 	if err != nil {
 		t.Fatalf("NewEvent(%s): %v", eventType, err)
 	}
+	event.SessionID = sessionID
 	return event
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
-	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -102,7 +101,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 					return fmt.Errorf("cannot resolve wave context: no CompletedWave in ApplyResult and no event data.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first")
 				}
 
-				allWaves = domain.RestoreWaves(state.Waves)
+				allWaves = session.RestoreWaves(state.Waves)
 
 				var candidates []sightjack.Wave
 				for _, w := range allWaves {
@@ -142,7 +141,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 
 			adrDir := session.ADRDir(baseDir)
 			existingADRs, _ := session.ReadExistingADRs(adrDir)
-			completedWaves := domain.CompletedWavesForCluster(allWaves, cluster.Name)
+			completedWaves := session.CompletedWavesForCluster(allWaves, cluster.Name)
 			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 			if dryRun {

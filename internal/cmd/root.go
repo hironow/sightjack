@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -187,6 +188,15 @@ func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
 	return append([]string{"scan"}, args...)
 }
 
+// ttyDevices returns the ordered list of terminal device paths to try for the
+// given GOOS. On Windows, CONIN$ is tried first; on Unix, /dev/tty is tried first.
+func ttyDevices(goos string) []string {
+	if goos == "windows" {
+		return []string{"CONIN$", "/dev/tty"}
+	}
+	return []string{"/dev/tty", "CONIN$"}
+}
+
 // openTTY opens the platform-appropriate controlling terminal for interactive
 // input. On Unix this is /dev/tty; on Windows it is CONIN$. Returns an error
 // if neither device is available (e.g., in a non-interactive container).
@@ -198,16 +208,18 @@ func openTTY() (*os.File, error) {
 	if path := os.Getenv("SIGHTJACK_TTY"); path != "" {
 		return os.Open(path)
 	}
-	// Try Unix first, then Windows.
-	tty, err := os.Open("/dev/tty")
-	if err == nil {
-		return tty, nil
+	devices := ttyDevices(runtime.GOOS)
+	var firstErr error
+	for _, dev := range devices {
+		tty, err := os.Open(dev)
+		if err == nil {
+			return tty, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
 	}
-	tty, winErr := os.Open("CONIN$")
-	if winErr == nil {
-		return tty, nil
-	}
-	return nil, fmt.Errorf("no controlling terminal available (/dev/tty: %v, CONIN$: %v)", err, winErr)
+	return nil, fmt.Errorf("no controlling terminal available (tried %v: %v)", devices, firstErr)
 }
 
 // resolveBaseDir returns the absolute path from the first arg or cwd.

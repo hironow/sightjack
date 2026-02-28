@@ -128,6 +128,36 @@ func TestResolveConfigPath_NotExplicit_UsesDefault(t *testing.T) {
 	}
 }
 
+func TestTTYDevices_Unix(t *testing.T) {
+	// given — Unix GOOS values
+	for _, goos := range []string{"darwin", "linux", "freebsd"} {
+		// when
+		devices := ttyDevices(goos)
+
+		// then — /dev/tty should be first
+		if len(devices) < 1 {
+			t.Fatalf("ttyDevices(%q) returned empty", goos)
+		}
+		if devices[0] != "/dev/tty" {
+			t.Errorf("ttyDevices(%q)[0] = %q, want /dev/tty", goos, devices[0])
+		}
+	}
+}
+
+func TestTTYDevices_Windows(t *testing.T) {
+	// given — Windows GOOS
+	// when
+	devices := ttyDevices("windows")
+
+	// then — CONIN$ should be first
+	if len(devices) < 1 {
+		t.Fatal("ttyDevices(windows) returned empty")
+	}
+	if devices[0] != "CONIN$" {
+		t.Errorf("ttyDevices(windows)[0] = %q, want CONIN$", devices[0])
+	}
+}
+
 func TestDefaultToScan_NoArgs(t *testing.T) {
 	// given: no args at all — should default to scan
 	rootCmd := NewRootCommand()

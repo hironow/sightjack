@@ -2,187 +2,140 @@ package eventsource
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"sync"
+	"sort"
+	"strings"
+	"time"
 
 	sightjack "github.com/hironow/sightjack"
 )
 
-// FileEventStore is a JSONL-based append-only event store.
-// Each event occupies one line (compact JSON + newline).
+// FileEventStore implements EventStore using daily JSONL files in a directory.
+// Each file is named YYYY-MM-DD.jsonl and contains one JSON event per line.
 type FileEventStore struct {
-	path           string
-	mu             sync.Mutex
-	lastWrittenSeq int64
-	seqInitialized bool
+	dir string
 }
 
-// NewFileEventStore creates a FileEventStore at the given path.
-func NewFileEventStore(path string) *FileEventStore {
-	return &FileEventStore{path: path}
+// Compile-time check that FileEventStore implements sightjack.EventStore.
+var _ sightjack.EventStore = (*FileEventStore)(nil)
+
+// NewFileEventStore creates a FileEventStore rooted at the given directory.
+func NewFileEventStore(dir string) *FileEventStore {
+	return &FileEventStore{dir: dir}
 }
 
-// Append writes one or more events to the JSONL file.
-// Events are serialized as compact JSON, one per line.
-// The parent directory is created if it does not exist.
+// Append persists events as JSONL lines to the daily file based on each event's timestamp.
+// All events are validated before any writes occur; if any event is invalid, the entire batch is rejected.
 func (s *FileEventStore) Append(events ...sightjack.Event) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Lazy init: read last sequence from file on first append
-	if !s.seqInitialized {
-		all, err := s.readAllUnlocked()
-		if err != nil {
-			return err
+	for _, ev := range events {
+		if err := sightjack.ValidateEvent(ev); err != nil {
+			return fmt.Errorf("validate event %s: %w", ev.ID, err)
 		}
-		for _, e := range all {
-			if e.Sequence > s.lastWrittenSeq {
-				s.lastWrittenSeq = e.Sequence
+	}
+
+	if err := os.MkdirAll(s.dir, 0o755); err != nil {
+		return fmt.Errorf("create event store dir: %w", err)
+	}
+
+	// Group events by date for file routing.
+	byDate := make(map[string][]sightjack.Event)
+	for _, ev := range events {
+		date := ev.Timestamp.Format("2006-01-02")
+		byDate[date] = append(byDate[date], ev)
+	}
+
+	for date, evs := range byDate {
+		filename := filepath.Join(s.dir, date+".jsonl")
+		f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return fmt.Errorf("open event file %s: %w", date, err)
+		}
+		for _, ev := range evs {
+			line, marshalErr := json.Marshal(ev)
+			if marshalErr != nil {
+				f.Close()
+				return fmt.Errorf("marshal event %s: %w", ev.ID, marshalErr)
+			}
+			if _, writeErr := f.Write(append(line, '\n')); writeErr != nil {
+				f.Close()
+				return fmt.Errorf("write event %s: %w", ev.ID, writeErr)
 			}
 		}
-		s.seqInitialized = true
-	}
-
-	// Validate all events before any I/O
-	for _, e := range events {
-		if err := sightjack.ValidateEvent(e); err != nil {
-			return fmt.Errorf("event store: %w", err)
+		if err := f.Sync(); err != nil {
+			f.Close()
+			return fmt.Errorf("fsync event file %s: %w", date, err)
 		}
-	}
-
-	// Sequence monotonicity check
-	expectedSeq := s.lastWrittenSeq
-	for _, e := range events {
-		expectedSeq++
-		if e.Sequence != expectedSeq {
-			return fmt.Errorf("event store: sequence gap: expected %d, got %d", expectedSeq, e.Sequence)
-		}
-	}
-
-	if err := s.appendUnlocked(events); err != nil {
-		return err
-	}
-
-	// Update tracked sequence after successful write
-	if len(events) > 0 {
-		s.lastWrittenSeq = events[len(events)-1].Sequence
-	}
-
-	return nil
-}
-
-// appendUnlocked writes events to the JSONL file (caller must hold mu).
-func (s *FileEventStore) appendUnlocked(events []sightjack.Event) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0755); err != nil {
-		return fmt.Errorf("event store mkdir: %w", err)
-	}
-
-	f, err := os.OpenFile(s.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("event store open: %w", err)
-	}
-	defer f.Close()
-
-	for _, e := range events {
-		data, marshalErr := sightjack.MarshalEvent(e)
-		if marshalErr != nil {
-			return fmt.Errorf("event store marshal: %w", marshalErr)
-		}
-		data = append(data, '\n')
-		if _, writeErr := f.Write(data); writeErr != nil {
-			return fmt.Errorf("event store write: %w", writeErr)
-		}
-		if syncErr := f.Sync(); syncErr != nil {
-			return fmt.Errorf("event store sync: %w", syncErr)
+		if err := f.Close(); err != nil {
+			return fmt.Errorf("close event file %s: %w", date, err)
 		}
 	}
 	return nil
 }
 
-// ReadAll reads all events from the JSONL file.
-// Invalid lines are silently skipped.
-// Returns an empty slice (not error) for a non-existent file.
-func (s *FileEventStore) ReadAll() ([]sightjack.Event, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	return s.readAllUnlocked()
+// LoadAll reads all JSONL files in lexicographic order and returns events chronologically.
+func (s *FileEventStore) LoadAll() ([]sightjack.Event, error) {
+	return s.loadEvents(time.Time{})
 }
 
-// readAllUnlocked reads all events without locking (caller must hold mu).
-func (s *FileEventStore) readAllUnlocked() ([]sightjack.Event, error) {
-	f, err := os.Open(s.path)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
+// LoadSince returns events with timestamps strictly after the given time.
+func (s *FileEventStore) LoadSince(after time.Time) ([]sightjack.Event, error) {
+	return s.loadEvents(after)
+}
+
+func (s *FileEventStore) loadEvents(after time.Time) ([]sightjack.Event, error) {
+	entries, err := os.ReadDir(s.dir)
 	if err != nil {
-		return nil, fmt.Errorf("event store open for read: %w", err)
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read event store dir: %w", err)
 	}
-	defer f.Close()
+
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".jsonl") {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
 
 	var events []sightjack.Event
-	reader := bufio.NewReader(f)
-	for {
-		line, readErr := reader.ReadBytes('\n')
-		// Trim trailing newline (and handle last line without newline)
-		line = bytes.TrimRight(line, "\n")
-		if len(line) > 0 {
-			var e sightjack.Event
-			if jsonErr := json.Unmarshal(line, &e); jsonErr == nil {
-				events = append(events, e)
-			}
-			// Skip corrupt lines silently
+	for _, name := range files {
+		path := filepath.Join(s.dir, name)
+		f, openErr := os.Open(path)
+		if openErr != nil {
+			return nil, fmt.Errorf("open %s: %w", name, openErr)
 		}
-		if readErr != nil {
-			if readErr == io.EOF {
-				break
+		scanner := bufio.NewScanner(f)
+		scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
 			}
-			return events, fmt.Errorf("event store read: %w", readErr)
+			var ev sightjack.Event
+			if jsonErr := json.Unmarshal(line, &ev); jsonErr != nil {
+				// Skip corrupt lines silently for resilience.
+				continue
+			}
+			if !after.IsZero() && !ev.Timestamp.After(after) {
+				continue
+			}
+			events = append(events, ev)
 		}
+		if scanErr := scanner.Err(); scanErr != nil {
+			f.Close()
+			return nil, fmt.Errorf("scan %s: %w", name, scanErr)
+		}
+		f.Close()
 	}
+
+	// Stable sort preserves insertion order for events with equal timestamps.
+	sort.SliceStable(events, func(i, j int) bool {
+		return events[i].Timestamp.Before(events[j].Timestamp)
+	})
 	return events, nil
-}
-
-// ReadSince reads events with sequence number strictly greater than afterSeq.
-func (s *FileEventStore) ReadSince(afterSeq int64) ([]sightjack.Event, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	all, err := s.readAllUnlocked()
-	if err != nil {
-		return nil, err
-	}
-
-	var filtered []sightjack.Event
-	for _, e := range all {
-		if e.Sequence > afterSeq {
-			filtered = append(filtered, e)
-		}
-	}
-	return filtered, nil
-}
-
-// LastSequence returns the highest sequence number in the store.
-// Returns 0 for an empty or non-existent store.
-func (s *FileEventStore) LastSequence() (int64, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	all, err := s.readAllUnlocked()
-	if err != nil {
-		return 0, err
-	}
-
-	var max int64
-	for _, e := range all {
-		if e.Sequence > max {
-			max = e.Sequence
-		}
-	}
-	return max, nil
 }

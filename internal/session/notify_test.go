@@ -136,7 +136,7 @@ func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 	}
 }
 
-func TestShellQuote(t *testing.T) {
+func TestShellQuoteUnix(t *testing.T) {
 	tests := []struct {
 		input string
 		want  string
@@ -148,9 +148,29 @@ func TestShellQuote(t *testing.T) {
 		{"$(rm -rf /)", "'$(rm -rf /)'"},
 	}
 	for _, tt := range tests {
-		got := session.ShellQuote(tt.input)
+		got := session.ShellQuoteUnix(tt.input)
 		if got != tt.want {
-			t.Errorf("ShellQuote(%q): got %q, want %q", tt.input, got, tt.want)
+			t.Errorf("ShellQuoteUnix(%q): got %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestShellQuoteCmd(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"hello", `"hello"`},
+		{`say "hi"`, `"say ""hi"""`},
+		{"normal text", `"normal text"`},
+		{"", `""`},
+		{"100%", `"100%%"`},
+		{`"quoted" & piped`, `"""quoted"" & piped"`},
+	}
+	for _, tt := range tests {
+		got := session.ShellQuoteCmd(tt.input)
+		if got != tt.want {
+			t.Errorf("ShellQuoteCmd(%q): got %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }
