@@ -51,6 +51,7 @@ const (
 	EventSessionRescanned    EventType = "session_rescanned"
 	EventSpecificationSent   EventType = "specification_sent"
 	EventReportSent          EventType = "report_sent"
+	EventFeedbackSent        EventType = "feedback_sent"
 )
 
 // Event is the immutable event envelope persisted to the event store.

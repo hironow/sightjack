@@ -14,13 +14,24 @@
 
 ## Extended Shared ADRs (S-series, canonical: phonewave)
 
-| # | Decision |
-|---|----------|
-| S0001 | ~~Logger as root package exception~~ (superseded by S0005) |
-| S0002 | JSONL append-only event sourcing pattern |
-| S0003 | Three-way approval contract |
-| S0004 | ~~Layer architecture conventions~~ (superseded by S0005) |
-| S0005 | Root infrastructure pattern and layer conventions |
+Canonical versions live in phonewave `docs/adr/`. Referenced here for discoverability.
+
+| # | Decision | Status |
+|---|----------|--------|
+| S0001 | ~~Logger as root package exception~~ | Superseded by S0005 |
+| S0002 | JSONL append-only event sourcing pattern | Accepted |
+| S0003 | Three-way approval contract | Accepted |
+| S0004 | ~~Layer architecture conventions~~ | Superseded by S0005 |
+| S0005 | Root infrastructure pattern and layer conventions | Accepted |
+| S0011 | SQLite WAL cooperative model for concurrent CLI | Accepted |
+| S0012 | Reference data management pattern | Accepted |
+| S0013 | COMMAND naming convention (imperative present tense) | Accepted |
+| S0014 | POLICY pattern reference implementation | Accepted |
+| S0015 | State directory naming convention | Accepted |
+| S0016 | Root package file organization | Accepted |
+| S0017 | Aggregate root and use case layer | Accepted |
+| S0018 | Event Storming alignment and per-tool applicability | Accepted |
+| S0019 | Data persistence boundaries (Linear/GitHub/local) | Accepted |
 
 ## sightjack-specific ADRs (0006~)
 

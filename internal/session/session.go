@@ -469,6 +469,15 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		})
 	}
 
+	// O2: sightjack → amadeus feedback D-Mail
+	if feedbackErr := ComposeFeedback(store, selected, applyResult); feedbackErr != nil {
+		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
+	} else {
+		recorder.Record(sightjack.EventFeedbackSent, sightjack.WaveIdentityPayload{
+			WaveID: selected.ID, ClusterName: selected.ClusterName,
+		})
+	}
+
 	// Update cluster completeness from delta, then recalculate overall
 	for i, c := range scanResult.Clusters {
 		if c.Name == selected.ClusterName {

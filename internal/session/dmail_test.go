@@ -2072,3 +2072,251 @@ func TestMarshalDMail_IdempotencyKey_DoesNotMutateOriginal(t *testing.T) {
 		t.Errorf("original metadata mutated: %v", mail.Metadata)
 	}
 }
+
+// --- O2: sightjack → amadeus feedback D-Mail ---
+
+func TestComposeFeedback_StagesInOutbox(t *testing.T) {
+	// given: a completed wave with apply result
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := sightjack.Wave{
+		ID:          "w1",
+		ClusterName: "auth",
+		Title:       "Auth hardening",
+		Actions: []sightjack.WaveAction{
+			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket"},
+			{Type: "add_dependency", IssueID: "MY-43", Description: "Auth dep"},
+		},
+	}
+	result := &sightjack.WaveApplyResult{
+		WaveID:  "w1",
+		Applied: 2,
+		Ripples: []sightjack.Ripple{
+			{ClusterName: "api", Description: "Rate limiting affects API cluster"},
+		},
+	}
+
+	// when
+	err := session.ComposeFeedback(store, wave, result)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("ComposeFeedback: %v", err)
+	}
+
+	// and: outbox file exists and is parseable
+	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-auth-w1.md")
+	data, readErr := os.ReadFile(outboxPath)
+	if readErr != nil {
+		t.Fatalf("outbox file missing: %v", readErr)
+	}
+	mail, parseErr := session.ParseDMail(data)
+	if parseErr != nil {
+		t.Fatalf("parse outbox: %v", parseErr)
+	}
+
+	// and: d-mail fields are correct
+	if mail.Kind != session.DMailFeedback {
+		t.Errorf("kind: got %q, want %q", mail.Kind, session.DMailFeedback)
+	}
+	if mail.Name != "feedback-auth-w1" {
+		t.Errorf("name: got %q, want %q", mail.Name, "feedback-auth-w1")
+	}
+	if mail.SchemaVersion != "1" {
+		t.Errorf("schema version: got %q, want %q", mail.SchemaVersion, "1")
+	}
+	if len(mail.Issues) != 2 {
+		t.Errorf("expected 2 issues, got %d: %v", len(mail.Issues), mail.Issues)
+	}
+
+	// and: archive file also exists
+	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), "feedback-auth-w1.md")
+	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+		t.Error("expected archive file to exist")
+	}
+}
+
+func TestComposeFeedback_BodyFormat(t *testing.T) {
+	// given: wave with errors and ripples
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := sightjack.Wave{
+		ID:          "w2",
+		ClusterName: "infra",
+		Title:       "Infra setup wave",
+		Actions: []sightjack.WaveAction{
+			{Type: "add_dod", IssueID: "MY-70", Description: "Docker setup"},
+			{Type: "add_dod", IssueID: "MY-71", Description: "CI pipeline"},
+		},
+	}
+	result := &sightjack.WaveApplyResult{
+		WaveID:  "w2",
+		Applied: 1,
+		Errors:  []string{"Failed to update MY-71: permission denied"},
+		Ripples: []sightjack.Ripple{
+			{ClusterName: "api", Description: "API now requires Docker"},
+		},
+	}
+
+	// when
+	err := session.ComposeFeedback(store, wave, result)
+
+	// then
+	if err != nil {
+		t.Fatalf("ComposeFeedback: %v", err)
+	}
+	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-infra-w2.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := session.ParseDMail(data)
+
+	// body contains key information
+	if !strings.Contains(mail.Body, "Infra setup wave") {
+		t.Error("body should contain wave title")
+	}
+	if !strings.Contains(mail.Body, "Applied 1 action(s)") {
+		t.Error("body should contain applied count")
+	}
+	if !strings.Contains(mail.Body, "## Errors") {
+		t.Error("body should contain Errors section")
+	}
+	if !strings.Contains(mail.Body, "permission denied") {
+		t.Error("body should contain error detail")
+	}
+	if !strings.Contains(mail.Body, "## Ripple Effects") {
+		t.Error("body should contain Ripple Effects section")
+	}
+	if !strings.Contains(mail.Body, "API now requires Docker") {
+		t.Error("body should contain ripple detail")
+	}
+}
+
+func TestComposeFeedback_NoErrorsNoRipples(t *testing.T) {
+	// given: clean apply with no errors or ripples
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := sightjack.Wave{
+		ID:          "w3",
+		ClusterName: "db",
+		Title:       "Database migrations",
+		Actions: []sightjack.WaveAction{
+			{Type: "add_dod", IssueID: "MY-50", Description: "Schema migration"},
+		},
+	}
+	result := &sightjack.WaveApplyResult{
+		WaveID:  "w3",
+		Applied: 1,
+	}
+
+	// when
+	err := session.ComposeFeedback(store, wave, result)
+
+	// then
+	if err != nil {
+		t.Fatalf("ComposeFeedback: %v", err)
+	}
+	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-db-w3.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := session.ParseDMail(data)
+
+	// body should not contain error or ripple sections
+	if strings.Contains(mail.Body, "## Errors") {
+		t.Error("should not have Errors section when no errors")
+	}
+	if strings.Contains(mail.Body, "## Ripple Effects") {
+		t.Error("should not have Ripple section when no ripples")
+	}
+	// but should still have the applied count
+	if !strings.Contains(mail.Body, "Applied 1 action(s)") {
+		t.Error("body should contain applied count")
+	}
+}
+
+func TestFeedbackBody_Format(t *testing.T) {
+	// given
+	wave := sightjack.Wave{Title: "Feedback Wave"}
+	result := &sightjack.WaveApplyResult{
+		Applied: 3,
+		Errors:  []string{"timeout on MY-5"},
+		Ripples: []sightjack.Ripple{
+			{ClusterName: "api", Description: "API needs rebuild"},
+		},
+	}
+
+	// when
+	body := session.FeedbackBody(wave, result)
+
+	// then
+	if !strings.HasPrefix(body, "# Wave Feedback: Feedback Wave\n") {
+		t.Errorf("body should start with feedback heading, got: %q", body[:50])
+	}
+	if !strings.Contains(body, "Applied 3 action(s).") {
+		t.Error("body should contain applied count")
+	}
+	if !strings.Contains(body, "## Errors") {
+		t.Error("body should contain Errors section")
+	}
+	if !strings.Contains(body, "timeout on MY-5") {
+		t.Error("body should contain error detail")
+	}
+	if !strings.Contains(body, "## Ripple Effects") {
+		t.Error("body should contain Ripple Effects section")
+	}
+	if !strings.Contains(body, "[api] API needs rebuild") {
+		t.Error("body should contain ripple detail")
+	}
+}
+
+func TestFeedbackBody_NoErrorsNoRipples(t *testing.T) {
+	// given: clean apply
+	wave := sightjack.Wave{Title: "Clean Wave"}
+	result := &sightjack.WaveApplyResult{Applied: 2}
+
+	// when
+	body := session.FeedbackBody(wave, result)
+
+	// then: no Errors or Ripple sections
+	if strings.Contains(body, "## Errors") {
+		t.Error("should not have Errors section when no errors")
+	}
+	if strings.Contains(body, "## Ripple Effects") {
+		t.Error("should not have Ripple section when no ripples")
+	}
+}
+
+func TestComposeFeedback_IssuesSorted(t *testing.T) {
+	// given: wave with unsorted issue IDs
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := sightjack.Wave{
+		ID:          "w1",
+		ClusterName: "sort",
+		Title:       "Sort test",
+		Actions: []sightjack.WaveAction{
+			{Type: "add_dod", IssueID: "MY-99", Description: "Last"},
+			{Type: "add_dod", IssueID: "MY-10", Description: "First"},
+			{Type: "add_dod", IssueID: "MY-50", Description: "Middle"},
+		},
+	}
+	result := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 3}
+
+	// when
+	err := session.ComposeFeedback(store, wave, result)
+
+	// then: issues are sorted
+	if err != nil {
+		t.Fatalf("ComposeFeedback: %v", err)
+	}
+	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-sort-w1.md")
+	data, _ := os.ReadFile(outboxPath)
+	mail, _ := session.ParseDMail(data)
+	if len(mail.Issues) != 3 {
+		t.Fatalf("expected 3 issues, got %d", len(mail.Issues))
+	}
+	if mail.Issues[0] != "MY-10" || mail.Issues[1] != "MY-50" || mail.Issues[2] != "MY-99" {
+		t.Errorf("issues not sorted: %v", mail.Issues)
+	}
+}

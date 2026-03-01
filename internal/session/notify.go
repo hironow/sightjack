@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // cmdFactoryFunc creates an *exec.Cmd — injectable for testing.
@@ -87,10 +88,14 @@ func (n *CmdNotifier) factory() cmdFactoryFunc {
 	return defaultCmdFactory
 }
 
+const notifyTimeout = 30 * time.Second
+
 func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	if n.template == "" {
 		return fmt.Errorf("notify: empty command template")
 	}
+	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
+	defer cancel()
 	expanded := strings.ReplaceAll(n.template, "{title}", ShellQuote(title))
 	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	cmd := n.factory()(ctx, shellName(), shellFlag(), expanded)

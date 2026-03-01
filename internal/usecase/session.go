@@ -15,6 +15,7 @@ func wrapRecorder(recorder sightjack.Recorder, logger *sightjack.Logger, dryRun 
 		return recorder
 	}
 	engine := NewPolicyEngine(logger)
+	registerSessionPolicies(engine, logger)
 	return session.NewDispatchingRecorder(recorder, engine, logger)
 }
 

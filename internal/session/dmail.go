@@ -583,6 +583,44 @@ func ComposeReport(store sightjack.OutboxStore, wave sightjack.Wave, result *sig
 	return ComposeDMail(store, mail)
 }
 
+// FeedbackBody formats wave apply results as Markdown body for a feedback d-mail.
+// Distinct from ReportBody: uses "Wave Feedback" heading to differentiate the
+// sightjack → amadeus feedback loop (O2) from the standard report d-mail.
+func FeedbackBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Wave Feedback: %s\n\n", wave.Title)
+	fmt.Fprintf(&b, "Applied %d action(s).\n\n", result.Applied)
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(&b, "## Errors\n\n")
+		for _, e := range result.Errors {
+			fmt.Fprintf(&b, "- %s\n", e)
+		}
+		b.WriteString("\n")
+	}
+	if len(result.Ripples) > 0 {
+		fmt.Fprintf(&b, "## Ripple Effects\n\n")
+		for _, r := range result.Ripples {
+			fmt.Fprintf(&b, "- [%s] %s\n", r.ClusterName, r.Description)
+		}
+	}
+	return b.String()
+}
+
+// ComposeFeedback stages a feedback D-Mail for amadeus consumption.
+// Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
+func ComposeFeedback(store sightjack.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
+	key := domain.WaveKey(wave)
+	mail := &DMail{
+		Name:          DMailName("feedback", key),
+		Kind:          DMailFeedback,
+		Description:   fmt.Sprintf("Wave %s feedback for amadeus", key),
+		SchemaVersion: "1",
+		Issues:        WaveIssueIDs(wave),
+		Body:          FeedbackBody(wave, result),
+	}
+	return ComposeDMail(store, mail)
+}
+
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
 func ComposeSpecification(store sightjack.OutboxStore, wave sightjack.Wave) error {
 	key := domain.WaveKey(wave)

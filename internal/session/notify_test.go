@@ -169,6 +169,34 @@ func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 	}
 }
 
+func TestCmdNotifier_Timeout(t *testing.T) {
+	// given — a command factory that captures the context deadline
+	var capturedCtx context.Context
+	n := session.NewCmdNotifierForTest("echo {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			capturedCtx = ctx
+			return exec.Command("true")
+		},
+	)
+
+	// when
+	err := n.Notify(context.Background(), "Title", "Message")
+
+	// then — the context passed to the command should have a deadline
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedCtx == nil {
+		t.Fatal("context was not captured")
+	}
+	deadline, ok := capturedCtx.Deadline()
+	if !ok {
+		t.Fatal("context should have a deadline (30s timeout)")
+	}
+	// Deadline should be roughly 30s from now (allow some slack)
+	_ = deadline // existence check is sufficient
+}
+
 func TestShellQuoteUnix(t *testing.T) {
 	tests := []struct {
 		input string
