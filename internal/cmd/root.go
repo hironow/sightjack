@@ -82,6 +82,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringVarP(&lang, "lang", "l", "", "Language override (ja/en)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false, "Generate prompts without executing Claude")
+	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 
 	rootCmd.Version = version
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -29,6 +30,9 @@ Pass --execute to actually remove the files.`,
   # Delete expired files
   sightjack archive-prune --execute
 
+  # JSON output for scripting
+  sightjack archive-prune -o json
+
   # Custom retention period
   sightjack archive-prune --days 7 --execute`,
 		Args: cobra.MaximumNArgs(1),
@@ -38,36 +42,75 @@ Pass --execute to actually remove the files.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 			logger := loggerFrom(cmd)
+			outputFmt, _ := cmd.Flags().GetString("output")
+
 			files, err := session.ListExpiredArchive(baseDir, days, logger)
 			if err != nil {
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
 
-			w := cmd.OutOrStdout()
+			eventFiles, eventErr := session.ListExpiredEventFiles(baseDir, days)
+			if eventErr != nil {
+				logger.Warn("Failed to list expired events: %v", eventErr)
+			}
+
+			if outputFmt == "json" {
+				out := struct {
+					ArchiveCandidates int      `json:"archive_candidates"`
+					ArchiveDeleted    int      `json:"archive_deleted"`
+					ArchiveFiles      []string `json:"archive_files"`
+					EventCandidates   int      `json:"event_candidates"`
+					EventDeleted      int      `json:"event_deleted"`
+					EventFiles        []string `json:"event_files"`
+				}{
+					ArchiveCandidates: len(files),
+					ArchiveFiles:      files,
+					EventCandidates:   len(eventFiles),
+					EventFiles:        eventFiles,
+				}
+				if execute {
+					if len(files) > 0 {
+						deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
+						if delErr != nil {
+							return fmt.Errorf("archive prune failed: %w", delErr)
+						}
+						out.ArchiveDeleted = len(deleted)
+					}
+					if len(eventFiles) > 0 {
+						deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
+						if delErr != nil {
+							return fmt.Errorf("event prune failed: %w", delErr)
+						}
+						out.EventDeleted = len(deleted)
+					}
+				}
+				data, jsonErr := json.Marshal(out)
+				if jsonErr != nil {
+					return jsonErr
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), string(data))
+				return nil
+			}
+
+			// text output — all metadata to stderr
 			errW := cmd.ErrOrStderr()
 
-			// --- Archive (d-mail) pruning ---
 			if len(files) == 0 {
 				fmt.Fprintf(errW, "No expired d-mail files (threshold: %d days).\n", days)
 			} else {
 				fmt.Fprintln(errW, "Expired d-mail files:")
 				for _, f := range files {
-					fmt.Fprintln(w, f)
+					fmt.Fprintln(errW, "  "+f)
 				}
 				fmt.Fprintf(errW, "%d d-mail file(s) older than %d days.\n", len(files), days)
 			}
 
-			// --- Event file pruning ---
-			eventFiles, eventErr := session.ListExpiredEventFiles(baseDir, days)
-			if eventErr != nil {
-				logger.Warn("Failed to list expired events: %v", eventErr)
-			}
 			if len(eventFiles) == 0 {
 				fmt.Fprintf(errW, "No expired event files (threshold: %d days).\n", days)
 			} else {
 				fmt.Fprintln(errW, "Expired event files:")
 				for _, f := range eventFiles {
-					fmt.Fprintln(w, f)
+					fmt.Fprintln(errW, "  "+f)
 				}
 				fmt.Fprintf(errW, "%d event file(s) older than %d days.\n", len(eventFiles), days)
 			}
