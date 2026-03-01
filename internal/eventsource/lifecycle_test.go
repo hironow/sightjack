@@ -12,7 +12,8 @@ import (
 func TestListExpiredEventFiles_FiltersOlderThanThreshold(t *testing.T) {
 	// given: 2 old files + 1 new file
 	dir := t.TempDir()
-	eventsDir := filepath.Join(dir, ".siren", "events")
+	stateDir := filepath.Join(dir, ".siren")
+	eventsDir := filepath.Join(stateDir, "events")
 	os.MkdirAll(eventsDir, 0755)
 
 	oldTime := time.Now().Add(-60 * 24 * time.Hour) // 60 days ago
@@ -24,7 +25,7 @@ func TestListExpiredEventFiles_FiltersOlderThanThreshold(t *testing.T) {
 	os.WriteFile(filepath.Join(eventsDir, "new.jsonl"), []byte("{}"), 0644)
 
 	// when
-	expired, err := eventsource.ListExpiredEventFiles(dir, 30)
+	expired, err := eventsource.ListExpiredEventFiles(stateDir, 30)
 
 	// then
 	if err != nil {
@@ -38,11 +39,12 @@ func TestListExpiredEventFiles_FiltersOlderThanThreshold(t *testing.T) {
 func TestListExpiredEventFiles_EmptyDir(t *testing.T) {
 	// given: empty events directory
 	dir := t.TempDir()
-	eventsDir := filepath.Join(dir, ".siren", "events")
+	stateDir := filepath.Join(dir, ".siren")
+	eventsDir := filepath.Join(stateDir, "events")
 	os.MkdirAll(eventsDir, 0755)
 
 	// when
-	expired, err := eventsource.ListExpiredEventFiles(dir, 30)
+	expired, err := eventsource.ListExpiredEventFiles(stateDir, 30)
 
 	// then
 	if err != nil {
@@ -54,11 +56,11 @@ func TestListExpiredEventFiles_EmptyDir(t *testing.T) {
 }
 
 func TestListExpiredEventFiles_NonExistentDir(t *testing.T) {
-	// given: non-existent base directory
-	dir := filepath.Join(t.TempDir(), "nonexistent")
+	// given: non-existent state directory
+	stateDir := filepath.Join(t.TempDir(), "nonexistent")
 
 	// when
-	expired, err := eventsource.ListExpiredEventFiles(dir, 30)
+	expired, err := eventsource.ListExpiredEventFiles(stateDir, 30)
 
 	// then: empty slice, not error
 	if err != nil {
@@ -72,7 +74,8 @@ func TestListExpiredEventFiles_NonExistentDir(t *testing.T) {
 func TestPruneEventFiles_DeletesSpecifiedFiles(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	eventsDir := filepath.Join(dir, ".siren", "events")
+	stateDir := filepath.Join(dir, ".siren")
+	eventsDir := filepath.Join(stateDir, "events")
 	os.MkdirAll(eventsDir, 0755)
 
 	for _, name := range []string{"a.jsonl", "b.jsonl", "keep.jsonl"} {
@@ -80,7 +83,7 @@ func TestPruneEventFiles_DeletesSpecifiedFiles(t *testing.T) {
 	}
 
 	// when: delete only a.jsonl and b.jsonl
-	deleted, err := eventsource.PruneEventFiles(dir, []string{"a.jsonl", "b.jsonl"})
+	deleted, err := eventsource.PruneEventFiles(stateDir, []string{"a.jsonl", "b.jsonl"})
 
 	// then
 	if err != nil {

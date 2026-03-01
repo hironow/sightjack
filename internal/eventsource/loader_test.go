@@ -394,12 +394,13 @@ func TestLoadState_EmptyStore_ReturnsError(t *testing.T) {
 
 func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	// given: two event files, older and newer
-	baseDir := t.TempDir()
-	eventsDir := eventsource.EventsDir(baseDir)
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, ".siren")
+	eventsDir := eventsource.EventsDir(stateDir)
 	os.MkdirAll(eventsDir, 0755)
 
 	// Older session
-	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-1000-1"))
+	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-1000-1"))
 	rec1, err1 := eventsource.NewSessionRecorder(store1, "session-1000-1")
 	if err1 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err1)
@@ -408,7 +409,7 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	rec1.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.3})
 
 	// Newer session
-	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(baseDir, "session-2000-2"))
+	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-2000-2"))
 	rec2, err2 := eventsource.NewSessionRecorder(store2, "session-2000-2")
 	if err2 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err2)
@@ -417,7 +418,7 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	rec2.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{Completeness: 0.7})
 
 	// when
-	state, sessionID, err := eventsource.LoadLatestState(baseDir)
+	state, sessionID, err := eventsource.LoadLatestState(stateDir)
 
 	// then
 	if err != nil {
@@ -435,11 +436,12 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 }
 
 func TestLoadLatestState_NoEventsDir(t *testing.T) {
-	// given: baseDir with no events directory
-	baseDir := t.TempDir()
+	// given: stateDir with no events directory
+	stateDir := filepath.Join(t.TempDir(), ".siren")
+	os.MkdirAll(stateDir, 0755)
 
 	// when
-	_, _, err := eventsource.LoadLatestState(baseDir)
+	_, _, err := eventsource.LoadLatestState(stateDir)
 
 	// then
 	if err == nil {
@@ -449,11 +451,11 @@ func TestLoadLatestState_NoEventsDir(t *testing.T) {
 
 func TestLoadLatestState_EmptyEventsDir(t *testing.T) {
 	// given: events directory with no files
-	baseDir := t.TempDir()
-	os.MkdirAll(eventsource.EventsDir(baseDir), 0755)
+	stateDir := filepath.Join(t.TempDir(), ".siren")
+	os.MkdirAll(eventsource.EventsDir(stateDir), 0755)
 
 	// when
-	_, _, err := eventsource.LoadLatestState(baseDir)
+	_, _, err := eventsource.LoadLatestState(stateDir)
 
 	// then
 	if err == nil {

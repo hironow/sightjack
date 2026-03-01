@@ -23,18 +23,20 @@ func LoadState(store sightjack.EventStore) (*sightjack.SessionState, error) {
 	return domain.ProjectState(events), nil
 }
 
-// LoadLatestState finds the most recent event store in .siren/events/ and
+// LoadLatestState finds the most recent event store in events/ and
 // replays its events to produce a SessionState.
+// stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
 // Returns the state, the sessionID, and any error.
-func LoadLatestState(baseDir string) (*sightjack.SessionState, string, error) {
-	return loadLatestStateMatching(baseDir, nil)
+func LoadLatestState(stateDir string) (*sightjack.SessionState, string, error) {
+	return loadLatestStateMatching(stateDir, nil)
 }
 
 // LoadLatestResumableState finds the most recent event store whose projected
 // state satisfies the given predicate. This allows callers to skip over
 // non-resumable sessions (e.g. scan-only) and find an older interactive session.
-func LoadLatestResumableState(baseDir string, match func(*sightjack.SessionState) bool) (*sightjack.SessionState, string, error) {
-	return loadLatestStateMatching(baseDir, match)
+// stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
+func LoadLatestResumableState(stateDir string, match func(*sightjack.SessionState) bool) (*sightjack.SessionState, string, error) {
+	return loadLatestStateMatching(stateDir, match)
 }
 
 type eventCandidate struct {
@@ -77,9 +79,10 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 }
 
 // LoadAllEventsAcrossSessions aggregates events from all session stores under
-// .siren/events/. Returns nil, nil when the events directory does not exist.
-func LoadAllEventsAcrossSessions(baseDir string) ([]sightjack.Event, error) {
-	eventsDir := EventsDir(baseDir)
+// events/. stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
+// Returns nil, nil when the events directory does not exist.
+func LoadAllEventsAcrossSessions(stateDir string) ([]sightjack.Event, error) {
+	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -89,7 +92,7 @@ func LoadAllEventsAcrossSessions(baseDir string) ([]sightjack.Event, error) {
 	}
 	var all []sightjack.Event
 	for _, c := range candidates {
-		store := NewFileEventStore(EventStorePath(baseDir, c.name))
+		store := NewFileEventStore(EventStorePath(stateDir, c.name))
 		events, loadErr := store.LoadAll()
 		if loadErr != nil {
 			continue
@@ -101,8 +104,8 @@ func LoadAllEventsAcrossSessions(baseDir string) ([]sightjack.Event, error) {
 
 // loadLatestStateMatching iterates event stores by modtime descending and
 // returns the first state that satisfies match (nil match accepts any).
-func loadLatestStateMatching(baseDir string, match func(*sightjack.SessionState) bool) (*sightjack.SessionState, string, error) {
-	eventsDir := EventsDir(baseDir)
+func loadLatestStateMatching(stateDir string, match func(*sightjack.SessionState) bool) (*sightjack.SessionState, string, error) {
+	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
 		return nil, "", fmt.Errorf("load latest state: %w", err)
@@ -113,7 +116,7 @@ func loadLatestStateMatching(baseDir string, match func(*sightjack.SessionState)
 
 	for _, c := range candidates {
 		sessionID := c.name
-		store := NewFileEventStore(EventStorePath(baseDir, sessionID))
+		store := NewFileEventStore(EventStorePath(stateDir, sessionID))
 		state, loadErr := LoadState(store)
 		if loadErr != nil {
 			continue

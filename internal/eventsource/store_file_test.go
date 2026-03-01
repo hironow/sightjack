@@ -314,16 +314,16 @@ func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 }
 
 func TestEventsDir(t *testing.T) {
-	got := eventsource.EventsDir("/project")
-	expected := filepath.Join("/project", ".siren", "events")
+	got := eventsource.EventsDir("/project/.siren")
+	expected := filepath.Join("/project/.siren", "events")
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
 	}
 }
 
 func TestEventStorePath(t *testing.T) {
-	got := eventsource.EventStorePath("/project", "session-123")
-	expected := filepath.Join("/project", ".siren", "events", "session-123")
+	got := eventsource.EventStorePath("/project/.siren", "session-123")
+	expected := filepath.Join("/project/.siren", "events", "session-123")
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
 	}
