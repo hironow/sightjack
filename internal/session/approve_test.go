@@ -9,12 +9,13 @@ import (
 	"testing"
 	"time"
 
+	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestAutoApprover_AlwaysApproves(t *testing.T) {
 	// given
-	a := &session.AutoApprover{}
+	a := &sightjack.AutoApprover{}
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "deploy?")

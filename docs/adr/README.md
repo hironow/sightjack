@@ -2,7 +2,7 @@
 
 ## Shared ADRs (canonical: phonewave)
 
-0001-0005 are reserved. Canonical versions live in [phonewave docs/adr/](https://github.com/hironow/phonewave/tree/main/docs/adr).
+0001-0005 are reserved. Canonical versions live in `phonewave/docs/adr/`.
 
 | # | Decision | Linear |
 |---|----------|--------|

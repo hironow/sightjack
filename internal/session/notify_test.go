@@ -123,9 +123,9 @@ func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
 
-	// then: should return error for unsupported OS
-	if err == nil {
-		t.Error("expected error for unsupported OS")
+	// then: should return ErrUnsupportedOS sentinel
+	if err != sightjack.ErrUnsupportedOS {
+		t.Errorf("err = %v, want sightjack.ErrUnsupportedOS", err)
 	}
 }
 

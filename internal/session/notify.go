@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // cmdFactoryFunc creates an *exec.Cmd — injectable for testing.
@@ -61,7 +63,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		cmd := factory(ctx, "powershell", "-NoProfile", "-Command", script)
 		return cmd.Run()
 	default:
-		return fmt.Errorf("notify: unsupported OS %q", n.os())
+		return sightjack.ErrUnsupportedOS
 	}
 }
 
@@ -72,13 +74,13 @@ func psEscapeSingleQuote(s string) string {
 
 // CmdNotifier runs a user-provided shell command with {title} and {message} placeholders.
 type CmdNotifier struct {
-	template   string
-	cmdFactory cmdFactoryFunc
+	cmdTemplate string
+	cmdFactory  cmdFactoryFunc
 }
 
 // NewCmdNotifier creates a CmdNotifier from a shell command template.
-func NewCmdNotifier(template string) *CmdNotifier {
-	return &CmdNotifier{template: template}
+func NewCmdNotifier(cmdTemplate string) *CmdNotifier {
+	return &CmdNotifier{cmdTemplate: cmdTemplate}
 }
 
 func (n *CmdNotifier) factory() cmdFactoryFunc {
@@ -91,12 +93,12 @@ func (n *CmdNotifier) factory() cmdFactoryFunc {
 const notifyTimeout = 30 * time.Second
 
 func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
-	if n.template == "" {
+	if n.cmdTemplate == "" {
 		return fmt.Errorf("notify: empty command template")
 	}
 	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
 	defer cancel()
-	expanded := strings.ReplaceAll(n.template, "{title}", ShellQuote(title))
+	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", ShellQuote(title))
 	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	cmd := n.factory()(ctx, shellName(), shellFlag(), expanded)
 	return cmd.Run()

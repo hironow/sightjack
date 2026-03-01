@@ -1,12 +1,18 @@
 package sightjack
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Recorder records domain events during a session.
 // session.go depends only on this interface, never on concrete implementations.
 type Recorder interface {
 	Record(eventType EventType, payload any) error
 }
+
+// ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
+var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
 // Notifier sends a notification to the user.
 type Notifier interface {
@@ -21,6 +27,13 @@ func (n *NopNotifier) Notify(_ context.Context, _, _ string) error { return nil 
 // Approver requests user approval for a convergence gate.
 type Approver interface {
 	RequestApproval(ctx context.Context, message string) (approved bool, err error)
+}
+
+// AutoApprover always approves without human interaction.
+type AutoApprover struct{}
+
+func (a *AutoApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
+	return true, nil
 }
 
 // Handoff defines the integration contract for downstream execution agents (v1.0).
