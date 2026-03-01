@@ -6,7 +6,7 @@
 
 ## Repository Structure
 
-- Entry: `cmd/sightjack/main.go` (signal.NotifyContext + DefaultToScan)
+- Entry: `cmd/sightjack/main.go` (signal.NotifyContext + NeedsDefaultScan)
 - CLI: `internal/cmd/` (cobra v1.10.2, `NewRootCommand()` exported for testability)
 - Root package `sightjack`: types, interfaces, constants, go:embed templates, pure functions only (ADR 0011/0012)
     - `types.go`, `interfaces.go`, `event.go`: 70+ types, 6 interfaces (incl. OutboxStore), Event system
@@ -18,7 +18,7 @@
 - Domain: `internal/domain/` (pure functions — wave scheduling, scan utils, event projection)
 - Session: `internal/session/` (I/O orchestration — Claude subprocess, file ops, scanner, dmail, archive, config loading, state I/O, outbox store)
     - `outbox_store.go`: SQLiteOutboxStore (transactional outbox pattern — Stage to SQLite, Flush with atomic writes to archive/ + outbox/)
-- Event sourcing: `internal/eventsource/` (event store infrastructure)
+- Event sourcing: `internal/eventsource/` (event store infrastructure; per-session directory storage, `os.RemoveAll` pruning)
 - OTel: `internal/cmd/telemetry.go` (initTracer + OTLP HTTP exporter, shutdown via cobra.OnFinalize)
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
 - Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
@@ -29,7 +29,7 @@
 - `cobra.EnableTraverseRunHooks = true` in `init()` (not constructor)
 - All commands use `RunE` (not `Run`)
 - `--config`, `--lang`, `--verbose`, `--dry-run` are PersistentFlags on root
-- Default subcommand: `sightjack [flags] <repo>` → prepends `scan` via `DefaultToScan`
+- Default subcommand: `sightjack [flags] <repo>` → prepends `scan` via `NeedsDefaultScan`
 - OTel tracer shutdown: `cobra.OnFinalize` + `sync.Once`
 - `run` subcommand: `--notify-cmd`, `--approve-cmd`, `--auto-approve` local flags (convergence gate)
 - `SIGHTJACK_TTY` env var: overrides `/dev/tty` in `openTTY()` for go-expect PTY injection in E2E tests
