@@ -8,11 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/session"
@@ -105,85 +103,6 @@ func NewRootCommand() *cobra.Command {
 	)
 
 	return rootCmd
-}
-
-// DefaultToScan preprocesses CLI args to inject "scan" when no subcommand
-// is detected. This preserves pre-cobra behavior where flags like --json
-// are forwarded to the scan command. Call before rootCmd.ExecuteContext.
-func DefaultToScan(rootCmd *cobra.Command, args []string) []string {
-	if len(args) == 0 {
-		return []string{"scan"}
-	}
-
-	// Root-level flags that should not be redirected to scan.
-	for _, arg := range args {
-		if arg == "--version" || arg == "--help" || arg == "-h" {
-			return args
-		}
-	}
-
-	// Build set of known subcommand names.
-	// Include cobra-injected commands (help, completion) that are only added
-	// at Execute() time — DefaultToScan runs before Execute().
-	known := map[string]bool{"help": true, "completion": true}
-	for _, sub := range rootCmd.Commands() {
-		known[sub.Name()] = true
-		for _, alias := range sub.Aliases {
-			known[alias] = true
-		}
-	}
-
-	// Classify persistent flags that consume a separate value arg (non-bool).
-	// Bool flags never consume the next arg in pflag (NoOptDefVal), so we
-	// only need to track value-taking flags to skip their arguments.
-	valueTakers := make(map[string]bool)
-	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		if f.Value.Type() != "bool" {
-			valueTakers["--"+f.Name] = true
-			if f.Shorthand != "" {
-				valueTakers["-"+f.Shorthand] = true
-			}
-		}
-	})
-
-	// Scan all args to find a known subcommand, skipping flags and their values.
-	// We must look past unknown flags/positionals (e.g., "--json" is a scan-local
-	// flag unknown to root, so "sightjack --json scan" must find "scan").
-	// When found at index > 0, reorder so the subcommand comes first — cobra
-	// parses flags left-to-right and would reject unknown flags before the
-	// subcommand (persistent flags work anywhere, so reorder is always safe).
-	skipNext := false
-	for i, arg := range args {
-		if skipNext {
-			skipNext = false
-			continue
-		}
-		if arg == "--" {
-			break
-		}
-		if strings.HasPrefix(arg, "-") {
-			// --flag=value doesn't consume the next arg.
-			if !strings.Contains(arg, "=") && valueTakers[arg] {
-				skipNext = true
-			}
-			continue
-		}
-		if known[arg] {
-			if i == 0 {
-				return args
-			}
-			// Move subcommand to front so cobra routes correctly.
-			reordered := make([]string, 0, len(args))
-			reordered = append(reordered, arg)
-			reordered = append(reordered, args[:i]...)
-			reordered = append(reordered, args[i+1:]...)
-			return reordered
-		}
-		// Unknown positional — continue scanning (don't return early).
-	}
-
-	// No subcommand found → default to scan.
-	return append([]string{"scan"}, args...)
 }
 
 // ttyDevices returns the ordered list of terminal device paths to try for the

@@ -226,11 +226,17 @@ func TestPersistentHooks_SpanContext(t *testing.T) {
 }
 
 func TestCobraRouting_DefaultToScan(t *testing.T) {
-	// given: run sightjack with no subcommand — DefaultToScan prepends "scan"
+	// given: run sightjack with no subcommand — NeedsDefaultScan prepends "scan"
 	dir := t.TempDir()
 
 	rootCmd := NewRootCommand()
-	rootCmd.SetArgs(DefaultToScan(rootCmd, []string{dir}))
+	args := []string{dir}
+	if NeedsDefaultScan(rootCmd, args) {
+		args = append([]string{"scan"}, args...)
+	} else {
+		args = ReorderArgs(rootCmd, args)
+	}
+	rootCmd.SetArgs(args)
 	rootCmd.SetOut(&bytes.Buffer{})
 	rootCmd.SetErr(&bytes.Buffer{})
 
@@ -252,7 +258,13 @@ func TestCobraRouting_DefaultToScanWithFlag(t *testing.T) {
 	dir := t.TempDir()
 
 	rootCmd := NewRootCommand()
-	rootCmd.SetArgs(DefaultToScan(rootCmd, []string{"--json", dir}))
+	args := []string{"--json", dir}
+	if NeedsDefaultScan(rootCmd, args) {
+		args = append([]string{"scan"}, args...)
+	} else {
+		args = ReorderArgs(rootCmd, args)
+	}
+	rootCmd.SetArgs(args)
 	rootCmd.SetOut(&bytes.Buffer{})
 	rootCmd.SetErr(&bytes.Buffer{})
 
