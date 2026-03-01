@@ -81,10 +81,16 @@ func parseExtraEndpoints(envVal string) []string {
 	return endpoints
 }
 
+// rootSpan holds the top-level span for the CLI invocation.
+// It is set by startRootSpan and closed by endRootSpan (called from
+// cobra.OnFinalize, which runs even on error — unlike PersistentPostRunE).
+var rootSpan trace.Span
+
 // startRootSpan creates the top-level span for a sightjack subcommand and
-// returns a new context carrying it. Call endRootSpan to close the span.
+// returns a new context carrying it. The span is stored in the package-level
+// rootSpan variable so endRootSpan can close it without a context argument.
 func startRootSpan(ctx context.Context, command string) context.Context {
-	ctx, _ = sightjack.Tracer.Start(ctx, "sightjack."+command,
+	ctx, rootSpan = sightjack.Tracer.Start(ctx, "sightjack."+command,
 		trace.WithAttributes(
 			attribute.String("sightjack.command", command),
 		),
@@ -92,8 +98,10 @@ func startRootSpan(ctx context.Context, command string) context.Context {
 	return ctx
 }
 
-// endRootSpan ends the span embedded in ctx (created by startRootSpan).
-func endRootSpan(ctx context.Context) {
-	span := trace.SpanFromContext(ctx)
-	span.End()
+// endRootSpan ends the package-level rootSpan (created by startRootSpan).
+// Safe to call when rootSpan is nil (e.g., before startRootSpan runs).
+func endRootSpan() {
+	if rootSpan != nil {
+		rootSpan.End()
+	}
 }

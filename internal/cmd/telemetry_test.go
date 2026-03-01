@@ -212,11 +212,14 @@ func TestParseExtraEndpoints_Empty(t *testing.T) {
 }
 
 func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
+	// given
 	exp := setupTestTracer(t)
 
-	ctx := startRootSpan(context.Background(), "scan")
-	endRootSpan(ctx)
+	// when
+	_ = startRootSpan(context.Background(), "scan")
+	endRootSpan()
 
+	// then
 	spans := exp.GetSpans()
 	if len(spans) == 0 {
 		t.Fatal("expected at least 1 span")
@@ -233,4 +236,12 @@ func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
 	if !found {
 		t.Error("expected sightjack.command=scan attribute on root span")
 	}
+}
+
+func TestEndRootSpan_NilSafe(t *testing.T) {
+	// given — rootSpan is nil (no startRootSpan called)
+	rootSpan = nil
+
+	// when / then — must not panic
+	endRootSpan()
 }

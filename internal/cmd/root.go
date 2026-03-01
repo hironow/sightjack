@@ -65,16 +65,13 @@ func NewRootCommand() *cobra.Command {
 			cmd.SetContext(spanCtx)
 			return nil
 		},
-		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-			endRootSpan(cmd.Context())
-			return nil
-		},
 		SilenceUsage:  true,
 		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output
 	}
 
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
+			endRootSpan()
 			if shutdownTracer != nil {
 				shutdownTracer(context.Background())
 			}
