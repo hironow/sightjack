@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -29,6 +30,10 @@ func ListExpiredEventFiles(stateDir string, days int) ([]string, error) {
 	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
 	var expired []string
 	for _, e := range entries {
+		// Only include event directories and .jsonl files; skip other entries.
+		if !e.IsDir() && !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
 		info, infoErr := e.Info()
 		if infoErr != nil {
 			continue
