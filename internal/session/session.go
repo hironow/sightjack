@@ -294,6 +294,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			recorder.Record(sightjack.EventWaveRejected, sightjack.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
+			sightjack.RecordWave(ctx, "rejected")
 			logger.Info("Wave rejected.")
 			return selected, approvalRejected
 		case sightjack.ApprovalDiscuss:
@@ -411,6 +412,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 		Errors: applyResult.Errors,
 	})
+	sightjack.RecordWave(ctx, "applied")
 
 	if !domain.IsWaveApplyComplete(applyResult) {
 		loopSpan.AddEvent("wave.partial_failure",
