@@ -290,13 +290,32 @@ func (w *Workspace) RunSightjack(t *testing.T, ctx context.Context, args ...stri
 	return err
 }
 
-// RunSightjackScan runs sightjack run with auto-approve.
+// RunSightjackScan runs sightjack run with auto-approve and provides stdin
+// input to drive the interactive session (select wave 1, approve, quit).
+// sightjack run is interactive: after scan + wave generation it enters a
+// wave selection/approval loop that reads from stdin. Without stdin input
+// the session would pause immediately without producing D-Mails.
 func (w *Workspace) RunSightjackScan(t *testing.T, ctx context.Context, extraArgs ...string) error {
 	t.Helper()
 	args := []string{"run", "--auto-approve"}
 	args = append(args, extraArgs...)
 	args = append(args, w.RepoPath)
-	return w.RunSightjack(t, ctx, args...)
+
+	cmd := w.runToolCmd(ctx, "sightjack", args...)
+
+	// Provide interactive input: select wave 1, approve all, quit.
+	// This drives the interactive loop through one full wave cycle.
+	cmd.Stdin = strings.NewReader("1\na\nq\n")
+
+	var combined bytes.Buffer
+	cmd.Stdout = &combined
+	cmd.Stderr = &combined
+
+	err := cmd.Run()
+	if err != nil {
+		t.Logf("sightjack %v failed: %v\n%s", args, err, combined.String())
+	}
+	return err
 }
 
 // RunPaintress runs paintress with the given args and waits for completion.
