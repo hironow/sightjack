@@ -15,7 +15,7 @@ import (
 )
 
 func TestDMailKind_Valid(t *testing.T) {
-	kinds := []session.DMailKind{session.DMailSpecification, session.DMailReport, session.DMailFeedback, session.DMailConvergence}
+	kinds := []session.DMailKind{session.DMailSpecification, session.DMailReport, session.DMailFeedback, session.DMailConvergence, session.DMailCIResult}
 	for _, k := range kinds {
 		if k == "" {
 			t.Errorf("kind constant should not be empty")
@@ -2318,5 +2318,79 @@ func TestComposeFeedback_IssuesSorted(t *testing.T) {
 	}
 	if mail.Issues[0] != "MY-10" || mail.Issues[1] != "MY-50" || mail.Issues[2] != "MY-99" {
 		t.Errorf("issues not sorted: %v", mail.Issues)
+	}
+}
+
+func TestValidateDMail_CIResultKind(t *testing.T) {
+	// given: a d-mail with ci-result kind
+	mail := &session.DMail{
+		Name:          "ci-result-pr-123",
+		Kind:          session.DMailCIResult,
+		Description:   "CI pipeline result for PR #123",
+		SchemaVersion: "1",
+	}
+
+	// when
+	err := session.ValidateDMail(mail)
+
+	// then
+	if err != nil {
+		t.Errorf("expected ci-result kind to be valid, got: %v", err)
+	}
+}
+
+func TestDMail_ActionPriorityFields(t *testing.T) {
+	// given: a d-mail with action and priority fields set
+	original := &session.DMail{
+		Name:          "ci-result-roundtrip",
+		Kind:          session.DMailCIResult,
+		Description:   "CI result with action and priority",
+		SchemaVersion: "1",
+		Action:        "review",
+		Priority:      3,
+		Body:          "# CI Result\n\nPipeline passed.\n",
+	}
+
+	// when: marshal then parse (round-trip)
+	data, err := session.MarshalDMail(original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	parsed, err := session.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	// then: action and priority are preserved
+	if parsed.Action != "review" {
+		t.Errorf("action: got %q, want %q", parsed.Action, "review")
+	}
+	if parsed.Priority != 3 {
+		t.Errorf("priority: got %d, want %d", parsed.Priority, 3)
+	}
+}
+
+func TestDMail_ActionPriorityOmitEmpty(t *testing.T) {
+	// given: a d-mail without action and priority (zero values)
+	mail := &session.DMail{
+		Name:          "no-action-priority",
+		Kind:          session.DMailFeedback,
+		Description:   "Feedback without action/priority",
+		SchemaVersion: "1",
+	}
+
+	// when
+	data, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	content := string(data)
+
+	// then: action and priority should be omitted from YAML
+	if strings.Contains(content, "action:") {
+		t.Error("expected action field to be omitted when empty")
+	}
+	if strings.Contains(content, "priority:") {
+		t.Error("expected priority field to be omitted when zero")
 	}
 }

@@ -28,6 +28,8 @@ type DMail struct {
 	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
 	Issues        []string          `yaml:"issues,omitempty"`
 	Severity      string            `yaml:"severity,omitempty"`
+	Action        string            `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Body          string            `yaml:"-"`
 }
@@ -40,6 +42,7 @@ const (
 	DMailReport        DMailKind = "report"
 	DMailFeedback      DMailKind = "feedback"
 	DMailConvergence   DMailKind = "convergence"
+	DMailCIResult      DMailKind = "ci-result"
 )
 
 // Filename returns the canonical filename: "<name>.md".
@@ -151,10 +154,10 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: dmail-schema-version is required")
 	}
 	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence:
+	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence, DMailCIResult:
 		// valid
 	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence)", mail.Kind)
+		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence, ci-result)", mail.Kind)
 	}
 	return nil
 }
