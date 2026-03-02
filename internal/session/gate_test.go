@@ -51,7 +51,7 @@ func TestConvergenceGate_NoConvergence(t *testing.T) {
 		{Name: "fb-1", Kind: session.DMailFeedback, Description: "feedback only"},
 	}
 	notifier := &sightjack.NopNotifier{}
-	approver := &session.AutoApprover{}
+	approver := &sightjack.AutoApprover{}
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
@@ -72,7 +72,7 @@ func TestConvergenceGate_Approved(t *testing.T) {
 		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
 	}
 	notifier := &sightjack.NopNotifier{}
-	approver := &session.AutoApprover{}
+	approver := &sightjack.AutoApprover{}
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
@@ -138,7 +138,7 @@ func TestConvergenceGate_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	notifier := &sightjack.NopNotifier{}
-	approver := &session.AutoApprover{}
+	approver := &sightjack.AutoApprover{}
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when
@@ -159,7 +159,7 @@ func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 	ch := make(chan *session.DMail, 2)
 	ch <- &session.DMail{Name: "late-conv", Kind: session.DMailConvergence, Description: "late convergence"}
 	notifier := &sightjack.NopNotifier{}
-	approver := &session.AutoApprover{}
+	approver := &sightjack.AutoApprover{}
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when: initial is empty, gate passes through, but re-drain catches late convergence
@@ -227,7 +227,7 @@ func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
 	}
 	notifier := &blockingNotifier{ch: make(chan struct{})}
-	approver := &session.AutoApprover{}
+	approver := &sightjack.AutoApprover{}
 	logger := sightjack.NewLogger(io.Discard, false)
 
 	// when: run gate with a deadline

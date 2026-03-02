@@ -6,6 +6,9 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
+
+	sightjack "github.com/hironow/sightjack"
 )
 
 // cmdFactoryFunc creates an *exec.Cmd — injectable for testing.
@@ -46,20 +49,38 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 	case "linux":
 		cmd := factory(ctx, "notify-send", title, message)
 		return cmd.Run()
+	case "windows":
+		script := fmt.Sprintf(
+			`Add-Type -AssemblyName System.Windows.Forms; `+
+				`$n = New-Object System.Windows.Forms.NotifyIcon; `+
+				`$n.Icon = [System.Drawing.SystemIcons]::Information; `+
+				`$n.BalloonTipTitle = '%s'; `+
+				`$n.BalloonTipText = '%s'; `+
+				`$n.Visible = $true; `+
+				`$n.ShowBalloonTip(5000)`,
+			psEscapeSingleQuote(title), psEscapeSingleQuote(message),
+		)
+		cmd := factory(ctx, "powershell", "-NoProfile", "-Command", script)
+		return cmd.Run()
 	default:
-		return fmt.Errorf("notify: unsupported OS %q", n.os())
+		return sightjack.ErrUnsupportedOS
 	}
+}
+
+// psEscapeSingleQuote escapes single quotes for PowerShell single-quoted strings.
+func psEscapeSingleQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
 
 // CmdNotifier runs a user-provided shell command with {title} and {message} placeholders.
 type CmdNotifier struct {
-	template   string
-	cmdFactory cmdFactoryFunc
+	cmdTemplate string
+	cmdFactory  cmdFactoryFunc
 }
 
 // NewCmdNotifier creates a CmdNotifier from a shell command template.
-func NewCmdNotifier(template string) *CmdNotifier {
-	return &CmdNotifier{template: template}
+func NewCmdNotifier(cmdTemplate string) *CmdNotifier {
+	return &CmdNotifier{cmdTemplate: cmdTemplate}
 }
 
 func (n *CmdNotifier) factory() cmdFactoryFunc {
@@ -69,19 +90,16 @@ func (n *CmdNotifier) factory() cmdFactoryFunc {
 	return defaultCmdFactory
 }
 
+const notifyTimeout = 30 * time.Second
+
 func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
-	if n.template == "" {
+	if n.cmdTemplate == "" {
 		return fmt.Errorf("notify: empty command template")
 	}
-	expanded := strings.ReplaceAll(n.template, "{title}", ShellQuote(title))
+	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
+	defer cancel()
+	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", ShellQuote(title))
 	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	cmd := n.factory()(ctx, shellName(), shellFlag(), expanded)
 	return cmd.Run()
-}
-
-// ShellQuote wraps a string in single quotes with proper escaping
-// to prevent shell injection. Single quotes within the string are
-// escaped by splitting: quote -> quote-backslash-quote-quote (see implementation).
-func ShellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }

@@ -1,17 +1,33 @@
 package sightjack
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+// EventDispatcher dispatches domain events to policy handlers.
+// Implemented by usecase.PolicyEngine; injected into session via struct field.
+type EventDispatcher interface {
+	Dispatch(ctx context.Context, event Event) error
+}
+
+// EventApplier applies domain events to update materialized projections.
+type EventApplier interface {
+	Apply(event Event) error
+	Rebuild(events []Event) error
+}
 
 // EventStore is the interface for an append-only event log.
 type EventStore interface {
 	Append(events ...Event) error
-	ReadAll() ([]Event, error)
-	ReadSince(afterSeq int64) ([]Event, error)
-	LastSequence() (int64, error)
+	LoadAll() ([]Event, error)
+	LoadSince(after time.Time) ([]Event, error)
 }
 
 // EventType identifies the kind of domain event.
@@ -35,61 +51,51 @@ const (
 	EventSessionRescanned    EventType = "session_rescanned"
 	EventSpecificationSent   EventType = "specification_sent"
 	EventReportSent          EventType = "report_sent"
+	EventFeedbackSent        EventType = "feedback_sent"
 )
 
-// EventSchemaVersion is the schema version stamped into every event envelope.
-const EventSchemaVersion = "2"
-
 // Event is the immutable event envelope persisted to the event store.
-// PayloadRaw holds the JSON-encoded payload; the Payload field is transient.
 type Event struct {
-	SchemaVersion string          `json:"schema_version"`
+	ID            string          `json:"id"`
 	Type          EventType       `json:"type"`
 	Timestamp     time.Time       `json:"timestamp"`
+	Data          json.RawMessage `json:"data"`
 	SessionID     string          `json:"session_id"`
-	Sequence      int64           `json:"sequence"`
-	CorrelationID string          `json:"correlation_id"`
-	CausationID   string          `json:"causation_id"`
-	PayloadRaw    json.RawMessage `json:"payload"`
+	CorrelationID string          `json:"correlation_id,omitempty"`
+	CausationID   string          `json:"causation_id,omitempty"`
 }
 
-// NewEvent creates an Event with the given type, session, sequence, and payload.
-// The payload is immediately marshaled to PayloadRaw.
-func NewEvent(eventType EventType, sessionID string, seq int64, payload any) (Event, error) {
-	raw, err := json.Marshal(payload)
+// NewEvent creates an Event with a UUID, the given timestamp, and marshaled data payload.
+func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error) {
+	raw, err := json.Marshal(data)
 	if err != nil {
-		return Event{}, fmt.Errorf("marshal event payload: %w", err)
+		return Event{}, fmt.Errorf("marshal event data: %w", err)
 	}
 	return Event{
-		SchemaVersion: EventSchemaVersion,
-		Type:          eventType,
-		Timestamp:     time.Now(),
-		SessionID:     sessionID,
-		Sequence:      seq,
-		PayloadRaw:    raw,
+		ID:        uuid.NewString(),
+		Type:      eventType,
+		Timestamp: timestamp,
+		Data:      raw,
 	}, nil
 }
 
 // ValidateEvent checks structural validity of an Event before persistence.
-// It returns an error if any required field is missing or invalid.
 func ValidateEvent(e Event) error {
+	var errs []string
+	if e.ID == "" {
+		errs = append(errs, "ID is required")
+	}
 	if e.Type == "" {
-		return fmt.Errorf("validate event: type is empty")
-	}
-	if e.SessionID == "" {
-		return fmt.Errorf("validate event: session_id is empty")
-	}
-	if e.Sequence < 1 {
-		return fmt.Errorf("validate event: sequence must be >= 1, got %d", e.Sequence)
-	}
-	if e.SchemaVersion == "" {
-		return fmt.Errorf("validate event: schema_version is empty")
+		errs = append(errs, "Type is required")
 	}
 	if e.Timestamp.IsZero() {
-		return fmt.Errorf("validate event: timestamp is zero")
+		errs = append(errs, "Timestamp must not be zero")
 	}
-	if len(e.PayloadRaw) == 0 {
-		return fmt.Errorf("validate event: payload is empty")
+	if len(e.Data) == 0 {
+		errs = append(errs, "Data must not be empty")
+	}
+	if len(errs) > 0 {
+		return errors.New("invalid event: " + strings.Join(errs, "; "))
 	}
 	return nil
 }
@@ -99,9 +105,9 @@ func MarshalEvent(e Event) ([]byte, error) {
 	return json.Marshal(e)
 }
 
-// UnmarshalEventPayload deserializes the PayloadRaw field into the given target.
+// UnmarshalEventPayload deserializes the Data field into the given target.
 func UnmarshalEventPayload(e Event, target any) error {
-	return json.Unmarshal(e.PayloadRaw, target)
+	return json.Unmarshal(e.Data, target)
 }
 
 // SessionStartedPayload is the payload for EventSessionStarted.

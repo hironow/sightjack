@@ -1221,7 +1221,7 @@ func TestCanResume_ValidState(t *testing.T) {
 	}
 
 	// when / then
-	if !session.CanResume(state) {
+	if !session.CanResume(dir, state) {
 		t.Error("expected CanResume true for valid state with waves")
 	}
 }
@@ -1237,7 +1237,7 @@ func TestCanResume_EmptyWaves(t *testing.T) {
 	state := &sightjack.SessionState{ScanResultPath: path, Waves: nil}
 
 	// when / then
-	if session.CanResume(state) {
+	if session.CanResume(dir, state) {
 		t.Error("expected CanResume false when waves are empty")
 	}
 }
@@ -1247,7 +1247,7 @@ func TestCanResume_EmptyPath(t *testing.T) {
 	state := &sightjack.SessionState{ScanResultPath: ""}
 
 	// when / then
-	if session.CanResume(state) {
+	if session.CanResume("", state) {
 		t.Error("expected CanResume false for empty path")
 	}
 }
@@ -1318,7 +1318,7 @@ func TestCanResume_MissingFile(t *testing.T) {
 	state := &sightjack.SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
 
 	// when / then
-	if session.CanResume(state) {
+	if session.CanResume("", state) {
 		t.Error("expected CanResume false for missing file")
 	}
 }

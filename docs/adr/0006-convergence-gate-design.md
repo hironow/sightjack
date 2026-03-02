@@ -1,7 +1,7 @@
 # 0006. Convergence Gate Design
 
 **Date:** 2026-02-23
-**Status:** Accepted — approval contract generalized in shared ADR S0003
+**Status:** Accepted
 
 ## Context
 
@@ -35,7 +35,7 @@ Implement a convergence gate architecture with the following properties:
      (closing fd 0 would break subsequent reads).
    - `CmdApprover`: External command with `{message}` placeholder.
      Exit 0 = approve, non-zero `ExitError` = deny, other error = fail.
-     Shell injection prevented via `shellQuote()`.
+     Shell injection prevented via `ShellQuote()`.
    - `AutoApprover`: Always approves. Used with `--auto-approve` flag for CI.
 
 4. **Redrain loop**: `RunConvergenceGateWithRedrain` re-drains the inbox

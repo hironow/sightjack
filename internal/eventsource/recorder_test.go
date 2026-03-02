@@ -2,8 +2,8 @@ package eventsource_test
 
 import (
 	"errors"
-	"path/filepath"
 	"testing"
+	"time"
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/eventsource"
@@ -24,14 +24,15 @@ func (s *failOnceStore) Append(events ...sightjack.Event) error {
 	return s.real.Append(events...)
 }
 
-func (s *failOnceStore) ReadAll() ([]sightjack.Event, error)        { return s.real.ReadAll() }
-func (s *failOnceStore) ReadSince(seq int64) ([]sightjack.Event, error) { return s.real.ReadSince(seq) }
-func (s *failOnceStore) LastSequence() (int64, error)                { return s.real.LastSequence() }
+func (s *failOnceStore) LoadAll() ([]sightjack.Event, error) { return s.real.LoadAll() }
+func (s *failOnceStore) LoadSince(after time.Time) ([]sightjack.Event, error) {
+	return s.real.LoadSince(after)
+}
 
-func TestSessionRecorder_Record_AutoSequence(t *testing.T) {
+func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -46,15 +47,18 @@ func TestSessionRecorder_Record_AutoSequence(t *testing.T) {
 	}
 
 	// then
-	events, _ := store.ReadAll()
+	events, _ := store.LoadAll()
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
-	if events[0].Sequence != 1 {
-		t.Errorf("expected seq 1, got %d", events[0].Sequence)
+	if events[0].ID == "" {
+		t.Error("expected non-empty UUID ID on first event")
 	}
-	if events[1].Sequence != 2 {
-		t.Errorf("expected seq 2, got %d", events[1].Sequence)
+	if events[1].ID == "" {
+		t.Error("expected non-empty UUID ID on second event")
+	}
+	if events[0].ID == events[1].ID {
+		t.Error("expected unique IDs for different events")
 	}
 	if events[0].SessionID != "session-1" {
 		t.Errorf("expected session-1, got %s", events[0].SessionID)
@@ -64,7 +68,7 @@ func TestSessionRecorder_Record_AutoSequence(t *testing.T) {
 func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -81,7 +85,7 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	}
 
 	// then
-	events, _ := store.ReadAll()
+	events, _ := store.LoadAll()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
@@ -95,7 +99,7 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 	recorder, err := eventsource.NewSessionRecorder(store, "session-42")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -106,7 +110,7 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	recorder.Record(sightjack.EventScanCompleted, nil)
 
 	// then: both events should have CorrelationID == sessionID
-	events, _ := store.ReadAll()
+	events, _ := store.LoadAll()
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -117,10 +121,10 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	}
 }
 
-func TestSessionRecorder_CausationID_ChainsPreviousSequence(t *testing.T) {
+func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -132,89 +136,63 @@ func TestSessionRecorder_CausationID_ChainsPreviousSequence(t *testing.T) {
 	recorder.Record(sightjack.EventWavesGenerated, nil)
 
 	// then
-	events, _ := store.ReadAll()
+	events, _ := store.LoadAll()
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
-	// Event 1 (seq 1): no previous event, CausationID should be empty
+	// Event 1: no previous event, CausationID should be empty
 	if events[0].CausationID != "" {
 		t.Errorf("event 1: expected empty CausationID, got %s", events[0].CausationID)
 	}
-	// Event 2 (seq 2): previous is seq 1
-	if events[1].CausationID != "1" {
-		t.Errorf("event 2: expected CausationID '1', got %s", events[1].CausationID)
+	// Event 2: previous is event 1
+	if events[1].CausationID != events[0].ID {
+		t.Errorf("event 2: expected CausationID %s, got %s", events[0].ID, events[1].CausationID)
 	}
-	// Event 3 (seq 3): previous is seq 2
-	if events[2].CausationID != "2" {
-		t.Errorf("event 3: expected CausationID '2', got %s", events[2].CausationID)
-	}
-}
-
-func TestSessionRecorder_Resume_CausationID_ContinuesChain(t *testing.T) {
-	// given: store with 3 existing events
-	dir := t.TempDir()
-	path := filepath.Join(dir, "test.jsonl")
-	store := eventsource.NewFileEventStore(path)
-
-	for i := int64(1); i <= 3; i++ {
-		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "session-1", i, nil)
-		store.Append(e)
-	}
-
-	// when: new recorder resumes from existing store, records event 4
-	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
-	if err != nil {
-		t.Fatalf("NewSessionRecorder: %v", err)
-	}
-	recorder.Record(sightjack.EventWavesGenerated, nil)
-
-	// then: event 4 should have CausationID == "3" (continuing chain)
-	events, _ := store.ReadAll()
-	if len(events) != 4 {
-		t.Fatalf("expected 4 events, got %d", len(events))
-	}
-	if events[3].CausationID != "3" {
-		t.Errorf("resumed event: expected CausationID '3', got %s", events[3].CausationID)
-	}
-	if events[3].CorrelationID != "session-1" {
-		t.Errorf("resumed event: expected CorrelationID 'session-1', got %s", events[3].CorrelationID)
+	// Event 3: previous is event 2
+	if events[2].CausationID != events[1].ID {
+		t.Errorf("event 3: expected CausationID %s, got %s", events[1].ID, events[2].CausationID)
 	}
 }
 
 func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
-	// given: store with 3 existing events
+	// given: store with existing events
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.jsonl")
-	store := eventsource.NewFileEventStore(path)
+	store := eventsource.NewFileEventStore(dir)
 
-	for i := int64(1); i <= 3; i++ {
-		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "session-1", i, nil)
-		store.Append(e)
-	}
+	rec1, _ := eventsource.NewSessionRecorder(store, "session-1")
+	rec1.Record(sightjack.EventSessionStarted, nil)
+	rec1.Record(sightjack.EventScanCompleted, nil)
+	rec1.Record(sightjack.EventWavesGenerated, nil)
+
+	events1, _ := store.LoadAll()
+	lastID := events1[len(events1)-1].ID
 
 	// when: create new recorder from same store
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(sightjack.EventWavesGenerated, nil); err != nil {
+	if err := recorder.Record(sightjack.EventWaveApproved, nil); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
-	// then: new event should have sequence 4
-	events, _ := store.ReadAll()
+	// then: new event should chain from last existing event
+	events, _ := store.LoadAll()
 	if len(events) != 4 {
 		t.Fatalf("expected 4 events, got %d", len(events))
 	}
-	if events[3].Sequence != 4 {
-		t.Errorf("expected seq 4 (resume from 3), got %d", events[3].Sequence)
+	if events[3].CausationID != lastID {
+		t.Errorf("resumed event: expected CausationID %s, got %s", lastID, events[3].CausationID)
+	}
+	if events[3].CorrelationID != "session-1" {
+		t.Errorf("resumed event: expected CorrelationID 'session-1', got %s", events[3].CorrelationID)
 	}
 }
 
 func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	// given: a store that fails the first Append, then succeeds
 	dir := t.TempDir()
-	real := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	real := eventsource.NewFileEventStore(dir)
 	fos := &failOnceStore{real: real}
 	recorder, err := eventsource.NewSessionRecorder(fos, "session-1")
 	if err != nil {
@@ -227,18 +205,18 @@ func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 		t.Fatal("expected error on first Record")
 	}
 
-	// when: second Record should succeed with sequence 1 (not 2)
+	// when: second Record should succeed
 	err2 := recorder.Record(sightjack.EventSessionStarted, nil)
 	if err2 != nil {
 		t.Fatalf("expected second Record to succeed, got: %v", err2)
 	}
 
-	// then: the store should have exactly 1 event with sequence 1
-	events, _ := real.ReadAll()
+	// then: the store should have exactly 1 event
+	events, _ := real.LoadAll()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	if events[0].Sequence != 1 {
-		t.Errorf("expected seq 1 (retry after failure), got %d", events[0].Sequence)
+	if events[0].ID == "" {
+		t.Error("expected non-empty UUID ID")
 	}
 }

@@ -146,7 +146,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		Clusters:       clusterStates,
 		Completeness:   scanResult.Completeness,
 		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: scanResultPath,
+		ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
 		LastScanned:    scanTime,
 	})
 
@@ -190,6 +190,15 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	scanResult *sightjack.ScanResult, cfg *sightjack.Config, available []sightjack.Wave, waves []sightjack.Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
 	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, selectPhaseResult, bool) {
+
+	// Auto-select first available wave when --auto-approve is set.
+	if cfg.Gate.AutoApprove {
+		if len(available) > 0 {
+			logger.Info("Auto-selecting wave: %s", available[0].Title)
+			return available[0], selectChosen, shibitoShown
+		}
+		return sightjack.Wave{}, selectQuit, shibitoShown
+	}
 
 	// Display Link Navigator
 	nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
@@ -253,6 +262,27 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	store sightjack.OutboxStore, recorder sightjack.Recorder,
 	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, approvalPhaseResult) {
 
+	// Auto-approve when --auto-approve is set.
+	if cfg.Gate.AutoApprove {
+		loopSpan.AddEvent("wave.auto_approved",
+			trace.WithAttributes(
+				attribute.String("wave.id", selected.ID),
+				attribute.String("wave.cluster_name", selected.ClusterName),
+			),
+		)
+		recorder.Record(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
+			WaveID: selected.ID, ClusterName: selected.ClusterName,
+		})
+		if err := ComposeSpecification(store, selected); err != nil {
+			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
+		} else {
+			recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
+				WaveID: selected.ID, ClusterName: selected.ClusterName,
+			})
+		}
+		return selected, approvalApproved
+	}
+
 	for {
 		choice, err := PromptWaveApproval(ctx, out, scanner, selected)
 		if err == ErrQuit {
@@ -294,6 +324,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			recorder.Record(sightjack.EventWaveRejected, sightjack.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
+			sightjack.RecordWave(ctx, "rejected")
 			logger.Info("Wave rejected.")
 			return selected, approvalRejected
 		case sightjack.ApprovalDiscuss:
@@ -411,6 +442,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 		Errors: applyResult.Errors,
 	})
+	sightjack.RecordWave(ctx, "applied")
 
 	if !domain.IsWaveApplyComplete(applyResult) {
 		loopSpan.AddEvent("wave.partial_failure",
@@ -465,6 +497,15 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
 		recorder.Record(sightjack.EventReportSent, sightjack.WaveIdentityPayload{
+			WaveID: selected.ID, ClusterName: selected.ClusterName,
+		})
+	}
+
+	// O2: sightjack → amadeus feedback D-Mail
+	if feedbackErr := ComposeFeedback(store, selected, applyResult); feedbackErr != nil {
+		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
+	} else {
+		recorder.Record(sightjack.EventFeedbackSent, sightjack.WaveIdentityPayload{
 			WaveID: selected.ID, ClusterName: selected.ClusterName,
 		})
 	}
@@ -672,7 +713,8 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 	if state.ScanResultPath == "" {
 		return nil, nil, nil, 0, fmt.Errorf("no cached scan result path in state")
 	}
-	scanResult, err := LoadScanResult(state.ScanResultPath)
+	resolvedPath := sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath)
+	scanResult, err := LoadScanResult(resolvedPath)
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
 	}
@@ -689,7 +731,7 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 // ScanResultPath is empty.
 func ResumeScanDir(state *sightjack.SessionState, baseDir string) string {
 	if state.ScanResultPath != "" {
-		return filepath.Dir(state.ScanResultPath)
+		return filepath.Dir(sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath))
 	}
 	return sightjack.ScanDir(baseDir, state.SessionID)
 }
@@ -866,7 +908,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		Clusters:       clusterStates,
 		Completeness:   scanResult.Completeness,
 		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: scanResultPath,
+		ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
 		LastScanned:    scanTime,
 	})
 	recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{

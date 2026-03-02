@@ -28,17 +28,22 @@ func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logge
 		logger = sightjack.NewLogger(nil, false)
 	}
 
+	budget := cfg.Gate.ReviewBudget
+	if budget <= 0 {
+		budget = maxReviewGateCycles
+	}
+
 	timeoutSec := cfg.Claude.TimeoutSec
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
 	reviewTimeout := max(
-		time.Duration(timeoutSec)*time.Second/time.Duration(maxReviewGateCycles),
+		time.Duration(timeoutSec)*time.Second/time.Duration(budget),
 		minReviewTimeout,
 	)
 
 	var lastComments string
-	for cycle := 1; cycle <= maxReviewGateCycles; cycle++ {
+	for cycle := 1; cycle <= budget; cycle++ {
 		if ctx.Err() != nil {
 			return false, fmt.Errorf("review gate canceled: %w", ctx.Err())
 		}
@@ -58,10 +63,10 @@ func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logge
 		}
 
 		lastComments = result.Comments
-		logger.Warn("Review gate: comments found (cycle %d/%d)", cycle, maxReviewGateCycles)
+		logger.Warn("Review gate: comments found (cycle %d/%d)", cycle, budget)
 
 		// Last cycle — no point running fix
-		if cycle == maxReviewGateCycles {
+		if cycle == budget {
 			break
 		}
 
@@ -72,7 +77,7 @@ func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logge
 		}
 	}
 
-	logger.Warn("Review gate: exhausted %d cycles, review not resolved", maxReviewGateCycles)
+	logger.Warn("Review gate: exhausted %d cycles, review not resolved", budget)
 	return false, nil
 }
 

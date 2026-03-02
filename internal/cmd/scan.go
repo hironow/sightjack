@@ -11,6 +11,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newScanCmd() *cobra.Command {
@@ -53,7 +54,12 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if jsonOutput {
 				streamOut = cmd.ErrOrStderr()
 			}
-			result, err := session.RunScan(cmd.Context(), cfg, baseDir, sessionID, dryRun, streamOut, logger)
+			result, err := usecase.RunScan(cmd.Context(), sightjack.RunScanCommand{
+				RepoPath:   baseDir,
+				Lang:       cfg.Lang,
+				Strictness: string(cfg.Strictness.Default),
+				DryRun:     dryRun,
+			}, cfg, baseDir, sessionID, dryRun, streamOut, logger)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}
@@ -106,7 +112,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				Clusters:       clusters,
 				Completeness:   result.Completeness,
 				ShibitoCount:   len(result.ShibitoWarnings),
-				ScanResultPath: scanResultPath,
+				ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
 				LastScanned:    time.Now(),
 			}); err != nil {
 				logger.Warn("Failed to record scan completed: %v", err)

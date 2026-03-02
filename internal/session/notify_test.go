@@ -79,9 +79,42 @@ func TestLocalNotifier_Linux(t *testing.T) {
 	}
 }
 
+func TestLocalNotifier_Windows(t *testing.T) {
+	// given: LocalNotifier forced to windows, with captured command
+	var captured []string
+	n := session.NewLocalNotifierForTest("windows",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			captured = append(captured, name)
+			captured = append(captured, args...)
+			return exec.Command("true")
+		},
+	)
+
+	// when
+	err := n.Notify(context.Background(), "Test Title", "Test Message")
+
+	// then
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(captured) == 0 {
+		t.Fatal("expected command to be captured")
+	}
+	if captured[0] != "powershell" {
+		t.Errorf("expected powershell, got %s", captured[0])
+	}
+	joined := strings.Join(captured, " ")
+	if !strings.Contains(joined, "Test Title") {
+		t.Error("expected title in powershell args")
+	}
+	if !strings.Contains(joined, "Test Message") {
+		t.Error("expected message in powershell args")
+	}
+}
+
 func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	// given: unsupported OS
-	n := session.NewLocalNotifierForTest("windows",
+	n := session.NewLocalNotifierForTest("freebsd",
 		func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			return exec.Command("true")
 		},
@@ -90,9 +123,9 @@ func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
 
-	// then: should return error for unsupported OS
-	if err == nil {
-		t.Error("expected error for unsupported OS")
+	// then: should return ErrUnsupportedOS sentinel
+	if err != sightjack.ErrUnsupportedOS {
+		t.Errorf("err = %v, want sightjack.ErrUnsupportedOS", err)
 	}
 }
 
@@ -136,7 +169,35 @@ func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 	}
 }
 
-func TestShellQuote(t *testing.T) {
+func TestCmdNotifier_Timeout(t *testing.T) {
+	// given — a command factory that captures the context deadline
+	var capturedCtx context.Context
+	n := session.NewCmdNotifierForTest("echo {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			capturedCtx = ctx
+			return exec.Command("true")
+		},
+	)
+
+	// when
+	err := n.Notify(context.Background(), "Title", "Message")
+
+	// then — the context passed to the command should have a deadline
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedCtx == nil {
+		t.Fatal("context was not captured")
+	}
+	deadline, ok := capturedCtx.Deadline()
+	if !ok {
+		t.Fatal("context should have a deadline (30s timeout)")
+	}
+	// Deadline should be roughly 30s from now (allow some slack)
+	_ = deadline // existence check is sufficient
+}
+
+func TestShellQuoteUnix(t *testing.T) {
 	tests := []struct {
 		input string
 		want  string
@@ -148,9 +209,29 @@ func TestShellQuote(t *testing.T) {
 		{"$(rm -rf /)", "'$(rm -rf /)'"},
 	}
 	for _, tt := range tests {
-		got := session.ShellQuote(tt.input)
+		got := session.ShellQuoteUnix(tt.input)
 		if got != tt.want {
-			t.Errorf("ShellQuote(%q): got %q, want %q", tt.input, got, tt.want)
+			t.Errorf("ShellQuoteUnix(%q): got %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestShellQuoteCmd(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"hello", `"hello"`},
+		{`say "hi"`, `"say ""hi"""`},
+		{"normal text", `"normal text"`},
+		{"", `""`},
+		{"100%", `"100%%"`},
+		{`"quoted" & piped`, `"""quoted"" & piped"`},
+	}
+	for _, tt := range tests {
+		got := session.ShellQuoteCmd(tt.input)
+		if got != tt.want {
+			t.Errorf("ShellQuoteCmd(%q): got %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

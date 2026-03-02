@@ -123,7 +123,7 @@ func BuildNotifier(cfg *sightjack.Config) sightjack.Notifier {
 // Priority: AutoApprove → CmdApprover → StdinApprover.
 func BuildApprover(cfg *sightjack.Config, input io.Reader, out io.Writer) sightjack.Approver {
 	if cfg.Gate.AutoApprove {
-		return &AutoApprover{}
+		return &sightjack.AutoApprover{}
 	}
 	if cfg.Gate.ApproveCmd != "" {
 		return NewCmdApprover(cfg.Gate.ApproveCmd)

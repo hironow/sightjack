@@ -20,13 +20,13 @@ func NewLocalNotifierForTest(osName string, factory func(ctx context.Context, na
 }
 
 // NewCmdNotifierForTest creates a CmdNotifier with a test command factory.
-func NewCmdNotifierForTest(template string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *CmdNotifier {
-	return &CmdNotifier{template: template, cmdFactory: factory}
+func NewCmdNotifierForTest(cmdTemplate string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *CmdNotifier {
+	return &CmdNotifier{cmdTemplate: cmdTemplate, cmdFactory: factory}
 }
 
 // NewCmdApproverForTest creates a CmdApprover with a test command factory.
-func NewCmdApproverForTest(template string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *CmdApprover {
-	return &CmdApprover{template: template, cmdFactory: factory}
+func NewCmdApproverForTest(cmdTemplate string, factory func(ctx context.Context, name string, args ...string) *exec.Cmd) *CmdApprover {
+	return &CmdApprover{cmdTemplate: cmdTemplate, cmdFactory: factory}
 }
 
 // DBForTest returns the underlying database connection for testing.

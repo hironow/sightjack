@@ -87,7 +87,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 			// Verify gen_ai.* semantic convention attributes (P1-3)
 			requiredAttrs := map[string]string{
 				"gen_ai.operation.name": "chat",
-				"gen_ai.system":        "anthropic",
+				"gen_ai.system":         "anthropic",
 			}
 			for key, want := range requiredAttrs {
 				var attrFound bool
@@ -165,12 +165,61 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	}
 }
 
+func TestMultiExporter_BothReceive(t *testing.T) {
+	exp1 := tracetest.NewInMemoryExporter()
+	exp2 := tracetest.NewInMemoryExporter()
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(exp1),
+		sdktrace.WithSyncer(exp2),
+	)
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	oldTracer := sightjack.Tracer
+	sightjack.Tracer = tp.Tracer("sightjack-test")
+	t.Cleanup(func() {
+		tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prev)
+		sightjack.Tracer = oldTracer
+	})
+
+	_, span := sightjack.Tracer.Start(context.Background(), "multi-span")
+	span.End()
+
+	if len(exp1.GetSpans()) == 0 {
+		t.Error("exporter 1 received no spans")
+	}
+	if len(exp2.GetSpans()) == 0 {
+		t.Error("exporter 2 received no spans")
+	}
+}
+
+func TestParseExtraEndpoints_CommaSeparated(t *testing.T) {
+	eps := parseExtraEndpoints("localhost:4318,weave.local:4318")
+	if len(eps) != 2 {
+		t.Fatalf("got %d endpoints, want 2", len(eps))
+	}
+	if eps[0] != "localhost:4318" {
+		t.Errorf("eps[0] = %q, want %q", eps[0], "localhost:4318")
+	}
+}
+
+func TestParseExtraEndpoints_Empty(t *testing.T) {
+	eps := parseExtraEndpoints("")
+	if len(eps) != 0 {
+		t.Errorf("got %d endpoints, want 0", len(eps))
+	}
+}
+
 func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
+	// given
 	exp := setupTestTracer(t)
 
-	ctx := startRootSpan(context.Background(), "scan")
-	endRootSpan(ctx)
+	// when
+	_ = startRootSpan(context.Background(), "scan")
+	endRootSpan()
 
+	// then
 	spans := exp.GetSpans()
 	if len(spans) == 0 {
 		t.Fatal("expected at least 1 span")
@@ -187,4 +236,12 @@ func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
 	if !found {
 		t.Error("expected sightjack.command=scan attribute on root span")
 	}
+}
+
+func TestEndRootSpan_NilSafe(t *testing.T) {
+	// given — rootSpan is nil (no startRootSpan called)
+	rootSpan = nil
+
+	// when / then — must not panic
+	endRootSpan()
 }

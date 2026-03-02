@@ -4,28 +4,29 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
-func TestFileEventStore_AppendAndReadAll_RoundTrip(t *testing.T) {
+func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, "s1", 2, nil)
+	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, time.Now())
 
 	// when
 	if err := store.Append(e1, e2); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
-	events, err := store.ReadAll()
+	events, err := store.LoadAll()
 
 	// then
 	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
+		t.Fatalf("LoadAll: %v", err)
 	}
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
@@ -38,108 +39,83 @@ func TestFileEventStore_AppendAndReadAll_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestFileEventStore_ReadSince_FiltersCorrectly(t *testing.T) {
+func TestFileEventStore_LoadSince_FiltersCorrectly(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 
-	for i := int64(1); i <= 5; i++ {
-		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", i, nil)
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	for i := range 5 {
+		ts := base.Add(time.Duration(i) * time.Minute)
+		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, ts)
 		store.Append(e)
 	}
 
-	// when: read events after sequence 3
-	events, err := store.ReadSince(3)
+	// when: load events after the 3rd event's timestamp (index 2 = base+2min)
+	cutoff := base.Add(2 * time.Minute)
+	events, err := store.LoadSince(cutoff)
 
 	// then
 	if err != nil {
-		t.Fatalf("ReadSince: %v", err)
+		t.Fatalf("LoadSince: %v", err)
 	}
 	if len(events) != 2 {
-		t.Fatalf("expected 2 events (seq 4,5), got %d", len(events))
-	}
-	if events[0].Sequence != 4 {
-		t.Errorf("expected seq 4, got %d", events[0].Sequence)
-	}
-	if events[1].Sequence != 5 {
-		t.Errorf("expected seq 5, got %d", events[1].Sequence)
+		t.Fatalf("expected 2 events (after cutoff), got %d", len(events))
 	}
 }
 
-func TestFileEventStore_ReadAll_EmptyFile(t *testing.T) {
+func TestFileEventStore_LoadAll_EmptyDir(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 
 	// when
-	events, err := store.ReadAll()
+	events, err := store.LoadAll()
 
 	// then
 	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
+		t.Fatalf("LoadAll: %v", err)
 	}
 	if len(events) != 0 {
 		t.Errorf("expected 0 events, got %d", len(events))
 	}
 }
 
-func TestFileEventStore_LastSequence(t *testing.T) {
+func TestFileEventStore_LoadAll_NonExistentDir(t *testing.T) {
 	// given
-	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "test.jsonl"))
-
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, "s1", 2, nil)
-	e3, _ := sightjack.NewEvent(sightjack.EventWavesGenerated, "s1", 3, nil)
-	store.Append(e1, e2, e3)
+	store := eventsource.NewFileEventStore(filepath.Join(t.TempDir(), "does-not-exist"))
 
 	// when
-	seq, err := store.LastSequence()
+	events, err := store.LoadAll()
 
 	// then
 	if err != nil {
-		t.Fatalf("LastSequence: %v", err)
+		t.Fatalf("LoadAll: %v", err)
 	}
-	if seq != 3 {
-		t.Errorf("expected 3, got %d", seq)
+	if len(events) != 0 {
+		t.Errorf("expected 0 events for non-existent dir, got %d", len(events))
 	}
 }
 
-func TestFileEventStore_LastSequence_EmptyFile(t *testing.T) {
+func TestFileEventStore_ManyEvents(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
-
-	// when
-	seq, err := store.LastSequence()
-
-	// then
-	if err != nil {
-		t.Fatalf("LastSequence: %v", err)
-	}
-	if seq != 0 {
-		t.Errorf("expected 0 for empty store, got %d", seq)
-	}
-}
-
-func TestFileEventStore_SequentialAppend_ManyEvents(t *testing.T) {
-	// given: monotonicity check enforces strictly increasing sequences
-	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "sequential.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 	count := 50
 
-	// when: append in sequential order
-	for i := int64(1); i <= int64(count); i++ {
-		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", i, nil)
+	// when
+	base := time.Now()
+	for i := range count {
+		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, base.Add(time.Duration(i)*time.Millisecond))
 		if err := store.Append(e); err != nil {
-			t.Fatalf("append seq %d: %v", i, err)
+			t.Fatalf("append event %d: %v", i, err)
 		}
 	}
 
 	// then
-	events, err := store.ReadAll()
+	events, err := store.LoadAll()
 	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
+		t.Fatalf("LoadAll: %v", err)
 	}
 	if len(events) != count {
 		t.Errorf("expected %d events, got %d", count, len(events))
@@ -147,26 +123,27 @@ func TestFileEventStore_SequentialAppend_ManyEvents(t *testing.T) {
 }
 
 func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
-	// given: a JSONL file with one corrupt line
+	// given: a daily JSONL file with one corrupt line
 	dir := t.TempDir()
-	path := filepath.Join(dir, "corrupt.jsonl")
 
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
+	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
 	data1, _ := sightjack.MarshalEvent(e1)
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, "s1", 2, nil)
+	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, time.Now())
 	data2, _ := sightjack.MarshalEvent(e2)
 
 	content := string(data1) + "\n" + "THIS IS NOT JSON\n" + string(data2) + "\n"
-	os.WriteFile(path, []byte(content), 0644)
+	filename := time.Now().Format("2006-01-02") + ".jsonl"
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644)
 
-	store := eventsource.NewFileEventStore(path)
+	store := eventsource.NewFileEventStore(dir)
 
 	// when
-	events, err := store.ReadAll()
+	events, err := store.LoadAll()
 
 	// then: corrupt line is skipped, valid events remain
 	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
+		t.Fatalf("LoadAll: %v", err)
 	}
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events (corrupt skipped), got %d", len(events))
@@ -174,12 +151,11 @@ func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
 }
 
 func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
-	// given: path with non-existent parent directory
-	dir := t.TempDir()
-	path := filepath.Join(dir, "sub", "dir", "events.jsonl")
-	store := eventsource.NewFileEventStore(path)
+	// given: store with non-existent directory
+	dir := filepath.Join(t.TempDir(), "sub", "dir", "events")
+	store := eventsource.NewFileEventStore(dir)
 
-	e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
+	e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
 
 	// when
 	err := store.Append(e)
@@ -188,7 +164,7 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Append should auto-create dirs: %v", err)
 	}
-	events, _ := store.ReadAll()
+	events, _ := store.LoadAll()
 	if len(events) != 1 {
 		t.Errorf("expected 1 event after auto-create, got %d", len(events))
 	}
@@ -197,92 +173,81 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "multi.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 
 	// when: append in separate calls
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
+	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
 	store.Append(e1)
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, "s1", 2, nil)
+	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, time.Now())
 	store.Append(e2)
 
 	// then
-	events, _ := store.ReadAll()
+	events, _ := store.LoadAll()
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
 }
 
-func TestFileEventStore_Append_SequenceMonotonicity_Success(t *testing.T) {
+func TestFileEventStore_UUIDUniqueness(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "mono.jsonl"))
+	store := eventsource.NewFileEventStore(dir)
 
-	// when: append in strictly increasing order
-	for i := int64(1); i <= 3; i++ {
-		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", i, nil)
-		if err := store.Append(e); err != nil {
-			t.Fatalf("append seq %d: %v", i, err)
+	// when
+	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	e2, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	store.Append(e1, e2)
+
+	// then
+	events, _ := store.LoadAll()
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	if events[0].ID == "" || events[1].ID == "" {
+		t.Error("expected non-empty UUIDs")
+	}
+	if events[0].ID == events[1].ID {
+		t.Error("expected unique IDs for different events")
+	}
+}
+
+func TestFileEventStore_DailyFileRouting(t *testing.T) {
+	// given: events with different dates
+	dir := t.TempDir()
+	store := eventsource.NewFileEventStore(dir)
+
+	day1 := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
+	day2 := time.Date(2025, 3, 2, 10, 0, 0, 0, time.UTC)
+
+	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, day1)
+	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, day2)
+
+	// when
+	store.Append(e1, e2)
+
+	// then: two separate daily files created
+	entries, _ := os.ReadDir(dir)
+	jsonlCount := 0
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".jsonl" {
+			jsonlCount++
 		}
 	}
-
-	// then
-	events, _ := store.ReadAll()
-	if len(events) != 3 {
-		t.Errorf("expected 3 events, got %d", len(events))
+	if jsonlCount != 2 {
+		t.Errorf("expected 2 daily JSONL files, got %d", jsonlCount)
 	}
-}
 
-func TestFileEventStore_Append_SequenceGap_Rejected(t *testing.T) {
-	// given
-	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "gap.jsonl"))
-
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
-	store.Append(e1)
-
-	// when: skip sequence 2, append sequence 3
-	e3, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 3, nil)
-	err := store.Append(e3)
-
-	// then
-	if err == nil {
-		t.Fatal("expected error for sequence gap")
-	}
-	events, _ := store.ReadAll()
-	if len(events) != 1 {
-		t.Errorf("expected 1 event (only seq 1), got %d", len(events))
-	}
-}
-
-func TestFileEventStore_Append_SequenceDuplicate_Rejected(t *testing.T) {
-	// given
-	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "dup.jsonl"))
-
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, nil)
-	e2, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 2, nil)
-	store.Append(e1)
-	store.Append(e2)
-
-	// when: re-append sequence 2
-	dup, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 2, nil)
-	err := store.Append(dup)
-
-	// then
-	if err == nil {
-		t.Fatal("expected error for duplicate sequence")
-	}
-	events, _ := store.ReadAll()
+	// and all events are returned by LoadAll
+	events, _ := store.LoadAll()
 	if len(events) != 2 {
-		t.Errorf("expected 2 events (seq 1,2 only), got %d", len(events))
+		t.Fatalf("expected 2 events from 2 files, got %d", len(events))
 	}
 }
 
 func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	// given
-	dir := t.TempDir()
-	path := filepath.Join(dir, "events", "test.jsonl")
-	store := eventsource.NewFileEventStore(path)
+	dir := filepath.Join(t.TempDir(), "events")
+	store := eventsource.NewFileEventStore(dir)
 
 	invalid := sightjack.Event{} // all fields empty
 
@@ -293,20 +258,19 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid event")
 	}
-	// File should not have been created
-	if _, statErr := os.Stat(path); statErr == nil {
-		t.Error("expected file not to be created for rejected event")
+	// Directory should not have been created
+	if _, statErr := os.Stat(dir); statErr == nil {
+		t.Error("expected directory not to be created for rejected event")
 	}
 }
 
 func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
 	// given: a valid event followed by an invalid event
-	dir := t.TempDir()
-	path := filepath.Join(dir, "events", "atomic.jsonl")
-	store := eventsource.NewFileEventStore(path)
+	dir := filepath.Join(t.TempDir(), "events")
+	store := eventsource.NewFileEventStore(dir)
 
-	valid, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "s1", 1, "data")
-	invalid := sightjack.Event{SessionID: "s1"} // missing Type, Sequence, etc.
+	valid, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "data", time.Now())
+	invalid := sightjack.Event{SessionID: "s1"} // missing ID, Type, Timestamp, Data
 
 	// when: batch append [valid, invalid]
 	err := store.Append(valid, invalid)
@@ -315,22 +279,51 @@ func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for batch with invalid event")
 	}
-	if _, statErr := os.Stat(path); statErr == nil {
-		t.Error("expected file not to be created: valid event should not be written when batch fails")
+	if _, statErr := os.Stat(dir); statErr == nil {
+		t.Error("expected directory not to be created: valid event should not be written when batch fails")
+	}
+}
+
+func TestFileEventStore_ChronologicalOrder(t *testing.T) {
+	// given: events appended in reverse chronological order
+	dir := t.TempDir()
+	store := eventsource.NewFileEventStore(dir)
+
+	later := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
+	earlier := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
+
+	e1, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, later)
+	e2, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, earlier)
+
+	store.Append(e1)
+	store.Append(e2)
+
+	// when
+	events, _ := store.LoadAll()
+
+	// then: events returned in chronological order
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	if events[0].Type != sightjack.EventSessionStarted {
+		t.Errorf("expected first event to be session_started (earlier), got %s", events[0].Type)
+	}
+	if events[1].Type != sightjack.EventScanCompleted {
+		t.Errorf("expected second event to be scan_completed (later), got %s", events[1].Type)
 	}
 }
 
 func TestEventsDir(t *testing.T) {
-	got := eventsource.EventsDir("/project")
-	expected := filepath.Join("/project", ".siren", "events")
+	got := eventsource.EventsDir("/project/.siren")
+	expected := filepath.Join("/project/.siren", "events")
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
 	}
 }
 
 func TestEventStorePath(t *testing.T) {
-	got := eventsource.EventStorePath("/project", "session-123")
-	expected := filepath.Join("/project", ".siren", "events", "session-123.jsonl")
+	got := eventsource.EventStorePath("/project/.siren", "session-123")
+	expected := filepath.Join("/project/.siren", "events", "session-123")
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
 	}

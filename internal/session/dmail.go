@@ -3,6 +3,8 @@ package session
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,6 +28,8 @@ type DMail struct {
 	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
 	Issues        []string          `yaml:"issues,omitempty"`
 	Severity      string            `yaml:"severity,omitempty"`
+	Action        string            `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Body          string            `yaml:"-"`
 }
@@ -38,6 +42,7 @@ const (
 	DMailReport        DMailKind = "report"
 	DMailFeedback      DMailKind = "feedback"
 	DMailConvergence   DMailKind = "convergence"
+	DMailCIResult      DMailKind = "ci-result"
 )
 
 // Filename returns the canonical filename: "<name>.md".
@@ -47,13 +52,37 @@ func (d *DMail) Filename() string {
 
 const frontmatterDelim = "---"
 
+// DMailIdempotencyKey computes a SHA256 content-based idempotency key from
+// the core fields of a DMail (name, kind, description, body).
+func DMailIdempotencyKey(mail *DMail) string {
+	h := sha256.New()
+	h.Write([]byte(mail.Name))
+	h.Write([]byte{0})
+	h.Write([]byte(string(mail.Kind)))
+	h.Write([]byte{0})
+	h.Write([]byte(mail.Description))
+	h.Write([]byte{0})
+	h.Write([]byte(mail.Body))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // MarshalDMail serializes a DMail to YAML frontmatter + Markdown body.
+// Automatically injects an idempotency_key into metadata based on content hash.
 func MarshalDMail(mail *DMail) ([]byte, error) {
+	// Create a shallow copy to avoid mutating the caller's DMail.
+	cp := *mail
+	meta := make(map[string]string, len(mail.Metadata)+1)
+	for k, v := range mail.Metadata {
+		meta[k] = v
+	}
+	meta["idempotency_key"] = DMailIdempotencyKey(mail)
+	cp.Metadata = meta
+
 	var buf bytes.Buffer
 	buf.WriteString(frontmatterDelim + "\n")
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
-	if err := enc.Encode(mail); err != nil {
+	if err := enc.Encode(&cp); err != nil {
 		return nil, fmt.Errorf("dmail marshal frontmatter: %w", err)
 	}
 	enc.Close()
@@ -100,8 +129,12 @@ func ComposeDMail(store sightjack.OutboxStore, mail *DMail) error {
 	if err := store.Stage(mail.Filename(), data); err != nil {
 		return fmt.Errorf("dmail stage: %w", err)
 	}
-	if _, err := store.Flush(); err != nil {
+	n, err := store.Flush()
+	if err != nil {
 		return fmt.Errorf("dmail flush: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("dmail flush: item not delivered (write failure, will retry)")
 	}
 	return nil
 }
@@ -121,10 +154,10 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: dmail-schema-version is required")
 	}
 	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence:
+	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence, DMailCIResult:
 		// valid
 	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence)", mail.Kind)
+		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence, ci-result)", mail.Kind)
 	}
 	return nil
 }
@@ -549,6 +582,44 @@ func ComposeReport(store sightjack.OutboxStore, wave sightjack.Wave, result *sig
 		SchemaVersion: "1",
 		Issues:        WaveIssueIDs(wave),
 		Body:          ReportBody(wave, result),
+	}
+	return ComposeDMail(store, mail)
+}
+
+// FeedbackBody formats wave apply results as Markdown body for a feedback d-mail.
+// Distinct from ReportBody: uses "Wave Feedback" heading to differentiate the
+// sightjack → amadeus feedback loop (O2) from the standard report d-mail.
+func FeedbackBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Wave Feedback: %s\n\n", wave.Title)
+	fmt.Fprintf(&b, "Applied %d action(s).\n\n", result.Applied)
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(&b, "## Errors\n\n")
+		for _, e := range result.Errors {
+			fmt.Fprintf(&b, "- %s\n", e)
+		}
+		b.WriteString("\n")
+	}
+	if len(result.Ripples) > 0 {
+		fmt.Fprintf(&b, "## Ripple Effects\n\n")
+		for _, r := range result.Ripples {
+			fmt.Fprintf(&b, "- [%s] %s\n", r.ClusterName, r.Description)
+		}
+	}
+	return b.String()
+}
+
+// ComposeFeedback stages a feedback D-Mail for amadeus consumption.
+// Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
+func ComposeFeedback(store sightjack.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
+	key := domain.WaveKey(wave)
+	mail := &DMail{
+		Name:          DMailName("feedback", key),
+		Kind:          DMailFeedback,
+		Description:   fmt.Sprintf("Wave %s feedback for amadeus", key),
+		SchemaVersion: "1",
+		Issues:        WaveIssueIDs(wave),
+		Body:          FeedbackBody(wave, result),
 	}
 	return ComposeDMail(store, mail)
 }

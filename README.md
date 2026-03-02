@@ -424,76 +424,103 @@ just jaeger-down    # Stop Jaeger
 
 ```
 +-- cmd/sightjack/
-|   +-- main.go              CLI entry point (signal handling, DefaultToScan, Execute)
-+-- internal/cmd/
-|   +-- root.go              Cobra root command, persistent flags, OTel hooks
-|   +-- scan.go              scan subcommand (classify + deep-scan)
-|   +-- waves.go             waves subcommand (wave generation from stdin)
-|   +-- select.go            select subcommand (interactive wave picker via tty)
-|   +-- discuss.go           discuss subcommand (Architect agent via tty)
-|   +-- apply.go             apply subcommand (wave apply to Linear)
-|   +-- adr.go               adr subcommand (ADR generation from discuss result)
-|   +-- nextgen.go           nextgen subcommand (follow-up wave generation)
-|   +-- show.go              show subcommand (human-readable display)
-|   +-- run.go               run subcommand (interactive session loop)
-|   +-- init.go              init subcommand (config scaffolding)
-|   +-- doctor.go            doctor subcommand (environment check)
-|   +-- archive_prune.go     archive-prune subcommand (expired scan cleanup)
-|   +-- version.go           version subcommand (build info)
-|   +-- update.go            update subcommand (self-update via GitHub releases)
-|   +-- *_test.go            Unit + integration tests (cobra routing, flags, etc.)
-+-- internal/tools/docgen/
-|   +-- main.go              CLI Markdown doc generator (cobra doc.GenMarkdownTree)
-+-- scanner.go               Scanner Agent (classify + deep-scan)
-+-- architect.go             Architect Agent (design discussion + ToDiscussResult)
-+-- scribe.go                Scribe Agent (ADR generation + RenderADRFromDiscuss)
-+-- handoff.go               Handoff interface for downstream tools
-+-- session.go               Session lifecycle (run, resume, rescan)
-+-- wave.go                  Wave model + unlock evaluation + ToApplyResult
-+-- wave_generator.go        Wave generation + nextgen (dynamic evolution)
-+-- navigator.go             Matrix Navigator rendering
-+-- cli.go                   Interactive prompts (selection, approval, discuss)
-+-- claude.go                Claude Code subprocess runner (--dangerously-skip-permissions)
-+-- config.go                Config parser + defaults (.siren/config.yaml)
-+-- json_normalize.go        JSON UTF-8 normalization for Claude output
-+-- linear_tools.go          Linear MCP allowed tools list
-+-- model.go                 Core types + JSON wire format (ScanResult, WavePlan, Wave, etc.)
-+-- state.go                 State persistence + path helpers (.siren/)
-+-- prompt.go                Go template renderer for AI prompts
-+-- logger.go                Structured logging (Logger struct, DI via cobra context)
-+-- init.go                  Config scaffolding logic
-+-- doctor.go                Environment health check logic
-+-- dmail.go                 D-Mail protocol (inbox/outbox/archive, fsnotify monitor)
-+-- notify.go                Notifier interface (LocalNotifier, CmdNotifier, NopNotifier)
-+-- approve.go               Approver interface (StdinApprover, CmdApprover, AutoApprover)
-+-- gate.go                  Convergence gate (FilterConvergence, RunConvergenceGate, RunConvergenceGateWithRedrain)
-+-- archive.go               Archive pruning (ListExpiredArchive, PruneArchive)
-+-- telemetry.go             OpenTelemetry tracing (OTLP export, noop fallback)
-+-- *_test.go                Tests
-+-- justfile                 Task runner
-+-- .semgrep/
-|   +-- cobra.yaml           Semgrep rules (cobra I/O, context, safety, readability)
-+-- docs/cli/                Auto-generated CLI reference (just docgen)
-+-- docker/
-|   +-- compose.yaml         Jaeger all-in-one for trace viewing
-|   +-- jaeger-v2-config.yaml  Jaeger v2 OTLP configuration
-+-- templates/
-    +-- scanner_classify_{en,ja}.md.tmpl
-    +-- scanner_deepscan_{en,ja}.md.tmpl
-    +-- wave_generate_{en,ja}.md.tmpl
-    +-- wave_apply_{en,ja}.md.tmpl
-    +-- wave_nextgen_{en,ja}.md.tmpl
-    +-- architect_discuss_{en,ja}.md.tmpl
-    +-- scribe_adr_{en,ja}.md.tmpl
-    +-- ready_label_{en,ja}.md.tmpl
-    +-- skills/
-        +-- dmail-readable/SKILL.md
-        +-- dmail-sendable/SKILL.md
+|   +-- main.go                 CLI entry point (signal handling, NeedsDefaultScan)
++-- internal/cmd/               Cobra CLI commands
+|   +-- root.go                 Root command, persistent flags, OTel hooks
+|   +-- scan.go                 scan subcommand (classify + deep-scan)
+|   +-- waves.go                waves subcommand (wave generation)
+|   +-- select.go               select subcommand (interactive wave picker via tty)
+|   +-- discuss.go              discuss subcommand (Architect agent via tty)
+|   +-- apply.go                apply subcommand (wave apply to Linear)
+|   +-- adr.go                  adr subcommand (ADR generation)
+|   +-- nextgen.go              nextgen subcommand (follow-up wave generation)
+|   +-- show.go                 show subcommand (human-readable display)
+|   +-- run.go                  run subcommand (interactive session loop)
+|   +-- init.go                 init subcommand (config scaffolding)
+|   +-- doctor.go               doctor subcommand (environment check)
+|   +-- status.go               status subcommand (machine-readable state)
+|   +-- archive_prune.go        archive-prune subcommand
+|   +-- clean.go                clean subcommand
+|   +-- version.go              version subcommand
+|   +-- update.go               update subcommand (self-update)
+|   +-- default_scan.go         NeedsDefaultScan + ReorderArgs
+|   +-- telemetry.go            initTracer (OTLP HTTP exporter)
++-- internal/usecase/           Use case layer (PolicyEngine + handlers)
+|   +-- policy.go               PolicyEngine type
+|   +-- policy_handlers.go      Event-driven policy handlers
+|   +-- scan.go                 Scan use case orchestration
+|   +-- session.go              Session use case orchestration
+|   +-- show.go                 Show use case orchestration
++-- internal/session/           I/O orchestration layer
+|   +-- scanner.go              Scanner Agent (classify + deep-scan)
+|   +-- architect.go            Architect Agent (discussion)
+|   +-- scribe.go               Scribe Agent (ADR generation)
+|   +-- session.go              Session lifecycle (run, resume)
+|   +-- wave.go                 Wave model + unlock evaluation
+|   +-- wave_generator.go       Wave generation + nextgen
+|   +-- handoff.go              Handoff to downstream tools
+|   +-- navigator.go            Matrix Navigator rendering
+|   +-- cli.go                  Interactive prompts (selection, approval)
+|   +-- claude.go               Claude Code subprocess runner
+|   +-- config.go               Config loader (.siren/config.yaml)
+|   +-- dmail.go                D-Mail file I/O (inbox/outbox/archive)
+|   +-- outbox_store.go         SQLiteOutboxStore (transactional outbox)
+|   +-- gate.go                 Convergence gate
+|   +-- approve.go              Approver (Stdin, Cmd, Auto)
+|   +-- notify.go               Notifier (Local, Cmd, Nop)
+|   +-- review.go               Review subprocess
+|   +-- review_gate.go          ReviewGate (exit code detection)
+|   +-- recorder.go             Event recorder
+|   +-- state_io.go             State persistence I/O
+|   +-- status.go               Status query
+|   +-- store_factory.go        Factory for cmd→eventsource access
+|   +-- archive.go              Archive pruning
+|   +-- skills.go               SKILL.md management
+|   +-- doctor.go               Health check logic
+|   +-- json_normalize.go       JSON UTF-8 normalization
+|   +-- preflight.go            Pre-flight checks
+|   +-- shell_quote.go          Cross-platform shell quoting
+|   +-- shell_{unix,windows}.go Platform-specific shell
+|   +-- signal_{unix,windows}.go Platform-specific signal handling
++-- internal/domain/            Pure domain functions
+|   +-- projection.go           Event projection
+|   +-- scan.go                 Scan utilities
+|   +-- wave.go                 Wave scheduling
++-- internal/eventsource/       Event store infrastructure
+|   +-- store_file.go           FileEventStore (JSONL append-only)
+|   +-- lifecycle.go            Event file expiry + pruning
+|   +-- loader.go               Event loader
+|   +-- recorder.go             Event recorder
+|   +-- path.go                 EventsDir path helper
++-- internal/tools/docgen/      CLI doc generator
++-- Root package (sightjack)    Types, interfaces, pure functions, go:embed
+|   +-- types.go                Core types (ScanResult, WavePlan, Wave, etc.)
+|   +-- interfaces.go           Port interfaces (OutboxStore, etc.)
+|   +-- config.go               Config type group + pure functions
+|   +-- state.go                Constants + path helpers (.siren/)
+|   +-- event.go                Event envelope, EventType constants
+|   +-- command.go              COMMAND types with Validate()
+|   +-- policy.go               Policy type definitions
+|   +-- prompt.go               Go template renderer for AI prompts
+|   +-- init.go                 Config scaffolding logic
+|   +-- sightjack.go            Core types
+|   +-- session_aggregate.go    SessionAggregate (domain aggregate)
+|   +-- wave_aggregate.go       WaveAggregate (domain aggregate)
+|   +-- metrics.go              OTel metric recording
+|   +-- logger.go               Structured logging
+|   +-- telemetry.go            OTel tracing (noop default)
++-- tests/scenario/             Scenario tests (L1-L4, //go:build scenario)
++-- tests/e2e/                  Docker E2E tests (//go:build e2e)
++-- .semgrep/                   Semgrep rules (layer enforcement)
++-- docs/cli/                   Auto-generated CLI reference
++-- docker/                     Jaeger v2 for trace viewing
++-- templates/                  AI prompt templates ({en,ja})
+    +-- skills/                 D-Mail SKILL.md templates
 ```
 
 ## Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - [just](https://just.systems/) task runner
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - [Linear MCP Server](https://github.com/anthropics/model-context-protocol) configured for Claude

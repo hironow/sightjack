@@ -360,6 +360,175 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	}
 }
 
+func TestSQLiteOutboxStore_FilePermission(t *testing.T) {
+	if os.Getenv("CI") != "" && strings.Contains(strings.ToLower(os.Getenv("RUNNER_OS")), "windows") {
+		t.Skip("NTFS does not support Unix file permissions")
+	}
+
+	// given
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// when
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		t.Fatalf("stat db: %v", err)
+	}
+
+	// then: permission should be 0o600 (owner read/write only)
+	perm := info.Mode().Perm()
+	if perm != 0o600 {
+		t.Errorf("db permission: got %o, want %o", perm, 0o600)
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
+	// given: store with archive dir that will be made unwritable
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
+	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage an item
+	if err := store.Stage("fail.md", []byte("data")); err != nil {
+		t.Fatalf("Stage: %v", err)
+	}
+
+	// Make archive dir read-only so atomicWrite fails
+	os.Chmod(archiveDir, 0o444)
+	defer os.Chmod(archiveDir, 0o755)
+
+	// when: flush 3 times (each fails, incrementing retry_count to 3)
+	for i := range 3 {
+		n, _ := store.Flush()
+		if n != 0 {
+			t.Errorf("flush %d: expected 0 flushed (write should fail), got %d", i+1, n)
+		}
+	}
+
+	// Restore permissions — writes would now succeed
+	os.Chmod(archiveDir, 0o755)
+
+	// when: flush again — item should be dead-letter (retry_count >= 3, skipped)
+	n, err := store.Flush()
+
+	// then: no items flushed
+	if err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 flushed (dead-letter), got %d", n)
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
+	// given: store that fails once, then succeeds
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
+	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage an item
+	store.Stage("retry.md", []byte("retry-data"))
+
+	// Make archive dir read-only for first flush
+	os.Chmod(archiveDir, 0o444)
+
+	// when: first flush fails
+	n, _ := store.Flush()
+	if n != 0 {
+		t.Errorf("first flush: expected 0 flushed, got %d", n)
+	}
+
+	// Restore permissions — next flush should succeed
+	os.Chmod(archiveDir, 0o755)
+
+	// when: second flush should succeed (retry_count = 1, below max)
+	n, err = store.Flush()
+	if err != nil {
+		t.Fatalf("second Flush: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("second flush: expected 1 flushed, got %d", n)
+	}
+
+	// then: file exists
+	archivePath := filepath.Join(archiveDir, "retry.md")
+	data, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatalf("read archive: %v", err)
+	}
+	if string(data) != "retry-data" {
+		t.Errorf("content: got %q, want %q", string(data), "retry-data")
+	}
+}
+
+func TestSQLiteOutboxStore_RetryCount_MixedItems(t *testing.T) {
+	// given: two items — one always fails (dead-letter), one always succeeds
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+
+	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
+	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	if err != nil {
+		t.Fatalf("create store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage first item, make it exhaust retries
+	store.Stage("bad.md", []byte("bad"))
+	os.Chmod(archiveDir, 0o444)
+	for range 3 {
+		store.Flush()
+	}
+	os.Chmod(archiveDir, 0o755)
+
+	// Stage second item (good)
+	store.Stage("good.md", []byte("good"))
+
+	// when: flush
+	n, err := store.Flush()
+
+	// then: only the good item flushed (bad is dead-letter)
+	if err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 flushed (only good.md), got %d", n)
+	}
+
+	// then: good.md exists
+	goodPath := filepath.Join(archiveDir, "good.md")
+	if _, err := os.Stat(goodPath); err != nil {
+		t.Errorf("good.md missing: %v", err)
+	}
+}
+
 func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 	// given: stage multiple items before flush
 	dir := t.TempDir()
@@ -389,5 +558,125 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 				t.Errorf("%s/%s missing: %v", sub, name, err)
 			}
 		}
+	}
+}
+
+func TestSQLiteOutboxStore_PruneFlushed(t *testing.T) {
+	// given: store with staged + flushed items
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage 3 items
+	for i := 0; i < 3; i++ {
+		name := fmt.Sprintf("test-%d.dmail", i)
+		if err := store.Stage(name, []byte(`{"kind":"feedback"}`)); err != nil {
+			t.Fatalf("stage %s: %v", name, err)
+		}
+	}
+
+	// Flush to mark items as flushed=1
+	flushed, err := store.Flush()
+	if err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	if flushed != 3 {
+		t.Fatalf("flush count: got %d, want 3", flushed)
+	}
+
+	// when: prune flushed items
+	pruned, err := store.PruneFlushed()
+	if err != nil {
+		t.Fatalf("PruneFlushed: %v", err)
+	}
+
+	// then: all flushed items removed
+	if pruned != 3 {
+		t.Errorf("PruneFlushed count: got %d, want 3", pruned)
+	}
+
+	// Verify DB has no rows
+	var count int
+	if err := store.DBForTest().QueryRow("SELECT COUNT(*) FROM staged").Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("remaining rows: got %d, want 0", count)
+	}
+}
+
+func TestSQLiteOutboxStore_PruneFlushed_KeepsUnflushed(t *testing.T) {
+	// given: store with mix of flushed and unflushed items
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// Stage 2 items, flush them
+	for i := 0; i < 2; i++ {
+		name := fmt.Sprintf("flushed-%d.dmail", i)
+		if err := store.Stage(name, []byte(`{"kind":"feedback"}`)); err != nil {
+			t.Fatalf("stage %s: %v", name, err)
+		}
+	}
+	if _, err := store.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+
+	// Stage 1 more item (unflushed)
+	if err := store.Stage("unflushed.dmail", []byte(`{"kind":"report"}`)); err != nil {
+		t.Fatalf("stage unflushed: %v", err)
+	}
+
+	// when
+	pruned, err := store.PruneFlushed()
+	if err != nil {
+		t.Fatalf("PruneFlushed: %v", err)
+	}
+
+	// then: only flushed items removed
+	if pruned != 2 {
+		t.Errorf("PruneFlushed count: got %d, want 2", pruned)
+	}
+
+	// Verify 1 unflushed row remains
+	var count int
+	if err := store.DBForTest().QueryRow("SELECT COUNT(*) FROM staged").Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("remaining rows: got %d, want 1", count)
+	}
+}
+
+func TestSQLiteOutboxStore_IncrementalVacuum(t *testing.T) {
+	// given: store with auto_vacuum=INCREMENTAL
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store, err := session.NewOutboxStoreForBase(dir)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	defer store.Close()
+
+	// when: call IncrementalVacuum (should not error even on empty DB)
+	if err := store.IncrementalVacuum(); err != nil {
+		t.Fatalf("IncrementalVacuum: %v", err)
+	}
+
+	// then: verify auto_vacuum is set to INCREMENTAL (2)
+	var autoVacuum string
+	if err := store.DBForTest().QueryRow("PRAGMA auto_vacuum").Scan(&autoVacuum); err != nil {
+		t.Fatalf("query PRAGMA auto_vacuum: %v", err)
+	}
+	if autoVacuum != "2" {
+		t.Errorf("PRAGMA auto_vacuum: got %q, want %q (INCREMENTAL)", autoVacuum, "2")
 	}
 }

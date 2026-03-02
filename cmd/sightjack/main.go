@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 
+	sightjack "github.com/hironow/sightjack"
 	cmd "github.com/hironow/sightjack/internal/cmd"
 )
 
@@ -17,7 +18,12 @@ func main() {
 	// and all 4 tools (phonewave, amadeus, paintress, sightjack) agreed to remove it.
 	// Standard behavior: "--dry-run false" = --dry-run (true) + positional "false".
 	// To explicitly set false, use the equals form: "--dry-run=false".
-	args := cmd.DefaultToScan(rootCmd, os.Args[1:])
+	args := os.Args[1:]
+	if cmd.NeedsDefaultScan(rootCmd, args) {
+		args = append([]string{"scan"}, args...)
+	} else {
+		args = cmd.ReorderArgs(rootCmd, args)
+	}
 	rootCmd.SetArgs(args)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
@@ -25,6 +31,6 @@ func main() {
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(sightjack.ExitCode(err))
 	}
 }

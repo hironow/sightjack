@@ -78,3 +78,71 @@ func TestSessionState_ScanResultPath_OmittedWhenEmpty(t *testing.T) {
 		t.Error("expected scan_result_path to be omitted when empty")
 	}
 }
+
+func TestRelativeScanResultPath(t *testing.T) {
+	// given
+	baseDir := "/project"
+	absPath := "/project/.siren/.run/session-1/scan_result.json"
+
+	// when
+	rel := sightjack.RelativeScanResultPath(baseDir, absPath)
+
+	// then
+	want := filepath.Join(".siren", ".run", "session-1", "scan_result.json")
+	if rel != want {
+		t.Errorf("RelativeScanResultPath = %q, want %q", rel, want)
+	}
+}
+
+func TestRelativeScanResultPath_AlreadyRelative(t *testing.T) {
+	// given — already relative path
+	baseDir := "/project"
+	relPath := ".siren/.run/session-1/scan_result.json"
+
+	// when
+	result := sightjack.RelativeScanResultPath(baseDir, relPath)
+
+	// then — returns as-is since it's already relative
+	if result != relPath {
+		t.Errorf("RelativeScanResultPath = %q, want %q (unchanged)", result, relPath)
+	}
+}
+
+func TestResolveScanResultPath_Relative(t *testing.T) {
+	// given
+	baseDir := "/project"
+	storedPath := filepath.Join(".siren", ".run", "session-1", "scan_result.json")
+
+	// when
+	abs := sightjack.ResolveScanResultPath(baseDir, storedPath)
+
+	// then
+	want := filepath.Join("/project", ".siren", ".run", "session-1", "scan_result.json")
+	if abs != want {
+		t.Errorf("ResolveScanResultPath = %q, want %q", abs, want)
+	}
+}
+
+func TestResolveScanResultPath_Absolute(t *testing.T) {
+	// given — backwards compatibility: absolute path stored in old events
+	baseDir := "/project"
+	storedPath := "/old-project/.siren/.run/session-1/scan_result.json"
+
+	// when
+	abs := sightjack.ResolveScanResultPath(baseDir, storedPath)
+
+	// then — absolute path returned as-is
+	if abs != storedPath {
+		t.Errorf("ResolveScanResultPath = %q, want %q (unchanged)", abs, storedPath)
+	}
+}
+
+func TestResolveScanResultPath_Empty(t *testing.T) {
+	// given
+	abs := sightjack.ResolveScanResultPath("/project", "")
+
+	// then
+	if abs != "" {
+		t.Errorf("ResolveScanResultPath empty = %q, want empty", abs)
+	}
+}

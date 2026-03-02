@@ -9,28 +9,21 @@ import (
 	"strings"
 )
 
-// AutoApprover always approves — for CI or --auto-approve flag.
-type AutoApprover struct{}
-
-func (a *AutoApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
-	return true, nil
-}
-
 // StdinApprover prompts the user on a terminal and reads y/n.
 // Uses goroutine + channel for context cancellation support.
 // Safe default: empty or non-y input = deny.
 type StdinApprover struct {
-	input io.Reader
-	out   io.Writer
+	reader io.Reader
+	writer io.Writer
 }
 
-// NewStdinApprover creates a StdinApprover with the given input/output.
-func NewStdinApprover(input io.Reader, out io.Writer) *StdinApprover {
-	return &StdinApprover{input: input, out: out}
+// NewStdinApprover creates a StdinApprover with the given reader and writer.
+func NewStdinApprover(r io.Reader, w io.Writer) *StdinApprover {
+	return &StdinApprover{reader: r, writer: w}
 }
 
 func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bool, error) {
-	if a.input == nil {
+	if a.reader == nil {
 		return false, nil
 	}
 
@@ -40,8 +33,8 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 	default:
 	}
 
-	if a.out != nil {
-		fmt.Fprintf(a.out, "[CONVERGENCE] %s\nApprove? (y/N): ", message)
+	if a.writer != nil {
+		fmt.Fprintf(a.writer, "[CONVERGENCE] %s\nApprove? (y/N): ", message)
 	}
 
 	// Read in a goroutine so we can select on ctx.Done().
@@ -55,7 +48,7 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 	}
 	ch := make(chan result, 1)
 	go func() {
-		line, err := readLine(a.input)
+		line, err := readLine(a.reader)
 		ch <- result{line: line, err: err}
 	}()
 
@@ -96,13 +89,13 @@ func readLine(r io.Reader) (string, error) {
 // CmdApprover runs an external command for approval.
 // Exit 0 = approve, non-zero ExitError = deny, other error = fail.
 type CmdApprover struct {
-	template   string
-	cmdFactory cmdFactoryFunc
+	cmdTemplate string
+	cmdFactory  cmdFactoryFunc
 }
 
 // NewCmdApprover creates a CmdApprover from a shell command template.
-func NewCmdApprover(template string) *CmdApprover {
-	return &CmdApprover{template: template}
+func NewCmdApprover(cmdTemplate string) *CmdApprover {
+	return &CmdApprover{cmdTemplate: cmdTemplate}
 }
 
 func (a *CmdApprover) factory() cmdFactoryFunc {
@@ -113,10 +106,10 @@ func (a *CmdApprover) factory() cmdFactoryFunc {
 }
 
 func (a *CmdApprover) RequestApproval(ctx context.Context, message string) (bool, error) {
-	if a.template == "" {
+	if a.cmdTemplate == "" {
 		return false, fmt.Errorf("approve: empty command template")
 	}
-	expanded := strings.ReplaceAll(a.template, "{message}", ShellQuote(message))
+	expanded := strings.ReplaceAll(a.cmdTemplate, "{message}", ShellQuote(message))
 	cmd := a.factory()(ctx, shellName(), shellFlag(), expanded)
 	err := cmd.Run()
 	if err == nil {

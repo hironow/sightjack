@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
-	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newShowCmd() *cobra.Command {
@@ -42,7 +41,7 @@ replays events from .siren/events/ and displays the matrix navigator.`,
 			if stdinIsPipe() {
 				return runShowFromStdin(w)
 			}
-			return runShowFromState(w, baseDir, logger)
+			return usecase.ShowFromState(w, baseDir, logger)
 		},
 	}
 }
@@ -89,37 +88,5 @@ func runShowFromStdin(w io.Writer) error {
 	default:
 		return fmt.Errorf("could not parse stdin: expected ScanResult (with \"clusters\" key) or WavePlan (with \"waves\" key)")
 	}
-	return nil
-}
-
-func runShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) error {
-	state, _, err := session.LoadLatestState(baseDir)
-	if err != nil {
-		logger.Info("Run 'sightjack scan' first.")
-		return fmt.Errorf("no previous scan found: %w", err)
-	}
-
-	result := &sightjack.ScanResult{
-		Completeness: state.Completeness,
-	}
-	for _, c := range state.Clusters {
-		result.Clusters = append(result.Clusters, sightjack.ClusterScanResult{
-			Name:         c.Name,
-			Completeness: c.Completeness,
-			IssueCount:   c.IssueCount,
-		})
-		result.TotalIssues += c.IssueCount
-	}
-
-	waves := domain.RestoreWaves(state.Waves)
-	strictness := state.StrictnessLevel
-	if strictness == "" {
-		strictness = "fog"
-	}
-	adrCount := session.CountADRFiles(session.ADRDir(baseDir))
-	nav := session.RenderMatrixNavigator(result, state.Project, waves, adrCount, (*time.Time)(nil), strictness, state.ShibitoCount)
-	fmt.Fprintln(w)
-	fmt.Fprint(w, nav)
-	logger.Info("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
 	return nil
 }

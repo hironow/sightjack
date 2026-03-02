@@ -94,6 +94,28 @@ func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sig
 	}
 }
 
+// --- Domain wrapper functions (cmd → session → domain) ---
+
+// WaveKey returns a globally unique key for a wave: "ClusterName:ID".
+func WaveKey(w sightjack.Wave) string {
+	return domain.WaveKey(w)
+}
+
+// AvailableWaves filters waves to those available and not completed.
+func AvailableWaves(waves []sightjack.Wave, completed map[string]bool) []sightjack.Wave {
+	return domain.AvailableWaves(waves, completed)
+}
+
+// RestoreWaves converts WaveState slices back to Wave slices.
+func RestoreWaves(states []sightjack.WaveState) []sightjack.Wave {
+	return domain.RestoreWaves(states)
+}
+
+// CompletedWavesForCluster returns completed waves for a specific cluster.
+func CompletedWavesForCluster(waves []sightjack.Wave, clusterName string) []sightjack.Wave {
+	return domain.CompletedWavesForCluster(waves, clusterName)
+}
+
 // WaveApplyFileName returns the output filename for a wave apply result.
 // Includes cluster name to avoid collisions when wave IDs are duplicated across clusters.
 func WaveApplyFileName(wave sightjack.Wave) string {

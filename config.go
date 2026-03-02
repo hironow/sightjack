@@ -32,10 +32,11 @@ type LabelsConfig struct {
 
 // GateConfig holds convergence gate notification and approval settings.
 type GateConfig struct {
-	NotifyCmd   string `yaml:"notify_cmd"`
-	ApproveCmd  string `yaml:"approve_cmd"`
-	AutoApprove bool   `yaml:"auto_approve"`
-	ReviewCmd   string `yaml:"review_cmd"`
+	NotifyCmd    string `yaml:"notify_cmd"`
+	ApproveCmd   string `yaml:"approve_cmd"`
+	AutoApprove  bool   `yaml:"auto_approve"`
+	ReviewCmd    string `yaml:"review_cmd"`
+	ReviewBudget int    `yaml:"review_budget"` // max review cycles (0 = default 3)
 }
 
 // Config holds the top-level sightjack configuration loaded from YAML.

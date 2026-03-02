@@ -38,24 +38,24 @@ installing.`,
 				return fmt.Errorf("failed to detect latest version: %w", err)
 			}
 			if !found {
-				fmt.Fprintln(cmd.OutOrStdout(), "No release found.")
+				fmt.Fprintln(cmd.ErrOrStderr(), "No release found.")
 				return nil
 			}
 
 			// Guard: version may be "dev" for local builds (non-semver).
 			// LessOrEqual calls semver.MustParse internally, which panics on invalid input.
 			if _, err := semver.NewVersion(version); err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", version, latest.Version())
+				fmt.Fprintf(cmd.ErrOrStderr(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", version, latest.Version())
 				return nil
 			}
 
 			if latest.LessOrEqual(version) {
-				fmt.Fprintf(cmd.OutOrStdout(), "Already up to date (v%s).\n", version)
+				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", version)
 				return nil
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.OutOrStdout(), "Update available: v%s → v%s\n", version, latest.Version())
+				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", version, latest.Version())
 				return nil
 			}
 
@@ -68,7 +68,7 @@ installing.`,
 				return fmt.Errorf("update failed: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Updated to v%s\n", latest.Version())
+			fmt.Fprintf(cmd.ErrOrStderr(), "Updated to v%s\n", latest.Version())
 			return nil
 		},
 	}

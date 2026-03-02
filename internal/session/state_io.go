@@ -68,13 +68,15 @@ func LoadScanResult(path string) (*sightjack.ScanResult, error) {
 // CanResume checks whether a saved session state supports resumption.
 // It returns false when the cached ScanResult path is empty (e.g. v0.4
 // state files) or the file no longer exists on disk.
-func CanResume(state *sightjack.SessionState) bool {
+// baseDir is used to resolve relative ScanResultPaths stored in newer events.
+func CanResume(baseDir string, state *sightjack.SessionState) bool {
 	if state.ScanResultPath == "" {
 		return false
 	}
 	if len(state.Waves) == 0 {
 		return false
 	}
-	_, err := os.Stat(state.ScanResultPath)
+	resolved := sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath)
+	_, err := os.Stat(resolved)
 	return err == nil
 }
