@@ -207,6 +207,8 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime.
 | `sightjack doctor` | Check environment and tool availability |
 | `sightjack version` | Print version, commit, date, and Go version (`-j` for JSON) |
 | `sightjack update` | Self-update to the latest GitHub release (`-C` to check only) |
+| `sightjack status` | Show sightjack operational status |
+| `sightjack clean` | Remove state directory (`.siren/`) |
 | `sightjack archive-prune` | Remove expired scan archives (`-x` to execute, default: dry-run) |
 
 ### Pipe-friendly (Unix pipeline)
