@@ -313,6 +313,7 @@ cat wave.json | sightjack apply | sightjack nextgen
 | `--config` | `-c` | `.siren/config.yaml` | Config file path |
 | `--lang` | `-l` | config (`ja`) | Language override (`en` / `ja`) |
 | `--verbose` | `-v` | `false` | Verbose logging |
+| `--output` | `-o` | `text` | Output format: `text` or `json` |
 | `--dry-run` | `-n` | `false` | Generate prompts without executing Claude |
 
 ### Subcommand flags

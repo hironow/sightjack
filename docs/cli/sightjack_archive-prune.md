@@ -24,6 +24,9 @@ sightjack archive-prune [path] [flags]
   # Delete expired files
   sightjack archive-prune --execute
 
+  # JSON output for scripting
+  sightjack archive-prune -o json
+
   # Custom retention period
   sightjack archive-prune --days 7 --execute
 ```
@@ -42,9 +45,11 @@ sightjack archive-prune [path] [flags]
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+

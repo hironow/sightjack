@@ -55,7 +55,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "sightjack",
 		Short: "SIREN-inspired issue architecture tool for Linear",
-		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse DefaultToScan() to preprocess args before Execute.",
+		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse NeedsDefaultScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			logger := sightjack.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)

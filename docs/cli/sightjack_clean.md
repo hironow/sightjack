@@ -1,34 +1,27 @@
-## sightjack doctor
+## sightjack clean
 
-Check environment and tool availability
+Remove state directory (.siren/)
 
 ### Synopsis
 
-Check environment health and tool availability.
-
-Verifies that the sightjack config is valid, required tools
-(claude, git) are installed, and the Linear MCP connection
-is working. Reports pass/fail/skip for each check.
+Delete the .siren/ directory to reset to a clean state. Use 'sightjack init' to reinitialize.
 
 ```
-sightjack doctor [path] [flags]
+sightjack clean [flags]
 ```
 
 ### Examples
 
 ```
-  # Run environment check
-  sightjack doctor
-
-  # Check a specific project directory
-  sightjack doctor /path/to/project
+  sightjack clean
+  sightjack clean --yes
 ```
 
 ### Options
 
 ```
-  -h, --help   help for doctor
-  -j, --json   output as JSON
+  -h, --help   help for clean
+      --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
