@@ -318,6 +318,16 @@ func (w *Workspace) RunPaintress(t *testing.T, ctx context.Context, args ...stri
 	return err
 }
 
+// RunPaintressExpedition runs paintress run with auto-approve, no-dev, workers 0,
+// and max-expeditions 1 (sufficient for scenario tests that inject D-Mails one at a time).
+func (w *Workspace) RunPaintressExpedition(t *testing.T, ctx context.Context, extraArgs ...string) error {
+	t.Helper()
+	args := []string{"run", "--auto-approve", "--no-dev", "--workers", "0", "--max-expeditions", "1"}
+	args = append(args, extraArgs...)
+	args = append(args, w.RepoPath)
+	return w.RunPaintress(t, ctx, args...)
+}
+
 // RunAmadeus runs amadeus with the given args and waits for completion.
 func (w *Workspace) RunAmadeus(t *testing.T, ctx context.Context, args ...string) error {
 	t.Helper()
