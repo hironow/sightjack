@@ -4,6 +4,7 @@ package scenario_test
 
 import (
 	"context"
+	"os/exec"
 	"testing"
 	"time"
 )
@@ -32,16 +33,25 @@ func TestScenario_L2_Small(t *testing.T) {
 	ws.WaitForDMailCount(t, ".expedition", "inbox", 1, 30*time.Second)
 	ws.WaitForAbsent(t, ".siren", "outbox", 15*time.Second)
 
-	// Inject feedback D-Mail (simulates amadeus response)
-	feedback := FormatDMail(map[string]string{
-		"dmail-schema-version": "1",
-		"name":                 "feedback-retry-001",
-		"kind":                 "feedback",
-		"description":          "Retry feedback from amadeus",
-	}, "# Feedback\n\n## Action: retry\n\nPlease rescan and update specifications.")
-	ws.InjectDMail(t, ".siren", "inbox", "feedback-retry-001.md", feedback)
+	// Paintress processes specification → report delivered to .gate/inbox
+	err = ws.RunPaintressExpedition(t, ctx)
+	if err != nil {
+		t.Fatalf("paintress expedition failed: %v", err)
+	}
+	ws.WaitForDMailCount(t, ".gate", "inbox", 1, 30*time.Second)
 
-	// Second scan (processes feedback)
+	// Amadeus processes report → feedback delivered to .siren/inbox
+	err = ws.RunAmadeusCheck(t, ctx)
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
+			t.Logf("amadeus check returned exit code 2 (drift detected) — expected")
+		} else {
+			t.Fatalf("amadeus check failed: %v", err)
+		}
+	}
+	ws.WaitForDMailCount(t, ".siren", "inbox", 1, 30*time.Second)
+
+	// Second scan (processes real feedback from amadeus)
 	err = ws.RunSightjackScan(t, ctx)
 	if err != nil {
 		t.Logf("second sightjack scan: %v", err)
