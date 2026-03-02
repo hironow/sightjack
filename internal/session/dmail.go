@@ -45,6 +45,14 @@ const (
 	DMailCIResult      DMailKind = "ci-result"
 )
 
+// validActions is the set of valid action values per D-Mail schema v1.
+// Strict on send, liberal on receive (Postel's law / S0021).
+var validActions = map[string]bool{
+	"retry":    true,
+	"escalate": true,
+	"resolve":  true,
+}
+
 // Filename returns the canonical filename: "<name>.md".
 func (d *DMail) Filename() string {
 	return d.Name + ".md"
@@ -158,6 +166,9 @@ func ValidateDMail(mail *DMail) error {
 		// valid
 	default:
 		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence, ci-result)", mail.Kind)
+	}
+	if mail.Action != "" && !validActions[mail.Action] {
+		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", mail.Action)
 	}
 	return nil
 }

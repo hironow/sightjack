@@ -7,7 +7,7 @@ Show sightjack operational status
 Display operational status including scan history, wave statistics,
 success rate, and pending d-mail counts.
 
-Output goes to stderr (human-readable) by default.
+Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.
 
 ```

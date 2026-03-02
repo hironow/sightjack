@@ -37,6 +37,9 @@ Pass --execute to actually remove the files.`,
   sightjack archive-prune --days 7 --execute`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if execute && dryRun {
+				return fmt.Errorf("--execute and --dry-run are mutually exclusive")
+			}
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
@@ -154,6 +157,7 @@ Pass --execute to actually remove the files.`,
 
 	cmd.Flags().BoolVarP(&execute, "execute", "x", false, "Execute archive pruning (default: dry-run)")
 	cmd.Flags().IntVarP(&days, "days", "d", 30, "Retention days for archive-prune")
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }

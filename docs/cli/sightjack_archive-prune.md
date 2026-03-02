@@ -37,6 +37,7 @@ sightjack archive-prune [path] [flags]
   -d, --days int   Retention days for archive-prune (default 30)
   -x, --execute    Execute archive pruning (default: dry-run)
   -h, --help       help for archive-prune
+  -y, --yes        Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
