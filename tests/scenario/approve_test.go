@@ -39,11 +39,20 @@ func TestScenario_ApproveCmdPath(t *testing.T) {
 		t.Fatalf("write notify script: %v", err)
 	}
 
+	// Inject a convergence D-Mail so sightjack's convergence gate fires the notifier.
+	// Without convergence in inbox, --notify-cmd is never invoked (gate only fires on convergence).
+	convergence := FormatDMail(map[string]string{
+		"dmail-schema-version": "1",
+		"name":                 "convergence-approve-test",
+		"kind":                 "convergence",
+		"description":          "Convergence for approve-cmd test",
+	}, "# Convergence\n\nAll tools stabilized.")
+	ws.InjectDMail(t, ".siren", "inbox", "convergence-approve-test.md", convergence)
+
 	// Run sightjack with --approve-cmd and --notify-cmd flags.
 	// --auto-approve is required for non-interactive wave selection/approval;
-	// --approve-cmd configures the convergence gate approver (exercised when
-	// convergence D-Mails arrive in the inbox).
-	// --notify-cmd configures the notifier (exercised on convergence signals).
+	// --approve-cmd configures the convergence gate approver;
+	// --notify-cmd configures the notifier (fires on convergence signals).
 	err := ws.RunSightjack(t, ctx, "run",
 		"--auto-approve",
 		"--approve-cmd", approveScript,
@@ -61,13 +70,13 @@ func TestScenario_ApproveCmdPath(t *testing.T) {
 	// Verify outbox was flushed
 	ws.WaitForAbsent(t, ".siren", "outbox", 10*time.Second)
 
-	// Verify notify script was invoked (notify.log should exist and be non-empty)
+	// Verify notify script was invoked (convergence gate fires the notifier)
 	data, err := os.ReadFile(notifyLog)
 	if err != nil {
-		t.Logf("notify.log not found (notification may not have fired): %v", err)
-	} else if len(data) == 0 {
-		t.Log("notify.log exists but is empty")
-	} else {
-		t.Logf("notify.log content:\n%s", string(data))
+		t.Fatalf("notify.log not found — notify-cmd was not invoked: %v", err)
 	}
+	if len(data) == 0 {
+		t.Fatal("notify.log exists but is empty — notify-cmd produced no output")
+	}
+	t.Logf("notify.log content:\n%s", string(data))
 }
