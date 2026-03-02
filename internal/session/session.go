@@ -191,6 +191,15 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
 	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, selectPhaseResult, bool) {
 
+	// Auto-select first available wave when --auto-approve is set.
+	if cfg.Gate.AutoApprove {
+		if len(available) > 0 {
+			logger.Info("Auto-selecting wave: %s", available[0].Title)
+			return available[0], selectChosen, shibitoShown
+		}
+		return sightjack.Wave{}, selectQuit, shibitoShown
+	}
+
 	// Display Link Navigator
 	nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
 	fmt.Fprintln(out)
@@ -252,6 +261,27 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	sessionRejected map[string][]sightjack.WaveAction, adrDir string, adrCount *int,
 	store sightjack.OutboxStore, recorder sightjack.Recorder,
 	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, approvalPhaseResult) {
+
+	// Auto-approve when --auto-approve is set.
+	if cfg.Gate.AutoApprove {
+		loopSpan.AddEvent("wave.auto_approved",
+			trace.WithAttributes(
+				attribute.String("wave.id", selected.ID),
+				attribute.String("wave.cluster_name", selected.ClusterName),
+			),
+		)
+		recorder.Record(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
+			WaveID: selected.ID, ClusterName: selected.ClusterName,
+		})
+		if err := ComposeSpecification(store, selected); err != nil {
+			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
+		} else {
+			recorder.Record(sightjack.EventSpecificationSent, sightjack.WaveIdentityPayload{
+				WaveID: selected.ID, ClusterName: selected.ClusterName,
+			})
+		}
+		return selected, approvalApproved
+	}
 
 	for {
 		choice, err := PromptWaveApproval(ctx, out, scanner, selected)
