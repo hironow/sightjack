@@ -62,7 +62,7 @@ for downstream commands (apply, discuss).`,
 
 			selected, err := session.PromptWaveSelection(cmd.Context(), cmd.ErrOrStderr(), scanner, available)
 			if err != nil {
-				if err == session.ErrQuit || err == session.ErrGoBack {
+				if err == domain.ErrQuit || err == domain.ErrGoBack {
 					return nil
 				}
 				return fmt.Errorf("selection failed: %w", err)

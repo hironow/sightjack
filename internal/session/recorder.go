@@ -7,12 +7,6 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-// NopRecorder is a no-op Recorder for dry-run mode and testing.
-type NopRecorder struct{}
-
-// Record always returns nil without recording anything.
-func (NopRecorder) Record(domain.EventType, any) error { return nil }
-
 // LoggingRecorder wraps a Recorder and logs errors instead of propagating them.
 // This ensures callers never need to handle Record errors at every call site.
 type LoggingRecorder struct {
@@ -24,7 +18,7 @@ type LoggingRecorder struct {
 // If inner is nil, NopRecorder is used to prevent panics.
 func NewLoggingRecorder(inner domain.Recorder, logger *domain.Logger) *LoggingRecorder {
 	if inner == nil {
-		inner = NopRecorder{}
+		inner = domain.NopRecorder{}
 	}
 	return &LoggingRecorder{inner: inner, logger: logger}
 }

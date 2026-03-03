@@ -88,7 +88,7 @@ if event data is found in .siren/events/.`,
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
 						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, baseDir, promptState)
-						if promptErr == session.ErrQuit {
+						if promptErr == domain.ErrQuit {
 							return nil
 						}
 						if promptErr != nil {
@@ -131,7 +131,7 @@ if event data is found in .siren/events/.`,
 
 			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 			var sessionInput io.Reader
-			var recorder domain.Recorder = session.NopRecorder{}
+			var recorder domain.Recorder = domain.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
 				sessionStore := session.NewEventStore(baseDir, sessionID)

@@ -13,6 +13,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
+
 func TestPromptWaveSelection(t *testing.T) {
 	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Delta: domain.WaveDelta{Before: 0.25, After: 0.40}},
@@ -45,7 +46,7 @@ func TestPromptWaveSelection_Quit(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := session.PromptWaveSelection(ctx, &output, scanner, waves)
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }
@@ -235,7 +236,7 @@ func TestPromptDiscussTopic_Quit(t *testing.T) {
 	_, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }
@@ -253,7 +254,7 @@ func TestPromptDiscussTopic_Empty(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty topic")
 	}
-	if err == session.ErrQuit {
+	if err == domain.ErrQuit {
 		t.Error("expected non-quit error for empty topic")
 	}
 }
@@ -355,7 +356,7 @@ func TestPromptWaveApproval_UppercaseQ(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := session.PromptWaveApproval(ctx, &output, scanner, wave)
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit for uppercase Q, got %v", err)
 	}
 }
@@ -382,7 +383,7 @@ func TestPromptWaveApproval_InvalidInput(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error for invalid input")
 			}
-			if err == session.ErrQuit {
+			if err == domain.ErrQuit {
 				t.Error("expected non-quit error for invalid input")
 			}
 		})
@@ -399,7 +400,7 @@ func TestPromptDiscussTopic_PaddedQuit(t *testing.T) {
 	_, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit for padded 'q', got %v", err)
 	}
 }
@@ -414,7 +415,7 @@ func TestPromptDiscussTopic_UppercaseQuit(t *testing.T) {
 	_, err := session.PromptDiscussTopic(ctx, &output, scanner)
 
 	// then
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit for uppercase 'Q', got %v", err)
 	}
 }
@@ -599,7 +600,7 @@ func TestPromptResume_ChooseQuit(t *testing.T) {
 
 	_, err := session.PromptResume(ctx, &output, scanner, t.TempDir(), state)
 
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }
@@ -616,7 +617,7 @@ func TestPromptResume_InvalidInput(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid input")
 	}
-	if err == session.ErrQuit {
+	if err == domain.ErrQuit {
 		t.Error("should not be ErrQuit for invalid input")
 	}
 }
@@ -852,7 +853,7 @@ func TestPromptCompletedWaveSelection_Back(t *testing.T) {
 	_, err := session.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
 
 	// then: b returns ErrGoBack (back to main navigator)
-	if err != session.ErrGoBack {
+	if err != domain.ErrGoBack {
 		t.Errorf("expected ErrGoBack, got %v", err)
 	}
 }
@@ -868,7 +869,7 @@ func TestPromptCompletedWaveSelection_Invalid(t *testing.T) {
 	_, err := session.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
 
 	// then
-	if err == nil || err == session.ErrQuit {
+	if err == nil || err == domain.ErrQuit {
 		t.Error("expected invalid selection error")
 	}
 }
@@ -960,7 +961,7 @@ func TestPromptWaveSelection_BackOption(t *testing.T) {
 	_, err := session.PromptWaveSelection(context.Background(), &buf, scanner, waves)
 
 	// then
-	if err != session.ErrGoBack {
+	if err != domain.ErrGoBack {
 		t.Errorf("expected ErrGoBack, got %v", err)
 	}
 }
@@ -1081,7 +1082,7 @@ func TestPromptSelectiveApproval_Quit(t *testing.T) {
 	var buf bytes.Buffer
 
 	_, _, err := session.PromptSelectiveApproval(context.Background(), &buf, scanner, wave)
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit, got %v", err)
 	}
 }

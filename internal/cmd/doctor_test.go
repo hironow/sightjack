@@ -5,15 +5,15 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestPrintDoctorJSON_Parseable(t *testing.T) {
 	// given
-	results := []session.CheckResult{
-		{Name: "config", Status: session.CheckOK, Message: "valid"},
-		{Name: "claude", Status: session.CheckFail, Message: "not found", Hint: "install claude"},
-		{Name: "linear", Status: session.CheckSkip, Message: "no API key"},
+	results := []domain.CheckResult{
+		{Name: "config", Status: domain.CheckOK, Message: "valid"},
+		{Name: "claude", Status: domain.CheckFail, Message: "not found", Hint: "install claude"},
+		{Name: "linear", Status: domain.CheckSkip, Message: "no API key"},
 	}
 
 	// when
@@ -40,8 +40,8 @@ func TestPrintDoctorJSON_Parseable(t *testing.T) {
 
 func TestPrintDoctorJSON_FailReturnsError(t *testing.T) {
 	// given — results with a failure
-	results := []session.CheckResult{
-		{Name: "claude", Status: session.CheckFail, Message: "not found"},
+	results := []domain.CheckResult{
+		{Name: "claude", Status: domain.CheckFail, Message: "not found"},
 	}
 
 	// when
@@ -56,8 +56,8 @@ func TestPrintDoctorJSON_FailReturnsError(t *testing.T) {
 
 func TestPrintDoctorJSON_NoFailNoError(t *testing.T) {
 	// given — all passing
-	results := []session.CheckResult{
-		{Name: "config", Status: session.CheckOK, Message: "valid"},
+	results := []domain.CheckResult{
+		{Name: "config", Status: domain.CheckOK, Message: "valid"},
 	}
 
 	// when

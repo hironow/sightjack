@@ -212,19 +212,19 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 
 	// Prompt wave selection
 	selected, err := PromptWaveSelection(ctx, out, scanner, available)
-	if err == ErrQuit {
+	if err == domain.ErrQuit {
 		loopSpan.AddEvent("session.paused")
 		logger.Info("Session paused. State saved.")
 		return domain.Wave{}, selectQuit, shibitoShown
 	}
-	if err == ErrGoBack {
+	if err == domain.ErrGoBack {
 		completedList := CompletedWaves(waves)
 		if len(completedList) == 0 {
 			logger.Info("No completed waves to revisit.")
 			return domain.Wave{}, selectRetry, shibitoShown
 		}
 		revisit, backErr := PromptCompletedWaveSelection(ctx, out, scanner, completedList)
-		if backErr == ErrQuit {
+		if backErr == domain.ErrQuit {
 			logger.Info("Session paused. State saved.")
 			return domain.Wave{}, selectQuit, shibitoShown
 		}
@@ -284,7 +284,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 
 	for {
 		choice, err := PromptWaveApproval(ctx, out, scanner, selected)
-		if err == ErrQuit {
+		if err == domain.ErrQuit {
 			return selected, approvalRejected
 		}
 		if err != nil {
@@ -328,7 +328,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			return selected, approvalRejected
 		case domain.ApprovalDiscuss:
 			topic, topicErr := PromptDiscussTopic(ctx, out, scanner)
-			if topicErr == ErrQuit {
+			if topicErr == domain.ErrQuit {
 				continue
 			}
 			if topicErr != nil {
@@ -377,7 +377,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			continue // back to approval prompt with (possibly modified) wave
 		case domain.ApprovalSelective:
 			approved, rejected, selErr := PromptSelectiveApproval(ctx, out, scanner, selected)
-			if selErr == ErrQuit {
+			if selErr == domain.ErrQuit {
 				return selected, approvalRejected
 			}
 			if selErr != nil {

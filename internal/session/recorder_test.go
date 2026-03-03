@@ -12,7 +12,7 @@ import (
 
 func TestNopRecorder_NoOp(t *testing.T) {
 	// given
-	var r domain.Recorder = session.NopRecorder{}
+	var r domain.Recorder = domain.NopRecorder{}
 
 	// when/then: should return nil without recording anything
 	if err := r.Record(domain.EventSessionStarted, nil); err != nil {
@@ -52,7 +52,7 @@ func TestLoggingRecorder_PassesThroughOnSuccess(t *testing.T) {
 	// given
 	var buf bytes.Buffer
 	logger := domain.NewLogger(&buf, true)
-	recorder := session.NewLoggingRecorder(session.NopRecorder{}, logger)
+	recorder := session.NewLoggingRecorder(domain.NopRecorder{}, logger)
 
 	// when
 	err := recorder.Record(domain.EventSessionStarted, nil)

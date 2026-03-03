@@ -27,7 +27,7 @@ linear:
 	result := session.CheckConfig(path)
 
 	// then
-	if result.Status != session.CheckOK {
+	if result.Status != domain.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "Config" {
@@ -40,7 +40,7 @@ func TestCheckConfig_MissingFile(t *testing.T) {
 	result := session.CheckConfig("/nonexistent/sightjack.yaml")
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -55,7 +55,7 @@ func TestCheckConfig_InvalidYAML(t *testing.T) {
 	result := session.CheckConfig(path)
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail for invalid YAML, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -68,7 +68,7 @@ func TestCheckTool_Exists(t *testing.T) {
 	result := session.CheckTool(ctx, "git")
 
 	// then
-	if result.Status != session.CheckOK {
+	if result.Status != domain.CheckOK {
 		t.Errorf("expected CheckOK for 'git', got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Message, "git") {
@@ -84,19 +84,19 @@ func TestCheckTool_NotFound(t *testing.T) {
 	result := session.CheckTool(ctx, "nonexistent-tool-xyz-12345")
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
 
 func TestCheckStatusLabel(t *testing.T) {
 	tests := []struct {
-		status session.CheckStatus
+		status domain.CheckStatus
 		want   string
 	}{
-		{session.CheckOK, "OK"},
-		{session.CheckFail, "FAIL"},
-		{session.CheckSkip, "SKIP"},
+		{domain.CheckOK, "OK"},
+		{domain.CheckFail, "FAIL"},
+		{domain.CheckSkip, "SKIP"},
 	}
 	for _, tt := range tests {
 		if got := tt.status.StatusLabel(); got != tt.want {
@@ -124,7 +124,7 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 	result := session.CheckClaudeAuth(ctx, cfg, domain.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != session.CheckOK {
+	if result.Status != domain.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "Claude Auth" {
@@ -149,7 +149,7 @@ func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 	result := session.CheckClaudeAuth(ctx, cfg, domain.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Hint, "claude login") {
@@ -174,7 +174,7 @@ func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
 	result := session.CheckClaudeAuth(ctx, cfg, domain.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -187,7 +187,7 @@ func TestCheckClaudeAuth_NilConfig_Skips(t *testing.T) {
 	result := session.CheckClaudeAuth(ctx, nil, domain.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != session.CheckSkip {
+	if result.Status != domain.CheckSkip {
 		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -212,7 +212,7 @@ func TestCheckLinearMCP_Success(t *testing.T) {
 	result := session.CheckLinearMCP(ctx, cfg, domain.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != session.CheckOK {
+	if result.Status != domain.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -235,7 +235,7 @@ func TestCheckLinearMCP_Failure(t *testing.T) {
 	result := session.CheckLinearMCP(ctx, cfg, domain.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
 	}
 	if !strings.Contains(result.Hint, "claude mcp add") {
@@ -251,7 +251,7 @@ func TestCheckLinearMCP_NilConfig_Skips(t *testing.T) {
 	result := session.CheckLinearMCP(ctx, nil, domain.NewLogger(io.Discard, false))
 
 	// then
-	if result.Status != session.CheckSkip {
+	if result.Status != domain.CheckSkip {
 		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -264,7 +264,7 @@ func TestCheckStateDir_Writable(t *testing.T) {
 	result := session.CheckStateDir(dir)
 
 	// then
-	if result.Status != session.CheckOK {
+	if result.Status != domain.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "State Dir" {
@@ -282,7 +282,7 @@ func TestCheckStateDir_NotWritable(t *testing.T) {
 	result := session.CheckStateDir(dir)
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail for read-only dir, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -296,7 +296,7 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 	result := session.CheckStateDir(dir)
 
 	// then
-	if result.Status != session.CheckOK {
+	if result.Status != domain.CheckOK {
 		t.Errorf("expected CheckOK for existing .siren/, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -312,7 +312,7 @@ func TestCheckSkills_OK(t *testing.T) {
 	result := session.CheckSkills(baseDir)
 
 	// then
-	if result.Status != session.CheckOK {
+	if result.Status != domain.CheckOK {
 		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "Skills" {
@@ -328,7 +328,7 @@ func TestCheckSkills_Missing(t *testing.T) {
 	result := session.CheckSkills(baseDir)
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail for missing SKILL.md files, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -346,7 +346,7 @@ func TestCheckSkills_MissingSchemaVersion(t *testing.T) {
 	result := session.CheckSkills(baseDir)
 
 	// then
-	if result.Status != session.CheckFail {
+	if result.Status != domain.CheckFail {
 		t.Errorf("expected CheckFail for missing schema version, got %v: %s", result.Status, result.Message)
 	}
 }
@@ -369,7 +369,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 		t.Fatalf("expected 8 results, got %d", len(results))
 	}
 	// Config should fail
-	if results[0].Status != session.CheckFail {
+	if results[0].Status != domain.CheckFail {
 		t.Errorf("Config: expected FAIL, got %v", results[0].Status)
 	}
 	// Claude Auth should be skipped (nil config)
@@ -377,7 +377,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if auth.Name != "Claude Auth" {
 		t.Errorf("expected 'Claude Auth', got %q", auth.Name)
 	}
-	if auth.Status != session.CheckSkip {
+	if auth.Status != domain.CheckSkip {
 		t.Errorf("Claude Auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
 	}
 	// Linear MCP should be skipped (nil config)
@@ -385,7 +385,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if mcp.Name != "Linear MCP" {
 		t.Errorf("expected 'Linear MCP', got %q", mcp.Name)
 	}
-	if mcp.Status != session.CheckSkip {
+	if mcp.Status != domain.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
 	}
 }
@@ -417,16 +417,16 @@ claude:
 		t.Fatalf("expected 8 results, got %d", len(results))
 	}
 	// Config should pass
-	if results[0].Status != session.CheckOK {
+	if results[0].Status != domain.CheckOK {
 		t.Errorf("Config: expected OK, got %v", results[0].Status)
 	}
 	// claude binary check should fail (nonexistent binary)
-	if results[2].Status != session.CheckFail {
+	if results[2].Status != domain.CheckFail {
 		t.Errorf("claude: expected FAIL, got %v: %s", results[2].Status, results[2].Message)
 	}
 	// Claude Auth should be skipped because claude binary is unavailable
 	auth := results[5]
-	if auth.Status != session.CheckSkip {
+	if auth.Status != domain.CheckSkip {
 		t.Errorf("Claude Auth: expected SKIP, got %v: %s", auth.Status, auth.Message)
 	}
 	if !strings.Contains(auth.Message, "claude not available") {
@@ -434,7 +434,7 @@ claude:
 	}
 	// Linear MCP should be skipped because claude binary is unavailable
 	mcp := results[6]
-	if mcp.Status != session.CheckSkip {
+	if mcp.Status != domain.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
 	}
 }
@@ -463,16 +463,16 @@ linear:
 	if len(results) != 8 {
 		t.Fatalf("expected 8 results, got %d: %v", len(results), results)
 	}
-	if results[0].Name != "Config" || results[0].Status != session.CheckOK {
+	if results[0].Name != "Config" || results[0].Status != domain.CheckOK {
 		t.Errorf("Config check: expected OK, got %v: %s", results[0].Status, results[0].Message)
 	}
-	if results[1].Name != "State Dir" || results[1].Status != session.CheckOK {
+	if results[1].Name != "State Dir" || results[1].Status != domain.CheckOK {
 		t.Errorf("State Dir check: expected OK, got %v: %s", results[1].Status, results[1].Message)
 	}
-	if results[5].Name != "Claude Auth" || results[5].Status != session.CheckOK {
+	if results[5].Name != "Claude Auth" || results[5].Status != domain.CheckOK {
 		t.Errorf("Claude Auth check: expected OK, got %v: %s", results[5].Status, results[5].Message)
 	}
-	if results[6].Name != "Linear MCP" || results[6].Status != session.CheckOK {
+	if results[6].Name != "Linear MCP" || results[6].Status != domain.CheckOK {
 		t.Errorf("Linear MCP check: expected OK, got %v: %s", results[6].Status, results[6].Message)
 	}
 	// success-rate should be last result, OK with "no events" (no events dir in temp)
@@ -480,7 +480,7 @@ linear:
 	if sr.Name != "success-rate" {
 		t.Errorf("expected 'success-rate', got %q", sr.Name)
 	}
-	if sr.Status != session.CheckOK {
+	if sr.Status != domain.CheckOK {
 		t.Errorf("success-rate: expected OK, got %v: %s", sr.Status, sr.Message)
 	}
 	if sr.Message != "no events" {
@@ -523,7 +523,7 @@ linear:
 	for _, r := range results {
 		if r.Name == "success-rate" {
 			found = true
-			if r.Status != session.CheckOK {
+			if r.Status != domain.CheckOK {
 				t.Errorf("success-rate: expected OK, got %v", r.Status)
 			}
 			want := "66.7% (2/3)"

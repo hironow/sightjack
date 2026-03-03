@@ -3,7 +3,6 @@ package session
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -11,12 +10,6 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 )
-
-// ErrQuit signals the user chose to quit.
-var ErrQuit = errors.New("user quit")
-
-// ErrGoBack signals the user chose to go back to the previous menu.
-var ErrGoBack = errors.New("go back")
 
 // ScanLine reads one line from s, returning early if ctx is cancelled.
 // The goroutine blocked on s.Scan() may outlive the call when the context
@@ -53,14 +46,14 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return domain.Wave{}, ErrQuit
+		return domain.Wave{}, domain.ErrQuit
 	}
 	input := strings.TrimSpace(line)
 	if input == "q" {
-		return domain.Wave{}, ErrQuit
+		return domain.Wave{}, domain.ErrQuit
 	}
 	if input == "b" {
-		return domain.Wave{}, ErrGoBack
+		return domain.Wave{}, domain.ErrGoBack
 	}
 	num, parseErr := strconv.Atoi(input)
 	if parseErr != nil || num < 1 || num > len(waves) {
@@ -81,7 +74,7 @@ func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return domain.ApprovalQuit, ErrQuit
+		return domain.ApprovalQuit, domain.ErrQuit
 	}
 	input := strings.TrimSpace(strings.ToLower(line))
 	switch input {
@@ -94,7 +87,7 @@ func PromptWaveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner, wave
 	case "s":
 		return domain.ApprovalSelective, nil
 	case "q":
-		return domain.ApprovalQuit, ErrQuit
+		return domain.ApprovalQuit, domain.ErrQuit
 	default:
 		return domain.ApprovalQuit, fmt.Errorf("invalid input: %s", input)
 	}
@@ -125,13 +118,13 @@ func PromptSelectiveApproval(ctx context.Context, w io.Writer, s *bufio.Scanner,
 
 		line, err := ScanLine(ctx, s)
 		if err != nil {
-			return nil, nil, ErrQuit
+			return nil, nil, domain.ErrQuit
 		}
 		input := strings.TrimSpace(strings.ToLower(line))
 
 		switch input {
 		case "q":
-			return nil, nil, ErrQuit
+			return nil, nil, domain.ErrQuit
 		case "done":
 			var approved, rejected []domain.WaveAction
 			for i, a := range wave.Actions {
@@ -169,11 +162,11 @@ func PromptDiscussTopic(ctx context.Context, w io.Writer, s *bufio.Scanner) (str
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return "", ErrQuit
+		return "", domain.ErrQuit
 	}
 	input := strings.TrimSpace(line)
 	if strings.EqualFold(input, "q") {
-		return "", ErrQuit
+		return "", domain.ErrQuit
 	}
 	if input == "" {
 		return "", fmt.Errorf("empty topic")
@@ -197,7 +190,7 @@ func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, baseDir st
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return domain.ResumeChoiceResume, ErrQuit
+		return domain.ResumeChoiceResume, domain.ErrQuit
 	}
 	input := strings.TrimSpace(strings.ToLower(line))
 	switch input {
@@ -208,7 +201,7 @@ func PromptResume(ctx context.Context, w io.Writer, s *bufio.Scanner, baseDir st
 	case "s":
 		return domain.ResumeChoiceRescan, nil
 	case "q":
-		return domain.ResumeChoiceResume, ErrQuit
+		return domain.ResumeChoiceResume, domain.ErrQuit
 	default:
 		return domain.ResumeChoiceResume, fmt.Errorf("invalid input: %s", input)
 	}
@@ -237,11 +230,11 @@ func PromptCompletedWaveSelection(ctx context.Context, w io.Writer, s *bufio.Sca
 
 	line, err := ScanLine(ctx, s)
 	if err != nil {
-		return domain.Wave{}, ErrQuit
+		return domain.Wave{}, domain.ErrQuit
 	}
 	input := strings.TrimSpace(line)
 	if input == "b" {
-		return domain.Wave{}, ErrGoBack
+		return domain.Wave{}, domain.ErrGoBack
 	}
 	num, parseErr := strconv.Atoi(input)
 	if parseErr != nil || num < 1 || num > len(completed) {

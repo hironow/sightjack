@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestRunSession_InvalidCommand(t *testing.T) {
@@ -14,7 +13,7 @@ func TestRunSession_InvalidCommand(t *testing.T) {
 	cmd := domain.RunSessionCommand{}
 
 	// when
-	err := RunSession(context.Background(), cmd, nil, "", "", false, nil, io.Discard, session.NopRecorder{}, domain.NewLogger(io.Discard, false))
+	err := RunSession(context.Background(), cmd, nil, "", "", false, nil, io.Discard, domain.NopRecorder{}, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -30,7 +29,7 @@ func TestResumeSession_InvalidCommand(t *testing.T) {
 	cmd := domain.ResumeSessionCommand{RepoPath: "/tmp"}
 
 	// when
-	err := ResumeSession(context.Background(), cmd, nil, "", nil, nil, io.Discard, session.NopRecorder{}, domain.NewLogger(io.Discard, false))
+	err := ResumeSession(context.Background(), cmd, nil, "", nil, nil, io.Discard, domain.NopRecorder{}, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -46,7 +45,7 @@ func TestRescanSession_InvalidCommand(t *testing.T) {
 	cmd := domain.RunSessionCommand{}
 
 	// when
-	err := RescanSession(context.Background(), cmd, nil, "", nil, "", nil, io.Discard, session.NopRecorder{}, domain.NewLogger(io.Discard, false))
+	err := RescanSession(context.Background(), cmd, nil, "", nil, "", nil, io.Discard, domain.NopRecorder{}, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
