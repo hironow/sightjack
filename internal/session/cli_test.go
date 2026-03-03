@@ -13,7 +13,6 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-
 func TestPromptWaveSelection(t *testing.T) {
 	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Delta: domain.WaveDelta{Before: 0.25, After: 0.40}},

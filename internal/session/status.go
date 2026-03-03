@@ -77,4 +77,3 @@ func countDirFiles(dir string) int {
 	}
 	return count
 }
-
