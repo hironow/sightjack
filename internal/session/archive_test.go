@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -19,7 +20,7 @@ func TestListExpiredArchive_EmptyDir(t *testing.T) {
 	}
 
 	// when
-	files, err := session.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
+	files, err := session.ListExpiredArchive(baseDir, 30, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -59,7 +60,7 @@ func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 	}
 
 	// when — threshold 30 days
-	files, err := session.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
+	files, err := session.ListExpiredArchive(baseDir, 30, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -101,7 +102,7 @@ func TestListExpiredArchive_OnlyMdFiles(t *testing.T) {
 	}
 
 	// when
-	files, err := session.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
+	files, err := session.ListExpiredArchive(baseDir, 30, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -120,7 +121,7 @@ func TestListExpiredArchive_NoDirReturnsEmpty(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	files, err := session.ListExpiredArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
+	files, err := session.ListExpiredArchive(baseDir, 30, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -154,7 +155,7 @@ func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 	}
 
 	// when
-	deleted, err := session.PruneArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
+	deleted, err := session.PruneArchive(baseDir, 30, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -182,7 +183,7 @@ func TestListExpiredArchive_NegativeDaysReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	_, err := session.ListExpiredArchive(baseDir, -1, sightjack.NewLogger(io.Discard, false))
+	_, err := session.ListExpiredArchive(baseDir, -1, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -198,7 +199,7 @@ func TestPruneArchive_NegativeDaysReturnsError(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	_, err := session.PruneArchive(baseDir, -1, sightjack.NewLogger(io.Discard, false))
+	_, err := session.PruneArchive(baseDir, -1, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -211,7 +212,7 @@ func TestPruneArchive_NoDirReturnsEmpty(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	deleted, err := session.PruneArchive(baseDir, 30, sightjack.NewLogger(io.Discard, false))
+	deleted, err := session.PruneArchive(baseDir, 30, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {

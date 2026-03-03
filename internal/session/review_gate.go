@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 const (
@@ -19,13 +20,13 @@ const (
 // Returns (true, nil) if review passes or is skipped (no ReviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logger *sightjack.Logger) (bool, error) {
+func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logger *domain.Logger) (bool, error) {
 	if strings.TrimSpace(cfg.Gate.ReviewCmd) == "" {
 		return true, nil
 	}
 
 	if logger == nil {
-		logger = sightjack.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
 
 	budget := cfg.Gate.ReviewBudget
@@ -82,7 +83,7 @@ func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logge
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, cfg *sightjack.Config, dir, comments string, logger *sightjack.Logger) error {
+func runReviewFix(ctx context.Context, cfg *sightjack.Config, dir, comments string, logger *domain.Logger) error {
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)

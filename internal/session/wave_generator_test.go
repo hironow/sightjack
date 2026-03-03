@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -469,7 +470,7 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 	}
 	completedWaves := []sightjack.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
 
-	err := session.GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, nil, sightjack.NewLogger(io.Discard, false))
+	err := session.GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, nil, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}

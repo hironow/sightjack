@@ -12,6 +12,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 
 	pond "github.com/alitto/pond/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -59,11 +60,11 @@ func MergeScanResults(clusters []sightjack.ClusterScanResult, shibitoWarnings []
 // RunScan executes the full two-pass scan.
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
-func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger *sightjack.Logger) (*sightjack.ScanResult, error) {
+func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger *domain.Logger) (*sightjack.ScanResult, error) {
 	if logger == nil {
-		logger = sightjack.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
-	ctx, scanSpan := sightjack.Tracer.Start(ctx, "scan",
+	ctx, scanSpan := platform.Tracer.Start(ctx, "scan",
 		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
 	)
 	defer scanSpan.End()
@@ -75,7 +76,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 
 	// --- Pass 1: Classify ---
 	logger.Info("Pass 1: Classifying issues...")
-	classifyCtx, classifySpan := sightjack.Tracer.Start(ctx, "classify")
+	classifyCtx, classifySpan := platform.Tracer.Start(ctx, "classify")
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
 	classifyPrompt, err := sightjack.RenderClassifyPrompt(cfg.Lang, sightjack.ClassifyPromptData{
@@ -145,7 +146,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 	)
 
 	// --- Pass 2: Deep scan per cluster (parallel) ---
-	deepscanCtx, deepscanSpan := sightjack.Tracer.Start(ctx, "deepscan")
+	deepscanCtx, deepscanSpan := platform.Tracer.Start(ctx, "deepscan")
 	logger.Info("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
 	// Build scan cluster list from classify results. The index parameter in
@@ -157,7 +158,7 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 	}
 
 	deepScanFn := func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
-		ctx, clusterSpan := sightjack.Tracer.Start(ctx, "deepscan.cluster",
+		ctx, clusterSpan := platform.Tracer.Start(ctx, "deepscan.cluster",
 			trace.WithAttributes(attribute.String("cluster.name", cluster.Name)),
 		)
 		defer clusterSpan.End()
@@ -221,8 +222,8 @@ func RunScan(ctx context.Context, cfg *sightjack.Config, baseDir string, session
 // Failed clusters are skipped with warnings (partial success), matching the
 // fault-tolerance pattern of RunParallelDeepScan. Returns an error only when
 // ALL clusters fail.
-func RunWaveGenerate(ctx context.Context, cfg *sightjack.Config, scanDir string, clusters []sightjack.ClusterScanResult, dryRun bool, logger *sightjack.Logger) ([]sightjack.Wave, []string, map[string]bool, error) {
-	ctx, waveGenSpan := sightjack.Tracer.Start(ctx, "wave.generate",
+func RunWaveGenerate(ctx context.Context, cfg *sightjack.Config, scanDir string, clusters []sightjack.ClusterScanResult, dryRun bool, logger *domain.Logger) ([]sightjack.Wave, []string, map[string]bool, error) {
+	ctx, waveGenSpan := platform.Tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
 	defer waveGenSpan.End()
@@ -260,7 +261,7 @@ func waveFileBase(index int, clusterName string) string {
 
 // savePromptAndCreateLog writes the prompt file and creates a log writer.
 // Returns the log writer and a cleanup function for the log file.
-func savePromptAndCreateLog(scanDir, base, prompt string, logger *sightjack.Logger) (io.Writer, func()) {
+func savePromptAndCreateLog(scanDir, base, prompt string, logger *domain.Logger) (io.Writer, func()) {
 	if err := os.WriteFile(filepath.Join(scanDir, base+"_prompt.md"), []byte(prompt), 0644); err != nil {
 		logger.Warn("save prompt: %v", err)
 	}
@@ -284,7 +285,7 @@ func parseAndNormalizeWaveResult(path, clusterName string) (*sightjack.WaveGener
 }
 
 // generateWaveForCluster generates waves for a single cluster.
-func generateWaveForCluster(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult, dryRun bool, linearTools RunOption, logger *sightjack.Logger) (sightjack.WaveGenerateResult, error) {
+func generateWaveForCluster(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult, dryRun bool, linearTools RunOption, logger *domain.Logger) (sightjack.WaveGenerateResult, error) {
 	base := waveFileBase(index, cluster.Name)
 	waveFile := filepath.Join(scanDir, base+".json")
 
@@ -338,7 +339,7 @@ type DeepScanFunc func(ctx context.Context, cfg *sightjack.Config, scanDir strin
 // Delegates to RunParallel for pond-based parallel orchestration.
 // Failed clusters produce warnings and are skipped; successful results preserve order.
 func RunParallelDeepScan(ctx context.Context, cfg *sightjack.Config, scanDir string,
-	clusters []sightjack.ClusterScanResult, scanFn DeepScanFunc, logger *sightjack.Logger) ([]sightjack.ClusterScanResult, []string) {
+	clusters []sightjack.ClusterScanResult, scanFn DeepScanFunc, logger *domain.Logger) ([]sightjack.ClusterScanResult, []string) {
 
 	return RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
 		func(ctx context.Context, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
@@ -359,7 +360,7 @@ func RunParallel[I, R any](
 	concurrency int,
 	work func(ctx context.Context, index int, item I) (R, error),
 	itemName func(I) string,
-	logger *sightjack.Logger,
+	logger *domain.Logger,
 ) ([]R, []string) {
 	if len(items) == 0 {
 		return nil, nil

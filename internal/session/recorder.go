@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -18,12 +17,12 @@ func (NopRecorder) Record(domain.EventType, any) error { return nil }
 // This ensures callers never need to handle Record errors at every call site.
 type LoggingRecorder struct {
 	inner  domain.Recorder
-	logger *sightjack.Logger
+	logger *domain.Logger
 }
 
 // NewLoggingRecorder creates a LoggingRecorder that wraps the given Recorder.
 // If inner is nil, NopRecorder is used to prevent panics.
-func NewLoggingRecorder(inner domain.Recorder, logger *sightjack.Logger) *LoggingRecorder {
+func NewLoggingRecorder(inner domain.Recorder, logger *domain.Logger) *LoggingRecorder {
 	if inner == nil {
 		inner = NopRecorder{}
 	}
@@ -43,12 +42,12 @@ func (r *LoggingRecorder) Record(eventType domain.EventType, payload any) error 
 type DispatchingRecorder struct {
 	inner      domain.Recorder
 	dispatcher domain.EventDispatcher
-	logger     *sightjack.Logger
+	logger     *domain.Logger
 }
 
 // NewDispatchingRecorder creates a DispatchingRecorder.
 // If dispatcher is nil, Record simply delegates to inner.
-func NewDispatchingRecorder(inner domain.Recorder, dispatcher domain.EventDispatcher, logger *sightjack.Logger) *DispatchingRecorder {
+func NewDispatchingRecorder(inner domain.Recorder, dispatcher domain.EventDispatcher, logger *domain.Logger) *DispatchingRecorder {
 	return &DispatchingRecorder{inner: inner, dispatcher: dispatcher, logger: logger}
 }
 

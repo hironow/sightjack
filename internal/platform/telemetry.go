@@ -1,4 +1,4 @@
-package sightjack
+package platform
 
 import (
 	"go.opentelemetry.io/otel/metric"

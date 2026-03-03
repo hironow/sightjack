@@ -12,6 +12,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -124,8 +125,8 @@ func WaveApplyFileName(wave sightjack.Wave) string {
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
-func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, strictness string, out io.Writer, logger *sightjack.Logger) (*sightjack.WaveApplyResult, error) {
-	ctx, applySpan := sightjack.Tracer.Start(ctx, "wave.apply",
+func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, strictness string, out io.Writer, logger *domain.Logger) (*sightjack.WaveApplyResult, error) {
+	ctx, applySpan := platform.Tracer.Start(ctx, "wave.apply",
 		trace.WithAttributes(
 			attribute.String("wave.id", wave.ID),
 			attribute.String("wave.cluster_name", wave.ClusterName),
@@ -192,7 +193,7 @@ func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 
 // RunReadyLabel applies the ready label to issues whose all waves have completed.
 // This must only be called after a successful wave apply.
-func RunReadyLabel(ctx context.Context, cfg *sightjack.Config, readyIssueIDs string, out io.Writer, logger *sightjack.Logger) error {
+func RunReadyLabel(ctx context.Context, cfg *sightjack.Config, readyIssueIDs string, out io.Writer, logger *domain.Logger) error {
 	prompt, err := sightjack.RenderReadyLabelPrompt(cfg.Lang, sightjack.ReadyLabelPromptData{
 		ReadyLabel:    cfg.Labels.ReadyLabel,
 		ReadyIssueIDs: readyIssueIDs,

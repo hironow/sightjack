@@ -120,10 +120,10 @@ type SessionStartedPayload struct {
 // ScanCompletedPayload is the payload for EventScanCompleted.
 type ScanCompletedPayload struct {
 	Clusters       []sightjack.ClusterState `json:"clusters"`
-	Completeness   float64        `json:"completeness"`
-	ShibitoCount   int            `json:"shibito_count"`
-	ScanResultPath string         `json:"scan_result_path"`
-	LastScanned    time.Time      `json:"last_scanned"`
+	Completeness   float64                  `json:"completeness"`
+	ShibitoCount   int                      `json:"shibito_count"`
+	ScanResultPath string                   `json:"scan_result_path"`
+	LastScanned    time.Time                `json:"last_scanned"`
 }
 
 // WavesGeneratedPayload is the payload for EventWavesGenerated.
@@ -140,8 +140,8 @@ type WaveIdentityPayload struct {
 
 // WaveModifiedPayload is the payload for EventWaveModified.
 type WaveModifiedPayload struct {
-	WaveID      string    `json:"wave_id"`
-	ClusterName string    `json:"cluster_name"`
+	WaveID      string              `json:"wave_id"`
+	ClusterName string              `json:"cluster_name"`
 	UpdatedWave sightjack.WaveState `json:"updated_wave"`
 }
 
@@ -176,7 +176,7 @@ type WavesUnlockedPayload struct {
 
 // NextGenWavesAddedPayload is the payload for EventNextGenWavesAdded.
 type NextGenWavesAddedPayload struct {
-	ClusterName string      `json:"cluster_name"`
+	ClusterName string                `json:"cluster_name"`
 	Waves       []sightjack.WaveState `json:"waves"`
 }
 

@@ -406,7 +406,7 @@ func TestRunParallelDeepScan(t *testing.T) {
 	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
 		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
-		}, sightjack.NewLogger(io.Discard, false))
+		}, domain.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 3 {
@@ -436,7 +436,7 @@ func TestRunParallelDeepScanWithFailure(t *testing.T) {
 				return sightjack.ClusterScanResult{}, fmt.Errorf("auth scan failed")
 			}
 			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
-		}, sightjack.NewLogger(io.Discard, false))
+		}, domain.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 1 {
@@ -463,7 +463,7 @@ func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 	results, _ := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
 		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		}, sightjack.NewLogger(io.Discard, false))
+		}, domain.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 1 {
@@ -496,7 +496,7 @@ func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
 				Completeness: 0.5,
 				Issues:       make([]sightjack.IssueDetail, len(cc.IssueIDs)),
 			}, nil
-		}, sightjack.NewLogger(io.Discard, false))
+		}, domain.NewLogger(io.Discard, false))
 
 	// then
 	if len(warnings) != 0 {
@@ -541,7 +541,7 @@ func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
 				Completeness: float64(len(cc.IssueIDs)) * 0.25,
 				Issues:       make([]sightjack.IssueDetail, len(cc.IssueIDs)),
 			}, nil
-		}, sightjack.NewLogger(io.Discard, false))
+		}, domain.NewLogger(io.Discard, false))
 
 	// then: both clusters scanned with correct issue counts (order is non-deterministic)
 	if len(warnings) != 0 {
@@ -593,7 +593,7 @@ func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
 			callCount.Add(1)
 			return sightjack.ClusterScanResult{Name: cluster.Name}, nil
-		}, sightjack.NewLogger(io.Discard, false))
+		}, domain.NewLogger(io.Discard, false))
 
 	// then: no goroutines should have been launched
 	if callCount.Load() != 0 {
@@ -667,7 +667,7 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 	cfg.Labels.Enabled = false // avoid RunClaudeOnce label path complexity
 
 	// when
-	result, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, io.Discard, sightjack.NewLogger(io.Discard, false))
+	result, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, io.Discard, domain.NewLogger(io.Discard, false))
 
 	// then: scan should succeed
 	if err != nil {
@@ -776,7 +776,7 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 	var recorder writeRecorder
 
 	// when
-	_, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, &recorder, sightjack.NewLogger(io.Discard, false))
+	_, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, &recorder, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -820,7 +820,7 @@ func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
 				cancel() // cancel while second cluster waits for semaphore
 			}
 			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		}, sightjack.NewLogger(io.Discard, false))
+		}, domain.NewLogger(io.Discard, false))
 
 	// then: only the first cluster should have been scanned
 	if callCount.Load() != 1 {
@@ -889,7 +889,7 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 	cfg.Claude.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	waves, warnings, _, err := session.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
@@ -930,7 +930,7 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 	cfg.Claude.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	waves, warnings, _, err := session.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
@@ -1030,7 +1030,7 @@ func TestRunWaveGenerate_DryRunPopulatesClusterName(t *testing.T) {
 	_, _, failedNames, err := session.RunWaveGenerate(
 		context.Background(), &cfg, scanDir, clusters,
 		true, // dryRun
-		sightjack.NewLogger(io.Discard, false),
+		domain.NewLogger(io.Discard, false),
 	)
 
 	// then: no error

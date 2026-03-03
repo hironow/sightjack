@@ -11,6 +11,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -23,12 +25,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := sightjack.Tracer
-	sightjack.Tracer = tp.Tracer("sightjack-test")
+	oldTracer := platform.Tracer
+	platform.Tracer = tp.Tracer("sightjack-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		sightjack.Tracer = oldTracer
+		platform.Tracer = oldTracer
 	})
 	return exp
 }
@@ -73,7 +75,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
-	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, sightjack.NewLogger(io.Discard, false))
+	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunClaude failed: %v", err)
 	}
@@ -148,7 +150,7 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	// Create a parent span so retry events have a recording span to attach to.
 	tr := otel.Tracer("sightjack-test")
 	ctx, parentSpan := tr.Start(context.Background(), "test-parent")
-	_, _ = session.RunClaude(ctx, cfg, "test", io.Discard, sightjack.NewLogger(io.Discard, false))
+	_, _ = session.RunClaude(ctx, cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
 	parentSpan.End()
 
 	spans := exp.GetSpans()
@@ -175,15 +177,15 @@ func TestMultiExporter_BothReceive(t *testing.T) {
 	)
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := sightjack.Tracer
-	sightjack.Tracer = tp.Tracer("sightjack-test")
+	oldTracer := platform.Tracer
+	platform.Tracer = tp.Tracer("sightjack-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		sightjack.Tracer = oldTracer
+		platform.Tracer = oldTracer
 	})
 
-	_, span := sightjack.Tracer.Start(context.Background(), "multi-span")
+	_, span := platform.Tracer.Start(context.Background(), "multi-span")
 	span.End()
 
 	if len(exp1.GetSpans()) == 0 {

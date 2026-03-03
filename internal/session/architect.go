@@ -12,6 +12,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -91,7 +92,7 @@ func ArchitectDiscussFileName(wave sightjack.Wave) string {
 }
 
 // RunArchitectDiscussDryRun saves the architect prompt to a file instead of executing Claude.
-func RunArchitectDiscussDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wave, topic string, strictness string, logger *sightjack.Logger) error {
+func RunArchitectDiscussDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wave, topic string, strictness string, logger *domain.Logger) error {
 	actionsJSON, err := json.Marshal(wave.Actions)
 	if err != nil {
 		return fmt.Errorf("marshal wave actions: %w", err)
@@ -123,8 +124,8 @@ func ClearArchitectOutput(scanDir string, wave sightjack.Wave) {
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
-func RunArchitectDiscuss(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, topic string, strictness string, out io.Writer, logger *sightjack.Logger) (*sightjack.ArchitectResponse, error) {
-	ctx, discussSpan := sightjack.Tracer.Start(ctx, "architect.discuss",
+func RunArchitectDiscuss(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, topic string, strictness string, out io.Writer, logger *domain.Logger) (*sightjack.ArchitectResponse, error) {
+	ctx, discussSpan := platform.Tracer.Start(ctx, "architect.discuss",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", wave.ClusterName),
 			attribute.String("wave.id", wave.ID),

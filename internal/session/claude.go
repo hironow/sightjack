@@ -12,6 +12,8 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -51,8 +53,8 @@ func WithAllowedTools(tools ...string) RunOption {
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
-func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *sightjack.Logger, opts ...RunOption) (string, error) {
-	ctx, span := sightjack.Tracer.Start(ctx, "claude.invoke",
+func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *domain.Logger, opts ...RunOption) (string, error) {
+	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("claude.model", cfg.Claude.Model),
 			attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec),
@@ -144,7 +146,7 @@ func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w 
 // complete.
 // Pass os.Stdout for interactive single-process usage, or io.Discard for
 // parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *sightjack.Logger, opts ...RunOption) (string, error) {
+func RunClaude(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *domain.Logger, opts ...RunOption) (string, error) {
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
@@ -198,7 +200,7 @@ func RunClaude(ctx context.Context, cfg *sightjack.Config, prompt string, w io.W
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
-func RunClaudeDryRun(cfg *sightjack.Config, prompt, outputPath string, name string, logger *sightjack.Logger) error {
+func RunClaudeDryRun(cfg *sightjack.Config, prompt, outputPath string, name string, logger *domain.Logger) error {
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return fmt.Errorf("create dry-run dir: %w", err)
 	}

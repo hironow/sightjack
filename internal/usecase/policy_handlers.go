@@ -3,13 +3,12 @@ package usecase
 import (
 	"context"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
 // registerSessionPolicies registers POLICY handlers for session events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
-func registerSessionPolicies(engine *PolicyEngine, logger *sightjack.Logger) {
+func registerSessionPolicies(engine *PolicyEngine, logger *domain.Logger) {
 	engine.Register(domain.EventWaveApplied, func(_ context.Context, event domain.Event) error {
 		logger.Debug("policy: wave applied (type=%s)", event.Type)
 		return nil

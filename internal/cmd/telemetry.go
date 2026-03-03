@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hironow/sightjack/internal/platform"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -16,15 +17,13 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
-
-	"github.com/hironow/sightjack"
 )
 
 func initTracer(serviceName, ver string) func(context.Context) error {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
-		sightjack.Tracer = np.Tracer(serviceName)
+		platform.Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -32,7 +31,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 	if err != nil {
 		np := noop.NewTracerProvider()
 		otel.SetTracerProvider(np)
-		sightjack.Tracer = np.Tracer(serviceName)
+		platform.Tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -62,7 +61,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 
 	tp := sdktrace.NewTracerProvider(opts...)
 	otel.SetTracerProvider(tp)
-	sightjack.Tracer = tp.Tracer(serviceName)
+	platform.Tracer = tp.Tracer(serviceName)
 
 	return func(ctx context.Context) error {
 		return tp.Shutdown(ctx)
@@ -74,7 +73,7 @@ func initTracer(serviceName, ver string) func(context.Context) error {
 func initMeter(serviceName, ver string) func(context.Context) error {
 	if os.Getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT") == "" {
 		mp := metricnoop.NewMeterProvider()
-		sightjack.Meter = mp.Meter(serviceName)
+		platform.Meter = mp.Meter(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -84,7 +83,7 @@ func initMeter(serviceName, ver string) func(context.Context) error {
 	)
 	if err != nil {
 		mp := metricnoop.NewMeterProvider()
-		sightjack.Meter = mp.Meter(serviceName)
+		platform.Meter = mp.Meter(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
@@ -101,7 +100,7 @@ func initMeter(serviceName, ver string) func(context.Context) error {
 		metric.WithReader(metric.NewPeriodicReader(exp)),
 		metric.WithResource(res),
 	)
-	sightjack.Meter = mp.Meter(serviceName)
+	platform.Meter = mp.Meter(serviceName)
 
 	return func(ctx context.Context) error {
 		return mp.Shutdown(ctx)
@@ -132,7 +131,7 @@ var rootSpan trace.Span
 // returns a new context carrying it. The span is stored in the package-level
 // rootSpan variable so endRootSpan can close it without a context argument.
 func startRootSpan(ctx context.Context, command string) context.Context {
-	ctx, rootSpan = sightjack.Tracer.Start(ctx, "sightjack."+command,
+	ctx, rootSpan = platform.Tracer.Start(ctx, "sightjack."+command,
 		trace.WithAttributes(
 			attribute.String("sightjack.command", command),
 		),

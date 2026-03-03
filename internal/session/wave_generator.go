@@ -12,6 +12,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -75,7 +76,7 @@ func ParseNextGenResult(path string) (*sightjack.NextGenResult, error) {
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt to a file instead of executing Claude.
-func GenerateNextWavesDryRun(cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail, reports []*DMail, logger *sightjack.Logger) error {
+func GenerateNextWavesDryRun(cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail, reports []*DMail, logger *domain.Logger) error {
 	prompt, err := BuildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness, feedback, reports)
 	if err != nil {
 		return err
@@ -85,8 +86,8 @@ func GenerateNextWavesDryRun(cfg *sightjack.Config, scanDir string, completedWav
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail, reports []*DMail, logger *sightjack.Logger) ([]sightjack.Wave, error) {
-	ctx, nextgenSpan := sightjack.Tracer.Start(ctx, "wave.nextgen",
+func GenerateNextWaves(ctx context.Context, cfg *sightjack.Config, scanDir string, completedWave sightjack.Wave, cluster sightjack.ClusterScanResult, completedWaves []sightjack.Wave, existingADRs []sightjack.ExistingADR, rejectedActions []sightjack.WaveAction, strictness string, feedback []*DMail, reports []*DMail, logger *domain.Logger) ([]sightjack.Wave, error) {
+	ctx, nextgenSpan := platform.Tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", completedWave.ClusterName),
 		),

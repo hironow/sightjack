@@ -193,7 +193,7 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 // receiveDMailIfNew reads a d-mail from inbox, applies consumer-side dedup (MY-271),
 // archives it, and returns it only if it is a feedback d-mail.
 // Returns nil for already-archived, non-feedback, or unreadable files.
-func receiveDMailIfNew(baseDir, filename string, logger *sightjack.Logger) *DMail {
+func receiveDMailIfNew(baseDir, filename string, logger *domain.Logger) *DMail {
 	// Consumer-side dedup: skip if already in archive.
 	// NOTE: Dedup is filename-based by design — the d-mail filename acts as a
 	// message ID in the protocol. Senders that need to deliver updated content
@@ -222,7 +222,7 @@ func receiveDMailIfNew(baseDir, filename string, logger *sightjack.Logger) *DMai
 // Each d-mail is received (archived + removed from inbox). Feedback, convergence,
 // and report d-mails are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
-func MonitorInbox(ctx context.Context, baseDir string, logger *sightjack.Logger) (<-chan *DMail, error) {
+func MonitorInbox(ctx context.Context, baseDir string, logger *domain.Logger) (<-chan *DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
@@ -291,7 +291,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger *sightjack.Logger)
 
 // DrainInboxFeedback reads all currently buffered d-mails (feedback and convergence)
 // from the monitor channel and logs them. Returns the drained messages for downstream use.
-func DrainInboxFeedback(ch <-chan *DMail, logger *sightjack.Logger) []*DMail {
+func DrainInboxFeedback(ch <-chan *DMail, logger *domain.Logger) []*DMail {
 	if ch == nil {
 		return nil
 	}
@@ -386,7 +386,7 @@ type FeedbackCollector struct {
 // and starts a background goroutine to accumulate late-arriving items
 // from the channel. Convergence d-mails trigger a notification via notifier.
 // Safe to call with nil initial, nil channel, or nil notifier.
-func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier domain.Notifier, logger *sightjack.Logger) *FeedbackCollector {
+func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier domain.Notifier, logger *domain.Logger) *FeedbackCollector {
 	if notifier == nil {
 		notifier = &domain.NopNotifier{}
 	}

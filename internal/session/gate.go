@@ -12,6 +12,7 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 // FilterConvergence returns convergence-kind D-Mails from the slice.
@@ -28,13 +29,13 @@ func FilterConvergence(dmails []*DMail) []*DMail {
 // RunConvergenceGate checks for convergence D-Mails and runs the
 // notify + approve flow. Returns true if approved or no convergence found.
 // Returns false if denied. Returns error on failure (fail-closed).
-func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier domain.Notifier, approver domain.Approver, logger *sightjack.Logger) (bool, error) {
+func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier domain.Notifier, approver domain.Approver, logger *domain.Logger) (bool, error) {
 	convergence := FilterConvergence(dmails)
 	if len(convergence) == 0 {
 		return true, nil
 	}
 
-	ctx, gateSpan := sightjack.Tracer.Start(ctx, "gate.convergence",
+	ctx, gateSpan := platform.Tracer.Start(ctx, "gate.convergence",
 		trace.WithAttributes(
 			attribute.Int("gate.convergence.count", len(convergence)),
 		),
@@ -54,7 +55,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier domain.No
 	if notifier != nil {
 		notifySpanCtx := trace.ContextWithSpan(context.Background(), trace.SpanFromContext(ctx))
 		go func(spanCtx context.Context, title, msg string) {
-			_, notifySpan := sightjack.Tracer.Start(spanCtx, "notify.convergence")
+			_, notifySpan := platform.Tracer.Start(spanCtx, "notify.convergence")
 			defer notifySpan.End()
 			notifyCtx, cancel := context.WithTimeout(spanCtx, 30*time.Second)
 			defer cancel()
@@ -92,7 +93,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier domain.No
 // and any error. The loop exits when no new convergence D-Mails arrived
 // during the approval prompt.
 func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
-	notifier domain.Notifier, approver domain.Approver, logger *sightjack.Logger) (dmails []*DMail, approved bool, err error) {
+	notifier domain.Notifier, approver domain.Approver, logger *domain.Logger) (dmails []*DMail, approved bool, err error) {
 	all := append([]*DMail{}, initial...)
 	for {
 		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)

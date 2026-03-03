@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -118,7 +119,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	}
 
 	// when
-	err := session.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
+	err := session.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -203,7 +204,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	}
 
 	// when
-	err := session.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", sightjack.NewLogger(io.Discard, false))
+	err := session.RunArchitectDiscussDryRun(cfg, scanDir, wave, "test topic", "fog", domain.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {

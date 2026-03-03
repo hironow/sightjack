@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // TestRace_OutboxStore_ConcurrentStageAndRead verifies that concurrent
@@ -48,7 +49,7 @@ func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 // FeedbackCollector mutex protects concurrent field access.
 func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
 	ch := make(chan *DMail, 10)
-	fc := CollectFeedback(nil, ch, nil, sightjack.NewLogger(nil, false))
+	fc := CollectFeedback(nil, ch, nil, domain.NewLogger(nil, false))
 
 	var wg sync.WaitGroup
 	for i := range 20 {
@@ -75,7 +76,7 @@ func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
 // TestRace_Logger_ConcurrentWrite verifies that Logger's mutex protects
 // concurrent log writes.
 func TestRace_Logger_ConcurrentWrite(t *testing.T) {
-	logger := sightjack.NewLogger(nil, false)
+	logger := domain.NewLogger(nil, false)
 
 	var wg sync.WaitGroup
 	for i := range 20 {

@@ -6,12 +6,13 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 // ShowFromState loads the latest session state and renders the matrix navigator.
 // This is the READ MODEL path for the show command.
-func ShowFromState(w io.Writer, baseDir string, logger *sightjack.Logger) error {
+func ShowFromState(w io.Writer, baseDir string, logger *domain.Logger) error {
 	state, _, err := session.LoadLatestState(baseDir)
 	if err != nil {
 		logger.Info("Run 'sightjack scan' first.")

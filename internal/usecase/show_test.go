@@ -4,13 +4,13 @@ import (
 	"io"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestShowFromState_NoState(t *testing.T) {
 	// given: empty temp dir with no events
 	baseDir := t.TempDir()
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	err := ShowFromState(io.Discard, baseDir, logger)

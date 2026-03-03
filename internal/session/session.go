@@ -14,12 +14,13 @@ import (
 
 	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
-func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger *sightjack.Logger) error {
+func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if logger == nil {
-		logger = sightjack.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
 	recorder = NewLoggingRecorder(recorder, logger)
 	if !dryRun && input == nil {
@@ -189,7 +190,7 @@ const (
 func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	scanResult *sightjack.ScanResult, cfg *sightjack.Config, available []sightjack.Wave, waves []sightjack.Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
-	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, selectPhaseResult, bool) {
+	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (sightjack.Wave, selectPhaseResult, bool) {
 
 	// Auto-select first available wave when --auto-approve is set.
 	if cfg.Gate.AutoApprove {
@@ -260,7 +261,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	waves []sightjack.Wave, completed map[string]bool,
 	sessionRejected map[string][]sightjack.WaveAction, adrDir string, adrCount *int,
 	store domain.OutboxStore, recorder domain.Recorder,
-	out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) (sightjack.Wave, approvalPhaseResult) {
+	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (sightjack.Wave, approvalPhaseResult) {
 
 	// Auto-approve when --auto-approve is set.
 	if cfg.Gate.AutoApprove {
@@ -324,7 +325,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			recorder.Record(domain.EventWaveRejected, domain.WaveIdentityPayload{
 				WaveID: selected.ID, ClusterName: selected.ClusterName,
 			})
-			domain.RecordWave(ctx, "rejected")
+			platform.RecordWave(ctx, "rejected")
 			logger.Info("Wave rejected.")
 			return selected, approvalRejected
 		case sightjack.ApprovalDiscuss:
@@ -424,7 +425,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	waves *[]sightjack.Wave, completed map[string]bool,
 	scanResult *sightjack.ScanResult, sessionRejected map[string][]sightjack.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger *sightjack.Logger) {
+	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger *domain.Logger) {
 
 	// --- Pass 4: Wave Apply ---
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
@@ -442,7 +443,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 		Errors: applyResult.Errors,
 	})
-	domain.RecordWave(ctx, "applied")
+	platform.RecordWave(ctx, "applied")
 
 	if !domain.IsWaveApplyComplete(applyResult) {
 		loopSpan.AddEvent("wave.partial_failure",
@@ -643,9 +644,9 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *sightjack.ScanResult, waves []sightjack.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store domain.OutboxStore, recorder domain.Recorder, out io.Writer, logger *sightjack.Logger) error {
+	store domain.OutboxStore, recorder domain.Recorder, out io.Writer, logger *domain.Logger) error {
 
-	ctx, loopSpan := sightjack.Tracer.Start(ctx, "interactive.loop",
+	ctx, loopSpan := platform.Tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
 			attribute.String("sightjack.session_id", sessionID),
 		),
@@ -737,9 +738,9 @@ func ResumeScanDir(state *sightjack.SessionState, baseDir string) string {
 }
 
 // RunResumeSession resumes an existing session from saved state.
-func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string, state *sightjack.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger *sightjack.Logger) error {
+func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string, state *sightjack.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if logger == nil {
-		logger = sightjack.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
 	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
@@ -804,9 +805,9 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
-func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string, oldState *sightjack.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger *sightjack.Logger) error {
+func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string, oldState *sightjack.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if logger == nil {
-		logger = sightjack.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
 	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {

@@ -5,7 +5,6 @@ import (
 	"io"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -14,7 +13,7 @@ func TestRunScan_InvalidCommand(t *testing.T) {
 	cmd := domain.RunScanCommand{}
 
 	// when
-	_, err := RunScan(context.Background(), cmd, nil, "", "", false, io.Discard, sightjack.NewLogger(io.Discard, false))
+	_, err := RunScan(context.Background(), cmd, nil, "", "", false, io.Discard, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -33,7 +32,7 @@ func TestRunScan_InvalidLang(t *testing.T) {
 	}
 
 	// when
-	_, err := RunScan(context.Background(), cmd, nil, "", "", false, io.Discard, sightjack.NewLogger(io.Discard, false))
+	_, err := RunScan(context.Background(), cmd, nil, "", "", false, io.Discard, domain.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {

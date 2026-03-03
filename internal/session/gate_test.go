@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -53,7 +52,7 @@ func TestConvergenceGate_NoConvergence(t *testing.T) {
 	}
 	notifier := &domain.NopNotifier{}
 	approver := &domain.AutoApprover{}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -74,7 +73,7 @@ func TestConvergenceGate_Approved(t *testing.T) {
 	}
 	notifier := &domain.NopNotifier{}
 	approver := &domain.AutoApprover{}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -95,7 +94,7 @@ func TestConvergenceGate_Denied(t *testing.T) {
 	}
 	notifier := &domain.NopNotifier{}
 	approver := &denyApprover{}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -116,7 +115,7 @@ func TestConvergenceGate_FailClosed(t *testing.T) {
 	}
 	notifier := &domain.NopNotifier{}
 	approver := &errorApprover{err: fmt.Errorf("approval service down")}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -140,7 +139,7 @@ func TestConvergenceGate_ContextCancel(t *testing.T) {
 	cancel()
 	notifier := &domain.NopNotifier{}
 	approver := &domain.AutoApprover{}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(ctx, dmails, notifier, approver, logger)
@@ -161,7 +160,7 @@ func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 	ch <- &session.DMail{Name: "late-conv", Kind: session.DMailConvergence, Description: "late convergence"}
 	notifier := &domain.NopNotifier{}
 	approver := &domain.AutoApprover{}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when: initial is empty, gate passes through, but re-drain catches late convergence
 	var initial []*session.DMail
@@ -194,7 +193,7 @@ func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T
 		inject: &session.DMail{Name: "late-conv", Kind: session.DMailConvergence, Description: "late convergence"},
 	}
 	notifier := &domain.NopNotifier{}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when: initial has convergence, approval triggers inject, re-drain catches it
 	initial := []*session.DMail{
@@ -229,7 +228,7 @@ func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 	}
 	notifier := &blockingNotifier{ch: make(chan struct{})}
 	approver := &domain.AutoApprover{}
-	logger := sightjack.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// when: run gate with a deadline
 	done := make(chan struct{})
