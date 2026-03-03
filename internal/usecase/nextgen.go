@@ -33,11 +33,11 @@ func CompletedWavesForCluster(waves []domain.Wave, clusterName string) []domain.
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt without executing Claude.
-func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, logger *domain.Logger) error {
+func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, logger domain.Logger) error {
 	return session.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness, nil, nil, logger)
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, logger *domain.Logger) ([]domain.Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, logger domain.Logger) ([]domain.Wave, error) {
 	return session.GenerateNextWaves(ctx, cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness, nil, nil, logger)
 }

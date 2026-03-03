@@ -90,7 +90,7 @@ func ArchitectDiscussFileName(wave domain.Wave) string {
 }
 
 // RunArchitectDiscussDryRun saves the architect prompt to a file instead of executing Claude.
-func RunArchitectDiscussDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, logger *domain.Logger) error {
+func RunArchitectDiscussDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, logger domain.Logger) error {
 	actionsJSON, err := json.Marshal(wave.Actions)
 	if err != nil {
 		return fmt.Errorf("marshal wave actions: %w", err)
@@ -122,7 +122,7 @@ func ClearArchitectOutput(scanDir string, wave domain.Wave) {
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
-func RunArchitectDiscuss(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, out io.Writer, logger *domain.Logger) (*domain.ArchitectResponse, error) {
+func RunArchitectDiscuss(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, out io.Writer, logger domain.Logger) (*domain.ArchitectResponse, error) {
 	ctx, discussSpan := platform.Tracer.Start(ctx, "architect.discuss",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", wave.ClusterName),

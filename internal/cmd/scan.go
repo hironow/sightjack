@@ -3,8 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -42,8 +40,6 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if err != nil {
 				return err
 			}
-			sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
-
 			logger.Info("Starting sightjack scan...")
 			logger.Info("Team: %s | Project: %s | Lang: %s", cfg.Linear.Team, cfg.Linear.Project, cfg.Lang)
 
@@ -52,12 +48,12 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if jsonOutput {
 				streamOut = cmd.ErrOrStderr()
 			}
-			result, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
+			result, sessionID, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
 				RepoPath:   baseDir,
 				Lang:       cfg.Lang,
 				Strictness: string(cfg.Strictness.Default),
 				DryRun:     dryRun,
-			}, cfg, baseDir, sessionID, dryRun, streamOut, logger)
+			}, cfg, baseDir, dryRun, streamOut, logger)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}

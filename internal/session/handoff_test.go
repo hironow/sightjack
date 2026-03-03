@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 // Compile-time check: Handoff interface exists and has expected methods.
-var _ domain.Handoff = (*handoffChecker)(nil)
+var _ port.Handoff = (*handoffChecker)(nil)
 
 type handoffChecker struct{}
 
@@ -18,7 +19,7 @@ func (p *handoffChecker) ReportIssue(_ context.Context, _ string, _ string) erro
 
 func TestHandoff_InterfaceCompiles(t *testing.T) {
 	// given: a type that implements Handoff
-	var h domain.Handoff = &handoffChecker{}
+	var h port.Handoff = &handoffChecker{}
 
 	// when / then: calling methods should not panic
 	if err := h.HandoffReady(context.Background(), []string{"ENG-101"}); err != nil {

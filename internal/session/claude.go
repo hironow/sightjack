@@ -51,7 +51,7 @@ func WithAllowedTools(tools ...string) RunOption {
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
-func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger *domain.Logger, opts ...RunOption) (string, error) {
+func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...RunOption) (string, error) {
 	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("claude.model", cfg.Claude.Model),
@@ -144,7 +144,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 // complete.
 // Pass os.Stdout for interactive single-process usage, or io.Discard for
 // parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger *domain.Logger, opts ...RunOption) (string, error) {
+func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...RunOption) (string, error) {
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
@@ -198,7 +198,7 @@ func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writ
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
-func RunClaudeDryRun(cfg *domain.Config, prompt, outputPath string, name string, logger *domain.Logger) error {
+func RunClaudeDryRun(cfg *domain.Config, prompt, outputPath string, name string, logger domain.Logger) error {
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return fmt.Errorf("create dry-run dir: %w", err)
 	}

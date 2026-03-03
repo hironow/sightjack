@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -28,7 +29,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	}
 
 	// when
-	session.RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard, domain.NewLogger(io.Discard, false))
+	session.RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
 	expected := []string{"--model", "opus", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
@@ -57,7 +58,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	}
 
 	// when
-	session.RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard, domain.NewLogger(io.Discard, false))
+	session.RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
 	expected := []string{"--dangerously-skip-permissions", "--print", "-p", "test prompt"}
@@ -77,7 +78,7 @@ func TestRunClaudeDryRun(t *testing.T) {
 	prompt := "test prompt content"
 	outDir := dir + "/dryrun"
 
-	err := session.RunClaudeDryRun(cfg, prompt, outDir, "classify", domain.NewLogger(io.Discard, false))
+	err := session.RunClaudeDryRun(cfg, prompt, outDir, "classify", platform.NewLogger(io.Discard, false))
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -98,10 +99,10 @@ func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	cfg := &domain.Config{Claude: domain.ClaudeConfig{Command: "claude"}}
 
 	// when
-	if err := session.RunClaudeDryRun(cfg, "prompt A", dir, "wave_00_auth", domain.NewLogger(io.Discard, false)); err != nil {
+	if err := session.RunClaudeDryRun(cfg, "prompt A", dir, "wave_00_auth", platform.NewLogger(io.Discard, false)); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.RunClaudeDryRun(cfg, "prompt B", dir, "wave_01_api", domain.NewLogger(io.Discard, false)); err != nil {
+	if err := session.RunClaudeDryRun(cfg, "prompt B", dir, "wave_01_api", platform.NewLogger(io.Discard, false)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,7 +138,7 @@ func TestRunClaudeOnceNoRetry(t *testing.T) {
 	}
 
 	// when
-	_, err := session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
+	_, err := session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then: should fail immediately without retrying
 	if err == nil {
@@ -163,7 +164,7 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
 	}
-	output, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
+	output, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("expected success after retries, got: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
-	_, err := session.RunClaude(ctx, cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
+	_, err := session.RunClaude(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -214,7 +215,7 @@ func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
 	}
 
 	// when
-	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, domain.NewLogger(io.Discard, false),
+	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
 		session.WithAllowedTools("mcp__linear__list_issues", "mcp__linear__get_issue", "Write"))
 
 	// then: --allowedTools flag present with comma-separated tools
@@ -249,7 +250,7 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 	}
 
 	// when
-	session.RunClaude(context.Background(), cfg, "test", io.Discard, domain.NewLogger(io.Discard, false),
+	session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
 		session.WithAllowedTools("mcp__linear__list_issues"))
 
 	// then: --allowedTools forwarded to RunClaudeOnce
@@ -288,7 +289,7 @@ func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
 	}()
 
 	start := time.Now()
-	_, err := session.RunClaudeOnce(ctx, cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
+	_, err := session.RunClaudeOnce(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	elapsed := time.Since(start)
 
 	// then: should terminate with error (context cancelled)
@@ -314,7 +315,7 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
-	_, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
+	_, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	if err == nil {
 		t.Fatal("expected error after exhausting retries")
 	}

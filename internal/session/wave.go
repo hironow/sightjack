@@ -123,7 +123,7 @@ func WaveApplyFileName(wave domain.Wave) string {
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
-func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, strictness string, out io.Writer, logger *domain.Logger) (*domain.WaveApplyResult, error) {
+func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, strictness string, out io.Writer, logger domain.Logger) (*domain.WaveApplyResult, error) {
 	ctx, applySpan := platform.Tracer.Start(ctx, "wave.apply",
 		trace.WithAttributes(
 			attribute.String("wave.id", wave.ID),
@@ -191,7 +191,7 @@ func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 
 // RunReadyLabel applies the ready label to issues whose all waves have completed.
 // This must only be called after a successful wave apply.
-func RunReadyLabel(ctx context.Context, cfg *domain.Config, readyIssueIDs string, out io.Writer, logger *domain.Logger) error {
+func RunReadyLabel(ctx context.Context, cfg *domain.Config, readyIssueIDs string, out io.Writer, logger domain.Logger) error {
 	prompt, err := domain.RenderReadyLabelPrompt(cfg.Lang, domain.ReadyLabelPromptData{
 		ReadyLabel:    cfg.Labels.ReadyLabel,
 		ReadyIssueIDs: readyIssueIDs,

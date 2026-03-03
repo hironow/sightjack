@@ -9,6 +9,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -27,7 +28,7 @@ func FilterConvergence(dmails []*DMail) []*DMail {
 // RunConvergenceGate checks for convergence D-Mails and runs the
 // notify + approve flow. Returns true if approved or no convergence found.
 // Returns false if denied. Returns error on failure (fail-closed).
-func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier domain.Notifier, approver domain.Approver, logger *domain.Logger) (bool, error) {
+func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Notifier, approver port.Approver, logger domain.Logger) (bool, error) {
 	convergence := FilterConvergence(dmails)
 	if len(convergence) == 0 {
 		return true, nil
@@ -91,7 +92,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier domain.No
 // and any error. The loop exits when no new convergence D-Mails arrived
 // during the approval prompt.
 func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
-	notifier domain.Notifier, approver domain.Approver, logger *domain.Logger) (dmails []*DMail, approved bool, err error) {
+	notifier port.Notifier, approver port.Approver, logger domain.Logger) (dmails []*DMail, approved bool, err error) {
 	all := append([]*DMail{}, initial...)
 	for {
 		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)
@@ -112,7 +113,7 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 
 // BuildNotifier creates the appropriate Notifier based on config.
 // If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
-func BuildNotifier(cfg *domain.Config) domain.Notifier {
+func BuildNotifier(cfg *domain.Config) port.Notifier {
 	if cfg.Gate.NotifyCmd != "" {
 		return NewCmdNotifier(cfg.Gate.NotifyCmd)
 	}
@@ -121,9 +122,9 @@ func BuildNotifier(cfg *domain.Config) domain.Notifier {
 
 // BuildApprover creates the appropriate Approver based on config.
 // Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(cfg *domain.Config, input io.Reader, out io.Writer) domain.Approver {
+func BuildApprover(cfg *domain.Config, input io.Reader, out io.Writer) port.Approver {
 	if cfg.Gate.AutoApprove {
-		return &domain.AutoApprover{}
+		return &port.AutoApprover{}
 	}
 	if cfg.Gate.ApproveCmd != "" {
 		return NewCmdApprover(cfg.Gate.ApproveCmd)

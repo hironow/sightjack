@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -121,7 +122,7 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckClaudeAuth(ctx, cfg, domain.NewLogger(io.Discard, false))
+	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -146,7 +147,7 @@ func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckClaudeAuth(ctx, cfg, domain.NewLogger(io.Discard, false))
+	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -171,7 +172,7 @@ func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckClaudeAuth(ctx, cfg, domain.NewLogger(io.Discard, false))
+	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -184,7 +185,7 @@ func TestCheckClaudeAuth_NilConfig_Skips(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckClaudeAuth(ctx, nil, domain.NewLogger(io.Discard, false))
+	result := session.CheckClaudeAuth(ctx, nil, platform.NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != domain.CheckSkip {
@@ -209,7 +210,7 @@ func TestCheckLinearMCP_Success(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckLinearMCP(ctx, cfg, domain.NewLogger(io.Discard, false))
+	result := session.CheckLinearMCP(ctx, cfg, platform.NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -232,7 +233,7 @@ func TestCheckLinearMCP_Failure(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckLinearMCP(ctx, cfg, domain.NewLogger(io.Discard, false))
+	result := session.CheckLinearMCP(ctx, cfg, platform.NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -248,7 +249,7 @@ func TestCheckLinearMCP_NilConfig_Skips(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result := session.CheckLinearMCP(ctx, nil, domain.NewLogger(io.Discard, false))
+	result := session.CheckLinearMCP(ctx, nil, platform.NewLogger(io.Discard, false))
 
 	// then
 	if result.Status != domain.CheckSkip {
@@ -362,7 +363,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, domain.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false))
 
 	// then: should have 8 results
 	if len(results) != 8 {
@@ -410,7 +411,7 @@ claude:
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, domain.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
 	// then
 	if len(results) != 8 {
@@ -457,7 +458,7 @@ linear:
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, domain.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
 	// then: should have 8 results (config, state dir, claude, git, skills, claude auth, linear mcp, success-rate)
 	if len(results) != 8 {
@@ -516,7 +517,7 @@ linear:
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, domain.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
 	// then: find success-rate result
 	var found bool

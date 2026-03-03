@@ -6,7 +6,7 @@ import (
 )
 
 // ListExpiredArchive returns archived d-mail files older than the retention threshold.
-func ListExpiredArchive(baseDir string, days int, logger *domain.Logger) ([]string, error) {
+func ListExpiredArchive(baseDir string, days int, logger domain.Logger) ([]string, error) {
 	return session.ListExpiredArchive(baseDir, days, logger)
 }
 

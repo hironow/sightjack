@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/port"
 )
 
 // cmdFactoryFunc creates an *exec.Cmd — injectable for testing.
@@ -63,7 +63,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		cmd := factory(ctx, "powershell", "-NoProfile", "-Command", script)
 		return cmd.Run()
 	default:
-		return domain.ErrUnsupportedOS
+		return port.ErrUnsupportedOS
 	}
 }
 

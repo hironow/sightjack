@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -30,7 +31,7 @@ func (failingRecorder) Record(domain.EventType, any) error {
 func TestLoggingRecorder_LogsErrorAndReturnsNil(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	logger := domain.NewLogger(&buf, true)
+	logger := platform.NewLogger(&buf, true)
 	recorder := session.NewLoggingRecorder(failingRecorder{}, logger)
 
 	// when
@@ -51,7 +52,7 @@ func TestLoggingRecorder_LogsErrorAndReturnsNil(t *testing.T) {
 func TestLoggingRecorder_PassesThroughOnSuccess(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	logger := domain.NewLogger(&buf, true)
+	logger := platform.NewLogger(&buf, true)
 	recorder := session.NewLoggingRecorder(domain.NopRecorder{}, logger)
 
 	// when

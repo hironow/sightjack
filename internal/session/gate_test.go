@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -50,9 +51,9 @@ func TestConvergenceGate_NoConvergence(t *testing.T) {
 	dmails := []*session.DMail{
 		{Name: "fb-1", Kind: session.DMailFeedback, Description: "feedback only"},
 	}
-	notifier := &domain.NopNotifier{}
-	approver := &domain.AutoApprover{}
-	logger := domain.NewLogger(io.Discard, false)
+	notifier := &port.NopNotifier{}
+	approver := &port.AutoApprover{}
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -71,9 +72,9 @@ func TestConvergenceGate_Approved(t *testing.T) {
 	dmails := []*session.DMail{
 		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
 	}
-	notifier := &domain.NopNotifier{}
-	approver := &domain.AutoApprover{}
-	logger := domain.NewLogger(io.Discard, false)
+	notifier := &port.NopNotifier{}
+	approver := &port.AutoApprover{}
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -92,9 +93,9 @@ func TestConvergenceGate_Denied(t *testing.T) {
 	dmails := []*session.DMail{
 		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
 	}
-	notifier := &domain.NopNotifier{}
+	notifier := &port.NopNotifier{}
 	approver := &denyApprover{}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -113,9 +114,9 @@ func TestConvergenceGate_FailClosed(t *testing.T) {
 	dmails := []*session.DMail{
 		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
 	}
-	notifier := &domain.NopNotifier{}
+	notifier := &port.NopNotifier{}
 	approver := &errorApprover{err: fmt.Errorf("approval service down")}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(context.Background(), dmails, notifier, approver, logger)
@@ -137,9 +138,9 @@ func TestConvergenceGate_ContextCancel(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	notifier := &domain.NopNotifier{}
-	approver := &domain.AutoApprover{}
-	logger := domain.NewLogger(io.Discard, false)
+	notifier := &port.NopNotifier{}
+	approver := &port.AutoApprover{}
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	approved, err := session.RunConvergenceGate(ctx, dmails, notifier, approver, logger)
@@ -158,9 +159,9 @@ func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 	// between the caller's drain and this gate call (simulated by pre-loading channel).
 	ch := make(chan *session.DMail, 2)
 	ch <- &session.DMail{Name: "late-conv", Kind: session.DMailConvergence, Description: "late convergence"}
-	notifier := &domain.NopNotifier{}
-	approver := &domain.AutoApprover{}
-	logger := domain.NewLogger(io.Discard, false)
+	notifier := &port.NopNotifier{}
+	approver := &port.AutoApprover{}
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when: initial is empty, gate passes through, but re-drain catches late convergence
 	var initial []*session.DMail
@@ -192,8 +193,8 @@ func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T
 		ch:     ch,
 		inject: &session.DMail{Name: "late-conv", Kind: session.DMailConvergence, Description: "late convergence"},
 	}
-	notifier := &domain.NopNotifier{}
-	logger := domain.NewLogger(io.Discard, false)
+	notifier := &port.NopNotifier{}
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when: initial has convergence, approval triggers inject, re-drain catches it
 	initial := []*session.DMail{
@@ -227,8 +228,8 @@ func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
 	}
 	notifier := &blockingNotifier{ch: make(chan struct{})}
-	approver := &domain.AutoApprover{}
-	logger := domain.NewLogger(io.Discard, false)
+	approver := &port.AutoApprover{}
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when: run gate with a deadline
 	done := make(chan struct{})

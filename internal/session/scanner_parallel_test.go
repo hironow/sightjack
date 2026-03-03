@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -21,7 +21,7 @@ func TestRunParallel_AllSucceed(t *testing.T) {
 	work := func(_ context.Context, index int, item string) (string, error) {
 		return fmt.Sprintf("result-%s", item), nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, warnings := session.RunParallel(context.Background(), items, 2, work, itemName, logger)
@@ -47,7 +47,7 @@ func TestRunParallel_PartialFailure(t *testing.T) {
 		}
 		return fmt.Sprintf("result-%s", item), nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, warnings := session.RunParallel(context.Background(), items, 2, work, itemName, logger)
@@ -73,7 +73,7 @@ func TestRunParallel_AllFail(t *testing.T) {
 	work := func(_ context.Context, _ int, item string) (string, error) {
 		return "", fmt.Errorf("%s failed", item)
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, warnings := session.RunParallel(context.Background(), items, 2, work, itemName, logger)
@@ -93,7 +93,7 @@ func TestRunParallel_EmptyItems(t *testing.T) {
 		t.Fatal("work should not be called")
 		return "", nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, warnings := session.RunParallel(context.Background(), nil, 2, work, itemName, logger)
@@ -118,7 +118,7 @@ func TestRunParallel_ContextCancelled(t *testing.T) {
 		callCount++
 		return "x", nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, _ := session.RunParallel(ctx, items, 2, work, itemName, logger)
@@ -140,7 +140,7 @@ func TestRunParallel_PreservesOrder(t *testing.T) {
 		time.Sleep(time.Duration(item[0]-'A') * time.Millisecond)
 		return item, nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, _ := session.RunParallel(context.Background(), items, 2, work, itemName, logger)
@@ -165,7 +165,7 @@ func TestRunParallel_ConcurrencyBound(t *testing.T) {
 		order = append(order, item)
 		return item, nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, _ := session.RunParallel(context.Background(), items, 1, work, itemName, logger)
@@ -190,7 +190,7 @@ func TestRunParallel_PanicRecovery(t *testing.T) {
 		}
 		return fmt.Sprintf("result-%s", item), nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, warnings := session.RunParallel(context.Background(), items, 2, work, itemName, logger)
@@ -221,7 +221,7 @@ func TestRunParallel_CancelWhileWaitingSemaphore(t *testing.T) {
 		}
 		return item, nil
 	}
-	logger := domain.NewLogger(io.Discard, false)
+	logger := platform.NewLogger(io.Discard, false)
 
 	// when
 	results, _ := session.RunParallel(ctx, items, 1, work, itemName, logger)

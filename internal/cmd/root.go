@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -57,7 +58,7 @@ func NewRootCommand() *cobra.Command {
 		Short: "SIREN-inspired issue architecture tool for Linear",
 		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse NeedsDefaultScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			logger := domain.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("sightjack", version)
 			shutdownMeter = initMeter("sightjack", version)
@@ -181,13 +182,13 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	return cfg, nil
 }
 
-// loggerFrom extracts the *domain.Logger from the cobra command context.
+// loggerFrom extracts the domain.Logger from the cobra command context.
 // Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
-func loggerFrom(cmd *cobra.Command) *domain.Logger {
-	if l, ok := cmd.Context().Value(loggerKey).(*domain.Logger); ok {
+func loggerFrom(cmd *cobra.Command) domain.Logger {
+	if l, ok := cmd.Context().Value(loggerKey).(domain.Logger); ok {
 		return l
 	}
-	return domain.NewLogger(cmd.ErrOrStderr(), false)
+	return platform.NewLogger(cmd.ErrOrStderr(), false)
 }
 
 // resolveConfigPath returns the final config file path.

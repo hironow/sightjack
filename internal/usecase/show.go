@@ -11,7 +11,7 @@ import (
 
 // ShowFromState loads the latest session state and renders the matrix navigator.
 // This is the READ MODEL path for the show command.
-func ShowFromState(w io.Writer, baseDir string, logger *domain.Logger) error {
+func ShowFromState(w io.Writer, baseDir string, logger domain.Logger) error {
 	state, _, err := session.LoadLatestState(baseDir)
 	if err != nil {
 		logger.Info("Run 'sightjack scan' first.")

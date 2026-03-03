@@ -9,7 +9,7 @@ import (
 )
 
 // RunWaveApply executes a wave apply via Claude Code.
-func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, strictness string, out io.Writer, logger *domain.Logger) (*domain.WaveApplyResult, error) {
+func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, strictness string, out io.Writer, logger domain.Logger) (*domain.WaveApplyResult, error) {
 	return session.RunWaveApply(ctx, cfg, scanDir, wave, strictness, out, logger)
 }
 

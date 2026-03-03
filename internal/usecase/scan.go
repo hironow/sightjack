@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -12,16 +13,19 @@ import (
 )
 
 // RunScan validates the RunScanCommand, then delegates to session.RunScan.
-func RunScan(ctx context.Context, cmd domain.RunScanCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger *domain.Logger) (*domain.ScanResult, error) {
+// The sessionID is generated internally and returned for downstream use.
+func RunScan(ctx context.Context, cmd domain.RunScanCommand, cfg *domain.Config, baseDir string, dryRun bool, streamOut io.Writer, logger domain.Logger) (*domain.ScanResult, string, error) {
 	if errs := cmd.Validate(); len(errs) > 0 {
-		return nil, fmt.Errorf("command validation: %w", errs[0])
+		return nil, "", fmt.Errorf("command validation: %w", errs[0])
 	}
-	return session.RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, logger)
+	sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
+	result, err := session.RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, logger)
+	return result, sessionID, err
 }
 
-// RecordScanEvents caches the scan result and records session events.
-// This consolidates the post-scan orchestration that belongs in the usecase layer.
-func RecordScanEvents(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, logger *domain.Logger) {
+// RecordScanEvents caches the scan result and records session events via SessionAggregate.
+// The aggregate generates event content; the recorder handles metadata and persistence.
+func RecordScanEvents(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, logger domain.Logger) {
 	// Cache scan result for pipe replay
 	scanResultPath := filepath.Join(domain.ScanDir(baseDir, sessionID), "scan_result.json")
 	if err := session.WriteScanResult(scanResultPath, result); err != nil {
@@ -38,26 +42,41 @@ func RecordScanEvents(baseDir, sessionID string, result *domain.ScanResult, cfg 
 		})
 	}
 
-	// Record events for state reconstruction
+	// Record events via aggregate → recorder pipeline
 	store := session.NewEventStore(baseDir, sessionID)
 	recorder, recErr := session.NewSessionRecorder(store, sessionID)
 	if recErr != nil {
 		logger.Warn("session recorder: %v", recErr)
 		return
 	}
-	if err := recorder.Record(domain.EventSessionStarted, domain.SessionStartedPayload{
-		Project:         cfg.Linear.Project,
-		StrictnessLevel: string(cfg.Strictness.Default),
-	}); err != nil {
+
+	agg := domain.NewSessionAggregate()
+	now := time.Now()
+
+	// Aggregate generates event content (type + payload)
+	startEvt, err := agg.Start(cfg.Linear.Project, string(cfg.Strictness.Default), now) // nosemgrep: adr0003-otel-span-without-defer-end -- SessionAggregate.Start, not tracer.Start
+	if err != nil {
+		logger.Warn("aggregate start: %v", err)
+		return
+	}
+	// Recorder handles SessionID/CorrelationID/CausationID and persistence
+	if err := recorder.Record(startEvt.Type, startEvt.Data); err != nil {
 		logger.Warn("Failed to record session start: %v", err)
 	}
-	if err := recorder.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{
+
+	scanPayload := domain.ScanCompletedPayload{
 		Clusters:       clusters,
 		Completeness:   result.Completeness,
 		ShibitoCount:   len(result.ShibitoWarnings),
 		ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
-		LastScanned:    time.Now(),
-	}); err != nil {
+		LastScanned:    now,
+	}
+	scanEvt, err := agg.RecordScan(scanPayload, now)
+	if err != nil {
+		logger.Warn("aggregate scan: %v", err)
+		return
+	}
+	if err := recorder.Record(scanEvt.Type, scanEvt.Data); err != nil {
 		logger.Warn("Failed to record scan completed: %v", err)
 	} else {
 		logger.OK("Events saved to %s", session.EventStorePath(baseDir, sessionID))

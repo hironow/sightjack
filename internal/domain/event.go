@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,12 +9,6 @@ import (
 
 	"github.com/google/uuid"
 )
-
-// EventDispatcher dispatches domain events to policy handlers.
-// Implemented by usecase.PolicyEngine; injected into session via struct field.
-type EventDispatcher interface {
-	Dispatch(ctx context.Context, event Event) error
-}
 
 // EventApplier applies domain events to update materialized projections.
 type EventApplier interface {

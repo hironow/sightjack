@@ -59,9 +59,9 @@ func MergeScanResults(clusters []domain.ClusterScanResult, shibitoWarnings []dom
 // RunScan executes the full two-pass scan.
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
-func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger *domain.Logger) (*domain.ScanResult, error) {
+func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger domain.Logger) (*domain.ScanResult, error) {
 	if logger == nil {
-		logger = domain.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 	ctx, scanSpan := platform.Tracer.Start(ctx, "scan",
 		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
@@ -221,7 +221,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 // Failed clusters are skipped with warnings (partial success), matching the
 // fault-tolerance pattern of RunParallelDeepScan. Returns an error only when
 // ALL clusters fail.
-func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, clusters []domain.ClusterScanResult, dryRun bool, logger *domain.Logger) ([]domain.Wave, []string, map[string]bool, error) {
+func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, clusters []domain.ClusterScanResult, dryRun bool, logger domain.Logger) ([]domain.Wave, []string, map[string]bool, error) {
 	ctx, waveGenSpan := platform.Tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
@@ -260,7 +260,7 @@ func waveFileBase(index int, clusterName string) string {
 
 // savePromptAndCreateLog writes the prompt file and creates a log writer.
 // Returns the log writer and a cleanup function for the log file.
-func savePromptAndCreateLog(scanDir, base, prompt string, logger *domain.Logger) (io.Writer, func()) {
+func savePromptAndCreateLog(scanDir, base, prompt string, logger domain.Logger) (io.Writer, func()) {
 	if err := os.WriteFile(filepath.Join(scanDir, base+"_prompt.md"), []byte(prompt), 0644); err != nil {
 		logger.Warn("save prompt: %v", err)
 	}
@@ -284,7 +284,7 @@ func parseAndNormalizeWaveResult(path, clusterName string) (*domain.WaveGenerate
 }
 
 // generateWaveForCluster generates waves for a single cluster.
-func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult, dryRun bool, linearTools RunOption, logger *domain.Logger) (domain.WaveGenerateResult, error) {
+func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult, dryRun bool, linearTools RunOption, logger domain.Logger) (domain.WaveGenerateResult, error) {
 	base := waveFileBase(index, cluster.Name)
 	waveFile := filepath.Join(scanDir, base+".json")
 
@@ -338,7 +338,7 @@ type DeepScanFunc func(ctx context.Context, cfg *domain.Config, scanDir string, 
 // Delegates to RunParallel for pond-based parallel orchestration.
 // Failed clusters produce warnings and are skipped; successful results preserve order.
 func RunParallelDeepScan(ctx context.Context, cfg *domain.Config, scanDir string,
-	clusters []domain.ClusterScanResult, scanFn DeepScanFunc, logger *domain.Logger) ([]domain.ClusterScanResult, []string) {
+	clusters []domain.ClusterScanResult, scanFn DeepScanFunc, logger domain.Logger) ([]domain.ClusterScanResult, []string) {
 
 	return RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
 		func(ctx context.Context, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
@@ -359,7 +359,7 @@ func RunParallel[I, R any](
 	concurrency int,
 	work func(ctx context.Context, index int, item I) (R, error),
 	itemName func(I) string,
-	logger *domain.Logger,
+	logger domain.Logger,
 ) ([]R, []string) {
 	if len(items) == 0 {
 		return nil, nil

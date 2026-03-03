@@ -5,18 +5,19 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/port"
 )
 
 // LoggingRecorder wraps a Recorder and logs errors instead of propagating them.
 // This ensures callers never need to handle Record errors at every call site.
 type LoggingRecorder struct {
 	inner  domain.Recorder
-	logger *domain.Logger
+	logger domain.Logger
 }
 
 // NewLoggingRecorder creates a LoggingRecorder that wraps the given Recorder.
 // If inner is nil, NopRecorder is used to prevent panics.
-func NewLoggingRecorder(inner domain.Recorder, logger *domain.Logger) *LoggingRecorder {
+func NewLoggingRecorder(inner domain.Recorder, logger domain.Logger) *LoggingRecorder {
 	if inner == nil {
 		inner = domain.NopRecorder{}
 	}
@@ -35,13 +36,13 @@ func (r *LoggingRecorder) Record(eventType domain.EventType, payload any) error 
 // Record is delegated to inner first; then an Event is constructed and dispatched best-effort.
 type DispatchingRecorder struct {
 	inner      domain.Recorder
-	dispatcher domain.EventDispatcher
-	logger     *domain.Logger
+	dispatcher port.EventDispatcher
+	logger     domain.Logger
 }
 
 // NewDispatchingRecorder creates a DispatchingRecorder.
 // If dispatcher is nil, Record simply delegates to inner.
-func NewDispatchingRecorder(inner domain.Recorder, dispatcher domain.EventDispatcher, logger *domain.Logger) *DispatchingRecorder {
+func NewDispatchingRecorder(inner domain.Recorder, dispatcher port.EventDispatcher, logger domain.Logger) *DispatchingRecorder {
 	return &DispatchingRecorder{inner: inner, dispatcher: dispatcher, logger: logger}
 }
 

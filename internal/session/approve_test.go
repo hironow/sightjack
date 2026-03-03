@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestAutoApprover_AlwaysApproves(t *testing.T) {
 	// given
-	a := &domain.AutoApprover{}
+	a := &port.AutoApprover{}
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "deploy?")

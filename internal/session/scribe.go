@@ -153,7 +153,7 @@ func ClearScribeOutput(scanDir string, wave domain.Wave) {
 }
 
 // RunScribeADRDryRun saves the scribe prompt to a file instead of executing Claude.
-func RunScribeADRDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, logger *domain.Logger) error {
+func RunScribeADRDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, logger domain.Logger) error {
 	adrNum, err := NextADRNumber(adrDir)
 	if err != nil {
 		return fmt.Errorf("next adr number: %w", err)
@@ -193,7 +193,7 @@ func RunScribeADRDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, ar
 // NormalizeScribeResult ensures the parsed ADRID matches the filesystem-derived
 // adrID. Claude may return a mismatched or empty adr_id; the generated ID is
 // authoritative because it is used to name the ADR file on disk.
-func NormalizeScribeResult(result *domain.ScribeResponse, adrID string, logger *domain.Logger) {
+func NormalizeScribeResult(result *domain.ScribeResponse, adrID string, logger domain.Logger) {
 	if result.ADRID != adrID {
 		if result.ADRID != "" {
 			logger.Info("Scribe ADR ID mismatch: generated %s, parsed %s; using %s", adrID, result.ADRID, adrID)
@@ -216,7 +216,7 @@ func ParseScribeResult(path string) (*domain.ScribeResponse, error) {
 }
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
-func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, logger *domain.Logger) (*domain.ScribeResponse, error) {
+func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, logger domain.Logger) (*domain.ScribeResponse, error) {
 	ClearScribeOutput(scanDir, wave)
 
 	adrNum, err := NextADRNumber(adrDir)

@@ -61,7 +61,7 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 // CheckClaudeAuth verifies that Claude Code is authenticated by sending a
 // simple prompt that does not require any MCP server.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger *domain.Logger) domain.CheckResult {
+func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger domain.Logger) domain.CheckResult {
 	if cfg == nil {
 		return domain.CheckResult{
 			Name:    "Claude Auth",
@@ -98,7 +98,7 @@ func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger *domain.Log
 // CheckLinearMCP verifies Linear MCP connectivity by sending a prompt that
 // references the configured Linear team.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger *domain.Logger) domain.CheckResult {
+func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger domain.Logger) domain.CheckResult {
 	if cfg == nil {
 		return domain.CheckResult{
 			Name:    "Linear MCP",
@@ -189,9 +189,9 @@ func CheckSkills(baseDir string) domain.CheckResult {
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
 // baseDir is used to verify the .siren/ state directory is writable.
-func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *domain.Logger) []domain.CheckResult {
+func RunDoctor(ctx context.Context, configPath string, baseDir string, logger domain.Logger) []domain.CheckResult {
 	if logger == nil {
-		logger = domain.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 	var results []domain.CheckResult
 

@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -651,7 +653,7 @@ func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -702,7 +704,7 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -740,7 +742,7 @@ func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -767,7 +769,7 @@ func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -805,7 +807,7 @@ func TestMonitorInbox_StopsOnCancel(t *testing.T) {
 	session.EnsureMailDirs(dir)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -840,12 +842,12 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	feedback := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(feedback) != 1 {
 		t.Errorf("expected 1 drained, got %d", len(feedback))
 	}
@@ -855,7 +857,7 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 }
 
 func TestDrainInboxFeedback_NilChannel(t *testing.T) {
-	feedback := session.DrainInboxFeedback(nil, domain.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(nil, platform.NewLogger(io.Discard, false))
 	if feedback != nil {
 		t.Errorf("expected nil for nil channel, got %d items", len(feedback))
 	}
@@ -879,16 +881,16 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// Drain initial feedback
-	initial := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	initial := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// Start collector with initial feedback
-	collector := session.CollectFeedback(initial, ch, &domain.NopNotifier{}, domain.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// All() should return initial feedback
 	all := collector.All()
@@ -935,7 +937,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 		{Name: "fb-001", Kind: session.DMailFeedback, Description: "Item 1"},
 		{Name: "fb-002", Kind: session.DMailFeedback, Description: "Item 2"},
 	}
-	collector := session.CollectFeedback(initial, nil, &domain.NopNotifier{}, domain.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when: call All() multiple times
 	first := collector.All()
@@ -952,7 +954,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 
 func TestFeedbackCollector_NilChannel(t *testing.T) {
 	// given: nil channel
-	collector := session.CollectFeedback(nil, nil, &domain.NopNotifier{}, domain.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// then: All() returns nil
 	if all := collector.All(); all != nil {
@@ -963,7 +965,7 @@ func TestFeedbackCollector_NilChannel(t *testing.T) {
 func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
 	// given: nil initial but channel that will receive items
 	ch := make(chan *session.DMail, 1)
-	collector := session.CollectFeedback(nil, ch, &domain.NopNotifier{}, domain.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when: send one item
 	ch <- &session.DMail{Name: "fb-late", Kind: session.DMailFeedback, Description: "Late only"}
@@ -1046,7 +1048,7 @@ func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 		{Name: "conv-001", Kind: session.DMailConvergence, Description: "Convergence signal"},
 		{Name: "fb-002", Kind: session.DMailFeedback, Description: "Naming convention"},
 	}
-	c := session.CollectFeedback(initial, nil, &domain.NopNotifier{}, domain.NewLogger(io.Discard, false))
+	c := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when
 	feedbackOnly := c.FeedbackOnly()
@@ -1151,13 +1153,13 @@ func TestMonitorInbox_MultipleFeedbackInitialDrain(t *testing.T) {
 	defer cancel()
 
 	// when
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: all 3 drained
-	feedback := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(feedback) != 3 {
 		t.Errorf("expected 3 feedback, got %d", len(feedback))
 	}
@@ -1192,13 +1194,13 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 	defer cancel()
 
 	// when
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: 3 items come through channel (2 feedback + 1 report; spec excluded)
-	feedback := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(feedback) != 3 {
 		t.Fatalf("expected 3 items (2 feedback + 1 report), got %d", len(feedback))
 	}
@@ -1224,7 +1226,7 @@ func TestDrainInboxFeedback_MultipleFeedback(t *testing.T) {
 	ch <- &session.DMail{Name: "fb-3", Kind: session.DMailFeedback, Description: "third", Severity: "high"}
 
 	// when
-	feedback := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// then
 	if len(feedback) != 3 {
@@ -1242,7 +1244,7 @@ func TestDrainInboxFeedback_ClosedChannel(t *testing.T) {
 	close(ch)
 
 	// when
-	feedback := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// then: should drain the buffered item
 	if len(feedback) != 1 {
@@ -1258,7 +1260,7 @@ func TestDrainInboxFeedback_EmptyChannel(t *testing.T) {
 	ch := make(chan *session.DMail, 5)
 
 	// when
-	feedback := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// then: returns nil (no feedback)
 	if feedback != nil {
@@ -1768,7 +1770,7 @@ func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 	notifier := &testNotifier{onNotify: func(title, message string) {
 		notifyCalled.Store(true)
 	}}
-	collector := session.CollectFeedback(nil, ch, notifier, domain.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, ch, notifier, platform.NewLogger(io.Discard, false))
 
 	// when: convergence arrives
 	ch <- &session.DMail{Name: "conv-late-001", Kind: session.DMailConvergence, Description: "Late convergence"}
@@ -1800,7 +1802,7 @@ func TestCollectFeedback_MixedFeedbackAndConvergence(t *testing.T) {
 		{Name: "fb-init", Kind: session.DMailFeedback, Description: "initial"},
 	}
 	ch := make(chan *session.DMail, 1)
-	collector := session.CollectFeedback(initial, ch, &domain.NopNotifier{}, domain.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	ch <- &session.DMail{Name: "conv-mix-001", Kind: session.DMailConvergence, Description: "convergence"}
 	close(ch)
@@ -1837,7 +1839,7 @@ func TestCollectFeedback_HangingNotifierDoesNotBlockDrain(t *testing.T) {
 	hangingNotifier := &testNotifier{onNotify: func(title, message string) {
 		time.Sleep(10 * time.Second) // simulate hung notifier
 	}}
-	collector := session.CollectFeedback(nil, ch, hangingNotifier, domain.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, ch, hangingNotifier, platform.NewLogger(io.Discard, false))
 
 	// when: send convergence (triggers hanging notify) then feedback
 	ch <- &session.DMail{Name: "conv-hang", Kind: session.DMailConvergence, Description: "convergence"}
@@ -1877,7 +1879,7 @@ func TestMonitorInbox_DeliversConvergence(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -1917,13 +1919,13 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, domain.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: 2 d-mails delivered (feedback + convergence), spec excluded
-	drained := session.DrainInboxFeedback(ch, domain.NewLogger(io.Discard, false))
+	drained := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(drained) != 2 {
 		t.Fatalf("expected 2 (feedback + convergence), got %d", len(drained))
 	}

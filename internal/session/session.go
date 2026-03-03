@@ -16,9 +16,9 @@ import (
 )
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
-func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger) error {
 	if logger == nil {
-		logger = domain.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 	recorder = NewLoggingRecorder(recorder, logger)
 	if !dryRun && input == nil {
@@ -188,7 +188,7 @@ const (
 func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	scanResult *domain.ScanResult, cfg *domain.Config, available []domain.Wave, waves []domain.Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
-	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (domain.Wave, selectPhaseResult, bool) {
+	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, selectPhaseResult, bool) {
 
 	// Auto-select first available wave when --auto-approve is set.
 	if cfg.Gate.AutoApprove {
@@ -259,7 +259,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	waves []domain.Wave, completed map[string]bool,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
 	store domain.OutboxStore, recorder domain.Recorder,
-	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (domain.Wave, approvalPhaseResult) {
+	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	// Auto-approve when --auto-approve is set.
 	if cfg.Gate.AutoApprove {
@@ -423,7 +423,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger *domain.Logger) {
+	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
 
 	// --- Pass 4: Wave Apply ---
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
@@ -642,7 +642,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store domain.OutboxStore, recorder domain.Recorder, out io.Writer, logger *domain.Logger) error {
+	store domain.OutboxStore, recorder domain.Recorder, out io.Writer, logger domain.Logger) error {
 
 	ctx, loopSpan := platform.Tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
@@ -736,9 +736,9 @@ func ResumeScanDir(state *domain.SessionState, baseDir string) string {
 }
 
 // RunResumeSession resumes an existing session from saved state.
-func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger) error {
 	if logger == nil {
-		logger = domain.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
@@ -803,9 +803,9 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
-func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger) error {
 	if logger == nil {
-		logger = domain.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {

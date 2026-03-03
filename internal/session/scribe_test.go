@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -152,7 +153,7 @@ func TestRunScribeADRDryRun(t *testing.T) {
 	}
 
 	// when
-	err := session.RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog", domain.NewLogger(io.Discard, false))
+	err := session.RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog", platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -407,7 +408,7 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 	resp := &domain.ArchitectResponse{Analysis: "test", Reasoning: "test"}
 
 	// when
-	err := session.RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog", domain.NewLogger(io.Discard, false))
+	err := session.RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog", platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -428,7 +429,7 @@ func TestNormalizeScribeResult_MatchingID(t *testing.T) {
 	result := &domain.ScribeResponse{ADRID: "0003", Title: "test"}
 
 	// when
-	session.NormalizeScribeResult(result, "0003", domain.NewLogger(io.Discard, false))
+	session.NormalizeScribeResult(result, "0003", platform.NewLogger(io.Discard, false))
 
 	// then: no change
 	if result.ADRID != "0003" {
@@ -441,7 +442,7 @@ func TestNormalizeScribeResult_MismatchID(t *testing.T) {
 	result := &domain.ScribeResponse{ADRID: "9999", Title: "test"}
 
 	// when
-	session.NormalizeScribeResult(result, "0003", domain.NewLogger(io.Discard, false))
+	session.NormalizeScribeResult(result, "0003", platform.NewLogger(io.Discard, false))
 
 	// then: overwritten with authoritative ID
 	if result.ADRID != "0003" {
@@ -454,7 +455,7 @@ func TestNormalizeScribeResult_EmptyID(t *testing.T) {
 	result := &domain.ScribeResponse{ADRID: "", Title: "test"}
 
 	// when
-	session.NormalizeScribeResult(result, "0003", domain.NewLogger(io.Discard, false))
+	session.NormalizeScribeResult(result, "0003", platform.NewLogger(io.Discard, false))
 
 	// then: filled with authoritative ID
 	if result.ADRID != "0003" {
