@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -125,6 +127,25 @@ Pass --execute to actually remove the files.`,
 			if !execute {
 				fmt.Fprintln(errW, "(dry-run — pass --execute to delete)")
 				return nil
+			}
+
+			yes, _ := cmd.Flags().GetBool("yes")
+			totalFiles := len(files) + len(eventFiles)
+			if !yes {
+				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
+				scanner := bufio.NewScanner(cmd.InOrStdin())
+				if !scanner.Scan() {
+					if scanErr := scanner.Err(); scanErr != nil {
+						return fmt.Errorf("read confirmation: %w", scanErr)
+					}
+					fmt.Fprintln(errW, "Cancelled.")
+					return nil
+				}
+				answer := strings.TrimSpace(scanner.Text())
+				if answer != "y" && answer != "Y" {
+					fmt.Fprintln(errW, "Cancelled.")
+					return nil
+				}
 			}
 
 			if len(files) > 0 {
