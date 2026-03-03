@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -19,11 +18,11 @@ func ShowFromState(w io.Writer, baseDir string, logger *domain.Logger) error {
 		return fmt.Errorf("no previous scan found: %w", err)
 	}
 
-	result := &sightjack.ScanResult{
+	result := &domain.ScanResult{
 		Completeness: state.Completeness,
 	}
 	for _, c := range state.Clusters {
-		result.Clusters = append(result.Clusters, sightjack.ClusterScanResult{
+		result.Clusters = append(result.Clusters, domain.ClusterScanResult{
 			Name:         c.Name,
 			Completeness: c.Completeness,
 			IssueCount:   c.IssueCount,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -39,7 +39,7 @@ Output is written to stdout for redirection to docs/adr/.`,
 				return fmt.Errorf("no input on stdin. Pipe discuss result: sightjack discuss | sightjack adr")
 			}
 
-			var dr sightjack.DiscussResult
+			var dr domain.DiscussResult
 			if err := json.Unmarshal(data, &dr); err != nil {
 				return fmt.Errorf("invalid DiscussResult JSON: %w", err)
 			}

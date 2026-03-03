@@ -3,14 +3,13 @@ package session
 import (
 	"path/filepath"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 // stateDir converts a repo-root baseDir to the tool's state directory.
 func stateDir(baseDir string) string {
-	return filepath.Join(baseDir, sightjack.StateDir)
+	return filepath.Join(baseDir, domain.StateDir)
 }
 
 // NewEventStore creates an event store for the given session.
@@ -30,12 +29,12 @@ func EventStorePath(baseDir, sessionID string) string {
 }
 
 // LoadLatestState loads the most recent session state from event data.
-func LoadLatestState(baseDir string) (*sightjack.SessionState, string, error) {
+func LoadLatestState(baseDir string) (*domain.SessionState, string, error) {
 	return eventsource.LoadLatestState(stateDir(baseDir))
 }
 
 // LoadLatestResumableState loads the latest session state that matches the predicate.
-func LoadLatestResumableState(baseDir string, match func(*sightjack.SessionState) bool) (*sightjack.SessionState, string, error) {
+func LoadLatestResumableState(baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
 	return eventsource.LoadLatestResumableState(stateDir(baseDir), match)
 }
 

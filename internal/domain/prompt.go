@@ -1,4 +1,4 @@
-package sightjack
+package domain
 
 import (
 	"bytes"

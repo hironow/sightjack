@@ -3,14 +3,12 @@ package domain
 import (
 	"fmt"
 	"time"
-
-	sightjack "github.com/hironow/sightjack"
 )
 
 // WaveAggregate owns wave lifecycle state and produces events for state transitions.
 // It wraps domain/ pure functions with event emission.
 type WaveAggregate struct {
-	waves     []sightjack.Wave
+	waves     []Wave
 	completed map[string]bool // keyed by WaveKey (ClusterName:ID)
 }
 
@@ -22,12 +20,12 @@ func NewWaveAggregate() *WaveAggregate {
 }
 
 // SetWaves replaces the current wave list (used for hydration from projection).
-func (a *WaveAggregate) SetWaves(waves []sightjack.Wave) {
+func (a *WaveAggregate) SetWaves(waves []Wave) {
 	a.waves = waves
 }
 
 // Waves returns the current wave list.
-func (a *WaveAggregate) Waves() []sightjack.Wave {
+func (a *WaveAggregate) Waves() []Wave {
 	return a.waves
 }
 
@@ -52,13 +50,13 @@ func (a *WaveAggregate) IsCompleted(waveKey string) bool {
 }
 
 // findWave returns the wave matching the given ID and cluster.
-func (a *WaveAggregate) findWave(waveID, clusterName string) (sightjack.Wave, bool) {
+func (a *WaveAggregate) findWave(waveID, clusterName string) (Wave, bool) {
 	for _, w := range a.waves {
 		if w.ID == waveID && w.ClusterName == clusterName {
 			return w, true
 		}
 	}
-	return sightjack.Wave{}, false
+	return Wave{}, false
 }
 
 // Approve produces a wave_approved event.
@@ -135,7 +133,7 @@ func (a *WaveAggregate) EvaluateUnlocks(now time.Time) ([]Event, error) {
 }
 
 // AddNextGen produces a nextgen_waves_added event.
-func (a *WaveAggregate) AddNextGen(clusterName string, waves []sightjack.WaveState, now time.Time) (Event, error) {
+func (a *WaveAggregate) AddNextGen(clusterName string, waves []WaveState, now time.Time) (Event, error) {
 	return NewEvent(EventNextGenWavesAdded, NextGenWavesAddedPayload{
 		ClusterName: clusterName,
 		Waves:       waves,

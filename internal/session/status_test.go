@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -44,8 +43,8 @@ func TestStatus_WithMailDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	inboxDir := sightjack.MailDir(baseDir, sightjack.InboxDir)
-	archiveDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	inboxDir := domain.MailDir(baseDir, domain.InboxDir)
+	archiveDir := domain.MailDir(baseDir, domain.ArchiveDir)
 
 	// Create 2 inbox files
 	for _, name := range []string{"spec-w1.md", "report-w2.md"} {
@@ -117,7 +116,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	rejectedEvent.SessionID = sessionID
 
 	// Persist events — need to create event store directory first
-	eventsDir := filepath.Join(baseDir, sightjack.StateDir, "events", sessionID)
+	eventsDir := filepath.Join(baseDir, domain.StateDir, "events", sessionID)
 	if err := os.MkdirAll(eventsDir, 0755); err != nil {
 		t.Fatal(err)
 	}

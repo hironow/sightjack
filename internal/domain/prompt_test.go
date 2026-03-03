@@ -1,22 +1,22 @@
-package sightjack_test
+package domain_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestRenderClassifyPrompt(t *testing.T) {
 	// given
-	data := sightjack.ClassifyPromptData{
+	data := domain.ClassifyPromptData{
 		TeamFilter:    "MY-TEAM",
 		ProjectFilter: "My Project",
 		OutputPath:    "/tmp/classify.json",
 	}
 
 	// when
-	result, err := sightjack.RenderClassifyPrompt("ja", data)
+	result, err := domain.RenderClassifyPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -32,14 +32,14 @@ func TestRenderClassifyPrompt(t *testing.T) {
 
 func TestRenderDeepScanPrompt(t *testing.T) {
 	// given
-	data := sightjack.DeepScanPromptData{
+	data := domain.DeepScanPromptData{
 		ClusterName: "Auth",
 		IssueIDs:    "ID1, ID2, ID3",
 		OutputPath:  "/tmp/cluster_auth.json",
 	}
 
 	// when
-	result, err := sightjack.RenderDeepScanPrompt("ja", data)
+	result, err := domain.RenderDeepScanPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -55,7 +55,7 @@ func TestRenderDeepScanPrompt(t *testing.T) {
 
 func TestRenderWaveGeneratePrompt(t *testing.T) {
 	// given
-	data := sightjack.WaveGeneratePromptData{
+	data := domain.WaveGeneratePromptData{
 		ClusterName:  "Auth",
 		Completeness: "25",
 		Issues:       `[{"id":"ENG-101","title":"Login","completeness":0.3,"gaps":["No DoD"]}]`,
@@ -64,7 +64,7 @@ func TestRenderWaveGeneratePrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderWaveGeneratePrompt("ja", data)
+	result, err := domain.RenderWaveGeneratePrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -80,7 +80,7 @@ func TestRenderWaveGeneratePrompt(t *testing.T) {
 
 func TestRenderWaveGeneratePrompt_English(t *testing.T) {
 	// given
-	data := sightjack.WaveGeneratePromptData{
+	data := domain.WaveGeneratePromptData{
 		ClusterName:  "Auth",
 		Completeness: "25",
 		Issues:       `[{"id":"ENG-101","title":"Login"}]`,
@@ -89,7 +89,7 @@ func TestRenderWaveGeneratePrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderWaveGeneratePrompt("en", data)
+	result, err := domain.RenderWaveGeneratePrompt("en", data)
 
 	// then
 	if err != nil {
@@ -105,7 +105,7 @@ func TestRenderWaveGeneratePrompt_English(t *testing.T) {
 
 func TestRenderWaveApplyPrompt(t *testing.T) {
 	// given
-	data := sightjack.WaveApplyPromptData{
+	data := domain.WaveApplyPromptData{
 		WaveID:      "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
@@ -114,7 +114,7 @@ func TestRenderWaveApplyPrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderWaveApplyPrompt("ja", data)
+	result, err := domain.RenderWaveApplyPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -130,7 +130,7 @@ func TestRenderWaveApplyPrompt(t *testing.T) {
 
 func TestRenderWaveApplyPrompt_English(t *testing.T) {
 	// given
-	data := sightjack.WaveApplyPromptData{
+	data := domain.WaveApplyPromptData{
 		WaveID:      "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
@@ -139,7 +139,7 @@ func TestRenderWaveApplyPrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderWaveApplyPrompt("en", data)
+	result, err := domain.RenderWaveApplyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -155,7 +155,7 @@ func TestRenderWaveApplyPrompt_English(t *testing.T) {
 
 func TestRenderArchitectDiscussPrompt(t *testing.T) {
 	// given
-	data := sightjack.ArchitectDiscussPromptData{
+	data := domain.ArchitectDiscussPromptData{
 		ClusterName: "Auth",
 		WaveTitle:   "Dependency Ordering",
 		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101","description":"Auth before token"}]`,
@@ -164,7 +164,7 @@ func TestRenderArchitectDiscussPrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderArchitectDiscussPrompt("en", data)
+	result, err := domain.RenderArchitectDiscussPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -183,7 +183,7 @@ func TestRenderArchitectDiscussPrompt(t *testing.T) {
 
 func TestRenderArchitectDiscussPrompt_Japanese(t *testing.T) {
 	// given
-	data := sightjack.ArchitectDiscussPromptData{
+	data := domain.ArchitectDiscussPromptData{
 		ClusterName: "Auth",
 		WaveTitle:   "Dependency Ordering",
 		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101"}]`,
@@ -192,7 +192,7 @@ func TestRenderArchitectDiscussPrompt_Japanese(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderArchitectDiscussPrompt("ja", data)
+	result, err := domain.RenderArchitectDiscussPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -208,7 +208,7 @@ func TestRenderArchitectDiscussPrompt_Japanese(t *testing.T) {
 
 func TestRenderArchitectDiscussPrompt_UnsupportedLang(t *testing.T) {
 	// given: unsupported language code
-	data := sightjack.ArchitectDiscussPromptData{
+	data := domain.ArchitectDiscussPromptData{
 		ClusterName: "Auth",
 		WaveTitle:   "Test",
 		WaveActions: "[]",
@@ -217,7 +217,7 @@ func TestRenderArchitectDiscussPrompt_UnsupportedLang(t *testing.T) {
 	}
 
 	// when
-	_, err := sightjack.RenderArchitectDiscussPrompt("fr", data)
+	_, err := domain.RenderArchitectDiscussPrompt("fr", data)
 
 	// then
 	if err == nil {
@@ -227,7 +227,7 @@ func TestRenderArchitectDiscussPrompt_UnsupportedLang(t *testing.T) {
 
 func TestRenderArchitectDiscussPrompt_SpecialCharsInTopic(t *testing.T) {
 	// given: topic containing Go template delimiters — should pass through as data, not template syntax
-	data := sightjack.ArchitectDiscussPromptData{
+	data := domain.ArchitectDiscussPromptData{
 		ClusterName: "Auth",
 		WaveTitle:   "Test",
 		WaveActions: "[]",
@@ -236,7 +236,7 @@ func TestRenderArchitectDiscussPrompt_SpecialCharsInTopic(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderArchitectDiscussPrompt("en", data)
+	result, err := domain.RenderArchitectDiscussPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -249,7 +249,7 @@ func TestRenderArchitectDiscussPrompt_SpecialCharsInTopic(t *testing.T) {
 
 func TestRenderArchitectDiscussPrompt_EmptyWaveActions(t *testing.T) {
 	// given: empty string for WaveActions (not "[]" or "null")
-	data := sightjack.ArchitectDiscussPromptData{
+	data := domain.ArchitectDiscussPromptData{
 		ClusterName: "Auth",
 		WaveTitle:   "Test",
 		WaveActions: "",
@@ -258,7 +258,7 @@ func TestRenderArchitectDiscussPrompt_EmptyWaveActions(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderArchitectDiscussPrompt("en", data)
+	result, err := domain.RenderArchitectDiscussPrompt("en", data)
 
 	// then: renders successfully with empty section
 	if err != nil {
@@ -271,14 +271,14 @@ func TestRenderArchitectDiscussPrompt_EmptyWaveActions(t *testing.T) {
 
 func TestRenderClassifyPrompt_English(t *testing.T) {
 	// given
-	data := sightjack.ClassifyPromptData{
+	data := domain.ClassifyPromptData{
 		TeamFilter:    "TEST",
 		ProjectFilter: "Test",
 		OutputPath:    "/tmp/out.json",
 	}
 
 	// when
-	result, err := sightjack.RenderClassifyPrompt("en", data)
+	result, err := domain.RenderClassifyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -291,7 +291,7 @@ func TestRenderClassifyPrompt_English(t *testing.T) {
 
 func TestRenderScribeADRPrompt_English(t *testing.T) {
 	// given
-	data := sightjack.ScribeADRPromptData{
+	data := domain.ScribeADRPromptData{
 		ClusterName: "Auth",
 		WaveTitle:   "Dependency Ordering",
 		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101"}]`,
@@ -302,7 +302,7 @@ func TestRenderScribeADRPrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderScribeADRPrompt("en", data)
+	result, err := domain.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -324,7 +324,7 @@ func TestRenderScribeADRPrompt_English(t *testing.T) {
 
 func TestRenderScribeADRPrompt_Japanese(t *testing.T) {
 	// given
-	data := sightjack.ScribeADRPromptData{
+	data := domain.ScribeADRPromptData{
 		ClusterName: "Auth",
 		WaveTitle:   "Dependency Ordering",
 		WaveActions: `[{"type":"add_dependency","issue_id":"ENG-101"}]`,
@@ -335,7 +335,7 @@ func TestRenderScribeADRPrompt_Japanese(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderScribeADRPrompt("ja", data)
+	result, err := domain.RenderScribeADRPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -354,7 +354,7 @@ func TestRenderScribeADRPrompt_Japanese(t *testing.T) {
 
 func TestRenderClassifyPrompt_ContainsStrictnessLevel(t *testing.T) {
 	// given
-	data := sightjack.ClassifyPromptData{
+	data := domain.ClassifyPromptData{
 		TeamFilter:      "TEST",
 		ProjectFilter:   "Test",
 		OutputPath:      "/tmp/out.json",
@@ -362,7 +362,7 @@ func TestRenderClassifyPrompt_ContainsStrictnessLevel(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderClassifyPrompt("en", data)
+	result, err := domain.RenderClassifyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -375,7 +375,7 @@ func TestRenderClassifyPrompt_ContainsStrictnessLevel(t *testing.T) {
 
 func TestRenderWaveGeneratePrompt_ContainsStrictnessLevel(t *testing.T) {
 	// given
-	data := sightjack.WaveGeneratePromptData{
+	data := domain.WaveGeneratePromptData{
 		ClusterName:     "Auth",
 		Completeness:    "25",
 		Issues:          "[]",
@@ -385,7 +385,7 @@ func TestRenderWaveGeneratePrompt_ContainsStrictnessLevel(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderWaveGeneratePrompt("en", data)
+	result, err := domain.RenderWaveGeneratePrompt("en", data)
 
 	// then
 	if err != nil {
@@ -398,7 +398,7 @@ func TestRenderWaveGeneratePrompt_ContainsStrictnessLevel(t *testing.T) {
 
 func TestRenderScribeADRPrompt_ContainsStrictnessLevel(t *testing.T) {
 	// given
-	data := sightjack.ScribeADRPromptData{
+	data := domain.ScribeADRPromptData{
 		ClusterName:     "Auth",
 		WaveTitle:       "Test",
 		WaveActions:     "[]",
@@ -410,7 +410,7 @@ func TestRenderScribeADRPrompt_ContainsStrictnessLevel(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderScribeADRPrompt("en", data)
+	result, err := domain.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -423,7 +423,7 @@ func TestRenderScribeADRPrompt_ContainsStrictnessLevel(t *testing.T) {
 
 func TestRenderClassifyPrompt_ContainsShibitoSection(t *testing.T) {
 	// given
-	data := sightjack.ClassifyPromptData{
+	data := domain.ClassifyPromptData{
 		TeamFilter:      "TEST",
 		ProjectFilter:   "Test",
 		OutputPath:      "/tmp/out.json",
@@ -431,7 +431,7 @@ func TestRenderClassifyPrompt_ContainsShibitoSection(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderClassifyPrompt("en", data)
+	result, err := domain.RenderClassifyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -444,7 +444,7 @@ func TestRenderClassifyPrompt_ContainsShibitoSection(t *testing.T) {
 
 func TestRenderClassifyPrompt_Japanese_ContainsShibitoSection(t *testing.T) {
 	// given
-	data := sightjack.ClassifyPromptData{
+	data := domain.ClassifyPromptData{
 		TeamFilter:      "TEST",
 		ProjectFilter:   "Test",
 		OutputPath:      "/tmp/out.json",
@@ -452,7 +452,7 @@ func TestRenderClassifyPrompt_Japanese_ContainsShibitoSection(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderClassifyPrompt("ja", data)
+	result, err := domain.RenderClassifyPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -465,7 +465,7 @@ func TestRenderClassifyPrompt_Japanese_ContainsShibitoSection(t *testing.T) {
 
 func TestRenderScribeADRPrompt_ContainsExistingADRs(t *testing.T) {
 	// given
-	data := sightjack.ScribeADRPromptData{
+	data := domain.ScribeADRPromptData{
 		ClusterName:     "Auth",
 		WaveTitle:       "Test",
 		WaveActions:     "[]",
@@ -474,14 +474,14 @@ func TestRenderScribeADRPrompt_ContainsExistingADRs(t *testing.T) {
 		ADRNumber:       "0003",
 		OutputPath:      "/tmp/out.json",
 		StrictnessLevel: "alert",
-		ExistingADRs: []sightjack.ExistingADR{
+		ExistingADRs: []domain.ExistingADR{
 			{Filename: "0001-auth.md", Content: "# 0001. Auth\nAccepted"},
 			{Filename: "0002-api.md", Content: "# 0002. API\nAccepted"},
 		},
 	}
 
 	// when
-	result, err := sightjack.RenderScribeADRPrompt("en", data)
+	result, err := domain.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -500,7 +500,7 @@ func TestRenderScribeADRPrompt_ContainsExistingADRs(t *testing.T) {
 
 func TestRenderScribeADRPrompt_NoExistingADRs(t *testing.T) {
 	// given
-	data := sightjack.ScribeADRPromptData{
+	data := domain.ScribeADRPromptData{
 		ClusterName:     "Auth",
 		WaveTitle:       "Test",
 		WaveActions:     "[]",
@@ -512,7 +512,7 @@ func TestRenderScribeADRPrompt_NoExistingADRs(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderScribeADRPrompt("en", data)
+	result, err := domain.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -525,14 +525,14 @@ func TestRenderScribeADRPrompt_NoExistingADRs(t *testing.T) {
 
 func TestRenderScribeADRPrompt_UnsupportedLang(t *testing.T) {
 	// given
-	data := sightjack.ScribeADRPromptData{
+	data := domain.ScribeADRPromptData{
 		ClusterName: "Auth",
 		ADRNumber:   "0001",
 		OutputPath:  "/tmp/out.json",
 	}
 
 	// when
-	_, err := sightjack.RenderScribeADRPrompt("fr", data)
+	_, err := domain.RenderScribeADRPrompt("fr", data)
 
 	// then
 	if err == nil {
@@ -542,19 +542,19 @@ func TestRenderScribeADRPrompt_UnsupportedLang(t *testing.T) {
 
 func TestRenderNextGenPrompt_English(t *testing.T) {
 	// given
-	data := sightjack.NextGenPromptData{
+	data := domain.NextGenPromptData{
 		ClusterName:     "Auth",
 		Completeness:    "65",
 		Issues:          `[{"id":"ENG-101"}]`,
 		CompletedWaves:  `[{"id":"auth-w1","title":"Initial setup"}]`,
-		ExistingADRs:    []sightjack.ExistingADR{{Filename: "0001-jwt.md", Content: "# JWT decision"}},
+		ExistingADRs:    []domain.ExistingADR{{Filename: "0001-jwt.md", Content: "# JWT decision"}},
 		RejectedActions: `[{"type":"add_dod","issue_id":"ENG-102","description":"Rejected action"}]`,
 		OutputPath:      "/tmp/nextgen.json",
 		StrictnessLevel: "alert",
 	}
 
 	// when
-	result, err := sightjack.RenderNextGenPrompt("en", data)
+	result, err := domain.RenderNextGenPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -569,7 +569,7 @@ func TestRenderNextGenPrompt_English(t *testing.T) {
 
 func TestRenderNextGenPrompt_Japanese(t *testing.T) {
 	// given
-	data := sightjack.NextGenPromptData{
+	data := domain.NextGenPromptData{
 		ClusterName:     "API",
 		Completeness:    "50",
 		Issues:          `[]`,
@@ -579,7 +579,7 @@ func TestRenderNextGenPrompt_Japanese(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderNextGenPrompt("ja", data)
+	result, err := domain.RenderNextGenPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -592,7 +592,7 @@ func TestRenderNextGenPrompt_Japanese(t *testing.T) {
 
 func TestRenderNextGenPrompt_NoADRs(t *testing.T) {
 	// given
-	data := sightjack.NextGenPromptData{
+	data := domain.NextGenPromptData{
 		ClusterName:     "DB",
 		Completeness:    "40",
 		Issues:          `[]`,
@@ -602,7 +602,7 @@ func TestRenderNextGenPrompt_NoADRs(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderNextGenPrompt("en", data)
+	result, err := domain.RenderNextGenPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -615,7 +615,7 @@ func TestRenderNextGenPrompt_NoADRs(t *testing.T) {
 
 func TestRenderNextGenPrompt_NoRejectedActions(t *testing.T) {
 	// given
-	data := sightjack.NextGenPromptData{
+	data := domain.NextGenPromptData{
 		ClusterName:     "DB",
 		Completeness:    "40",
 		Issues:          `[]`,
@@ -625,7 +625,7 @@ func TestRenderNextGenPrompt_NoRejectedActions(t *testing.T) {
 	}
 
 	// when
-	result, err := sightjack.RenderNextGenPrompt("en", data)
+	result, err := domain.RenderNextGenPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -637,7 +637,7 @@ func TestRenderNextGenPrompt_NoRejectedActions(t *testing.T) {
 }
 
 func TestMatchDoDTemplate(t *testing.T) {
-	templates := map[string]sightjack.DoDTemplate{
+	templates := map[string]domain.DoDTemplate{
 		"auth":  {Must: []string{"auth must"}, Should: []string{"auth should"}},
 		"infra": {Must: []string{"infra must"}},
 	}
@@ -653,7 +653,7 @@ func TestMatchDoDTemplate(t *testing.T) {
 		{"frontend", false, ""},
 	}
 	for _, tt := range tests {
-		matched, key := sightjack.MatchDoDTemplate(templates, tt.clusterName)
+		matched, key := domain.MatchDoDTemplate(templates, tt.clusterName)
 		if matched != tt.wantMatch {
 			t.Errorf("MatchDoDTemplate(%q): matched=%v, want %v", tt.clusterName, matched, tt.wantMatch)
 		}
@@ -665,13 +665,13 @@ func TestMatchDoDTemplate(t *testing.T) {
 
 func TestMatchDoDTemplate_CaseTieBreaker(t *testing.T) {
 	// given: keys that differ only by case -> same length after lowering
-	templates := map[string]sightjack.DoDTemplate{
+	templates := map[string]domain.DoDTemplate{
 		"Auth": {Must: []string{"upper"}},
 		"auth": {Must: []string{"lower"}},
 	}
 
 	// when: both match "authentication" with equal length prefix
-	matched, key := sightjack.MatchDoDTemplate(templates, "authentication")
+	matched, key := domain.MatchDoDTemplate(templates, "authentication")
 
 	// then: "Auth" < "auth" in ASCII, so "Auth" wins the original-key tie-breaker
 	if !matched {
@@ -683,7 +683,7 @@ func TestMatchDoDTemplate_CaseTieBreaker(t *testing.T) {
 
 	// Verify determinism across multiple calls (map iteration order varies)
 	for i := range 50 {
-		_, k := sightjack.MatchDoDTemplate(templates, "authentication")
+		_, k := domain.MatchDoDTemplate(templates, "authentication")
 		if k != key {
 			t.Fatalf("non-deterministic on iteration %d: got %q, want %q", i, k, key)
 		}
@@ -692,13 +692,13 @@ func TestMatchDoDTemplate_CaseTieBreaker(t *testing.T) {
 
 func TestMatchDoDTemplate_LongestPrefixWins(t *testing.T) {
 	// given: "a" and "auth" both match "authentication"
-	templates := map[string]sightjack.DoDTemplate{
+	templates := map[string]domain.DoDTemplate{
 		"a":    {Must: []string{"short"}},
 		"auth": {Must: []string{"long"}},
 	}
 
 	// when
-	matched, key := sightjack.MatchDoDTemplate(templates, "authentication")
+	matched, key := domain.MatchDoDTemplate(templates, "authentication")
 
 	// then: longest prefix wins
 	if !matched {
@@ -710,11 +710,11 @@ func TestMatchDoDTemplate_LongestPrefixWins(t *testing.T) {
 }
 
 func TestFormatDoDSection(t *testing.T) {
-	tmpl := sightjack.DoDTemplate{
+	tmpl := domain.DoDTemplate{
 		Must:   []string{"Unit tests", "Error handling"},
 		Should: []string{"Integration tests"},
 	}
-	section := sightjack.FormatDoDSection(tmpl)
+	section := domain.FormatDoDSection(tmpl)
 	if !strings.Contains(section, "Unit tests") {
 		t.Error("expected Must items in section")
 	}
@@ -724,7 +724,7 @@ func TestFormatDoDSection(t *testing.T) {
 }
 
 func TestFormatDoDSectionEmpty(t *testing.T) {
-	section := sightjack.FormatDoDSection(sightjack.DoDTemplate{})
+	section := domain.FormatDoDSection(domain.DoDTemplate{})
 	if section != "" {
 		t.Errorf("expected empty section for empty template, got %q", section)
 	}
@@ -732,7 +732,7 @@ func TestFormatDoDSectionEmpty(t *testing.T) {
 
 func TestRenderWaveGeneratePromptWithDoD(t *testing.T) {
 	// given
-	data := sightjack.WaveGeneratePromptData{
+	data := domain.WaveGeneratePromptData{
 		ClusterName:     "auth",
 		Completeness:    "50",
 		Issues:          "[]",
@@ -744,7 +744,7 @@ func TestRenderWaveGeneratePromptWithDoD(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderWaveGeneratePrompt(lang, data)
+		result, err := domain.RenderWaveGeneratePrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
 		}
@@ -756,7 +756,7 @@ func TestRenderWaveGeneratePromptWithDoD(t *testing.T) {
 
 func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
 	// given
-	data := sightjack.WaveGeneratePromptData{
+	data := domain.WaveGeneratePromptData{
 		ClusterName:     "auth",
 		Completeness:    "50",
 		Issues:          "[]",
@@ -768,7 +768,7 @@ func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderWaveGeneratePrompt(lang, data)
+		result, err := domain.RenderWaveGeneratePrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
 		}
@@ -779,7 +779,7 @@ func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
 }
 
 func TestRenderClassifyPromptWithLabels(t *testing.T) {
-	data := sightjack.ClassifyPromptData{
+	data := domain.ClassifyPromptData{
 		TeamFilter:      "test",
 		ProjectFilter:   "test",
 		OutputPath:      "/tmp/out.json",
@@ -788,7 +788,7 @@ func TestRenderClassifyPromptWithLabels(t *testing.T) {
 		LabelPrefix:     "sightjack",
 	}
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderClassifyPrompt(lang, data)
+		result, err := domain.RenderClassifyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -799,7 +799,7 @@ func TestRenderClassifyPromptWithLabels(t *testing.T) {
 }
 
 func TestRenderClassifyPromptWithoutLabels(t *testing.T) {
-	data := sightjack.ClassifyPromptData{
+	data := domain.ClassifyPromptData{
 		TeamFilter:      "test",
 		ProjectFilter:   "test",
 		OutputPath:      "/tmp/out.json",
@@ -807,7 +807,7 @@ func TestRenderClassifyPromptWithoutLabels(t *testing.T) {
 		LabelsEnabled:   false,
 	}
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderClassifyPrompt(lang, data)
+		result, err := domain.RenderClassifyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -818,7 +818,7 @@ func TestRenderClassifyPromptWithoutLabels(t *testing.T) {
 }
 
 func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
-	data := sightjack.WaveApplyPromptData{
+	data := domain.WaveApplyPromptData{
 		WaveID:          "w1",
 		ClusterName:     "auth",
 		Title:           "Wave 1",
@@ -829,7 +829,7 @@ func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
 		LabelPrefix:     "sightjack",
 	}
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderWaveApplyPrompt(lang, data)
+		result, err := domain.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -842,7 +842,7 @@ func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
 func TestRenderWaveApplyPromptNoReadySection(t *testing.T) {
 	// given: wave_apply should NEVER contain ready-label instructions
 	// (ready labels are applied in a separate step after apply success)
-	data := sightjack.WaveApplyPromptData{
+	data := domain.WaveApplyPromptData{
 		WaveID:          "w1",
 		ClusterName:     "auth",
 		Title:           "Wave 1",
@@ -855,7 +855,7 @@ func TestRenderWaveApplyPromptNoReadySection(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderWaveApplyPrompt(lang, data)
+		result, err := domain.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -867,7 +867,7 @@ func TestRenderWaveApplyPromptNoReadySection(t *testing.T) {
 
 func TestRenderWaveApplyPrompt_WithDoDSection(t *testing.T) {
 	// given: wave apply prompt with DoD section
-	data := sightjack.WaveApplyPromptData{
+	data := domain.WaveApplyPromptData{
 		WaveID:          "auth-w1",
 		ClusterName:     "Auth",
 		Title:           "Dependency Ordering",
@@ -879,7 +879,7 @@ func TestRenderWaveApplyPrompt_WithDoDSection(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderWaveApplyPrompt(lang, data)
+		result, err := domain.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -894,7 +894,7 @@ func TestRenderWaveApplyPrompt_WithDoDSection(t *testing.T) {
 
 func TestRenderWaveApplyPrompt_WithoutDoDSection(t *testing.T) {
 	// given: wave apply prompt without DoD section
-	data := sightjack.WaveApplyPromptData{
+	data := domain.WaveApplyPromptData{
 		WaveID:          "auth-w1",
 		ClusterName:     "Auth",
 		Title:           "Dependency Ordering",
@@ -906,7 +906,7 @@ func TestRenderWaveApplyPrompt_WithoutDoDSection(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderWaveApplyPrompt(lang, data)
+		result, err := domain.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -918,14 +918,14 @@ func TestRenderWaveApplyPrompt_WithoutDoDSection(t *testing.T) {
 
 func TestRenderReadyLabelPrompt(t *testing.T) {
 	// given
-	data := sightjack.ReadyLabelPromptData{
+	data := domain.ReadyLabelPromptData{
 		ReadyLabel:    "sightjack:ready",
 		ReadyIssueIDs: "AUTH-1, AUTH-2",
 	}
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderReadyLabelPrompt(lang, data)
+		result, err := domain.RenderReadyLabelPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -940,13 +940,13 @@ func TestRenderReadyLabelPrompt(t *testing.T) {
 
 func TestRenderReadyLabelPrompt_UnsupportedLang(t *testing.T) {
 	// given
-	data := sightjack.ReadyLabelPromptData{
+	data := domain.ReadyLabelPromptData{
 		ReadyLabel:    "sightjack:ready",
 		ReadyIssueIDs: "AUTH-1",
 	}
 
 	// when
-	_, err := sightjack.RenderReadyLabelPrompt("fr", data)
+	_, err := domain.RenderReadyLabelPrompt("fr", data)
 
 	// then
 	if err == nil {
@@ -956,7 +956,7 @@ func TestRenderReadyLabelPrompt_UnsupportedLang(t *testing.T) {
 
 func TestRenderNextGenPromptWithDoD(t *testing.T) {
 	// given
-	data := sightjack.NextGenPromptData{
+	data := domain.NextGenPromptData{
 		ClusterName:     "auth",
 		Completeness:    "70",
 		Issues:          "[]",
@@ -968,7 +968,7 @@ func TestRenderNextGenPromptWithDoD(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderNextGenPrompt(lang, data)
+		result, err := domain.RenderNextGenPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
 		}
@@ -980,7 +980,7 @@ func TestRenderNextGenPromptWithDoD(t *testing.T) {
 
 func TestRenderNextGenPrompt_WithFeedback(t *testing.T) {
 	// given
-	data := sightjack.NextGenPromptData{
+	data := domain.NextGenPromptData{
 		ClusterName:     "Auth",
 		Completeness:    "60",
 		Issues:          `[]`,
@@ -992,7 +992,7 @@ func TestRenderNextGenPrompt_WithFeedback(t *testing.T) {
 
 	// when / then: both languages should render feedback
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderNextGenPrompt(lang, data)
+		result, err := domain.RenderNextGenPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
 		}
@@ -1010,7 +1010,7 @@ func TestRenderNextGenPrompt_WithFeedback(t *testing.T) {
 
 func TestRenderNextGenPrompt_NoFeedback(t *testing.T) {
 	// given: no feedback
-	data := sightjack.NextGenPromptData{
+	data := domain.NextGenPromptData{
 		ClusterName:     "DB",
 		Completeness:    "40",
 		Issues:          `[]`,
@@ -1021,7 +1021,7 @@ func TestRenderNextGenPrompt_NoFeedback(t *testing.T) {
 
 	// when
 	for _, lang := range []string{"en", "ja"} {
-		result, err := sightjack.RenderNextGenPrompt(lang, data)
+		result, err := domain.RenderNextGenPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
 		}

@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestCleanCmd_NothingToClean(t *testing.T) {
 	// given: empty directory with no .siren/
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, sightjack.StateDir)
+	stateDir := filepath.Join(dir, domain.StateDir)
 
 	cmd := NewRootCommand()
 	buf := new(bytes.Buffer)
@@ -36,7 +36,7 @@ func TestCleanCmd_NothingToClean(t *testing.T) {
 func TestCleanCmd_DeletesStateDir(t *testing.T) {
 	// given: .siren/ directory with config
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, sightjack.StateDir)
+	stateDir := filepath.Join(dir, domain.StateDir)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		t.Fatalf("create state dir: %v", err)
 	}

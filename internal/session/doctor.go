@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -93,7 +92,7 @@ func CheckTool(ctx context.Context, name string) CheckResult {
 // CheckClaudeAuth verifies that Claude Code is authenticated by sending a
 // simple prompt that does not require any MCP server.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func CheckClaudeAuth(ctx context.Context, cfg *sightjack.Config, logger *domain.Logger) CheckResult {
+func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger *domain.Logger) CheckResult {
 	if cfg == nil {
 		return CheckResult{
 			Name:    "Claude Auth",
@@ -130,7 +129,7 @@ func CheckClaudeAuth(ctx context.Context, cfg *sightjack.Config, logger *domain.
 // CheckLinearMCP verifies Linear MCP connectivity by sending a prompt that
 // references the configured Linear team.
 // Returns CheckSkip if cfg is nil (config loading failed).
-func CheckLinearMCP(ctx context.Context, cfg *sightjack.Config, logger *domain.Logger) CheckResult {
+func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger *domain.Logger) CheckResult {
 	if cfg == nil {
 		return CheckResult{
 			Name:    "Linear MCP",
@@ -160,7 +159,7 @@ func CheckLinearMCP(ctx context.Context, cfg *sightjack.Config, logger *domain.L
 // CheckStateDir verifies that the .siren/ state directory exists or can be
 // created, and that it is writable. Uses a temporary file probe to confirm.
 func CheckStateDir(baseDir string) CheckResult {
-	dir := filepath.Join(baseDir, sightjack.StateDir)
+	dir := filepath.Join(baseDir, domain.StateDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return CheckResult{
 			Name:    "State Dir",
@@ -188,7 +187,7 @@ func CheckStateDir(baseDir string) CheckResult {
 // and that their frontmatter contains a dmail-schema-version field.
 func CheckSkills(baseDir string) CheckResult {
 	skillNames := []string{"dmail-sendable", "dmail-readable"}
-	skillsDir := filepath.Join(baseDir, sightjack.StateDir, "skills")
+	skillsDir := filepath.Join(baseDir, domain.StateDir, "skills")
 
 	for _, name := range skillNames {
 		path := filepath.Join(skillsDir, name, "SKILL.md")
@@ -234,7 +233,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *d
 	// 2. State directory check
 	results = append(results, CheckStateDir(baseDir))
 
-	var cfg *sightjack.Config
+	var cfg *domain.Config
 	if cfgResult.Status == CheckOK {
 		// Re-load to use for subsequent checks (checkConfig already validated).
 		cfg, _ = LoadConfig(configPath)

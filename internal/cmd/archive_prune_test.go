@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestArchivePruneCmd_TextOutput_StdoutClean(t *testing.T) {
 	// given — expired event file exists
 	dir := t.TempDir()
-	eventsDir := filepath.Join(dir, sightjack.StateDir, "events")
+	eventsDir := filepath.Join(dir, domain.StateDir, "events")
 	os.MkdirAll(eventsDir, 0o755)
 
 	oldFile := filepath.Join(eventsDir, "old-session")
@@ -49,7 +49,7 @@ func TestArchivePruneCmd_TextOutput_StdoutClean(t *testing.T) {
 func TestArchivePruneCmd_JSONOutput_DryRun(t *testing.T) {
 	// given — expired event file exists
 	dir := t.TempDir()
-	eventsDir := filepath.Join(dir, sightjack.StateDir, "events")
+	eventsDir := filepath.Join(dir, domain.StateDir, "events")
 	os.MkdirAll(eventsDir, 0o755)
 
 	oldFile := filepath.Join(eventsDir, "old-session")
@@ -95,7 +95,7 @@ func TestArchivePruneCmd_JSONOutput_DryRun(t *testing.T) {
 func TestArchivePruneCmd_JSONOutput_Execute(t *testing.T) {
 	// given — expired event file exists
 	dir := t.TempDir()
-	eventsDir := filepath.Join(dir, sightjack.StateDir, "events")
+	eventsDir := filepath.Join(dir, domain.StateDir, "events")
 	os.MkdirAll(eventsDir, 0o755)
 
 	oldFile := filepath.Join(eventsDir, "old-session")

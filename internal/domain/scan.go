@@ -2,8 +2,6 @@ package domain
 
 import (
 	"strings"
-
-	sightjack "github.com/hironow/sightjack"
 )
 
 // SanitizeName converts a cluster name to a safe filename component.
@@ -25,7 +23,7 @@ func SanitizeName(name string) string {
 // and returns names where at least one instance failed wave generation.
 // With duplicate cluster names, a name is marked failed if fewer instances
 // succeeded than existed in the input.
-func DetectFailedClusterNames(clusters []sightjack.ClusterScanResult, successes []sightjack.WaveGenerateResult) map[string]bool {
+func DetectFailedClusterNames(clusters []ClusterScanResult, successes []WaveGenerateResult) map[string]bool {
 	inputCount := make(map[string]int, len(clusters))
 	for _, c := range clusters {
 		inputCount[c.Name]++
@@ -64,8 +62,8 @@ func ChunkSlice(items []string, size int) [][]string {
 
 // MergeClusterChunks combines multiple chunk results from the same cluster
 // into a single ClusterScanResult, recalculating completeness from individual issues.
-func MergeClusterChunks(name string, chunks []sightjack.ClusterScanResult) sightjack.ClusterScanResult {
-	merged := sightjack.ClusterScanResult{Name: name}
+func MergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResult {
+	merged := ClusterScanResult{Name: name}
 	for _, c := range chunks {
 		merged.Issues = append(merged.Issues, c.Issues...)
 		merged.Observations = append(merged.Observations, c.Observations...)

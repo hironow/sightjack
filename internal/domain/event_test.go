@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -292,7 +291,7 @@ func TestPayload_SessionStarted_RoundTrip(t *testing.T) {
 func TestPayload_ScanCompleted_RoundTrip(t *testing.T) {
 	// given
 	payload := domain.ScanCompletedPayload{
-		Clusters: []sightjack.ClusterState{
+		Clusters: []domain.ClusterState{
 			{Name: "Auth", Completeness: 0.5, IssueCount: 3},
 		},
 		Completeness:   0.5,
@@ -321,7 +320,7 @@ func TestPayload_ScanCompleted_RoundTrip(t *testing.T) {
 func TestPayload_WavesGenerated_RoundTrip(t *testing.T) {
 	// given
 	payload := domain.WavesGeneratedPayload{
-		Waves: []sightjack.WaveState{
+		Waves: []domain.WaveState{
 			{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available", ActionCount: 2},
 		},
 	}
@@ -388,7 +387,7 @@ func TestPayload_CompletenessUpdated_RoundTrip(t *testing.T) {
 func TestPayload_NextGenWavesAdded_RoundTrip(t *testing.T) {
 	payload := domain.NextGenWavesAddedPayload{
 		ClusterName: "Auth",
-		Waves: []sightjack.WaveState{
+		Waves: []domain.WaveState{
 			{ID: "w2", ClusterName: "Auth", Title: "Second", Status: "available"},
 		},
 	}
@@ -406,7 +405,7 @@ func TestPayload_WaveModified_RoundTrip(t *testing.T) {
 	payload := domain.WaveModifiedPayload{
 		WaveID:      "w1",
 		ClusterName: "Auth",
-		UpdatedWave: sightjack.WaveState{
+		UpdatedWave: domain.WaveState{
 			ID: "w1", ClusterName: "Auth", Title: "Modified", Status: "available",
 		},
 	}

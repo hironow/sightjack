@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -37,7 +36,7 @@ func TestListExpiredArchive_FiltersByMtime(t *testing.T) {
 	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	archDir := domain.MailDir(baseDir, domain.ArchiveDir)
 
 	// Create old file (40 days ago)
 	oldFile := filepath.Join(archDir, "report-old-w1.md")
@@ -80,7 +79,7 @@ func TestListExpiredArchive_OnlyMdFiles(t *testing.T) {
 	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	archDir := domain.MailDir(baseDir, domain.ArchiveDir)
 
 	// Create old .md file
 	mdFile := filepath.Join(archDir, "feedback-001.md")
@@ -138,7 +137,7 @@ func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	ad := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	ad := domain.MailDir(baseDir, domain.ArchiveDir)
 
 	oldFile := filepath.Join(ad, "report-old-w1.md")
 	if err := os.WriteFile(oldFile, []byte("old"), 0644); err != nil {
@@ -229,7 +228,7 @@ func TestDeleteArchiveFiles_DeletesSpecifiedFiles(t *testing.T) {
 	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	archDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	archDir := domain.MailDir(baseDir, domain.ArchiveDir)
 
 	f1 := filepath.Join(archDir, "report-old-w1.md")
 	if err := os.WriteFile(f1, []byte("old"), 0644); err != nil {

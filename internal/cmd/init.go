@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -60,7 +60,7 @@ func initProject(baseDir, team, project, lang, strictness string, w io.Writer) e
 		strictness = "fog"
 	}
 
-	cfgPath := sightjack.ConfigPath(baseDir)
+	cfgPath := domain.ConfigPath(baseDir)
 	if _, err := os.Stat(cfgPath); err == nil {
 		return fmt.Errorf(".siren/config.yaml already exists in %s", baseDir)
 	}
@@ -70,14 +70,14 @@ func initProject(baseDir, team, project, lang, strictness string, w io.Writer) e
 		return fmt.Errorf("create .siren dir: %w", err)
 	}
 
-	content := sightjack.RenderInitConfig(team, project, lang, strictness)
+	content := domain.RenderInitConfig(team, project, lang, strictness)
 	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 
 	_ = session.WriteGitIgnore(baseDir)
 
-	if err := session.InstallSkills(baseDir, sightjack.SkillsFS); err != nil {
+	if err := session.InstallSkills(baseDir, domain.SkillsFS); err != nil {
 		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -46,8 +45,8 @@ func TestProjectState_SessionStarted(t *testing.T) {
 	state := domain.ProjectState(events)
 
 	// then
-	if state.Version != sightjack.StateFormatVersion {
-		t.Errorf("Version = %q, want %q", state.Version, sightjack.StateFormatVersion)
+	if state.Version != domain.StateFormatVersion {
+		t.Errorf("Version = %q, want %q", state.Version, domain.StateFormatVersion)
 	}
 	if state.SessionID != "sess-1" {
 		t.Errorf("SessionID = %q, want %q", state.SessionID, "sess-1")
@@ -66,7 +65,7 @@ func TestProjectState_ScanCompleted(t *testing.T) {
 	events := []domain.Event{
 		mustEvent(t, domain.EventScanCompleted, "sess-1", 2,
 			domain.ScanCompletedPayload{
-				Clusters:     []sightjack.ClusterState{{Name: "auth", Completeness: 0.6}},
+				Clusters:     []domain.ClusterState{{Name: "auth", Completeness: 0.6}},
 				Completeness: 0.6,
 				ShibitoCount: 2,
 			}),
@@ -93,12 +92,12 @@ func TestProjectState_ScanCompleted(t *testing.T) {
 func TestProjectState_WavesGenerated_Idempotent(t *testing.T) {
 	t.Parallel()
 	// given — same wave in two events (duplicate replay)
-	wave := sightjack.WaveState{ID: "w1", ClusterName: "auth", Status: "available"}
+	wave := domain.WaveState{ID: "w1", ClusterName: "auth", Status: "available"}
 	events := []domain.Event{
 		mustEvent(t, domain.EventWavesGenerated, "sess-1", 3,
-			domain.WavesGeneratedPayload{Waves: []sightjack.WaveState{wave}}),
+			domain.WavesGeneratedPayload{Waves: []domain.WaveState{wave}}),
 		mustEvent(t, domain.EventWavesGenerated, "sess-1", 4,
-			domain.WavesGeneratedPayload{Waves: []sightjack.WaveState{wave}}),
+			domain.WavesGeneratedPayload{Waves: []domain.WaveState{wave}}),
 	}
 
 	// when
@@ -115,7 +114,7 @@ func TestProjectState_WaveCompleted(t *testing.T) {
 	// given
 	events := []domain.Event{
 		mustEvent(t, domain.EventWavesGenerated, "sess-1", 1,
-			domain.WavesGeneratedPayload{Waves: []sightjack.WaveState{
+			domain.WavesGeneratedPayload{Waves: []domain.WaveState{
 				{ID: "w1", ClusterName: "auth", Status: "available"},
 			}}),
 		mustEvent(t, domain.EventWaveCompleted, "sess-1", 2,
@@ -137,7 +136,7 @@ func TestProjectState_CompletenessUpdated(t *testing.T) {
 	events := []domain.Event{
 		mustEvent(t, domain.EventScanCompleted, "sess-1", 1,
 			domain.ScanCompletedPayload{
-				Clusters:     []sightjack.ClusterState{{Name: "auth", Completeness: 0.5}},
+				Clusters:     []domain.ClusterState{{Name: "auth", Completeness: 0.5}},
 				Completeness: 0.5,
 			}),
 		mustEvent(t, domain.EventCompletenessUpdated, "sess-1", 2,
@@ -165,7 +164,7 @@ func TestProjectState_WavesUnlocked(t *testing.T) {
 	// given
 	events := []domain.Event{
 		mustEvent(t, domain.EventWavesGenerated, "sess-1", 1,
-			domain.WavesGeneratedPayload{Waves: []sightjack.WaveState{
+			domain.WavesGeneratedPayload{Waves: []domain.WaveState{
 				{ID: "w1", ClusterName: "auth", Status: "locked"},
 				{ID: "w2", ClusterName: "auth", Status: "available"},
 			}}),
@@ -191,13 +190,13 @@ func TestProjectState_NextGenWavesAdded(t *testing.T) {
 	// given
 	events := []domain.Event{
 		mustEvent(t, domain.EventWavesGenerated, "sess-1", 1,
-			domain.WavesGeneratedPayload{Waves: []sightjack.WaveState{
+			domain.WavesGeneratedPayload{Waves: []domain.WaveState{
 				{ID: "w1", ClusterName: "auth", Status: "available"},
 			}}),
 		mustEvent(t, domain.EventNextGenWavesAdded, "sess-1", 2,
 			domain.NextGenWavesAddedPayload{
 				ClusterName: "auth",
-				Waves: []sightjack.WaveState{
+				Waves: []domain.WaveState{
 					{ID: "w2", ClusterName: "auth", Status: "locked"},
 				},
 			}),
@@ -220,14 +219,14 @@ func TestProjectState_WaveModified(t *testing.T) {
 	// given
 	events := []domain.Event{
 		mustEvent(t, domain.EventWavesGenerated, "sess-1", 1,
-			domain.WavesGeneratedPayload{Waves: []sightjack.WaveState{
+			domain.WavesGeneratedPayload{Waves: []domain.WaveState{
 				{ID: "w1", ClusterName: "auth", Title: "Original", Status: "available"},
 			}}),
 		mustEvent(t, domain.EventWaveModified, "sess-1", 2,
 			domain.WaveModifiedPayload{
 				WaveID:      "w1",
 				ClusterName: "auth",
-				UpdatedWave: sightjack.WaveState{ID: "w1", ClusterName: "auth", Title: "Modified", Status: "available"},
+				UpdatedWave: domain.WaveState{ID: "w1", ClusterName: "auth", Title: "Modified", Status: "available"},
 			}),
 	}
 
@@ -309,12 +308,12 @@ func TestProjectState_FullLifecycle(t *testing.T) {
 			domain.SessionStartedPayload{Project: "myapp", StrictnessLevel: "standard"}),
 		mustEvent(t, domain.EventScanCompleted, "sess-1", 2,
 			domain.ScanCompletedPayload{
-				Clusters:     []sightjack.ClusterState{{Name: "auth", Completeness: 0.4}},
+				Clusters:     []domain.ClusterState{{Name: "auth", Completeness: 0.4}},
 				Completeness: 0.4,
 				ShibitoCount: 1,
 			}),
 		mustEvent(t, domain.EventWavesGenerated, "sess-1", 3,
-			domain.WavesGeneratedPayload{Waves: []sightjack.WaveState{
+			domain.WavesGeneratedPayload{Waves: []domain.WaveState{
 				{ID: "w1", ClusterName: "auth", Status: "available"},
 				{ID: "w2", ClusterName: "auth", Status: "locked"},
 			}}),

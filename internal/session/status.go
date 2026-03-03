@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -26,10 +25,10 @@ func Status(baseDir string) StatusReport {
 	var report StatusReport
 
 	// Count inbox files
-	report.InboxCount = countDirFiles(sightjack.MailDir(baseDir, sightjack.InboxDir))
+	report.InboxCount = countDirFiles(domain.MailDir(baseDir, domain.InboxDir))
 
 	// Count archive files
-	report.ArchiveCount = countDirFiles(sightjack.MailDir(baseDir, sightjack.ArchiveDir))
+	report.ArchiveCount = countDirFiles(domain.MailDir(baseDir, domain.ArchiveDir))
 
 	// Load all events across sessions for wave stats
 	allEvents, err := LoadAllEvents(baseDir)

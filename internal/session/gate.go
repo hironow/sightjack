@@ -7,12 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // FilterConvergence returns convergence-kind D-Mails from the slice.
@@ -114,7 +112,7 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 
 // BuildNotifier creates the appropriate Notifier based on config.
 // If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
-func BuildNotifier(cfg *sightjack.Config) domain.Notifier {
+func BuildNotifier(cfg *domain.Config) domain.Notifier {
 	if cfg.Gate.NotifyCmd != "" {
 		return NewCmdNotifier(cfg.Gate.NotifyCmd)
 	}
@@ -123,7 +121,7 @@ func BuildNotifier(cfg *sightjack.Config) domain.Notifier {
 
 // BuildApprover creates the appropriate Approver based on config.
 // Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(cfg *sightjack.Config, input io.Reader, out io.Writer) domain.Approver {
+func BuildApprover(cfg *domain.Config, input io.Reader, out io.Writer) domain.Approver {
 	if cfg.Gate.AutoApprove {
 		return &domain.AutoApprover{}
 	}

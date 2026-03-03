@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -85,7 +85,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	}
 
 	// then: archive file exists with correct content
-	archivePath := filepath.Join(sightjack.MailDir(dir, sightjack.ArchiveDir), "test-mail.md")
+	archivePath := filepath.Join(domain.MailDir(dir, domain.ArchiveDir), "test-mail.md")
 	data, err := os.ReadFile(archivePath)
 	if err != nil {
 		t.Fatalf("read archive: %v", err)
@@ -95,7 +95,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	}
 
 	// then: outbox file exists with correct content
-	outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), "test-mail.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "test-mail.md")
 	data, err = os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -131,7 +131,7 @@ func TestSQLiteOutboxStore_StageIdempotent(t *testing.T) {
 	}
 
 	// then: content is the first version (INSERT OR IGNORE)
-	outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), "dup.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "dup.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -183,7 +183,7 @@ func TestSQLiteOutboxStore_FlushOnlyUnflushed(t *testing.T) {
 
 	// then: both files exist
 	for _, name := range []string{"first.md", "second.md"} {
-		outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), name)
+		outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), name)
 		if _, err := os.Stat(outboxPath); err != nil {
 			t.Errorf("outbox %s missing: %v", name, err)
 		}
@@ -201,9 +201,9 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	storeA, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -269,8 +269,8 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	for _, prefix := range []string{"a", "b"} {
 		for i := range itemsPerStore {
 			name := fmt.Sprintf("%s-%03d.md", prefix, i)
-			for _, sub := range []string{sightjack.ArchiveDir, sightjack.OutboxDir} {
-				p := filepath.Join(sightjack.MailDir(dir, sub), name)
+			for _, sub := range []string{domain.ArchiveDir, domain.OutboxDir} {
+				p := filepath.Join(domain.MailDir(dir, sub), name)
 				data, readErr := os.ReadFile(p)
 				if readErr != nil {
 					t.Errorf("%s/%s missing: %v", sub, name, readErr)
@@ -294,9 +294,9 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	storeSetup, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -350,7 +350,7 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	}
 
 	// then: file exists with correct content
-	outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), "shared.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "shared.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -375,7 +375,7 @@ func TestSQLiteOutboxStore_FilePermission(t *testing.T) {
 	defer store.Close()
 
 	// when
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
 	info, err := os.Stat(dbPath)
 	if err != nil {
 		t.Fatalf("stat db: %v", err)
@@ -393,9 +393,9 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -440,9 +440,9 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -490,9 +490,9 @@ func TestSQLiteOutboxStore_RetryCount_MixedItems(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -552,8 +552,8 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 
 	// then: all files exist in both dirs
 	for _, name := range []string{"a.md", "b.md", "c.md"} {
-		for _, sub := range []string{sightjack.ArchiveDir, sightjack.OutboxDir} {
-			p := filepath.Join(sightjack.MailDir(dir, sub), name)
+		for _, sub := range []string{domain.ArchiveDir, domain.OutboxDir} {
+			p := filepath.Join(domain.MailDir(dir, sub), name)
 			if _, err := os.Stat(p); err != nil {
 				t.Errorf("%s/%s missing: %v", sub, name, err)
 			}

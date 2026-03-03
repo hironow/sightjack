@@ -1,11 +1,11 @@
-package sightjack_test
+package domain_test
 
 import (
 	"encoding/json"
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -20,7 +20,7 @@ func TestClassifyResult_UnmarshalJSON(t *testing.T) {
 	}`
 
 	// when
-	var result sightjack.ClassifyResult
+	var result domain.ClassifyResult
 	err := json.Unmarshal([]byte(raw), &result)
 
 	// then
@@ -59,7 +59,7 @@ func TestClusterScanResult_UnmarshalJSON(t *testing.T) {
 	}`
 
 	// when
-	var result sightjack.ClusterScanResult
+	var result domain.ClusterScanResult
 	err := json.Unmarshal([]byte(raw), &result)
 
 	// then
@@ -96,7 +96,7 @@ func TestWave_UnmarshalJSON(t *testing.T) {
 		"delta": {"before": 0.25, "after": 0.40},
 		"status": "available"
 	}`
-	var w sightjack.Wave
+	var w domain.Wave
 	if err := json.Unmarshal([]byte(data), &w); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestWaveGenerateResult_UnmarshalJSON(t *testing.T) {
 			{"id": "auth-w2", "cluster_name": "Auth", "title": "W2", "actions": [], "prerequisites": ["auth-w1"], "delta": {"before": 0.40, "after": 0.65}, "status": "locked"}
 		]
 	}`
-	var result sightjack.WaveGenerateResult
+	var result domain.WaveGenerateResult
 	if err := json.Unmarshal([]byte(data), &result); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestWaveApplyResult_UnmarshalJSON(t *testing.T) {
 			{"cluster_name": "API", "description": "W2 unlocked"}
 		]
 	}`
-	var result sightjack.WaveApplyResult
+	var result domain.WaveApplyResult
 	if err := json.Unmarshal([]byte(data), &result); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestArchitectResponse_UnmarshalJSON(t *testing.T) {
 		"reasoning": "Project scale favors fewer issues"
 	}`
 
-	var resp sightjack.ArchitectResponse
+	var resp domain.ArchitectResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestArchitectResponse_NilModifiedWave(t *testing.T) {
 		"reasoning": "Current actions are sufficient"
 	}`
 
-	var resp sightjack.ArchitectResponse
+	var resp domain.ArchitectResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -220,10 +220,10 @@ func TestArchitectResponse_NilModifiedWave(t *testing.T) {
 
 func TestScanResult_CalculateCompleteness(t *testing.T) {
 	// given
-	result := sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
-			{Name: "Auth", Completeness: 0.25, Issues: make([]sightjack.IssueDetail, 5)},
-			{Name: "API", Completeness: 0.40, Issues: make([]sightjack.IssueDetail, 5)},
+	result := domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25, Issues: make([]domain.IssueDetail, 5)},
+			{Name: "API", Completeness: 0.40, Issues: make([]domain.IssueDetail, 5)},
 		},
 	}
 
@@ -248,7 +248,7 @@ func TestArchitectResponse_MissingAnalysis(t *testing.T) {
 	}`
 
 	// when
-	var resp sightjack.ArchitectResponse
+	var resp domain.ArchitectResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestArchitectResponse_ModifiedWaveEmptyActions(t *testing.T) {
 	}`
 
 	// when
-	var resp sightjack.ArchitectResponse
+	var resp domain.ArchitectResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestArchitectResponse_ModifiedWaveEmptyActions(t *testing.T) {
 
 func TestScribeResponse_JSONRoundTrip(t *testing.T) {
 	// given
-	original := sightjack.ScribeResponse{
+	original := domain.ScribeResponse{
 		ADRID:     "0003",
 		Title:     "adopt-event-sourcing",
 		Content:   "# 0003. Adopt Event Sourcing\n\n**Date:** 2026-02-18\n**Status:** Accepted",
@@ -307,7 +307,7 @@ func TestScribeResponse_JSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.ScribeResponse
+	var decoded domain.ScribeResponse
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -330,17 +330,17 @@ func TestScribeResponse_JSONRoundTrip(t *testing.T) {
 func TestParseStrictnessLevel_ValidValues(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected sightjack.StrictnessLevel
+		expected domain.StrictnessLevel
 	}{
-		{"fog", sightjack.StrictnessFog},
-		{"alert", sightjack.StrictnessAlert},
-		{"lockdown", sightjack.StrictnessLockdown},
-		{"FOG", sightjack.StrictnessFog},
-		{"Alert", sightjack.StrictnessAlert},
+		{"fog", domain.StrictnessFog},
+		{"alert", domain.StrictnessAlert},
+		{"lockdown", domain.StrictnessLockdown},
+		{"FOG", domain.StrictnessFog},
+		{"Alert", domain.StrictnessAlert},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			level, err := sightjack.ParseStrictnessLevel(tt.input)
+			level, err := domain.ParseStrictnessLevel(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -352,15 +352,15 @@ func TestParseStrictnessLevel_ValidValues(t *testing.T) {
 }
 
 func TestParseStrictnessLevel_Invalid(t *testing.T) {
-	_, err := sightjack.ParseStrictnessLevel("nightmare")
+	_, err := domain.ParseStrictnessLevel("nightmare")
 	if err == nil {
 		t.Fatal("expected error for invalid strictness level")
 	}
 }
 
 func TestStrictnessLevel_Valid(t *testing.T) {
-	valid := sightjack.StrictnessFog
-	invalid := sightjack.StrictnessLevel("nightmare")
+	valid := domain.StrictnessFog
+	invalid := domain.StrictnessLevel("nightmare")
 	if !valid.Valid() {
 		t.Error("expected fog to be valid")
 	}
@@ -371,7 +371,7 @@ func TestStrictnessLevel_Valid(t *testing.T) {
 
 func TestShibitoWarning_JSONRoundTrip(t *testing.T) {
 	// given
-	original := sightjack.ShibitoWarning{
+	original := domain.ShibitoWarning{
 		ClosedIssueID:  "ENG-045",
 		CurrentIssueID: "ENG-102",
 		Description:    "Token management circular dependency re-emerging",
@@ -383,7 +383,7 @@ func TestShibitoWarning_JSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.ShibitoWarning
+	var decoded domain.ShibitoWarning
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -399,8 +399,8 @@ func TestShibitoWarning_JSONRoundTrip(t *testing.T) {
 
 func TestScanResult_MarshalJSON_SnakeCaseKeys(t *testing.T) {
 	// given
-	result := sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
+	result := domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
 			{Name: "Auth", Completeness: 0.25},
 		},
 		TotalIssues:  5,
@@ -442,7 +442,7 @@ func TestScanResult_UnmarshalJSON_SnakeCaseKeys(t *testing.T) {
 	}`
 
 	// when
-	var result sightjack.ScanResult
+	var result domain.ScanResult
 	err := json.Unmarshal([]byte(raw), &result)
 
 	// then
@@ -468,16 +468,16 @@ func TestScanResult_UnmarshalJSON_SnakeCaseKeys(t *testing.T) {
 
 func TestScanResult_JSONRoundTrip(t *testing.T) {
 	// given
-	original := sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
-			{Name: "Auth", Completeness: 0.25, Issues: []sightjack.IssueDetail{
+	original := domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
+			{Name: "Auth", Completeness: 0.25, Issues: []domain.IssueDetail{
 				{ID: "abc", Identifier: "ENG-1", Title: "Login", Completeness: 0.3, Gaps: []string{"DoD"}},
 			}, Observations: []string{"obs1"}, Labels: []string{"security"}},
 		},
 		TotalIssues:     1,
 		Completeness:    0.25,
 		Observations:    []string{"global"},
-		ShibitoWarnings: []sightjack.ShibitoWarning{{ClosedIssueID: "X", CurrentIssueID: "Y", Description: "reborn", RiskLevel: "high"}},
+		ShibitoWarnings: []domain.ShibitoWarning{{ClosedIssueID: "X", CurrentIssueID: "Y", Description: "reborn", RiskLevel: "high"}},
 		ScanWarnings:    []string{"warn"},
 	}
 
@@ -486,7 +486,7 @@ func TestScanResult_JSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.ScanResult
+	var decoded domain.ScanResult
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -524,7 +524,7 @@ func TestScanResult_UnmarshalJSON_ForwardCompatible(t *testing.T) {
 	}`
 
 	// when
-	var result sightjack.ScanResult
+	var result domain.ScanResult
 	err := json.Unmarshal([]byte(raw), &result)
 
 	// then: should not error on unknown fields
@@ -535,7 +535,7 @@ func TestScanResult_UnmarshalJSON_ForwardCompatible(t *testing.T) {
 
 func TestScanResult_ShibitoWarnings_OmittedWhenEmpty(t *testing.T) {
 	// given
-	result := sightjack.ScanResult{Completeness: 0.5}
+	result := domain.ScanResult{Completeness: 0.5}
 
 	// when
 	data, err := json.Marshal(result)
@@ -551,7 +551,7 @@ func TestScanResult_ShibitoWarnings_OmittedWhenEmpty(t *testing.T) {
 
 func TestADRConflict_JSONRoundTrip(t *testing.T) {
 	// given
-	original := sightjack.ADRConflict{
+	original := domain.ADRConflict{
 		ExistingADRID: "0002",
 		Description:   "Contradicts ADR-0002 decision on session storage",
 	}
@@ -561,7 +561,7 @@ func TestADRConflict_JSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.ADRConflict
+	var decoded domain.ADRConflict
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -577,7 +577,7 @@ func TestADRConflict_JSONRoundTrip(t *testing.T) {
 
 func TestScribeResponse_Conflicts_OmittedWhenEmpty(t *testing.T) {
 	// given
-	resp := sightjack.ScribeResponse{ADRID: "0001", Title: "test"}
+	resp := domain.ScribeResponse{ADRID: "0001", Title: "test"}
 
 	// when
 	data, err := json.Marshal(resp)
@@ -593,10 +593,10 @@ func TestScribeResponse_Conflicts_OmittedWhenEmpty(t *testing.T) {
 
 func TestScribeResponse_Conflicts_Present(t *testing.T) {
 	// given
-	resp := sightjack.ScribeResponse{
+	resp := domain.ScribeResponse{
 		ADRID: "0003",
 		Title: "test",
-		Conflicts: []sightjack.ADRConflict{
+		Conflicts: []domain.ADRConflict{
 			{ExistingADRID: "0001", Description: "contradicts auth decision"},
 		},
 	}
@@ -606,7 +606,7 @@ func TestScribeResponse_Conflicts_Present(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.ScribeResponse
+	var decoded domain.ScribeResponse
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -623,7 +623,7 @@ func TestScribeResponse_Conflicts_Present(t *testing.T) {
 func TestNextGenResult_UnmarshalJSON(t *testing.T) {
 	raw := `{"cluster_name":"Auth","waves":[{"id":"auth-w3","cluster_name":"Auth","title":"Security hardening","description":"Final security pass","actions":[{"type":"add_dod","issue_id":"ENG-101","description":"Add security checklist","detail":"..."}],"prerequisites":["auth-w2"],"delta":{"before":0.65,"after":0.80},"status":"available"}],"reasoning":"Auth cluster needs final security pass"}`
 
-	var result sightjack.NextGenResult
+	var result domain.NextGenResult
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -639,8 +639,8 @@ func TestNextGenResult_UnmarshalJSON(t *testing.T) {
 }
 
 func TestApprovalSelective_IsDistinctValue(t *testing.T) {
-	choices := []sightjack.ApprovalChoice{sightjack.ApprovalApprove, sightjack.ApprovalReject, sightjack.ApprovalDiscuss, sightjack.ApprovalQuit, sightjack.ApprovalSelective}
-	seen := make(map[sightjack.ApprovalChoice]bool)
+	choices := []domain.ApprovalChoice{domain.ApprovalApprove, domain.ApprovalReject, domain.ApprovalDiscuss, domain.ApprovalQuit, domain.ApprovalSelective}
+	seen := make(map[domain.ApprovalChoice]bool)
 	for _, c := range choices {
 		if seen[c] {
 			t.Errorf("duplicate ApprovalChoice value: %d", c)
@@ -657,7 +657,7 @@ func TestWaveApplyResultTotalCount(t *testing.T) {
 	data := `{"wave_id":"w1","applied":3,"total_count":5,"errors":["e1"]}`
 
 	// when
-	var result sightjack.WaveApplyResult
+	var result domain.WaveApplyResult
 	if err := json.Unmarshal([]byte(data), &result); err != nil {
 		t.Fatal(err)
 	}
@@ -670,8 +670,8 @@ func TestWaveApplyResultTotalCount(t *testing.T) {
 
 func TestScanResult_StrictnessKeys(t *testing.T) {
 	// given: scan result with labeled clusters
-	result := &sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
+	result := &domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
 			{Name: "Auth", Labels: []string{"security", "backend"}},
 			{Name: "UI", Labels: []string{"frontend"}},
 		},
@@ -695,9 +695,9 @@ func TestScanResult_StrictnessKeys(t *testing.T) {
 
 func TestClusterScanResult_NumIssues_FromSlice(t *testing.T) {
 	// given: cluster with populated Issues slice
-	c := sightjack.ClusterScanResult{
+	c := domain.ClusterScanResult{
 		Name:   "Auth",
-		Issues: make([]sightjack.IssueDetail, 5),
+		Issues: make([]domain.IssueDetail, 5),
 	}
 
 	// when/then
@@ -708,7 +708,7 @@ func TestClusterScanResult_NumIssues_FromSlice(t *testing.T) {
 
 func TestClusterScanResult_NumIssues_FromIssueCount(t *testing.T) {
 	// given: cluster with IssueCount but no Issues slice (show command case)
-	c := sightjack.ClusterScanResult{
+	c := domain.ClusterScanResult{
 		Name:       "Auth",
 		IssueCount: 8,
 	}
@@ -721,9 +721,9 @@ func TestClusterScanResult_NumIssues_FromIssueCount(t *testing.T) {
 
 func TestClusterScanResult_NumIssues_SliceTakesPrecedence(t *testing.T) {
 	// given: both Issues and IssueCount set — slice wins
-	c := sightjack.ClusterScanResult{
+	c := domain.ClusterScanResult{
 		Name:       "Auth",
-		Issues:     make([]sightjack.IssueDetail, 3),
+		Issues:     make([]domain.IssueDetail, 3),
 		IssueCount: 10,
 	}
 
@@ -735,8 +735,8 @@ func TestClusterScanResult_NumIssues_SliceTakesPrecedence(t *testing.T) {
 
 func TestScanResult_ClusterLabels_NilWhenNoLabels(t *testing.T) {
 	// given: cluster without labels
-	result := &sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
+	result := &domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
 			{Name: "Auth"},
 		},
 	}
@@ -753,7 +753,7 @@ func TestScribeResponse_ZeroValues(t *testing.T) {
 	data := `{"adr_id":"","title":"","content":"","reasoning":""}`
 
 	// when
-	var resp sightjack.ScribeResponse
+	var resp domain.ScribeResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -793,7 +793,7 @@ func TestWavePlan_JSONRoundTrip(t *testing.T) {
 	}`
 
 	// when
-	var plan sightjack.WavePlan
+	var plan domain.WavePlan
 	if err := json.Unmarshal([]byte(raw), &plan); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -817,7 +817,7 @@ func TestWavePlan_JSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.WavePlan
+	var decoded domain.WavePlan
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("re-unmarshal: %v", err)
 	}
@@ -831,10 +831,10 @@ func TestDetectPipeType_ScanResultWithClusters(t *testing.T) {
 	data := []byte(`{"clusters":[{"name":"Auth","completeness":0.5,"issues":[],"observations":[]}],"total_issues":1,"completeness":0.5,"observations":[]}`)
 
 	// when
-	got := sightjack.DetectPipeType(data)
+	got := domain.DetectPipeType(data)
 
 	// then
-	if got != sightjack.PipeTypeScanResult {
+	if got != domain.PipeTypeScanResult {
 		t.Errorf("expected PipeTypeScanResult, got %d", got)
 	}
 }
@@ -844,10 +844,10 @@ func TestDetectPipeType_ScanResultWithEmptyClusters(t *testing.T) {
 	data := []byte(`{"clusters":[],"total_issues":0,"completeness":0.0,"observations":[]}`)
 
 	// when
-	got := sightjack.DetectPipeType(data)
+	got := domain.DetectPipeType(data)
 
 	// then
-	if got != sightjack.PipeTypeScanResult {
+	if got != domain.PipeTypeScanResult {
 		t.Errorf("expected PipeTypeScanResult for empty clusters, got %d", got)
 	}
 }
@@ -857,10 +857,10 @@ func TestDetectPipeType_WavePlan(t *testing.T) {
 	data := []byte(`{"waves":[{"id":"w1","cluster_name":"Auth","title":"T","description":"D","actions":[],"prerequisites":[],"delta":{"before":0.2,"after":0.5},"status":"available"}]}`)
 
 	// when
-	got := sightjack.DetectPipeType(data)
+	got := domain.DetectPipeType(data)
 
 	// then
-	if got != sightjack.PipeTypeWavePlan {
+	if got != domain.PipeTypeWavePlan {
 		t.Errorf("expected PipeTypeWavePlan, got %d", got)
 	}
 }
@@ -870,10 +870,10 @@ func TestDetectPipeType_InvalidJSON(t *testing.T) {
 	data := []byte(`{bad json`)
 
 	// when
-	got := sightjack.DetectPipeType(data)
+	got := domain.DetectPipeType(data)
 
 	// then
-	if got != sightjack.PipeTypeUnknown {
+	if got != domain.PipeTypeUnknown {
 		t.Errorf("expected PipeTypeUnknown for invalid JSON, got %d", got)
 	}
 }
@@ -883,16 +883,16 @@ func TestDetectPipeType_NoDiscriminatingKeys(t *testing.T) {
 	data := []byte(`{"some_field":"value"}`)
 
 	// when
-	got := sightjack.DetectPipeType(data)
+	got := domain.DetectPipeType(data)
 
 	// then
-	if got != sightjack.PipeTypeUnknown {
+	if got != domain.PipeTypeUnknown {
 		t.Errorf("expected PipeTypeUnknown when no discriminating keys, got %d", got)
 	}
 }
 
 func TestWavePlan_ScanResultOmittedWhenNil(t *testing.T) {
-	plan := sightjack.WavePlan{Waves: []sightjack.Wave{{ID: "w1", ClusterName: "X", Title: "T"}}}
+	plan := domain.WavePlan{Waves: []domain.Wave{{ID: "w1", ClusterName: "X", Title: "T"}}}
 	data, err := json.Marshal(plan)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -922,7 +922,7 @@ func TestWave_ClusterContext(t *testing.T) {
 	}`
 
 	// when
-	var w sightjack.Wave
+	var w domain.Wave
 	if err := json.Unmarshal([]byte(raw), &w); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -940,7 +940,7 @@ func TestWave_ClusterContext(t *testing.T) {
 }
 
 func TestWave_ClusterContext_OmittedWhenNil(t *testing.T) {
-	w := sightjack.Wave{ID: "w1", ClusterName: "X", Title: "T"}
+	w := domain.Wave{ID: "w1", ClusterName: "X", Title: "T"}
 	data, err := json.Marshal(w)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -965,7 +965,7 @@ func TestDiscussResult_JSONRoundTrip(t *testing.T) {
 	}`
 
 	// when
-	var dr sightjack.DiscussResult
+	var dr domain.DiscussResult
 	if err := json.Unmarshal([]byte(raw), &dr); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -992,7 +992,7 @@ func TestDiscussResult_JSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.DiscussResult
+	var decoded domain.DiscussResult
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("re-unmarshal: %v", err)
 	}
@@ -1002,7 +1002,7 @@ func TestDiscussResult_JSONRoundTrip(t *testing.T) {
 }
 
 func TestDiscussResult_ModificationsOmittedWhenEmpty(t *testing.T) {
-	dr := sightjack.DiscussResult{WaveID: "w1", Analysis: "ok", Decision: "noop"}
+	dr := domain.DiscussResult{WaveID: "w1", Analysis: "ok", Decision: "noop"}
 	data, err := json.Marshal(dr)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -1026,7 +1026,7 @@ func TestApplyResult_JSONRoundTrip(t *testing.T) {
 	}`
 
 	// when
-	var ar sightjack.ApplyResult
+	var ar domain.ApplyResult
 	if err := json.Unmarshal([]byte(raw), &ar); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -1053,7 +1053,7 @@ func TestApplyResult_JSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.ApplyResult
+	var decoded domain.ApplyResult
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("re-unmarshal: %v", err)
 	}
@@ -1071,7 +1071,7 @@ func TestApplyResult_ActionWithError(t *testing.T) {
 		"new_completeness": 0.30
 	}`
 
-	var ar sightjack.ApplyResult
+	var ar domain.ApplyResult
 	if err := json.Unmarshal([]byte(raw), &ar); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -1084,7 +1084,7 @@ func TestApplyResult_ActionWithError(t *testing.T) {
 }
 
 func TestApplyResult_RippleEffectsOmittedWhenEmpty(t *testing.T) {
-	ar := sightjack.ApplyResult{WaveID: "w1", NewCompleteness: 0.5}
+	ar := domain.ApplyResult{WaveID: "w1", NewCompleteness: 0.5}
 	data, err := json.Marshal(ar)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -1096,8 +1096,8 @@ func TestApplyResult_RippleEffectsOmittedWhenEmpty(t *testing.T) {
 
 func TestToDiscussResult_Basic(t *testing.T) {
 	// given
-	wave := sightjack.Wave{ID: "w1", ClusterName: "Auth", Title: "Setup JWT"}
-	resp := &sightjack.ArchitectResponse{
+	wave := domain.Wave{ID: "w1", ClusterName: "Auth", Title: "Setup JWT"}
+	resp := &domain.ArchitectResponse{
 		Analysis:  "JWT has trade-offs in complexity",
 		Reasoning: "Session-based auth is simpler",
 	}
@@ -1123,21 +1123,21 @@ func TestToDiscussResult_Basic(t *testing.T) {
 
 func TestToDiscussResult_WithModifiedWave(t *testing.T) {
 	// given
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID: "w1", ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
 			{Type: "add_dod", IssueID: "ENG-102", Description: "unchanged"},
 		},
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID: "w1", ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "updated with Redis"},
 			{Type: "add_dod", IssueID: "ENG-102", Description: "unchanged"},
 		},
 	}
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis:     "Redis needed",
 		Reasoning:    "For session store",
 		ModifiedWave: &modified,
@@ -1157,8 +1157,8 @@ func TestToDiscussResult_WithModifiedWave(t *testing.T) {
 
 func TestToDiscussResult_NilModifiedWave(t *testing.T) {
 	// given
-	wave := sightjack.Wave{ID: "w1", ClusterName: "Auth"}
-	resp := &sightjack.ArchitectResponse{Analysis: "ok", Reasoning: "no changes needed"}
+	wave := domain.Wave{ID: "w1", ClusterName: "Auth"}
+	resp := &domain.ArchitectResponse{Analysis: "ok", Reasoning: "no changes needed"}
 
 	// when
 	result := session.ToDiscussResult(wave, resp, "review")
@@ -1171,20 +1171,20 @@ func TestToDiscussResult_NilModifiedWave(t *testing.T) {
 
 func TestToDiscussResult_WithAddedActions(t *testing.T) {
 	// given: modified wave has more actions than original
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID: "w1", ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
 		},
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID: "w1", ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
 			{Type: "add_dod", IssueID: "ENG-103", Description: "new action added by architect"},
 		},
 	}
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis:     "Additional action needed",
 		Reasoning:    "Discovered missing DoD",
 		ModifiedWave: &modified,
@@ -1207,20 +1207,20 @@ func TestToDiscussResult_WithAddedActions(t *testing.T) {
 
 func TestToDiscussResult_WithRemovedActions(t *testing.T) {
 	// given: modified wave has fewer actions than original
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID: "w1", ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "keep this"},
 			{Type: "add_dod", IssueID: "ENG-102", Description: "remove this"},
 		},
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID: "w1", ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "keep this"},
 		},
 	}
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis:     "Simplified",
 		Reasoning:    "Action not needed",
 		ModifiedWave: &modified,
@@ -1243,8 +1243,8 @@ func TestToDiscussResult_WithRemovedActions(t *testing.T) {
 
 func TestToDiscussResult_UsesArchitectDecision(t *testing.T) {
 	// given: architect provides an explicit decision
-	wave := sightjack.Wave{ID: "w1", ClusterName: "Auth"}
-	resp := &sightjack.ArchitectResponse{
+	wave := domain.Wave{ID: "w1", ClusterName: "Auth"}
+	resp := &domain.ArchitectResponse{
 		Analysis:  "JWT is overkill here",
 		Reasoning: "Session cookies are simpler and sufficient",
 		Decision:  "Use session-based auth with httpOnly cookies",
@@ -1262,8 +1262,8 @@ func TestToDiscussResult_UsesArchitectDecision(t *testing.T) {
 
 func TestToDiscussResult_FallsBackToTopicWhenNoDecision(t *testing.T) {
 	// given: architect does not provide a decision (empty string)
-	wave := sightjack.Wave{ID: "w1", ClusterName: "Auth"}
-	resp := &sightjack.ArchitectResponse{
+	wave := domain.Wave{ID: "w1", ClusterName: "Auth"}
+	resp := &domain.ArchitectResponse{
 		Analysis:  "No changes needed",
 		Reasoning: "Wave is fine as-is",
 	}
@@ -1280,16 +1280,16 @@ func TestToDiscussResult_FallsBackToTopicWhenNoDecision(t *testing.T) {
 
 func TestToApplyResult_PartialFailureStatus(t *testing.T) {
 	// given: wave with 2 actions, only 1 succeeds
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101"},
 			{Type: "add_dod", IssueID: "ENG-102"},
 		},
-		Delta: sightjack.WaveDelta{Before: 0.3, After: 0.5},
+		Delta: domain.WaveDelta{Before: 0.3, After: 0.5},
 	}
-	internal := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 1, Errors: []string{"denied"}}
+	internal := &domain.WaveApplyResult{WaveID: "w1", Applied: 1, Errors: []string{"denied"}}
 
 	// when
 	result := session.ToApplyResult(wave, internal)
@@ -1305,20 +1305,20 @@ func TestToApplyResult_PartialFailureStatus(t *testing.T) {
 
 func TestToApplyResult_AllSuccess(t *testing.T) {
 	// given
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101"},
 			{Type: "add_dod", IssueID: "ENG-102"},
 		},
-		Delta: sightjack.WaveDelta{Before: 0.30, After: 0.50},
+		Delta: domain.WaveDelta{Before: 0.30, After: 0.50},
 	}
-	internal := &sightjack.WaveApplyResult{
+	internal := &domain.WaveApplyResult{
 		WaveID:  "w1",
 		Applied: 2,
 		Errors:  nil,
-		Ripples: []sightjack.Ripple{{ClusterName: "API", Description: "W2 unlocked"}},
+		Ripples: []domain.Ripple{{ClusterName: "API", Description: "W2 unlocked"}},
 	}
 
 	// when
@@ -1346,16 +1346,16 @@ func TestToApplyResult_AllSuccess(t *testing.T) {
 
 func TestToApplyResult_WithErrors(t *testing.T) {
 	// given
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "Auth",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101"},
 			{Type: "add_dod", IssueID: "ENG-102"},
 		},
-		Delta: sightjack.WaveDelta{Before: 0.30, After: 0.50},
+		Delta: domain.WaveDelta{Before: 0.30, After: 0.50},
 	}
-	internal := &sightjack.WaveApplyResult{
+	internal := &domain.WaveApplyResult{
 		WaveID:  "w1",
 		Applied: 1,
 		Errors:  []string{"permission denied on ENG-102"},
@@ -1388,8 +1388,8 @@ func TestToApplyResult_WithErrors(t *testing.T) {
 
 func TestToApplyResult_NoActions(t *testing.T) {
 	// given
-	wave := sightjack.Wave{ID: "w1", ClusterName: "Auth", Delta: sightjack.WaveDelta{After: 0.40}}
-	internal := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 0}
+	wave := domain.Wave{ID: "w1", ClusterName: "Auth", Delta: domain.WaveDelta{After: 0.40}}
+	internal := &domain.WaveApplyResult{WaveID: "w1", Applied: 0}
 
 	// when
 	result := session.ToApplyResult(wave, internal)
@@ -1405,20 +1405,20 @@ func TestToApplyResult_NoActions(t *testing.T) {
 
 func TestToApplyResult_EmbedCompletedWave(t *testing.T) {
 	// given: wave with cluster context
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101"},
 		},
-		Delta: sightjack.WaveDelta{Before: 0.30, After: 0.50},
-		ClusterContext: &sightjack.ClusterScanResult{
+		Delta: domain.WaveDelta{Before: 0.30, After: 0.50},
+		ClusterContext: &domain.ClusterScanResult{
 			Name:         "Auth",
 			Completeness: 0.30,
 		},
 	}
-	internal := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 1}
+	internal := &domain.WaveApplyResult{WaveID: "w1", Applied: 1}
 
 	// when
 	result := session.ToApplyResult(wave, internal)
@@ -1445,16 +1445,16 @@ func TestToApplyResult_EmbedCompletedWave(t *testing.T) {
 
 func TestApplyResult_RemainingWaves_RoundTrip(t *testing.T) {
 	// given: ApplyResult with remaining waves
-	result := sightjack.ApplyResult{
+	result := domain.ApplyResult{
 		WaveID:          "w1",
-		AppliedActions:  []sightjack.ActionResult{{Type: "add_dependency", IssueID: "ENG-101", Success: true}},
+		AppliedActions:  []domain.ActionResult{{Type: "add_dependency", IssueID: "ENG-101", Success: true}},
 		NewCompleteness: 0.50,
-		CompletedWave: &sightjack.Wave{
+		CompletedWave: &domain.Wave{
 			ID: "w1", ClusterName: "Auth", Status: "completed",
-			Actions: []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101"}},
-			Delta:   sightjack.WaveDelta{Before: 0.30, After: 0.50},
+			Actions: []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101"}},
+			Delta:   domain.WaveDelta{Before: 0.30, After: 0.50},
 		},
-		RemainingWaves: []sightjack.Wave{
+		RemainingWaves: []domain.Wave{
 			{ID: "w2", ClusterName: "Auth", Status: "available", Title: "Token lifecycle"},
 			{ID: "w3", ClusterName: "Auth", Status: "locked", Title: "Audit logging"},
 		},
@@ -1465,7 +1465,7 @@ func TestApplyResult_RemainingWaves_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.ApplyResult
+	var decoded domain.ApplyResult
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -1482,8 +1482,8 @@ func TestApplyResult_RemainingWaves_RoundTrip(t *testing.T) {
 	}
 
 	// Verify NeedsMoreWaves sees the full picture.
-	allWaves := append([]sightjack.Wave{*decoded.CompletedWave}, decoded.RemainingWaves...)
-	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.50}
+	allWaves := append([]domain.Wave{*decoded.CompletedWave}, decoded.RemainingWaves...)
+	cluster := domain.ClusterScanResult{Name: "Auth", Completeness: 0.50}
 	if session.NeedsMoreWaves(cluster, allWaves) {
 		t.Error("NeedsMoreWaves should return false when available waves remain")
 	}

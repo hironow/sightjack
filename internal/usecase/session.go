@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -22,7 +21,7 @@ func wrapRecorder(recorder domain.Recorder, logger *domain.Logger, dryRun bool) 
 
 // RunSession orchestrates the sightjack session pipeline.
 // Validates the RunSessionCommand, then delegates to session.RunSession.
-func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *sightjack.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
@@ -31,7 +30,7 @@ func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *sightjac
 
 // ResumeSession orchestrates the session resume pipeline.
 // Validates the ResumeSessionCommand, then delegates to session.RunResumeSession.
-func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *sightjack.Config, baseDir string, state *sightjack.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
@@ -39,7 +38,7 @@ func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *si
 }
 
 // RescanSession orchestrates the session rescan pipeline.
-func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *sightjack.Config, baseDir string, oldState *sightjack.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}

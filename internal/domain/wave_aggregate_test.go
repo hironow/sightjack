@@ -4,14 +4,13 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestWaveAggregate_Approve_Available(t *testing.T) {
 	// given
 	agg := domain.NewWaveAggregate()
-	agg.SetWaves([]sightjack.Wave{
+	agg.SetWaves([]domain.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 	})
 
@@ -43,7 +42,7 @@ func TestWaveAggregate_Approve_NotFound(t *testing.T) {
 func TestWaveAggregate_Reject(t *testing.T) {
 	// given
 	agg := domain.NewWaveAggregate()
-	agg.SetWaves([]sightjack.Wave{
+	agg.SetWaves([]domain.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 	})
 
@@ -62,8 +61,8 @@ func TestWaveAggregate_Reject(t *testing.T) {
 func TestWaveAggregate_RecordApplied(t *testing.T) {
 	// given
 	agg := domain.NewWaveAggregate()
-	agg.SetWaves([]sightjack.Wave{
-		{ID: "w1", ClusterName: "auth", Status: "available", Actions: []sightjack.WaveAction{{Type: "fix"}}},
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "available", Actions: []domain.WaveAction{{Type: "fix"}}},
 	})
 
 	// when
@@ -83,8 +82,8 @@ func TestWaveAggregate_RecordApplied(t *testing.T) {
 func TestWaveAggregate_Complete(t *testing.T) {
 	// given
 	agg := domain.NewWaveAggregate()
-	agg.SetWaves([]sightjack.Wave{
-		{ID: "w1", ClusterName: "auth", Status: "available", Actions: []sightjack.WaveAction{{Type: "fix"}}},
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "available", Actions: []domain.WaveAction{{Type: "fix"}}},
 	})
 
 	// when
@@ -106,7 +105,7 @@ func TestWaveAggregate_Complete(t *testing.T) {
 func TestWaveAggregate_EvaluateUnlocks(t *testing.T) {
 	// given: w2 depends on w1
 	agg := domain.NewWaveAggregate()
-	agg.SetWaves([]sightjack.Wave{
+	agg.SetWaves([]domain.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 		{ID: "w2", ClusterName: "auth", Status: "locked", Prerequisites: []string{"auth:w1"}},
 	})
@@ -130,7 +129,7 @@ func TestWaveAggregate_EvaluateUnlocks(t *testing.T) {
 func TestWaveAggregate_EvaluateUnlocks_NothingToUnlock(t *testing.T) {
 	// given: no locked waves
 	agg := domain.NewWaveAggregate()
-	agg.SetWaves([]sightjack.Wave{
+	agg.SetWaves([]domain.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 	})
 
@@ -149,7 +148,7 @@ func TestWaveAggregate_EvaluateUnlocks_NothingToUnlock(t *testing.T) {
 func TestWaveAggregate_AddNextGen(t *testing.T) {
 	// given
 	agg := domain.NewWaveAggregate()
-	newWaves := []sightjack.WaveState{
+	newWaves := []domain.WaveState{
 		{ID: "w2", ClusterName: "auth", Title: "Next wave", Status: "available"},
 	}
 

@@ -10,21 +10,19 @@ import (
 	"slices"
 	"strings"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // ParseWaveGenerateResult reads and parses a wave_{name}.json output file.
-func ParseWaveGenerateResult(path string) (*sightjack.WaveGenerateResult, error) {
+func ParseWaveGenerateResult(path string) (*domain.WaveGenerateResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read wave result: %w", err)
 	}
-	var result sightjack.WaveGenerateResult
+	var result domain.WaveGenerateResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse wave result: %w", err)
 	}
@@ -32,27 +30,27 @@ func ParseWaveGenerateResult(path string) (*sightjack.WaveGenerateResult, error)
 }
 
 // ParseWaveApplyResult reads and parses an apply_{wave_id}.json output file.
-func ParseWaveApplyResult(path string) (*sightjack.WaveApplyResult, error) {
+func ParseWaveApplyResult(path string) (*domain.WaveApplyResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read apply result: %w", err)
 	}
-	var result sightjack.WaveApplyResult
+	var result domain.WaveApplyResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse apply result: %w", err)
 	}
 	return &result, nil
 }
 
-// ToApplyResult converts the internal sightjack.WaveApplyResult to the pipe wire format sightjack.ApplyResult.
+// ToApplyResult converts the internal domain.WaveApplyResult to the pipe wire format domain.ApplyResult.
 // It builds per-action results from the wave's actions and the internal result's error list.
-func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sightjack.ApplyResult {
-	actions := make([]sightjack.ActionResult, 0, len(wave.Actions))
+func ToApplyResult(wave domain.Wave, internal *domain.WaveApplyResult) domain.ApplyResult {
+	actions := make([]domain.ActionResult, 0, len(wave.Actions))
 
 	// Build per-action results: first N actions succeed (N = Applied),
 	// remaining get error messages from the Errors list.
 	for i, a := range wave.Actions {
-		ar := sightjack.ActionResult{
+		ar := domain.ActionResult{
 			Type:    a.Type,
 			IssueID: a.IssueID,
 			Success: i < internal.Applied,
@@ -86,7 +84,7 @@ func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sig
 		wave.Status = "partial"
 	}
 
-	return sightjack.ApplyResult{
+	return domain.ApplyResult{
 		WaveID:          internal.WaveID,
 		AppliedActions:  actions,
 		RippleEffects:   internal.Ripples,
@@ -98,34 +96,34 @@ func ToApplyResult(wave sightjack.Wave, internal *sightjack.WaveApplyResult) sig
 // --- Domain wrapper functions (cmd → session → domain) ---
 
 // WaveKey returns a globally unique key for a wave: "ClusterName:ID".
-func WaveKey(w sightjack.Wave) string {
+func WaveKey(w domain.Wave) string {
 	return domain.WaveKey(w)
 }
 
 // AvailableWaves filters waves to those available and not completed.
-func AvailableWaves(waves []sightjack.Wave, completed map[string]bool) []sightjack.Wave {
+func AvailableWaves(waves []domain.Wave, completed map[string]bool) []domain.Wave {
 	return domain.AvailableWaves(waves, completed)
 }
 
 // RestoreWaves converts WaveState slices back to Wave slices.
-func RestoreWaves(states []sightjack.WaveState) []sightjack.Wave {
+func RestoreWaves(states []domain.WaveState) []domain.Wave {
 	return domain.RestoreWaves(states)
 }
 
 // CompletedWavesForCluster returns completed waves for a specific cluster.
-func CompletedWavesForCluster(waves []sightjack.Wave, clusterName string) []sightjack.Wave {
+func CompletedWavesForCluster(waves []domain.Wave, clusterName string) []domain.Wave {
 	return domain.CompletedWavesForCluster(waves, clusterName)
 }
 
 // WaveApplyFileName returns the output filename for a wave apply result.
 // Includes cluster name to avoid collisions when wave IDs are duplicated across clusters.
-func WaveApplyFileName(wave sightjack.Wave) string {
+func WaveApplyFileName(wave domain.Wave) string {
 	return fmt.Sprintf("apply_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 }
 
 // RunWaveApply executes Pass 4: apply a single approved wave via Claude Code.
 // It writes the apply result to a JSON file and returns the parsed result.
-func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, strictness string, out io.Writer, logger *domain.Logger) (*sightjack.WaveApplyResult, error) {
+func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, strictness string, out io.Writer, logger *domain.Logger) (*domain.WaveApplyResult, error) {
 	ctx, applySpan := platform.Tracer.Start(ctx, "wave.apply",
 		trace.WithAttributes(
 			attribute.String("wave.id", wave.ID),
@@ -142,9 +140,9 @@ func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 		return nil, fmt.Errorf("marshal wave actions: %w", err)
 	}
 
-	dodSection := sightjack.ResolveDoDSection(cfg.DoDTemplates, wave.ClusterName)
+	dodSection := domain.ResolveDoDSection(cfg.DoDTemplates, wave.ClusterName)
 
-	prompt, err := sightjack.RenderWaveApplyPrompt(cfg.Lang, sightjack.WaveApplyPromptData{
+	prompt, err := domain.RenderWaveApplyPrompt(cfg.Lang, domain.WaveApplyPromptData{
 		WaveID:          wave.ID,
 		ClusterName:     wave.ClusterName,
 		Title:           wave.Title,
@@ -193,8 +191,8 @@ func RunWaveApply(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 
 // RunReadyLabel applies the ready label to issues whose all waves have completed.
 // This must only be called after a successful wave apply.
-func RunReadyLabel(ctx context.Context, cfg *sightjack.Config, readyIssueIDs string, out io.Writer, logger *domain.Logger) error {
-	prompt, err := sightjack.RenderReadyLabelPrompt(cfg.Lang, sightjack.ReadyLabelPromptData{
+func RunReadyLabel(ctx context.Context, cfg *domain.Config, readyIssueIDs string, out io.Writer, logger *domain.Logger) error {
+	prompt, err := domain.RenderReadyLabelPrompt(cfg.Lang, domain.ReadyLabelPromptData{
 		ReadyLabel:    cfg.Labels.ReadyLabel,
 		ReadyIssueIDs: readyIssueIDs,
 	})

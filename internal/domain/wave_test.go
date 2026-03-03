@@ -3,14 +3,13 @@ package domain_test
 import (
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestWaveKey(t *testing.T) {
 	t.Parallel()
 	// given
-	w := sightjack.Wave{ClusterName: "auth", ID: "w1"}
+	w := domain.Wave{ClusterName: "auth", ID: "w1"}
 
 	// when
 	got := domain.WaveKey(w)
@@ -27,7 +26,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 	t.Run("bare_id_gets_cluster_prefix", func(t *testing.T) {
 		t.Parallel()
 		// given
-		waves := []sightjack.Wave{
+		waves := []domain.Wave{
 			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"w1"}},
 		}
 
@@ -43,7 +42,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 	t.Run("composite_id_unchanged", func(t *testing.T) {
 		t.Parallel()
 		// given
-		waves := []sightjack.Wave{
+		waves := []domain.Wave{
 			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"billing:w1"}},
 		}
 
@@ -59,7 +58,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 	t.Run("does_not_mutate_input", func(t *testing.T) {
 		t.Parallel()
 		// given
-		waves := []sightjack.Wave{
+		waves := []domain.Wave{
 			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"w1"}},
 		}
 
@@ -76,11 +75,11 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 func TestMergeWaveResults(t *testing.T) {
 	t.Parallel()
 	// given
-	results := []sightjack.WaveGenerateResult{
-		{ClusterName: "auth", Waves: []sightjack.Wave{
+	results := []domain.WaveGenerateResult{
+		{ClusterName: "auth", Waves: []domain.Wave{
 			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"w0"}},
 		}},
-		{ClusterName: "billing", Waves: []sightjack.Wave{
+		{ClusterName: "billing", Waves: []domain.Wave{
 			{ClusterName: "billing", ID: "w1"},
 		}},
 	}
@@ -101,7 +100,7 @@ func TestMergeWaveResults(t *testing.T) {
 func TestAvailableWaves(t *testing.T) {
 	t.Parallel()
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ClusterName: "auth", ID: "w1", Status: "available"},
 		{ClusterName: "auth", ID: "w2", Status: "locked"},
 		{ClusterName: "billing", ID: "w1", Status: "available"},
@@ -127,7 +126,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 	t.Run("unlocks_when_prerequisites_met", func(t *testing.T) {
 		t.Parallel()
 		// given
-		waves := []sightjack.Wave{
+		waves := []domain.Wave{
 			{ClusterName: "auth", ID: "w1", Status: "completed"},
 			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
 		}
@@ -145,7 +144,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 	t.Run("stays_locked_when_prerequisite_unmet", func(t *testing.T) {
 		t.Parallel()
 		// given
-		waves := []sightjack.Wave{
+		waves := []domain.Wave{
 			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
 		}
 		completed := map[string]bool{}
@@ -162,7 +161,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 	t.Run("non_locked_waves_unchanged", func(t *testing.T) {
 		t.Parallel()
 		// given
-		waves := []sightjack.Wave{
+		waves := []domain.Wave{
 			{ClusterName: "auth", ID: "w1", Status: "available"},
 			{ClusterName: "auth", ID: "w2", Status: "completed"},
 		}
@@ -209,31 +208,31 @@ func TestCalcNewlyUnlocked(t *testing.T) {
 
 func TestPartialApplyDelta(t *testing.T) {
 	t.Parallel()
-	delta := sightjack.WaveDelta{Before: 0.5, After: 0.9}
+	delta := domain.WaveDelta{Before: 0.5, After: 0.9}
 
 	tests := []struct {
 		name   string
-		result *sightjack.WaveApplyResult
+		result *domain.WaveApplyResult
 		want   float64
 	}{
 		{
 			name:   "all_applied",
-			result: &sightjack.WaveApplyResult{Applied: 3, TotalCount: 3},
+			result: &domain.WaveApplyResult{Applied: 3, TotalCount: 3},
 			want:   0.9,
 		},
 		{
 			name:   "none_applied",
-			result: &sightjack.WaveApplyResult{Applied: 0, TotalCount: 3},
+			result: &domain.WaveApplyResult{Applied: 0, TotalCount: 3},
 			want:   0.5,
 		},
 		{
 			name:   "half_applied",
-			result: &sightjack.WaveApplyResult{Applied: 1, TotalCount: 2},
+			result: &domain.WaveApplyResult{Applied: 1, TotalCount: 2},
 			want:   0.7, // 0.5 + (0.9-0.5)*0.5
 		},
 		{
 			name:   "zero_total_returns_after",
-			result: &sightjack.WaveApplyResult{Applied: 0, TotalCount: 0},
+			result: &domain.WaveApplyResult{Applied: 0, TotalCount: 0},
 			want:   0.9,
 		},
 	}
@@ -257,7 +256,7 @@ func TestIsWaveApplyComplete(t *testing.T) {
 	t.Run("complete_when_no_errors", func(t *testing.T) {
 		t.Parallel()
 		// given
-		result := &sightjack.WaveApplyResult{Applied: 3, TotalCount: 3}
+		result := &domain.WaveApplyResult{Applied: 3, TotalCount: 3}
 
 		// when/then
 		if !domain.IsWaveApplyComplete(result) {
@@ -268,7 +267,7 @@ func TestIsWaveApplyComplete(t *testing.T) {
 	t.Run("incomplete_when_errors", func(t *testing.T) {
 		t.Parallel()
 		// given
-		result := &sightjack.WaveApplyResult{Applied: 2, TotalCount: 3, Errors: []string{"fail"}}
+		result := &domain.WaveApplyResult{Applied: 2, TotalCount: 3, Errors: []string{"fail"}}
 
 		// when/then
 		if domain.IsWaveApplyComplete(result) {
@@ -283,13 +282,13 @@ func TestApplyModifiedWave(t *testing.T) {
 	t.Run("preserves_identity_fields", func(t *testing.T) {
 		t.Parallel()
 		// given
-		original := sightjack.Wave{
+		original := domain.Wave{
 			ID: "w1", ClusterName: "auth", Title: "Original",
-			Actions:       []sightjack.WaveAction{{Type: "fix", IssueID: "1"}},
+			Actions:       []domain.WaveAction{{Type: "fix", IssueID: "1"}},
 			Prerequisites: []string{"auth:w0"},
-			Delta:         sightjack.WaveDelta{Before: 0.3, After: 0.6},
+			Delta:         domain.WaveDelta{Before: 0.3, After: 0.6},
 		}
-		modified := sightjack.Wave{
+		modified := domain.Wave{
 			ID: "overwritten", ClusterName: "overwritten", Title: "Modified",
 		}
 		completed := map[string]bool{"auth:w0": true}
@@ -312,13 +311,13 @@ func TestApplyModifiedWave(t *testing.T) {
 	t.Run("preserves_original_when_modified_nil", func(t *testing.T) {
 		t.Parallel()
 		// given
-		original := sightjack.Wave{
+		original := domain.Wave{
 			ID: "w1", ClusterName: "auth",
-			Actions:       []sightjack.WaveAction{{Type: "fix", IssueID: "1"}},
+			Actions:       []domain.WaveAction{{Type: "fix", IssueID: "1"}},
 			Prerequisites: []string{"auth:w0"},
-			Delta:         sightjack.WaveDelta{Before: 0.3, After: 0.6},
+			Delta:         domain.WaveDelta{Before: 0.3, After: 0.6},
 		}
-		modified := sightjack.Wave{} // all nil/zero
+		modified := domain.Wave{} // all nil/zero
 		completed := map[string]bool{"auth:w0": true}
 
 		// when
@@ -336,8 +335,8 @@ func TestApplyModifiedWave(t *testing.T) {
 	t.Run("normalizes_bare_prerequisites", func(t *testing.T) {
 		t.Parallel()
 		// given
-		original := sightjack.Wave{ID: "w2", ClusterName: "auth"}
-		modified := sightjack.Wave{Prerequisites: []string{"w1"}}
+		original := domain.Wave{ID: "w2", ClusterName: "auth"}
+		modified := domain.Wave{Prerequisites: []string{"w1"}}
 		completed := map[string]bool{"auth:w1": true}
 
 		// when
@@ -355,8 +354,8 @@ func TestApplyModifiedWave(t *testing.T) {
 	t.Run("locks_when_prerequisite_unmet", func(t *testing.T) {
 		t.Parallel()
 		// given
-		original := sightjack.Wave{ID: "w2", ClusterName: "auth"}
-		modified := sightjack.Wave{Prerequisites: []string{"w1"}}
+		original := domain.Wave{ID: "w2", ClusterName: "auth"}
+		modified := domain.Wave{Prerequisites: []string{"w1"}}
 		completed := map[string]bool{} // w1 not completed
 
 		// when
@@ -372,11 +371,11 @@ func TestApplyModifiedWave(t *testing.T) {
 func TestPropagateWaveUpdate(t *testing.T) {
 	t.Parallel()
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ClusterName: "auth", ID: "w1", Title: "Old"},
 		{ClusterName: "auth", ID: "w2", Title: "Other"},
 	}
-	updated := sightjack.Wave{ClusterName: "auth", ID: "w1", Title: "New"}
+	updated := domain.Wave{ClusterName: "auth", ID: "w1", Title: "New"}
 
 	// when
 	domain.PropagateWaveUpdate(waves, updated)
@@ -393,7 +392,7 @@ func TestPropagateWaveUpdate(t *testing.T) {
 func TestBuildCompletedWaveMap(t *testing.T) {
 	t.Parallel()
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ClusterName: "auth", ID: "w1", Status: "completed"},
 		{ClusterName: "auth", ID: "w2", Status: "available"},
 		{ClusterName: "billing", ID: "w1", Status: "completed"},
@@ -420,10 +419,10 @@ func TestMergeOldWaves(t *testing.T) {
 	t.Run("carries_forward_failed_cluster_waves", func(t *testing.T) {
 		t.Parallel()
 		// given
-		oldWaves := []sightjack.Wave{
+		oldWaves := []domain.Wave{
 			{ClusterName: "auth", ID: "w1", Title: "Old Auth Wave"},
 		}
-		newWaves := []sightjack.Wave{
+		newWaves := []domain.Wave{
 			{ClusterName: "billing", ID: "w1", Title: "New Billing Wave"},
 		}
 		scannedClusters := map[string]bool{"auth": true, "billing": true}
@@ -441,7 +440,7 @@ func TestMergeOldWaves(t *testing.T) {
 	t.Run("drops_waves_from_removed_clusters", func(t *testing.T) {
 		t.Parallel()
 		// given — auth was removed from scan
-		oldWaves := []sightjack.Wave{
+		oldWaves := []domain.Wave{
 			{ClusterName: "auth", ID: "w1"},
 		}
 		scannedClusters := map[string]bool{"billing": true}
@@ -459,10 +458,10 @@ func TestMergeOldWaves(t *testing.T) {
 	t.Run("no_duplicate_keys", func(t *testing.T) {
 		t.Parallel()
 		// given — same wave in both old and new
-		oldWaves := []sightjack.Wave{
+		oldWaves := []domain.Wave{
 			{ClusterName: "auth", ID: "w1"},
 		}
-		newWaves := []sightjack.Wave{
+		newWaves := []domain.Wave{
 			{ClusterName: "auth", ID: "w1"},
 		}
 		scannedClusters := map[string]bool{"auth": true}
@@ -481,7 +480,7 @@ func TestMergeCompletedStatus(t *testing.T) {
 	t.Parallel()
 	// given
 	oldCompleted := map[string]bool{"auth:w1": true}
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ClusterName: "auth", ID: "w1", Status: "available"},
 		{ClusterName: "auth", ID: "w2", Status: "locked"},
 	}
@@ -505,13 +504,13 @@ func TestMergeCompletedStatus(t *testing.T) {
 func TestRestoreWaves(t *testing.T) {
 	t.Parallel()
 	// given
-	states := []sightjack.WaveState{
+	states := []domain.WaveState{
 		{
 			ID: "w1", ClusterName: "auth", Title: "Fix login",
 			Description: "desc", Status: "available",
-			Actions:       []sightjack.WaveAction{{Type: "fix", IssueID: "1"}},
+			Actions:       []domain.WaveAction{{Type: "fix", IssueID: "1"}},
 			Prerequisites: []string{"auth:w0"},
-			Delta:         sightjack.WaveDelta{Before: 0.3, After: 0.7},
+			Delta:         domain.WaveDelta{Before: 0.3, After: 0.7},
 		},
 	}
 
@@ -540,13 +539,13 @@ func TestRestoreWaves(t *testing.T) {
 func TestBuildWaveStates(t *testing.T) {
 	t.Parallel()
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{
 			ID: "w1", ClusterName: "auth", Title: "Fix login",
 			Description: "desc", Status: "available",
-			Actions:       []sightjack.WaveAction{{Type: "fix", IssueID: "1"}, {Type: "fix", IssueID: "2"}},
+			Actions:       []domain.WaveAction{{Type: "fix", IssueID: "1"}, {Type: "fix", IssueID: "2"}},
 			Prerequisites: []string{"auth:w0"},
-			Delta:         sightjack.WaveDelta{Before: 0.3, After: 0.7},
+			Delta:         domain.WaveDelta{Before: 0.3, After: 0.7},
 		},
 	}
 
@@ -571,13 +570,13 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 	tests := []struct {
 		name     string
 		overall  float64
-		clusters []sightjack.ClusterScanResult
+		clusters []domain.ClusterScanResult
 		want     bool
 	}{
 		{
 			name:    "consistent",
 			overall: 0.7,
-			clusters: []sightjack.ClusterScanResult{
+			clusters: []domain.ClusterScanResult{
 				{Completeness: 0.7}, {Completeness: 0.7},
 			},
 			want: false,
@@ -585,7 +584,7 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 		{
 			name:    "inconsistent_beyond_tolerance",
 			overall: 0.9,
-			clusters: []sightjack.ClusterScanResult{
+			clusters: []domain.ClusterScanResult{
 				{Completeness: 0.5}, {Completeness: 0.5},
 			},
 			want: true, // diff = 0.4 > 0.05
@@ -599,7 +598,7 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 		{
 			name:    "within_tolerance",
 			overall: 0.72,
-			clusters: []sightjack.ClusterScanResult{
+			clusters: []domain.ClusterScanResult{
 				{Completeness: 0.7}, {Completeness: 0.7},
 			},
 			want: false, // diff = 0.02 < 0.05
@@ -622,7 +621,7 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 func TestCompletedWavesForCluster(t *testing.T) {
 	t.Parallel()
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ClusterName: "auth", ID: "w1", Status: "completed"},
 		{ClusterName: "auth", ID: "w2", Status: "available"},
 		{ClusterName: "billing", ID: "w1", Status: "completed"},

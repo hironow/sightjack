@@ -6,13 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.
 func EnsureMailDirs(baseDir string) error {
-	for _, sub := range []string{sightjack.InboxDir, sightjack.OutboxDir, sightjack.ArchiveDir} {
-		if err := os.MkdirAll(sightjack.MailDir(baseDir, sub), 0755); err != nil {
+	for _, sub := range []string{domain.InboxDir, domain.OutboxDir, domain.ArchiveDir} {
+		if err := os.MkdirAll(domain.MailDir(baseDir, sub), 0755); err != nil {
 			return fmt.Errorf("create %s dir: %w", sub, err)
 		}
 	}
@@ -24,14 +24,14 @@ func EnsureMailDirs(baseDir string) error {
 // The write is idempotent — the file is always overwritten with the canonical content.
 func WriteGitIgnore(baseDir string) error {
 	content := "events/\n.run/\ninbox/\noutbox/\n"
-	path := filepath.Join(baseDir, sightjack.StateDir, ".gitignore")
+	path := filepath.Join(baseDir, domain.StateDir, ".gitignore")
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
 // EnsureScanDir creates the scan directory for a session and returns its path.
 // It also writes .siren/.gitignore as a best-effort side effect.
 func EnsureScanDir(baseDir, sessionID string) (string, error) {
-	dir := sightjack.ScanDir(baseDir, sessionID)
+	dir := domain.ScanDir(baseDir, sessionID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("create scan dir: %w", err)
 	}
@@ -41,7 +41,7 @@ func EnsureScanDir(baseDir, sessionID string) (string, error) {
 }
 
 // WriteScanResult serializes a ScanResult to a JSON file for session resume caching.
-func WriteScanResult(path string, result *sightjack.ScanResult) error {
+func WriteScanResult(path string, result *domain.ScanResult) error {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal scan result: %w", err)
@@ -53,12 +53,12 @@ func WriteScanResult(path string, result *sightjack.ScanResult) error {
 }
 
 // LoadScanResult reads a cached ScanResult from a JSON file.
-func LoadScanResult(path string) (*sightjack.ScanResult, error) {
+func LoadScanResult(path string) (*domain.ScanResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read scan result: %w", err)
 	}
-	var result sightjack.ScanResult
+	var result domain.ScanResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse scan result: %w", err)
 	}
@@ -69,14 +69,14 @@ func LoadScanResult(path string) (*sightjack.ScanResult, error) {
 // It returns false when the cached ScanResult path is empty (e.g. v0.4
 // state files) or the file no longer exists on disk.
 // baseDir is used to resolve relative ScanResultPaths stored in newer events.
-func CanResume(baseDir string, state *sightjack.SessionState) bool {
+func CanResume(baseDir string, state *domain.SessionState) bool {
 	if state.ScanResultPath == "" {
 		return false
 	}
 	if len(state.Waves) == 0 {
 		return false
 	}
-	resolved := sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath)
+	resolved := domain.ResolveScanResultPath(baseDir, state.ScanResultPath)
 	_, err := os.Stat(resolved)
 	return err == nil
 }

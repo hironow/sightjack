@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -17,17 +16,17 @@ func TestParseArchitectResult(t *testing.T) {
 	// given: a valid architect response JSON file
 	dir := t.TempDir()
 	path := filepath.Join(dir, "architect_auth_auth-w1.json")
-	data := sightjack.ArchitectResponse{
+	data := domain.ArchitectResponse{
 		Analysis: "Splitting is unnecessary.",
-		ModifiedWave: &sightjack.Wave{
+		ModifiedWave: &domain.Wave{
 			ID:          "auth-w1",
 			ClusterName: "Auth",
 			Title:       "Dependency Ordering",
-			Actions: []sightjack.WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "add_dependency", IssueID: "ENG-101", Description: "Auth before token"},
 				{Type: "add_dod", IssueID: "ENG-101", Description: "Middleware interface"},
 			},
-			Delta:  sightjack.WaveDelta{Before: 0.25, After: 0.42},
+			Delta:  domain.WaveDelta{Before: 0.25, After: 0.42},
 			Status: "available",
 		},
 		Reasoning: "Project scale favors fewer issues.",
@@ -89,7 +88,7 @@ func TestParseArchitectResult_FileNotFound(t *testing.T) {
 }
 
 func TestArchitectDiscussFileName(t *testing.T) {
-	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
+	wave := domain.Wave{ID: "auth-w1", ClusterName: "Auth"}
 	name := session.ArchitectDiscussFileName(wave)
 	if name != "architect_auth_auth-w1.json" {
 		t.Errorf("expected architect_auth_auth-w1.json, got %s", name)
@@ -97,7 +96,7 @@ func TestArchitectDiscussFileName(t *testing.T) {
 }
 
 func TestArchitectDiscussFileName_SpecialChars(t *testing.T) {
-	wave := sightjack.Wave{ID: "w-1", ClusterName: "UI/Frontend"}
+	wave := domain.Wave{ID: "w-1", ClusterName: "UI/Frontend"}
 	name := session.ArchitectDiscussFileName(wave)
 	if name != "architect_ui_frontend_w-1.json" {
 		t.Errorf("expected architect_ui_frontend_w-1.json, got %s", name)
@@ -107,15 +106,15 @@ func TestArchitectDiscussFileName_SpecialChars(t *testing.T) {
 func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	// given
 	scanDir := t.TempDir()
-	cfg := &sightjack.Config{
+	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
 	}
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
-		Actions:     []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Actions:     []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
 	}
 
 	// when
@@ -192,11 +191,11 @@ func TestParseArchitectResult_ModifiedWaveNilActions(t *testing.T) {
 func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	// given: wave with nil Actions — json.Marshal produces "null" not "[]"
 	scanDir := t.TempDir()
-	cfg := &sightjack.Config{
+	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
 	}
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Empty Wave",
@@ -224,7 +223,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
 	// given: a pre-existing stale output file from a previous discuss round
 	scanDir := t.TempDir()
-	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth", Title: "Test"}
+	wave := domain.Wave{ID: "auth-w1", ClusterName: "Auth", Title: "Test"}
 	outputFile := filepath.Join(scanDir, session.ArchitectDiscussFileName(wave))
 	if err := os.WriteFile(outputFile, []byte(`{"analysis":"stale","modified_wave":null,"reasoning":"old"}`), 0644); err != nil {
 		t.Fatalf("write test file: %v", err)

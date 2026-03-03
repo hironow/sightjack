@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestResolveBaseDir_NonExistentPath(t *testing.T) {
@@ -122,7 +122,7 @@ func TestResolveConfigPath_NotExplicit_UsesDefault(t *testing.T) {
 	got := resolveConfigPath(c, "/repo")
 
 	// then: should use ConfigPath(baseDir)
-	want := sightjack.ConfigPath("/repo")
+	want := domain.ConfigPath("/repo")
 	if got != want {
 		t.Errorf("resolveConfigPath: expected %q, got %q", want, got)
 	}

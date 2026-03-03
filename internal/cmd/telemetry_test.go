@@ -6,14 +6,12 @@ import (
 	"os/exec"
 	"testing"
 
-	"go.opentelemetry.io/otel"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-
-	"github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 // setupTestTracer installs an InMemoryExporter with a synchronous span processor
@@ -70,9 +68,9 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 	})
 	t.Cleanup(cleanup)
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "echo", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "echo", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
 	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, domain.NewLogger(io.Discard, false))
@@ -142,9 +140,9 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	})
 	t.Cleanup(cleanup)
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "false", TimeoutSec: 30},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "false", TimeoutSec: 30},
+		Retry:  domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
 
 	// Create a parent span so retry events have a recording span to attach to.
@@ -236,7 +234,7 @@ func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("expected sightjack.command=scan attribute on root span")
+		t.Error("expected domain.command=scan attribute on root span")
 	}
 }
 

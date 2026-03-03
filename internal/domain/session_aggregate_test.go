@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -28,7 +27,7 @@ func TestSessionAggregate_RecordScan(t *testing.T) {
 	// given
 	agg := domain.NewSessionAggregate()
 	payload := domain.ScanCompletedPayload{
-		Clusters:       []sightjack.ClusterState{{Name: "auth", Completeness: 0.3}},
+		Clusters:       []domain.ClusterState{{Name: "auth", Completeness: 0.3}},
 		Completeness:   0.3,
 		ShibitoCount:   5,
 		ScanResultPath: "scan/result.json",

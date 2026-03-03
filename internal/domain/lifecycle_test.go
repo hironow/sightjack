@@ -1,4 +1,4 @@
-package sightjack_test
+package domain_test
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"sync"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
@@ -20,11 +19,11 @@ import (
 
 // testStateDir returns the tool state directory for the given repo root.
 func testStateDir(baseDir string) string {
-	return filepath.Join(baseDir, sightjack.StateDir)
+	return filepath.Join(baseDir, domain.StateDir)
 }
 
 // loadTestState loads the latest state from events for test verification.
-func loadTestState(t *testing.T, baseDir string) *sightjack.SessionState {
+func loadTestState(t *testing.T, baseDir string) *domain.SessionState {
 	t.Helper()
 	state, _, err := eventsource.LoadLatestState(testStateDir(baseDir))
 	if err != nil {
@@ -34,7 +33,7 @@ func loadTestState(t *testing.T, baseDir string) *sightjack.SessionState {
 }
 
 // writeTestEvents creates an event store to simulate a pre-existing session state.
-func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.SessionState) {
+func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.SessionState) {
 	t.Helper()
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID))
 	recorder, err := eventsource.NewSessionRecorder(store, sessionID)
@@ -88,16 +87,16 @@ func testRecorder(baseDir, sessionID string) domain.Recorder {
 
 // testConfig returns a minimal Config for lifecycle tests.
 // Labels and Scribe disabled to avoid extra Claude calls.
-func testConfig() *sightjack.Config {
-	return &sightjack.Config{
+func testConfig() *domain.Config {
+	return &domain.Config{
 		Lang:       "en",
-		Claude:     sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 30},
-		Scan:       sightjack.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Linear:     sightjack.LinearConfig{Team: "ENG", Project: "TestProject"},
-		Scribe:     sightjack.ScribeConfig{Enabled: false},
-		Strictness: sightjack.StrictnessConfig{Default: sightjack.StrictnessFog},
-		Retry:      sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-		Labels:     sightjack.LabelsConfig{Enabled: false},
+		Claude:     domain.ClaudeConfig{Command: "claude", TimeoutSec: 30},
+		Scan:       domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Linear:     domain.LinearConfig{Team: "ENG", Project: "TestProject"},
+		Scribe:     domain.ScribeConfig{Enabled: false},
+		Strictness: domain.StrictnessConfig{Default: domain.StrictnessFog},
+		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Labels:     domain.LabelsConfig{Enabled: false},
 	}
 }
 
@@ -384,7 +383,7 @@ func TestLifecycle_RunScan_SingleCluster(t *testing.T) {
 		t.Errorf("expected 2 total issues, got %d", result.TotalIssues)
 	}
 	// Verify classify.json was written
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	assertFileExists(t, filepath.Join(scanDir, "classify.json"))
 }
 
@@ -418,7 +417,7 @@ func TestLifecycle_RunScan_StreamingGoesToOut(t *testing.T) {
 		t.Error("expected streaming output in out writer, got empty buffer")
 	}
 	// The streaming output must NOT be valid ScanResult JSON — it's raw Claude output.
-	var probe sightjack.ScanResult
+	var probe domain.ScanResult
 	if json.Unmarshal([]byte(streamBuf.String()), &probe) == nil && len(probe.Clusters) > 0 {
 		t.Error("streaming output should be raw Claude output, not structured ScanResult JSON")
 	}
@@ -456,7 +455,7 @@ func TestLifecycle_RunScan_JsonPipeStdoutClean(t *testing.T) {
 	stdoutBuf.WriteByte('\n')
 
 	// then: stdout must be valid ScanResult JSON parseable by `waves`
-	var parsed sightjack.ScanResult
+	var parsed domain.ScanResult
 	if err := json.Unmarshal([]byte(stdoutBuf.String()), &parsed); err != nil {
 		t.Fatalf("stdout is not valid JSON (pipe would break): %v\nContent: %s", err, stdoutBuf.String())
 	}
@@ -492,7 +491,7 @@ func TestLifecycle_RunScan_SavesScanResultJson(t *testing.T) {
 	}
 
 	// Simulate what scan.go does: save scan_result.json
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	if err := session.WriteScanResult(scanResultPath, result); err != nil {
 		t.Fatalf("WriteScanResult failed: %v", err)
@@ -592,7 +591,7 @@ func TestLifecycle_HappyPath(t *testing.T) {
 	}
 
 	// scan_result.json should be cached
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	assertFileExists(t, filepath.Join(scanDir, "scan_result.json"))
 
 	// show path: RestoreWaves should reconstruct waves
@@ -700,12 +699,12 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 		t.Fatalf("EnsureScanDir: %v", err)
 	}
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	scanResult := &sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
+	scanResult := &domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
 			{
 				Name:         "Auth",
 				Completeness: 0.55,
-				Issues: []sightjack.IssueDetail{
+				Issues: []domain.IssueDetail{
 					{ID: "AUTH-1", Identifier: "AUTH-1", Title: "Login flow", Completeness: 0.5, Gaps: []string{"Tests missing"}},
 					{ID: "AUTH-2", Identifier: "AUTH-2", Title: "Token refresh", Completeness: 0.6, Gaps: []string{}},
 				},
@@ -719,22 +718,22 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 	}
 
 	// Write pre-existing state: wave 1 completed, wave 2 available
-	state := &sightjack.SessionState{
-		Version:      sightjack.StateFormatVersion,
+	state := &domain.SessionState{
+		Version:      domain.StateFormatVersion,
 		SessionID:    sessionID,
 		Project:      "TestProject",
 		Completeness: 0.55,
-		Clusters: []sightjack.ClusterState{
+		Clusters: []domain.ClusterState{
 			{Name: "Auth", Completeness: 0.55, IssueCount: 2},
 		},
-		Waves: []sightjack.WaveState{
+		Waves: []domain.WaveState{
 			{
 				ID:          "auth-w1",
 				ClusterName: "Auth",
 				Title:       "Add DoD",
 				Status:      "completed",
 				ActionCount: 1,
-				Delta:       sightjack.WaveDelta{Before: 0.35, After: 0.55},
+				Delta:       domain.WaveDelta{Before: 0.35, After: 0.55},
 			},
 			{
 				ID:          "auth-w2",
@@ -742,8 +741,8 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 				Title:       "Add Tests",
 				Status:      "available",
 				ActionCount: 1,
-				Actions:     []sightjack.WaveAction{{Type: "add_test", IssueID: "AUTH-2", Description: "Add tests"}},
-				Delta:       sightjack.WaveDelta{Before: 0.55, After: 0.75},
+				Actions:     []domain.WaveAction{{Type: "add_test", IssueID: "AUTH-2", Description: "Add tests"}},
+				Delta:       domain.WaveDelta{Before: 0.55, After: 0.75},
 			},
 		},
 		ScanResultPath: scanResultPath,
@@ -958,7 +957,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inboxPath := filepath.Join(sightjack.MailDir(baseDir, sightjack.InboxDir), feedbackMail.Filename())
+	inboxPath := filepath.Join(domain.MailDir(baseDir, domain.InboxDir), feedbackMail.Filename())
 	if err := os.WriteFile(inboxPath, feedbackData, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -989,7 +988,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	}
 
 	// Feedback should exist in archive
-	archiveFeedback := filepath.Join(sightjack.MailDir(baseDir, sightjack.ArchiveDir), feedbackMail.Filename())
+	archiveFeedback := filepath.Join(domain.MailDir(baseDir, domain.ArchiveDir), feedbackMail.Filename())
 	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
 		t.Error("feedback should exist in archive")
 	}
@@ -1011,12 +1010,12 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	}
 
 	// Specification d-mail should exist in outbox and archive
-	outboxFiles, _ := session.ListDMail(baseDir, sightjack.OutboxDir)
+	outboxFiles, _ := session.ListDMail(baseDir, domain.OutboxDir)
 	var foundSpec, foundReport bool
 	for _, f := range outboxFiles {
 		if strings.Contains(f, "spec") {
 			foundSpec = true
-			data, readErr := os.ReadFile(filepath.Join(sightjack.MailDir(baseDir, sightjack.OutboxDir), f))
+			data, readErr := os.ReadFile(filepath.Join(domain.MailDir(baseDir, domain.OutboxDir), f))
 			if readErr != nil {
 				t.Fatalf("read spec: %v", readErr)
 			}
@@ -1033,7 +1032,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 		}
 		if strings.Contains(f, "report") {
 			foundReport = true
-			data, readErr := os.ReadFile(filepath.Join(sightjack.MailDir(baseDir, sightjack.OutboxDir), f))
+			data, readErr := os.ReadFile(filepath.Join(domain.MailDir(baseDir, domain.OutboxDir), f))
 			if readErr != nil {
 				t.Fatalf("read report: %v", readErr)
 			}
@@ -1054,7 +1053,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	}
 
 	// Both should also be in archive
-	archiveFiles, _ := session.ListDMail(baseDir, sightjack.ArchiveDir)
+	archiveFiles, _ := session.ListDMail(baseDir, domain.ArchiveDir)
 	var archiveSpec, archiveReport bool
 	for _, f := range archiveFiles {
 		if strings.Contains(f, "spec") {
@@ -1085,12 +1084,12 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 		t.Fatalf("EnsureScanDir: %v", err)
 	}
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	scanResult := &sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
+	scanResult := &domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
 			{
 				Name:         "Auth",
 				Completeness: 0.55,
-				Issues: []sightjack.IssueDetail{
+				Issues: []domain.IssueDetail{
 					{ID: "AUTH-1", Identifier: "AUTH-1", Title: "Login flow", Completeness: 0.5},
 					{ID: "AUTH-2", Identifier: "AUTH-2", Title: "Token refresh", Completeness: 0.6},
 				},
@@ -1103,23 +1102,23 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	}
 
 	// Write pre-existing state
-	state := &sightjack.SessionState{
-		Version:      sightjack.StateFormatVersion,
+	state := &domain.SessionState{
+		Version:      domain.StateFormatVersion,
 		SessionID:    sessionID,
 		Project:      "TestProject",
 		Completeness: 0.55,
-		Clusters:     []sightjack.ClusterState{{Name: "Auth", Completeness: 0.55, IssueCount: 2}},
-		Waves: []sightjack.WaveState{
+		Clusters:     []domain.ClusterState{{Name: "Auth", Completeness: 0.55, IssueCount: 2}},
+		Waves: []domain.WaveState{
 			{
 				ID: "auth-w1", ClusterName: "Auth", Title: "Add DoD",
 				Status: "completed", ActionCount: 1,
-				Delta: sightjack.WaveDelta{Before: 0.35, After: 0.55},
+				Delta: domain.WaveDelta{Before: 0.35, After: 0.55},
 			},
 			{
 				ID: "auth-w2", ClusterName: "Auth", Title: "Add Tests",
 				Status: "available", ActionCount: 1,
-				Actions: []sightjack.WaveAction{{Type: "add_test", IssueID: "AUTH-2", Description: "Add tests"}},
-				Delta:   sightjack.WaveDelta{Before: 0.55, After: 0.75},
+				Actions: []domain.WaveAction{{Type: "add_test", IssueID: "AUTH-2", Description: "Add tests"}},
+				Delta:   domain.WaveDelta{Before: 0.55, After: 0.75},
 			},
 		},
 		ScanResultPath: scanResultPath,
@@ -1141,7 +1140,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	if marshalErr != nil {
 		t.Fatal(marshalErr)
 	}
-	inboxPath := filepath.Join(sightjack.MailDir(baseDir, sightjack.InboxDir), feedbackMail.Filename())
+	inboxPath := filepath.Join(domain.MailDir(baseDir, domain.InboxDir), feedbackMail.Filename())
 	if err := os.WriteFile(inboxPath, feedbackData, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -1168,18 +1167,18 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
 		t.Error("feedback should have been removed from inbox")
 	}
-	archiveFeedback := filepath.Join(sightjack.MailDir(baseDir, sightjack.ArchiveDir), feedbackMail.Filename())
+	archiveFeedback := filepath.Join(domain.MailDir(baseDir, domain.ArchiveDir), feedbackMail.Filename())
 	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
 		t.Error("feedback should exist in archive")
 	}
 
 	// Spec and report d-mails should exist for wave auth-w2
-	outboxFiles, _ := session.ListDMail(baseDir, sightjack.OutboxDir)
+	outboxFiles, _ := session.ListDMail(baseDir, domain.OutboxDir)
 	var specFound, reportFound bool
 	for _, f := range outboxFiles {
 		if strings.Contains(f, "spec") && strings.Contains(f, "auth") {
 			specFound = true
-			data, readErr := os.ReadFile(filepath.Join(sightjack.MailDir(baseDir, sightjack.OutboxDir), f))
+			data, readErr := os.ReadFile(filepath.Join(domain.MailDir(baseDir, domain.OutboxDir), f))
 			if readErr != nil {
 				t.Fatalf("read spec: %v", readErr)
 			}
@@ -1244,7 +1243,7 @@ func TestLifecycle_DMailNoFeedback_StillGeneratesSpecAndReport(t *testing.T) {
 	}
 
 	// Spec and report should still be generated even without feedback
-	outboxFiles, listErr := session.ListDMail(baseDir, sightjack.OutboxDir)
+	outboxFiles, listErr := session.ListDMail(baseDir, domain.OutboxDir)
 	if listErr != nil {
 		t.Fatalf("list outbox: %v", listErr)
 	}
@@ -1265,7 +1264,7 @@ func TestLifecycle_DMailNoFeedback_StillGeneratesSpecAndReport(t *testing.T) {
 	}
 
 	// Inbox should be empty (no feedback was placed)
-	inboxFiles, _ := session.ListDMail(baseDir, sightjack.InboxDir)
+	inboxFiles, _ := session.ListDMail(baseDir, domain.InboxDir)
 	if len(inboxFiles) != 0 {
 		t.Errorf("expected empty inbox, got %d files", len(inboxFiles))
 	}
@@ -1303,13 +1302,13 @@ func TestResultCache_WavesPlan(t *testing.T) {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
 
-	plan := sightjack.WavePlan{Waves: waves, ScanResult: scanResult}
+	plan := domain.WavePlan{Waves: waves, ScanResult: scanResult}
 
 	// when: marshal and write (same as cmd/waves.go)
 	data, err := json.MarshalIndent(plan, "", "  ")
@@ -1328,7 +1327,7 @@ func TestResultCache_WavesPlan(t *testing.T) {
 		t.Fatalf("read failed: %v", err)
 	}
 
-	var parsed sightjack.WavePlan
+	var parsed domain.WavePlan
 	if err := json.Unmarshal(loaded, &parsed); err != nil {
 		t.Fatalf("unmarshal as WavePlan failed (select would break): %v", err)
 	}
@@ -1362,14 +1361,14 @@ func TestResultCache_ApplyResult(t *testing.T) {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
 
 	wave := waves[0]
-	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
 	internal, err := session.RunWaveApply(context.Background(), cfg, scanDir, wave, strictness, io.Discard, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveApply failed: %v", err)
@@ -1394,7 +1393,7 @@ func TestResultCache_ApplyResult(t *testing.T) {
 		t.Fatalf("read failed: %v", err)
 	}
 
-	var parsed sightjack.ApplyResult
+	var parsed domain.ApplyResult
 	if err := json.Unmarshal(loaded, &parsed); err != nil {
 		t.Fatalf("unmarshal as ApplyResult failed (nextgen would break): %v", err)
 	}
@@ -1425,14 +1424,14 @@ func TestResultCache_DiscussResult(t *testing.T) {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
 
 	wave := waves[0]
-	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
 	resp, err := session.RunArchitectDiscuss(context.Background(), cfg, scanDir, wave, "review coupling", strictness, io.Discard, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunArchitectDiscuss failed: %v", err)
@@ -1457,7 +1456,7 @@ func TestResultCache_DiscussResult(t *testing.T) {
 		t.Fatalf("read failed: %v", err)
 	}
 
-	var parsed sightjack.DiscussResult
+	var parsed domain.DiscussResult
 	if err := json.Unmarshal(loaded, &parsed); err != nil {
 		t.Fatalf("unmarshal as DiscussResult failed (adr would break): %v", err)
 	}
@@ -1492,7 +1491,7 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
@@ -1504,14 +1503,14 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 
 	existingADRs, _ := session.ReadExistingADRs(session.ADRDir(baseDir))
 	completedWaves := domain.CompletedWavesForCluster(waves, cluster.Name)
-	strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, domain.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("GenerateNextWaves failed: %v", err)
 	}
 
-	plan := sightjack.WavePlan{Waves: newWaves}
+	plan := domain.WavePlan{Waves: newWaves}
 
 	// when: marshal and write (same as cmd/nextgen.go)
 	data, err := json.MarshalIndent(plan, "", "  ")
@@ -1530,7 +1529,7 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 		t.Fatalf("read failed: %v", err)
 	}
 
-	var parsed sightjack.WavePlan
+	var parsed domain.WavePlan
 	if err := json.Unmarshal(loaded, &parsed); err != nil {
 		t.Fatalf("unmarshal as WavePlan failed (select would break): %v", err)
 	}

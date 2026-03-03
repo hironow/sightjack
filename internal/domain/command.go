@@ -2,8 +2,6 @@ package domain
 
 import (
 	"fmt"
-
-	sightjack "github.com/hironow/sightjack"
 )
 
 // RunScanCommand represents the intent to run a sightjack scan.
@@ -21,11 +19,11 @@ func (c *RunScanCommand) Validate() []error {
 	if c.RepoPath == "" {
 		errs = append(errs, fmt.Errorf("RepoPath is required"))
 	}
-	if c.Lang != "" && !sightjack.ValidLang(c.Lang) {
+	if c.Lang != "" && !ValidLang(c.Lang) {
 		errs = append(errs, fmt.Errorf("invalid lang %q (valid: ja, en)", c.Lang))
 	}
 	if c.Strictness != "" {
-		if _, err := sightjack.ParseStrictnessLevel(c.Strictness); err != nil {
+		if _, err := ParseStrictnessLevel(c.Strictness); err != nil {
 			errs = append(errs, fmt.Errorf("invalid strictness %q", c.Strictness))
 		}
 	}

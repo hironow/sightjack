@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
@@ -84,15 +83,15 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			}
 
 			// Cache scan result for pipe replay: cat .siren/.run/<id>/scan_result.json | sightjack waves
-			scanResultPath := filepath.Join(sightjack.ScanDir(baseDir, sessionID), "scan_result.json")
+			scanResultPath := filepath.Join(domain.ScanDir(baseDir, sessionID), "scan_result.json")
 			if err := session.WriteScanResult(scanResultPath, result); err != nil {
 				logger.Warn("Failed to cache scan result: %v", err)
 			}
 
 			// Record events for state reconstruction
-			var clusters []sightjack.ClusterState
+			var clusters []domain.ClusterState
 			for _, c := range result.Clusters {
-				clusters = append(clusters, sightjack.ClusterState{
+				clusters = append(clusters, domain.ClusterState{
 					Name:         c.Name,
 					Completeness: c.Completeness,
 					IssueCount:   len(c.Issues),
@@ -113,7 +112,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				Clusters:       clusters,
 				Completeness:   result.Completeness,
 				ShibitoCount:   len(result.ShibitoWarnings),
-				ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
+				ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
 				LastScanned:    time.Now(),
 			}); err != nil {
 				logger.Warn("Failed to record scan completed: %v", err)

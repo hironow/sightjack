@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
@@ -75,7 +74,7 @@ if event data is found in .siren/events/.`,
 			// state for rescan/new choices.
 			if !dryRun {
 				// Find best resumable session (may differ from the latest)
-				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(baseDir, func(s *sightjack.SessionState) bool {
+				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(baseDir, func(s *domain.SessionState) bool {
 					return session.CanResume(baseDir, s)
 				})
 				// Find latest state for display and rescan (regardless of resumability)
@@ -97,7 +96,7 @@ if event data is found in .siren/events/.`,
 							continue
 						}
 						switch choice {
-						case sightjack.ResumeChoiceResume:
+						case domain.ResumeChoiceResume:
 							if resumableState == nil {
 								logger.Warn("No resumable session found — starting fresh session instead.")
 								goto freshSession
@@ -111,7 +110,7 @@ if event data is found in .siren/events/.`,
 								RepoPath:  baseDir,
 								SessionID: resumableSessionID,
 							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
-						case sightjack.ResumeChoiceRescan:
+						case domain.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 							rescanStore := session.NewEventStore(baseDir, rescanID)
 							rescanRecorder, recErr := session.NewSessionRecorder(rescanStore, rescanID)
@@ -122,7 +121,7 @@ if event data is found in .siren/events/.`,
 								RepoPath: baseDir,
 								DryRun:   dryRun,
 							}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
-						case sightjack.ResumeChoiceNew:
+						case domain.ResumeChoiceNew:
 							goto freshSession
 						}
 					}

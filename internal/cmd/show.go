@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
 )
@@ -60,9 +60,9 @@ func runShowFromStdin(w io.Writer) error {
 		return fmt.Errorf("failed to read stdin: %w", err)
 	}
 
-	switch sightjack.DetectPipeType(data) {
-	case sightjack.PipeTypeScanResult:
-		var scanResult sightjack.ScanResult
+	switch domain.DetectPipeType(data) {
+	case domain.PipeTypeScanResult:
+		var scanResult domain.ScanResult
 		if err := json.Unmarshal(data, &scanResult); err != nil {
 			return fmt.Errorf("parse ScanResult: %w", err)
 		}
@@ -70,16 +70,16 @@ func runShowFromStdin(w io.Writer) error {
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
-	case sightjack.PipeTypeWavePlan:
-		var plan sightjack.WavePlan
+	case domain.PipeTypeWavePlan:
+		var plan domain.WavePlan
 		if err := json.Unmarshal(data, &plan); err != nil {
 			return fmt.Errorf("parse WavePlan: %w", err)
 		}
-		var result *sightjack.ScanResult
+		var result *domain.ScanResult
 		if plan.ScanResult != nil {
 			result = plan.ScanResult
 		} else {
-			result = &sightjack.ScanResult{}
+			result = &domain.ScanResult{}
 		}
 		nav := session.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
 		fmt.Fprintln(w)

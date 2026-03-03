@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestPromptWaveSelection(t *testing.T) {
-	waves := []sightjack.Wave{
-		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Delta: sightjack.WaveDelta{Before: 0.25, After: 0.40}},
-		{ID: "api-w1", ClusterName: "API", Title: "Split", Delta: sightjack.WaveDelta{Before: 0.30, After: 0.45}},
+	waves := []domain.Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Delta: domain.WaveDelta{Before: 0.25, After: 0.40}},
+		{ID: "api-w1", ClusterName: "API", Title: "Split", Delta: domain.WaveDelta{Before: 0.30, After: 0.45}},
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader("1\n"))
@@ -36,7 +36,7 @@ func TestPromptWaveSelection(t *testing.T) {
 }
 
 func TestPromptWaveSelection_Quit(t *testing.T) {
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps"},
 	}
 
@@ -51,14 +51,14 @@ func TestPromptWaveSelection_Quit(t *testing.T) {
 }
 
 func TestPromptWaveApproval_Approve(t *testing.T) {
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "Auth before token"},
 		},
-		Delta: sightjack.WaveDelta{Before: 0.25, After: 0.40},
+		Delta: domain.WaveDelta{Before: 0.25, After: 0.40},
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader("a\n"))
@@ -69,13 +69,13 @@ func TestPromptWaveApproval_Approve(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if choice != sightjack.ApprovalApprove {
+	if choice != domain.ApprovalApprove {
 		t.Errorf("expected ApprovalApprove, got %d", choice)
 	}
 }
 
 func TestPromptWaveApproval_Reject(t *testing.T) {
-	wave := sightjack.Wave{ID: "auth-w1", Actions: []sightjack.WaveAction{}}
+	wave := domain.Wave{ID: "auth-w1", Actions: []domain.WaveAction{}}
 
 	scanner := bufio.NewScanner(strings.NewReader("r\n"))
 	var output bytes.Buffer
@@ -85,18 +85,18 @@ func TestPromptWaveApproval_Reject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if choice != sightjack.ApprovalReject {
+	if choice != domain.ApprovalReject {
 		t.Errorf("expected ApprovalReject, got %d", choice)
 	}
 }
 
 func TestPromptWaveApproval_Discuss(t *testing.T) {
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
-		Actions:     []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
-		Delta:       sightjack.WaveDelta{Before: 0.25, After: 0.40},
+		Actions:     []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Delta:       domain.WaveDelta{Before: 0.25, After: 0.40},
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader("d\n"))
@@ -107,7 +107,7 @@ func TestPromptWaveApproval_Discuss(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if choice != sightjack.ApprovalDiscuss {
+	if choice != domain.ApprovalDiscuss {
 		t.Errorf("expected ApprovalDiscuss, got %d", choice)
 	}
 	if !strings.Contains(output.String(), "[d] Discuss") {
@@ -117,10 +117,10 @@ func TestPromptWaveApproval_Discuss(t *testing.T) {
 
 func TestPromptSequence_SelectionThenApproval(t *testing.T) {
 	// given: piped input with both selection and approval on one reader
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
-			Actions: []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
-			Delta:   sightjack.WaveDelta{Before: 0.25, After: 0.40}},
+			Actions: []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   domain.WaveDelta{Before: 0.25, After: 0.40}},
 	}
 	scanner := bufio.NewScanner(strings.NewReader("1\na\n"))
 	var output bytes.Buffer
@@ -141,7 +141,7 @@ func TestPromptSequence_SelectionThenApproval(t *testing.T) {
 	}
 
 	// then: approval should read "a" from the same scanner
-	if choice != sightjack.ApprovalApprove {
+	if choice != domain.ApprovalApprove {
 		t.Errorf("expected ApprovalApprove, got %d (scanner likely lost buffered input)", choice)
 	}
 }
@@ -187,7 +187,7 @@ func TestScanLine_NormalInput(t *testing.T) {
 }
 
 func TestDisplayRippleEffects(t *testing.T) {
-	ripples := []sightjack.Ripple{
+	ripples := []domain.Ripple{
 		{ClusterName: "API", Description: "W2 unlocked"},
 		{ClusterName: "DB", Description: "New dependency added"},
 	}
@@ -260,17 +260,17 @@ func TestPromptDiscussTopic_Empty(t *testing.T) {
 
 func TestDisplayArchitectResponse_WithModifiedWave(t *testing.T) {
 	// given
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis: "Splitting is unnecessary for this scale.",
-		ModifiedWave: &sightjack.Wave{
+		ModifiedWave: &domain.Wave{
 			ID:          "auth-w1",
 			ClusterName: "Auth",
 			Title:       "Dependency Ordering",
-			Actions: []sightjack.WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "add_dependency", IssueID: "ENG-101", Description: "Auth before token"},
 				{Type: "add_dod", IssueID: "ENG-101", Description: "Middleware interface"},
 			},
-			Delta: sightjack.WaveDelta{Before: 0.25, After: 0.42},
+			Delta: domain.WaveDelta{Before: 0.25, After: 0.42},
 		},
 		Reasoning: "Project scale favors fewer issues.",
 	}
@@ -294,7 +294,7 @@ func TestDisplayArchitectResponse_WithModifiedWave(t *testing.T) {
 
 func TestDisplayArchitectResponse_NoModifications(t *testing.T) {
 	// given
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis:     "Current actions look good.",
 		ModifiedWave: nil,
 		Reasoning:    "No changes needed.",
@@ -315,20 +315,20 @@ func TestDisplayArchitectResponse_NoModifications(t *testing.T) {
 }
 
 func TestPromptWaveApproval_UppercaseInput(t *testing.T) {
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID: "auth-w1", ClusterName: "Auth", Title: "Test",
-		Actions: []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
-		Delta:   sightjack.WaveDelta{Before: 0.25, After: 0.40},
+		Actions: []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Delta:   domain.WaveDelta{Before: 0.25, After: 0.40},
 	}
 
 	tests := []struct {
 		name     string
 		input    string
-		expected sightjack.ApprovalChoice
+		expected domain.ApprovalChoice
 	}{
-		{"uppercase A", "A\n", sightjack.ApprovalApprove},
-		{"uppercase D", "D\n", sightjack.ApprovalDiscuss},
-		{"uppercase R", "R\n", sightjack.ApprovalReject},
+		{"uppercase A", "A\n", domain.ApprovalApprove},
+		{"uppercase D", "D\n", domain.ApprovalDiscuss},
+		{"uppercase R", "R\n", domain.ApprovalReject},
 	}
 
 	for _, tt := range tests {
@@ -349,7 +349,7 @@ func TestPromptWaveApproval_UppercaseInput(t *testing.T) {
 }
 
 func TestPromptWaveApproval_UppercaseQ(t *testing.T) {
-	wave := sightjack.Wave{ID: "auth-w1", Actions: []sightjack.WaveAction{}}
+	wave := domain.Wave{ID: "auth-w1", Actions: []domain.WaveAction{}}
 	scanner := bufio.NewScanner(strings.NewReader("Q\n"))
 	var output bytes.Buffer
 	ctx := context.Background()
@@ -361,7 +361,7 @@ func TestPromptWaveApproval_UppercaseQ(t *testing.T) {
 }
 
 func TestPromptWaveApproval_InvalidInput(t *testing.T) {
-	wave := sightjack.Wave{ID: "auth-w1", Actions: []sightjack.WaveAction{}}
+	wave := domain.Wave{ID: "auth-w1", Actions: []domain.WaveAction{}}
 
 	tests := []struct {
 		name  string
@@ -421,12 +421,12 @@ func TestPromptDiscussTopic_UppercaseQuit(t *testing.T) {
 
 func TestDisplayArchitectResponse_ZeroDelta(t *testing.T) {
 	// given: ModifiedWave with zero-value delta (architect forgot to populate)
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis: "Modified wave.",
-		ModifiedWave: &sightjack.Wave{
+		ModifiedWave: &domain.Wave{
 			ID:      "auth-w1",
-			Actions: []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "test"}},
-			Delta:   sightjack.WaveDelta{Before: 0.0, After: 0.0},
+			Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "test"}},
+			Delta:   domain.WaveDelta{Before: 0.0, After: 0.0},
 		},
 	}
 	var output bytes.Buffer
@@ -443,7 +443,7 @@ func TestDisplayArchitectResponse_ZeroDelta(t *testing.T) {
 
 func TestDisplayArchitectResponse_EmptyAnalysis(t *testing.T) {
 	// given: empty analysis string (Claude omitted the field)
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis:  "",
 		Reasoning: "some reasoning",
 	}
@@ -462,12 +462,12 @@ func TestDisplayArchitectResponse_EmptyAnalysis(t *testing.T) {
 
 func TestDisplayArchitectResponse_ModifiedWaveNilActions(t *testing.T) {
 	// given: ModifiedWave is non-nil but Actions is nil
-	resp := &sightjack.ArchitectResponse{
+	resp := &domain.ArchitectResponse{
 		Analysis: "Simplified wave.",
-		ModifiedWave: &sightjack.Wave{
+		ModifiedWave: &domain.Wave{
 			ID:      "auth-w1",
 			Actions: nil,
-			Delta:   sightjack.WaveDelta{Before: 0.25, After: 0.35},
+			Delta:   domain.WaveDelta{Before: 0.25, After: 0.35},
 		},
 	}
 	var output bytes.Buffer
@@ -484,7 +484,7 @@ func TestDisplayArchitectResponse_ModifiedWaveNilActions(t *testing.T) {
 
 func TestDisplayScribeResponse(t *testing.T) {
 	// given
-	resp := &sightjack.ScribeResponse{
+	resp := &domain.ScribeResponse{
 		ADRID:     "0003",
 		Title:     "adopt-event-sourcing",
 		Content:   "# 0003. Adopt Event Sourcing",
@@ -510,7 +510,7 @@ func TestDisplayScribeResponse(t *testing.T) {
 
 func TestDisplayScribeResponse_EmptyTitle(t *testing.T) {
 	// given
-	resp := &sightjack.ScribeResponse{
+	resp := &domain.ScribeResponse{
 		ADRID: "0001",
 		Title: "",
 	}
@@ -530,7 +530,7 @@ func TestDisplayScribeResponse_EmptyTitle(t *testing.T) {
 }
 
 func TestPromptResume_ChooseResume(t *testing.T) {
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		Completeness: 0.62,
 		ADRCount:     4,
 		LastScanned:  time.Date(2026, 2, 17, 15, 30, 0, 0, time.UTC),
@@ -545,7 +545,7 @@ func TestPromptResume_ChooseResume(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if choice != sightjack.ResumeChoiceResume {
+	if choice != domain.ResumeChoiceResume {
 		t.Errorf("expected ResumeChoiceResume, got %d", choice)
 	}
 	if !strings.Contains(output.String(), "62%") {
@@ -557,7 +557,7 @@ func TestPromptResume_ChooseResume(t *testing.T) {
 }
 
 func TestPromptResume_ChooseNew(t *testing.T) {
-	state := &sightjack.SessionState{Completeness: 0.30, ADRCount: 1, LastScanned: time.Now()}
+	state := &domain.SessionState{Completeness: 0.30, ADRCount: 1, LastScanned: time.Now()}
 	input := "n\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	var output bytes.Buffer
@@ -568,13 +568,13 @@ func TestPromptResume_ChooseNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if choice != sightjack.ResumeChoiceNew {
+	if choice != domain.ResumeChoiceNew {
 		t.Errorf("expected ResumeChoiceNew, got %d", choice)
 	}
 }
 
 func TestPromptResume_ChooseRescan(t *testing.T) {
-	state := &sightjack.SessionState{Completeness: 0.50, ADRCount: 2, LastScanned: time.Now()}
+	state := &domain.SessionState{Completeness: 0.50, ADRCount: 2, LastScanned: time.Now()}
 	input := "s\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	var output bytes.Buffer
@@ -585,13 +585,13 @@ func TestPromptResume_ChooseRescan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if choice != sightjack.ResumeChoiceRescan {
+	if choice != domain.ResumeChoiceRescan {
 		t.Errorf("expected ResumeChoiceRescan, got %d", choice)
 	}
 }
 
 func TestPromptResume_ChooseQuit(t *testing.T) {
-	state := &sightjack.SessionState{Completeness: 0.50, LastScanned: time.Now()}
+	state := &domain.SessionState{Completeness: 0.50, LastScanned: time.Now()}
 	input := "q\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	var output bytes.Buffer
@@ -605,7 +605,7 @@ func TestPromptResume_ChooseQuit(t *testing.T) {
 }
 
 func TestPromptResume_InvalidInput(t *testing.T) {
-	state := &sightjack.SessionState{Completeness: 0.50, LastScanned: time.Now()}
+	state := &domain.SessionState{Completeness: 0.50, LastScanned: time.Now()}
 	input := "x\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	var output bytes.Buffer
@@ -639,7 +639,7 @@ func TestDisplayShibitoWarnings_EmptySlice(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	session.DisplayShibitoWarnings(&output, []sightjack.ShibitoWarning{})
+	session.DisplayShibitoWarnings(&output, []domain.ShibitoWarning{})
 
 	// then: no output
 	if output.Len() != 0 {
@@ -649,7 +649,7 @@ func TestDisplayShibitoWarnings_EmptySlice(t *testing.T) {
 
 func TestDisplayShibitoWarnings_MultipleWarnings(t *testing.T) {
 	// given
-	warnings := []sightjack.ShibitoWarning{
+	warnings := []domain.ShibitoWarning{
 		{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-201", Description: "Login retry pattern reappeared", RiskLevel: "high"},
 		{ClosedIssueID: "ENG-30", CurrentIssueID: "ENG-180", Description: "Similar caching approach", RiskLevel: "medium"},
 	}
@@ -698,7 +698,7 @@ func TestDisplayADRConflicts_EmptySlice(t *testing.T) {
 	var output bytes.Buffer
 
 	// when
-	session.DisplayADRConflicts(&output, []sightjack.ADRConflict{})
+	session.DisplayADRConflicts(&output, []domain.ADRConflict{})
 
 	// then
 	if output.Len() != 0 {
@@ -708,7 +708,7 @@ func TestDisplayADRConflicts_EmptySlice(t *testing.T) {
 
 func TestDisplayADRConflicts_MultipleConflicts(t *testing.T) {
 	// given
-	conflicts := []sightjack.ADRConflict{
+	conflicts := []domain.ADRConflict{
 		{ExistingADRID: "0001", Description: "Contradicts auth approach"},
 		{ExistingADRID: "0002", Description: "API versioning conflict"},
 	}
@@ -735,7 +735,7 @@ func TestDisplayADRConflicts_MultipleConflicts(t *testing.T) {
 
 func TestCompletedWaves_FiltersCompleted(t *testing.T) {
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "w1", ClusterName: "Auth", Title: "Deps", Status: "completed"},
 		{ID: "w2", ClusterName: "Auth", Title: "DoD", Status: "available"},
 		{ID: "w3", ClusterName: "API", Title: "Split", Status: "completed"},
@@ -758,7 +758,7 @@ func TestCompletedWaves_FiltersCompleted(t *testing.T) {
 
 func TestCompletedWaves_NoneCompleted(t *testing.T) {
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "w1", Status: "available"},
 		{ID: "w2", Status: "locked"},
 	}
@@ -775,14 +775,14 @@ func TestCompletedWaves_NoneCompleted(t *testing.T) {
 func TestDisplayCompletedWaveActions_ShowsActions(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ClusterName: "Auth",
 		Title:       "DoD",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "ENG-101", Description: "Auth flow"},
 			{Type: "add_dependency", IssueID: "ENG-102", Description: "Token dep"},
 		},
-		Delta: sightjack.WaveDelta{Before: 0.25, After: 0.40},
+		Delta: domain.WaveDelta{Before: 0.25, After: 0.40},
 	}
 
 	// when
@@ -807,7 +807,7 @@ func TestDisplayCompletedWaveActions_ShowsActions(t *testing.T) {
 func TestDisplayCompletedWaveActions_NoActions(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "Empty"}
+	wave := domain.Wave{ClusterName: "Auth", Title: "Empty"}
 
 	// when
 	session.DisplayCompletedWaveActions(&buf, wave)
@@ -824,9 +824,9 @@ func TestPromptCompletedWaveSelection_ValidChoice(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("2\n")
 	scanner := bufio.NewScanner(input)
-	completed := []sightjack.Wave{
-		{ID: "w1", ClusterName: "Auth", Title: "Deps", Delta: sightjack.WaveDelta{Before: 0.25, After: 0.40}},
-		{ID: "w3", ClusterName: "API", Title: "Split", Delta: sightjack.WaveDelta{Before: 0.30, After: 0.45}},
+	completed := []domain.Wave{
+		{ID: "w1", ClusterName: "Auth", Title: "Deps", Delta: domain.WaveDelta{Before: 0.25, After: 0.40}},
+		{ID: "w3", ClusterName: "API", Title: "Split", Delta: domain.WaveDelta{Before: 0.30, After: 0.45}},
 	}
 
 	// when
@@ -846,7 +846,7 @@ func TestPromptCompletedWaveSelection_Back(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("b\n")
 	scanner := bufio.NewScanner(input)
-	completed := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+	completed := []domain.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
 
 	// when
 	_, err := session.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
@@ -862,7 +862,7 @@ func TestPromptCompletedWaveSelection_Invalid(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("99\n")
 	scanner := bufio.NewScanner(input)
-	completed := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+	completed := []domain.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
 
 	// when
 	_, err := session.PromptCompletedWaveSelection(context.Background(), &buf, scanner, completed)
@@ -876,8 +876,8 @@ func TestPromptCompletedWaveSelection_Invalid(t *testing.T) {
 func TestDisplayWaveCompletion_Basic(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "DoD", Delta: sightjack.WaveDelta{Before: 0.40, After: 0.65}}
-	ripples := []sightjack.Ripple{
+	wave := domain.Wave{ClusterName: "Auth", Title: "DoD", Delta: domain.WaveDelta{Before: 0.40, After: 0.65}}
+	ripples := []domain.Ripple{
 		{ClusterName: "DB", Description: "Wave 2 unlocked"},
 		{ClusterName: "DB", Description: "Schema dependency added"},
 		{ClusterName: "API", Description: "DoD updated: token validation"},
@@ -918,7 +918,7 @@ func TestDisplayWaveCompletion_Basic(t *testing.T) {
 func TestDisplayWaveCompletion_NoRipples(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "Deps", Delta: sightjack.WaveDelta{Before: 0.25, After: 0.40}}
+	wave := domain.Wave{ClusterName: "Auth", Title: "Deps", Delta: domain.WaveDelta{Before: 0.25, After: 0.40}}
 
 	// when
 	session.DisplayWaveCompletion(&buf, wave, nil, 0.36, 0)
@@ -936,8 +936,8 @@ func TestDisplayWaveCompletion_NoRipples(t *testing.T) {
 func TestDisplayWaveCompletion_ZeroNewWaves(t *testing.T) {
 	// given
 	var buf bytes.Buffer
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "DoD", Delta: sightjack.WaveDelta{Before: 0.40, After: 0.65}}
-	ripples := []sightjack.Ripple{{ClusterName: "DB", Description: "Updated"}}
+	wave := domain.Wave{ClusterName: "Auth", Title: "DoD", Delta: domain.WaveDelta{Before: 0.40, After: 0.65}}
+	ripples := []domain.Ripple{{ClusterName: "DB", Description: "Updated"}}
 
 	// when
 	session.DisplayWaveCompletion(&buf, wave, ripples, 0.50, 0)
@@ -954,7 +954,7 @@ func TestPromptWaveSelection_BackOption(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("b\n")
 	scanner := bufio.NewScanner(input)
-	waves := []sightjack.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
+	waves := []domain.Wave{{ID: "w1", ClusterName: "Auth", Title: "Deps"}}
 
 	// when
 	_, err := session.PromptWaveSelection(context.Background(), &buf, scanner, waves)
@@ -966,11 +966,11 @@ func TestPromptWaveSelection_BackOption(t *testing.T) {
 }
 
 func TestPromptWaveApproval_Selective(t *testing.T) {
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ClusterName: "Auth",
 		Title:       "JWT middleware",
-		Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"}},
-		Delta:       sightjack.WaveDelta{Before: 0.3, After: 0.5},
+		Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"}},
+		Delta:       domain.WaveDelta{Before: 0.3, After: 0.5},
 	}
 	input := strings.NewReader("s\n")
 	scanner := bufio.NewScanner(input)
@@ -980,17 +980,17 @@ func TestPromptWaveApproval_Selective(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if choice != sightjack.ApprovalSelective {
+	if choice != domain.ApprovalSelective {
 		t.Errorf("expected ApprovalSelective, got %d", choice)
 	}
 }
 
 func TestPromptSelectiveApproval_AllSelected(t *testing.T) {
-	actions := []sightjack.WaveAction{
+	actions := []domain.WaveAction{
 		{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"},
 		{Type: "add_dep", IssueID: "ENG-102", Description: "Add dependency"},
 	}
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	wave := domain.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
 	input := strings.NewReader("done\n")
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
@@ -1008,12 +1008,12 @@ func TestPromptSelectiveApproval_AllSelected(t *testing.T) {
 }
 
 func TestPromptSelectiveApproval_ToggleOne(t *testing.T) {
-	actions := []sightjack.WaveAction{
+	actions := []domain.WaveAction{
 		{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"},
 		{Type: "add_dep", IssueID: "ENG-102", Description: "Add dependency"},
 		{Type: "create", IssueID: "ENG-103", Description: "Create sub-issue"},
 	}
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	wave := domain.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
 	input := strings.NewReader("3\ndone\n")
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
@@ -1034,10 +1034,10 @@ func TestPromptSelectiveApproval_ToggleOne(t *testing.T) {
 }
 
 func TestPromptSelectiveApproval_SelectNoneThenDone(t *testing.T) {
-	actions := []sightjack.WaveAction{
+	actions := []domain.WaveAction{
 		{Type: "add_dod", IssueID: "ENG-101", Description: "Add spec"},
 	}
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	wave := domain.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
 	input := strings.NewReader("n\ndone\n")
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
@@ -1055,11 +1055,11 @@ func TestPromptSelectiveApproval_SelectNoneThenDone(t *testing.T) {
 }
 
 func TestPromptSelectiveApproval_SelectAll(t *testing.T) {
-	actions := []sightjack.WaveAction{
+	actions := []domain.WaveAction{
 		{Type: "add_dod", IssueID: "ENG-101", Description: "Spec"},
 		{Type: "add_dep", IssueID: "ENG-102", Description: "Dep"},
 	}
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	wave := domain.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
 	input := strings.NewReader("n\na\ndone\n")
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
@@ -1074,8 +1074,8 @@ func TestPromptSelectiveApproval_SelectAll(t *testing.T) {
 }
 
 func TestPromptSelectiveApproval_Quit(t *testing.T) {
-	actions := []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "Spec"}}
-	wave := sightjack.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
+	actions := []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "Spec"}}
+	wave := domain.Wave{ClusterName: "Auth", Title: "Test", Actions: actions}
 	input := strings.NewReader("q\n")
 	scanner := bufio.NewScanner(input)
 	var buf bytes.Buffer
@@ -1088,12 +1088,12 @@ func TestPromptSelectiveApproval_Quit(t *testing.T) {
 
 func TestDisplayCompletedWaveActions(t *testing.T) {
 	// given: a completed wave with multiple actions
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
 		Status:      "completed",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "ENG-101 blocks ENG-102"},
 			{Type: "add_dod", IssueID: "ENG-102", Description: "Token lifecycle defined"},
 			{Type: "add_dod", IssueID: "ENG-103", Description: "Reset flow documented"},
@@ -1119,7 +1119,7 @@ func TestDisplayCompletedWaveActions(t *testing.T) {
 
 func TestDisplayCompletedWaveActions_Empty(t *testing.T) {
 	// given: a completed wave with no actions
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Empty Wave",
@@ -1140,7 +1140,7 @@ func TestDisplayCompletedWaveActions_Empty(t *testing.T) {
 
 func TestDisplayScribeResponse_SanitizedFilename(t *testing.T) {
 	// given: title with uppercase and spaces (would be sanitized on write)
-	resp := &sightjack.ScribeResponse{
+	resp := &domain.ScribeResponse{
 		ADRID:   "0005",
 		Title:   "Use FastAPI for API Layer",
 		Content: "# 0005. Use FastAPI for API Layer",

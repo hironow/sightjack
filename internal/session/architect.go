@@ -10,19 +10,17 @@ import (
 	"slices"
 	"strings"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// ToDiscussResult converts an sightjack.ArchitectResponse to the pipe wire format sightjack.DiscussResult.
+// ToDiscussResult converts an domain.ArchitectResponse to the pipe wire format domain.DiscussResult.
 // It compares original and modified wave actions to build the modifications list,
 // detecting changed, added, and removed actions.
-func ToDiscussResult(wave sightjack.Wave, resp *sightjack.ArchitectResponse, topic string) sightjack.DiscussResult {
-	var mods []sightjack.WaveModification
+func ToDiscussResult(wave domain.Wave, resp *domain.ArchitectResponse, topic string) domain.DiscussResult {
+	var mods []domain.WaveModification
 	if resp.ModifiedWave != nil {
 		origLen := len(wave.Actions)
 		modLen := len(resp.ModifiedWave.Actions)
@@ -33,7 +31,7 @@ func ToDiscussResult(wave sightjack.Wave, resp *sightjack.ArchitectResponse, top
 			orig := wave.Actions[i]
 			mod := resp.ModifiedWave.Actions[i]
 			if orig.Description != mod.Description || orig.Detail != mod.Detail || orig.Type != mod.Type || orig.IssueID != mod.IssueID {
-				mods = append(mods, sightjack.WaveModification{
+				mods = append(mods, domain.WaveModification{
 					ActionIndex: i,
 					Change:      fmt.Sprintf("%s → %s", orig.Description, mod.Description),
 				})
@@ -43,7 +41,7 @@ func ToDiscussResult(wave sightjack.Wave, resp *sightjack.ArchitectResponse, top
 		// Report added actions (modified has more than original).
 		for i := origLen; i < modLen; i++ {
 			mod := resp.ModifiedWave.Actions[i]
-			mods = append(mods, sightjack.WaveModification{
+			mods = append(mods, domain.WaveModification{
 				ActionIndex: i,
 				Change:      fmt.Sprintf("added: %s", mod.Description),
 			})
@@ -52,7 +50,7 @@ func ToDiscussResult(wave sightjack.Wave, resp *sightjack.ArchitectResponse, top
 		// Report removed actions (original has more than modified).
 		for i := modLen; i < origLen; i++ {
 			orig := wave.Actions[i]
-			mods = append(mods, sightjack.WaveModification{
+			mods = append(mods, domain.WaveModification{
 				ActionIndex: i,
 				Change:      fmt.Sprintf("removed: %s", orig.Description),
 			})
@@ -64,7 +62,7 @@ func ToDiscussResult(wave sightjack.Wave, resp *sightjack.ArchitectResponse, top
 		decision = topic
 	}
 
-	return sightjack.DiscussResult{
+	return domain.DiscussResult{
 		WaveID:        wave.ID,
 		Analysis:      resp.Analysis,
 		Reasoning:     resp.Reasoning,
@@ -74,12 +72,12 @@ func ToDiscussResult(wave sightjack.Wave, resp *sightjack.ArchitectResponse, top
 }
 
 // ParseArchitectResult reads and parses an architect response JSON file.
-func ParseArchitectResult(path string) (*sightjack.ArchitectResponse, error) {
+func ParseArchitectResult(path string) (*domain.ArchitectResponse, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read architect result: %w", err)
 	}
-	var result sightjack.ArchitectResponse
+	var result domain.ArchitectResponse
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse architect result: %w", err)
 	}
@@ -87,19 +85,19 @@ func ParseArchitectResult(path string) (*sightjack.ArchitectResponse, error) {
 }
 
 // ArchitectDiscussFileName returns the output filename for an architect discussion.
-func ArchitectDiscussFileName(wave sightjack.Wave) string {
+func ArchitectDiscussFileName(wave domain.Wave) string {
 	return fmt.Sprintf("architect_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 }
 
 // RunArchitectDiscussDryRun saves the architect prompt to a file instead of executing Claude.
-func RunArchitectDiscussDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wave, topic string, strictness string, logger *domain.Logger) error {
+func RunArchitectDiscussDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, logger *domain.Logger) error {
 	actionsJSON, err := json.Marshal(wave.Actions)
 	if err != nil {
 		return fmt.Errorf("marshal wave actions: %w", err)
 	}
 
 	outputFile := filepath.Join(scanDir, ArchitectDiscussFileName(wave))
-	prompt, err := sightjack.RenderArchitectDiscussPrompt(cfg.Lang, sightjack.ArchitectDiscussPromptData{
+	prompt, err := domain.RenderArchitectDiscussPrompt(cfg.Lang, domain.ArchitectDiscussPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),
@@ -118,13 +116,13 @@ func RunArchitectDiscussDryRun(cfg *sightjack.Config, scanDir string, wave sight
 // ClearArchitectOutput removes any existing architect output file to prevent
 // stale results from a prior discuss round being parsed if Claude fails to
 // write a new file.
-func ClearArchitectOutput(scanDir string, wave sightjack.Wave) {
+func ClearArchitectOutput(scanDir string, wave domain.Wave) {
 	path := filepath.Join(scanDir, ArchitectDiscussFileName(wave))
 	_ = os.Remove(path)
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
-func RunArchitectDiscuss(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, topic string, strictness string, out io.Writer, logger *domain.Logger) (*sightjack.ArchitectResponse, error) {
+func RunArchitectDiscuss(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, out io.Writer, logger *domain.Logger) (*domain.ArchitectResponse, error) {
 	ctx, discussSpan := platform.Tracer.Start(ctx, "architect.discuss",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", wave.ClusterName),
@@ -141,7 +139,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *sightjack.Config, scanDir str
 		return nil, fmt.Errorf("marshal wave actions: %w", err)
 	}
 
-	prompt, err := sightjack.RenderArchitectDiscussPrompt(cfg.Lang, sightjack.ArchitectDiscussPromptData{
+	prompt, err := domain.RenderArchitectDiscussPrompt(cfg.Lang, domain.ArchitectDiscussPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),

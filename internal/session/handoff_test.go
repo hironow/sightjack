@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -44,19 +43,19 @@ func TestHandoffResult_ZeroValue(t *testing.T) {
 }
 
 func TestReadyIssueIDs(t *testing.T) {
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "completed",
-			Actions: []sightjack.WaveAction{
+			Actions: []domain.WaveAction{
 				{IssueID: "AUTH-1"},
 				{IssueID: "AUTH-2"},
 			}},
 		{ID: "w2", ClusterName: "auth", Status: "completed",
-			Actions: []sightjack.WaveAction{
+			Actions: []domain.WaveAction{
 				{IssueID: "AUTH-2"},
 				{IssueID: "AUTH-3"},
 			}},
 		{ID: "w3", ClusterName: "auth", Status: "available",
-			Actions: []sightjack.WaveAction{
+			Actions: []domain.WaveAction{
 				{IssueID: "AUTH-3"},
 			}},
 	}
@@ -85,8 +84,8 @@ func TestReadyIssueIDs(t *testing.T) {
 }
 
 func TestReadyIssueIDsNoCompleted(t *testing.T) {
-	waves := []sightjack.Wave{
-		{ID: "w1", Status: "available", Actions: []sightjack.WaveAction{{IssueID: "A-1"}}},
+	waves := []domain.Wave{
+		{ID: "w1", Status: "available", Actions: []domain.WaveAction{{IssueID: "A-1"}}},
 	}
 	ready := session.ReadyIssueIDs(waves)
 	if len(ready) != 0 {
@@ -95,9 +94,9 @@ func TestReadyIssueIDsNoCompleted(t *testing.T) {
 }
 
 func TestReadyIssueIDsAllCompleted(t *testing.T) {
-	waves := []sightjack.Wave{
-		{ID: "w1", Status: "completed", Actions: []sightjack.WaveAction{{IssueID: "A-1"}}},
-		{ID: "w2", Status: "completed", Actions: []sightjack.WaveAction{{IssueID: "A-1"}, {IssueID: "A-2"}}},
+	waves := []domain.Wave{
+		{ID: "w1", Status: "completed", Actions: []domain.WaveAction{{IssueID: "A-1"}}},
+		{ID: "w2", Status: "completed", Actions: []domain.WaveAction{{IssueID: "A-1"}, {IssueID: "A-2"}}},
 	}
 	ready := session.ReadyIssueIDs(waves)
 	if len(ready) != 2 {
@@ -107,8 +106,8 @@ func TestReadyIssueIDsAllCompleted(t *testing.T) {
 
 func TestReadyIssueIDs_Sorted(t *testing.T) {
 	// given: multiple completed issues that would be returned in random map order
-	waves := []sightjack.Wave{
-		{ID: "w1", Status: "completed", Actions: []sightjack.WaveAction{
+	waves := []domain.Wave{
+		{ID: "w1", Status: "completed", Actions: []domain.WaveAction{
 			{IssueID: "Z-1"},
 			{IssueID: "A-1"},
 			{IssueID: "M-1"},

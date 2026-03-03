@@ -7,7 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -16,10 +15,10 @@ import (
 func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
 	os.MkdirAll(filepath.Dir(dbPath), 0o755)
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {

@@ -1,9 +1,5 @@
 package domain
 
-import (
-	sightjack "github.com/hironow/sightjack"
-)
-
 // projectionContext tracks seen entities during replay to ensure idempotency.
 type projectionContext struct {
 	seenWaves map[string]bool // key = ClusterName:WaveID
@@ -13,8 +9,8 @@ type projectionContext struct {
 // ProjectState replays a sequence of events to produce a SessionState.
 // Unknown event types are silently skipped.
 // Returns a zero-value SessionState for nil/empty input.
-func ProjectState(events []Event) *sightjack.SessionState {
-	state := &sightjack.SessionState{}
+func ProjectState(events []Event) *SessionState {
+	state := &SessionState{}
 	ctx := &projectionContext{
 		seenWaves: make(map[string]bool),
 		seenADRs:  make(map[string]bool),
@@ -27,12 +23,12 @@ func ProjectState(events []Event) *sightjack.SessionState {
 
 // applyEvent mutates state according to the event type.
 // The projectionContext tracks seen entities to ensure idempotent replay.
-func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e Event) {
+func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 	switch e.Type {
 	case EventSessionStarted:
 		var p SessionStartedPayload
 		if unmarshalPayload(e, &p) {
-			state.Version = sightjack.StateFormatVersion
+			state.Version = StateFormatVersion
 			state.SessionID = e.SessionID
 			state.Project = p.Project
 			state.StrictnessLevel = p.StrictnessLevel

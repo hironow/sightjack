@@ -1,4 +1,4 @@
-package sightjack_test
+package domain_test
 
 import (
 	"encoding/json"
@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestConfigPath(t *testing.T) {
 	// when
-	path := sightjack.ConfigPath("/project")
+	path := domain.ConfigPath("/project")
 
 	// then
 	expected := filepath.Join("/project", ".siren", "config.yaml")
@@ -22,7 +22,7 @@ func TestConfigPath(t *testing.T) {
 
 func TestSessionState_ADRCount_Positive(t *testing.T) {
 	// given
-	state := sightjack.SessionState{
+	state := domain.SessionState{
 		Version:  "0.4",
 		ADRCount: 3,
 	}
@@ -32,7 +32,7 @@ func TestSessionState_ADRCount_Positive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var decoded sightjack.SessionState
+	var decoded domain.SessionState
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestSessionState_ADRCount_Positive(t *testing.T) {
 
 func TestSessionState_ADRCount_ZeroOmitted(t *testing.T) {
 	// given: ADRCount = 0 should be omitted from JSON (omitempty)
-	state := sightjack.SessionState{
+	state := domain.SessionState{
 		Version:  "0.4",
 		ADRCount: 0,
 	}
@@ -65,7 +65,7 @@ func TestSessionState_ADRCount_ZeroOmitted(t *testing.T) {
 
 func TestSessionState_ScanResultPath_OmittedWhenEmpty(t *testing.T) {
 	// given
-	state := sightjack.SessionState{Version: "0.5", ScanResultPath: ""}
+	state := domain.SessionState{Version: "0.5", ScanResultPath: ""}
 
 	// when
 	data, err := json.Marshal(state)
@@ -85,7 +85,7 @@ func TestRelativeScanResultPath(t *testing.T) {
 	absPath := "/project/.siren/.run/session-1/scan_result.json"
 
 	// when
-	rel := sightjack.RelativeScanResultPath(baseDir, absPath)
+	rel := domain.RelativeScanResultPath(baseDir, absPath)
 
 	// then
 	want := filepath.Join(".siren", ".run", "session-1", "scan_result.json")
@@ -100,7 +100,7 @@ func TestRelativeScanResultPath_AlreadyRelative(t *testing.T) {
 	relPath := ".siren/.run/session-1/scan_result.json"
 
 	// when
-	result := sightjack.RelativeScanResultPath(baseDir, relPath)
+	result := domain.RelativeScanResultPath(baseDir, relPath)
 
 	// then — returns as-is since it's already relative
 	if result != relPath {
@@ -114,7 +114,7 @@ func TestResolveScanResultPath_Relative(t *testing.T) {
 	storedPath := filepath.Join(".siren", ".run", "session-1", "scan_result.json")
 
 	// when
-	abs := sightjack.ResolveScanResultPath(baseDir, storedPath)
+	abs := domain.ResolveScanResultPath(baseDir, storedPath)
 
 	// then
 	want := filepath.Join("/project", ".siren", ".run", "session-1", "scan_result.json")
@@ -129,7 +129,7 @@ func TestResolveScanResultPath_Absolute(t *testing.T) {
 	storedPath := "/old-project/.siren/.run/session-1/scan_result.json"
 
 	// when
-	abs := sightjack.ResolveScanResultPath(baseDir, storedPath)
+	abs := domain.ResolveScanResultPath(baseDir, storedPath)
 
 	// then — absolute path returned as-is
 	if abs != storedPath {
@@ -139,7 +139,7 @@ func TestResolveScanResultPath_Absolute(t *testing.T) {
 
 func TestResolveScanResultPath_Empty(t *testing.T) {
 	// given
-	abs := sightjack.ResolveScanResultPath("/project", "")
+	abs := domain.ResolveScanResultPath("/project", "")
 
 	// then
 	if abs != "" {

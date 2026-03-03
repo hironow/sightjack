@@ -1,4 +1,4 @@
-package sightjack_test
+package domain_test
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -115,9 +114,9 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -140,9 +139,9 @@ func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -165,9 +164,9 @@ func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -202,10 +201,10 @@ func TestCheckLinearMCP_Success(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Linear: sightjack.LinearConfig{Team: "Engineering"},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Linear: domain.LinearConfig{Team: "Engineering"},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -225,10 +224,10 @@ func TestCheckLinearMCP_Failure(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Linear: sightjack.LinearConfig{Team: "Engineering"},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Linear: domain.LinearConfig{Team: "Engineering"},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -305,7 +304,7 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 func TestCheckSkills_OK(t *testing.T) {
 	// given: valid SKILL.md files installed
 	baseDir := t.TempDir()
-	if err := session.InstallSkills(baseDir, sightjack.SkillsFS); err != nil {
+	if err := session.InstallSkills(baseDir, domain.SkillsFS); err != nil {
 		t.Fatalf("InstallSkills: %v", err)
 	}
 

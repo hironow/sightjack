@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -23,9 +22,9 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -52,9 +51,9 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", Model: "", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", Model: "", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -74,7 +73,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 
 func TestRunClaudeDryRun(t *testing.T) {
 	dir := t.TempDir()
-	cfg := &sightjack.Config{Claude: sightjack.ClaudeConfig{Command: "claude"}}
+	cfg := &domain.Config{Claude: domain.ClaudeConfig{Command: "claude"}}
 	prompt := "test prompt content"
 	outDir := dir + "/dryrun"
 
@@ -96,7 +95,7 @@ func TestRunClaudeDryRun(t *testing.T) {
 func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	// given: two dry-run calls with different names to the same dir
 	dir := t.TempDir()
-	cfg := &sightjack.Config{Claude: sightjack.ClaudeConfig{Command: "claude"}}
+	cfg := &domain.Config{Claude: domain.ClaudeConfig{Command: "claude"}}
 
 	// when
 	if err := session.RunClaudeDryRun(cfg, "prompt A", dir, "wave_00_auth", domain.NewLogger(io.Discard, false)); err != nil {
@@ -132,9 +131,9 @@ func TestRunClaudeOnceNoRetry(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
 
 	// when
@@ -160,9 +159,9 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
 	}
 	output, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
 	if err != nil {
@@ -187,9 +186,9 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already cancelled
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
 	_, err := session.RunClaude(ctx, cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
 	if err == nil {
@@ -209,9 +208,9 @@ func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -244,9 +243,9 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -277,9 +276,9 @@ func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
 	defer cleanup()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "sleep", TimeoutSec: 30},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "sleep", TimeoutSec: 30},
+		Retry:  domain.RetryConfig{MaxAttempts: 1},
 	}
 
 	// when: cancel context after 100ms
@@ -311,9 +310,9 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
+	cfg := &domain.Config{
+		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Retry:  domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
 	_, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, domain.NewLogger(io.Discard, false))
 	if err == nil {

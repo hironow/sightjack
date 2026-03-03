@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -171,11 +170,11 @@ func TestChunkSlice(t *testing.T) {
 
 func TestMergeClusterChunks(t *testing.T) {
 	// given: two chunks from the same cluster
-	chunks := []sightjack.ClusterScanResult{
+	chunks := []domain.ClusterScanResult{
 		{
 			Name:         "Auth",
 			Completeness: 0.4,
-			Issues: []sightjack.IssueDetail{
+			Issues: []domain.IssueDetail{
 				{ID: "1", Completeness: 0.3},
 				{ID: "2", Completeness: 0.5},
 			},
@@ -184,7 +183,7 @@ func TestMergeClusterChunks(t *testing.T) {
 		{
 			Name:         "Auth",
 			Completeness: 0.6,
-			Issues: []sightjack.IssueDetail{
+			Issues: []domain.IssueDetail{
 				{ID: "3", Completeness: 0.7},
 			},
 			Observations: []string{"obs2"},
@@ -213,11 +212,11 @@ func TestMergeClusterChunks(t *testing.T) {
 func TestMergeClusterChunks_SingleChunk(t *testing.T) {
 	// given: single chunk where Claude's top-level completeness differs from per-issue average
 	// Claude returned 0.80 (rounded) but individual issues average to 0.75
-	chunks := []sightjack.ClusterScanResult{
+	chunks := []domain.ClusterScanResult{
 		{
 			Name:         "API",
 			Completeness: 0.80,
-			Issues: []sightjack.IssueDetail{
+			Issues: []domain.IssueDetail{
 				{ID: "1", Completeness: 0.5},
 				{ID: "2", Completeness: 1.0},
 			},
@@ -239,8 +238,8 @@ func TestMergeClusterChunks_SingleChunk(t *testing.T) {
 
 func TestMergeClusterChunks_SingleChunk_CanonicalName(t *testing.T) {
 	// given: Claude returned a slightly different name than pass-1 classification
-	chunks := []sightjack.ClusterScanResult{
-		{Name: "auth & login", Completeness: 0.5, Issues: make([]sightjack.IssueDetail, 3)},
+	chunks := []domain.ClusterScanResult{
+		{Name: "auth & login", Completeness: 0.5, Issues: make([]domain.IssueDetail, 3)},
 	}
 
 	// when: canonical name from pass-1 is "Auth"
@@ -282,7 +281,7 @@ func TestRunWaveGenerate_ParsesResults(t *testing.T) {
 	}
 
 	// then: merge waves
-	allWaves := domain.MergeWaveResults([]sightjack.WaveGenerateResult{*result0, *result1})
+	allWaves := domain.MergeWaveResults([]domain.WaveGenerateResult{*result0, *result1})
 	if len(allWaves) != 2 {
 		t.Fatalf("expected 2 waves, got %d", len(allWaves))
 	}
@@ -330,10 +329,10 @@ func TestParseClassifyResult_WithShibitoWarnings(t *testing.T) {
 
 func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
 	// given
-	clusters := []sightjack.ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: make([]sightjack.IssueDetail, 3)},
+	clusters := []domain.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: make([]domain.IssueDetail, 3)},
 	}
-	warnings := []sightjack.ShibitoWarning{
+	warnings := []domain.ShibitoWarning{
 		{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-120", Description: "pattern", RiskLevel: "high"},
 	}
 
@@ -351,9 +350,9 @@ func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
 
 func TestMergeScanResults(t *testing.T) {
 	// given
-	clusters := []sightjack.ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: make([]sightjack.IssueDetail, 3)},
-		{Name: "API", Completeness: 0.50, Issues: make([]sightjack.IssueDetail, 7)},
+	clusters := []domain.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: make([]domain.IssueDetail, 3)},
+		{Name: "API", Completeness: 0.50, Issues: make([]domain.IssueDetail, 7)},
 	}
 
 	// when
@@ -373,8 +372,8 @@ func TestMergeScanResults(t *testing.T) {
 
 func TestMergeScanResults_WithScanWarnings(t *testing.T) {
 	// given: partial scan success — some clusters failed
-	clusters := []sightjack.ClusterScanResult{
-		{Name: "Auth", Completeness: 0.5, Issues: make([]sightjack.IssueDetail, 3)},
+	clusters := []domain.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.5, Issues: make([]domain.IssueDetail, 3)},
 	}
 	scanWarnings := []string{`Cluster "Infra" scan failed: timeout`}
 
@@ -392,20 +391,20 @@ func TestMergeScanResults_WithScanWarnings(t *testing.T) {
 
 func TestRunParallelDeepScan(t *testing.T) {
 	// given
-	clusters := []sightjack.ClusterScanResult{
-		{Name: "auth", Issues: []sightjack.IssueDetail{{ID: "A-1"}}},
-		{Name: "infra", Issues: []sightjack.IssueDetail{{ID: "I-1"}}},
-		{Name: "frontend", Issues: []sightjack.IssueDetail{{ID: "F-1"}}},
+	clusters := []domain.ClusterScanResult{
+		{Name: "auth", Issues: []domain.IssueDetail{{ID: "A-1"}}},
+		{Name: "infra", Issues: []domain.IssueDetail{{ID: "I-1"}}},
+		{Name: "frontend", Issues: []domain.IssueDetail{{ID: "F-1"}}},
 	}
 
 	dir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 2
 
 	// when
 	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
-			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
+		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
+			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
 		}, domain.NewLogger(io.Discard, false))
 
 	// then
@@ -419,23 +418,23 @@ func TestRunParallelDeepScan(t *testing.T) {
 
 func TestRunParallelDeepScanWithFailure(t *testing.T) {
 	// given
-	clusters := []sightjack.ClusterScanResult{
+	clusters := []domain.ClusterScanResult{
 		{Name: "auth"},
 		{Name: "infra"},
 	}
 
 	dir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	var callCount atomic.Int32
 
 	// when
 	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
+		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
 			callCount.Add(1)
 			if cluster.Name == "auth" {
-				return sightjack.ClusterScanResult{}, fmt.Errorf("auth scan failed")
+				return domain.ClusterScanResult{}, fmt.Errorf("auth scan failed")
 			}
-			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
+			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
 		}, domain.NewLogger(io.Discard, false))
 
 	// then
@@ -455,14 +454,14 @@ func TestRunParallelDeepScanWithFailure(t *testing.T) {
 
 func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 	// given
-	clusters := []sightjack.ClusterScanResult{{Name: "only"}}
+	clusters := []domain.ClusterScanResult{{Name: "only"}}
 	dir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 
 	// when
 	results, _ := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
-			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
+			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
 		}, domain.NewLogger(io.Discard, false))
 
 	// then
@@ -473,28 +472,28 @@ func TestRunParallelDeepScanSingleCluster(t *testing.T) {
 
 func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
 	// given: classify result with cluster names and issue IDs (simulates Pass 1 output)
-	classifyClusters := []sightjack.ClusterClassification{
+	classifyClusters := []domain.ClusterClassification{
 		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
 		{Name: "Infra", IssueIDs: []string{"I-1"}},
 	}
 
-	scanClusters := make([]sightjack.ClusterScanResult, len(classifyClusters))
+	scanClusters := make([]domain.ClusterScanResult, len(classifyClusters))
 	for i, cc := range classifyClusters {
-		scanClusters[i] = sightjack.ClusterScanResult{Name: cc.Name}
+		scanClusters[i] = domain.ClusterScanResult{Name: cc.Name}
 	}
 
 	dir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 2
 
 	// when: use index-based lookup (same pattern as wired in RunScan)
 	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
-		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
+		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
 			cc := classifyClusters[index]
-			return sightjack.ClusterScanResult{
+			return domain.ClusterScanResult{
 				Name:         cc.Name,
 				Completeness: 0.5,
-				Issues:       make([]sightjack.IssueDetail, len(cc.IssueIDs)),
+				Issues:       make([]domain.IssueDetail, len(cc.IssueIDs)),
 			}, nil
 		}, domain.NewLogger(io.Discard, false))
 
@@ -519,27 +518,27 @@ func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
 
 func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
 	// given: classifier returns duplicate cluster names with different issue IDs
-	classifyClusters := []sightjack.ClusterClassification{
+	classifyClusters := []domain.ClusterClassification{
 		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
 		{Name: "Auth", IssueIDs: []string{"A-3"}},
 	}
 
-	scanClusters := make([]sightjack.ClusterScanResult, len(classifyClusters))
+	scanClusters := make([]domain.ClusterScanResult, len(classifyClusters))
 	for i, cc := range classifyClusters {
-		scanClusters[i] = sightjack.ClusterScanResult{Name: cc.Name}
+		scanClusters[i] = domain.ClusterScanResult{Name: cc.Name}
 	}
 
 	dir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 
 	// when: index-based lookup ensures each duplicate gets its own issue IDs
 	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
-		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
+		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
 			cc := classifyClusters[index]
-			return sightjack.ClusterScanResult{
+			return domain.ClusterScanResult{
 				Name:         cc.Name,
 				Completeness: float64(len(cc.IssueIDs)) * 0.25,
-				Issues:       make([]sightjack.IssueDetail, len(cc.IssueIDs)),
+				Issues:       make([]domain.IssueDetail, len(cc.IssueIDs)),
 			}, nil
 		}, domain.NewLogger(io.Discard, false))
 
@@ -574,13 +573,13 @@ func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
 
 func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 	// given: 5 clusters but context is already cancelled
-	clusters := make([]sightjack.ClusterScanResult, 5)
+	clusters := make([]domain.ClusterScanResult, 5)
 	for i := range clusters {
-		clusters[i] = sightjack.ClusterScanResult{Name: fmt.Sprintf("c%d", i)}
+		clusters[i] = domain.ClusterScanResult{Name: fmt.Sprintf("c%d", i)}
 	}
 
 	dir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 1
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -590,9 +589,9 @@ func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 
 	// when
 	results, _ := session.RunParallelDeepScan(ctx, &cfg, dir, clusters,
-		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
+		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
 			callCount.Add(1)
-			return sightjack.ClusterScanResult{Name: cluster.Name}, nil
+			return domain.ClusterScanResult{Name: cluster.Name}, nil
 		}, domain.NewLogger(io.Discard, false))
 
 	// then: no goroutines should have been launched
@@ -608,7 +607,7 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 	// given: fake claude that outputs chunks incrementally and writes classify.json
 	baseDir := t.TempDir()
 	sessionID := "test-stream"
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 
 	classifyResult := `{"clusters":[{"name":"Auth","issue_ids":["T-1"]}],"total_issues":1}`
 	deepScanResult := `{"name":"Auth","completeness":0.8,"issues":[{"id":"T-1","title":"test","completeness":0.8}],"observations":["ok"]}`
@@ -658,7 +657,7 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Linear.Team = "TEST"
 	cfg.Linear.Project = "test-project"
 	cfg.Claude.TimeoutSec = 30
@@ -721,7 +720,7 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 	// deterministically proves incremental streaming.
 	baseDir := t.TempDir()
 	sessionID := "test-incremental"
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 
 	classifyResult := `{"clusters":[{"name":"X","issue_ids":["T-1"]}],"total_issues":1}`
 	deepScanResult := `{"name":"X","completeness":1.0,"issues":[{"id":"T-1","title":"t","completeness":1.0}],"observations":[]}`
@@ -765,7 +764,7 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 	})
 	defer cleanup()
 
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Linear.Team = "T"
 	cfg.Linear.Project = "p"
 	cfg.Claude.TimeoutSec = 30
@@ -800,13 +799,13 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 
 func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
 	// given: concurrency=1, cancel while second cluster waits for semaphore
-	clusters := []sightjack.ClusterScanResult{
+	clusters := []domain.ClusterScanResult{
 		{Name: "slow"},
 		{Name: "should-not-run"},
 	}
 
 	dir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Scan.MaxConcurrency = 1
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -814,12 +813,12 @@ func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
 
 	// when: first scan runs, cancels ctx during execution; second should not start
 	results, _ := session.RunParallelDeepScan(ctx, &cfg, dir, clusters,
-		func(ctx context.Context, cfg *sightjack.Config, scanDir string, index int, cluster sightjack.ClusterScanResult) (sightjack.ClusterScanResult, error) {
+		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
 			callCount.Add(1)
 			if index == 0 {
 				cancel() // cancel while second cluster waits for semaphore
 			}
-			return sightjack.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
+			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
 		}, domain.NewLogger(io.Discard, false))
 
 	// then: only the first cluster should have been scanned
@@ -880,12 +879,12 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 	})
 	defer cleanup()
 
-	clusters := []sightjack.ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: []sightjack.IssueDetail{{ID: "T-1"}}},
-		{Name: "Bad", Completeness: 0.10, Issues: []sightjack.IssueDetail{{ID: "T-2"}}},
-		{Name: "API", Completeness: 0.30, Issues: []sightjack.IssueDetail{{ID: "T-3"}}},
+	clusters := []domain.ClusterScanResult{
+		{Name: "Auth", Completeness: 0.25, Issues: []domain.IssueDetail{{ID: "T-1"}}},
+		{Name: "Bad", Completeness: 0.10, Issues: []domain.IssueDetail{{ID: "T-2"}}},
+		{Name: "API", Completeness: 0.30, Issues: []domain.IssueDetail{{ID: "T-3"}}},
 	}
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Claude.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
@@ -922,11 +921,11 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 	})
 	defer cleanup()
 
-	clusters := []sightjack.ClusterScanResult{
-		{Name: "A", Completeness: 0.1, Issues: []sightjack.IssueDetail{{ID: "T-1"}}},
-		{Name: "B", Completeness: 0.1, Issues: []sightjack.IssueDetail{{ID: "T-2"}}},
+	clusters := []domain.ClusterScanResult{
+		{Name: "A", Completeness: 0.1, Issues: []domain.IssueDetail{{ID: "T-1"}}},
+		{Name: "B", Completeness: 0.1, Issues: []domain.IssueDetail{{ID: "T-2"}}},
 	}
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	cfg.Claude.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
@@ -954,50 +953,50 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 func TestDetectFailedClusterNames(t *testing.T) {
 	tests := []struct {
 		name      string
-		clusters  []sightjack.ClusterScanResult
-		successes []sightjack.WaveGenerateResult
+		clusters  []domain.ClusterScanResult
+		successes []domain.WaveGenerateResult
 		want      map[string]bool
 	}{
 		{
 			name:      "all succeed no duplicates",
-			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
-			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
+			clusters:  []domain.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []domain.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
 			want:      map[string]bool{},
 		},
 		{
 			name:      "one fails no duplicates",
-			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
-			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}},
+			clusters:  []domain.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []domain.WaveGenerateResult{{ClusterName: "Auth"}},
 			want:      map[string]bool{"DB": true},
 		},
 		{
 			name:      "duplicates all succeed",
-			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
-			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "Auth"}, {ClusterName: "DB"}},
+			clusters:  []domain.ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
+			successes: []domain.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "Auth"}, {ClusterName: "DB"}},
 			want:      map[string]bool{},
 		},
 		{
 			name:      "duplicates partial failure",
-			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
-			successes: []sightjack.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
+			clusters:  []domain.ClusterScanResult{{Name: "Auth"}, {Name: "Auth"}, {Name: "DB"}},
+			successes: []domain.WaveGenerateResult{{ClusterName: "Auth"}, {ClusterName: "DB"}},
 			want:      map[string]bool{"Auth": true},
 		},
 		{
 			name:      "all fail",
-			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
-			successes: []sightjack.WaveGenerateResult{},
+			clusters:  []domain.ClusterScanResult{{Name: "Auth"}, {Name: "DB"}},
+			successes: []domain.WaveGenerateResult{},
 			want:      map[string]bool{"Auth": true, "DB": true},
 		},
 		{
 			name:      "empty input",
-			clusters:  []sightjack.ClusterScanResult{},
-			successes: []sightjack.WaveGenerateResult{},
+			clusters:  []domain.ClusterScanResult{},
+			successes: []domain.WaveGenerateResult{},
 			want:      map[string]bool{},
 		},
 		{
 			name:      "empty cluster name in success is not counted",
-			clusters:  []sightjack.ClusterScanResult{{Name: "Auth"}},
-			successes: []sightjack.WaveGenerateResult{{ClusterName: ""}},
+			clusters:  []domain.ClusterScanResult{{Name: "Auth"}},
+			successes: []domain.WaveGenerateResult{{ClusterName: ""}},
 			want:      map[string]bool{"Auth": true},
 		},
 	}
@@ -1020,10 +1019,10 @@ func TestDetectFailedClusterNames(t *testing.T) {
 func TestRunWaveGenerate_DryRunPopulatesClusterName(t *testing.T) {
 	// given: two clusters in dry-run mode
 	scanDir := t.TempDir()
-	cfg := sightjack.DefaultConfig()
-	clusters := []sightjack.ClusterScanResult{
-		{Name: "Auth", Issues: []sightjack.IssueDetail{{ID: "T-1"}}},
-		{Name: "API", Issues: []sightjack.IssueDetail{{ID: "T-2"}}},
+	cfg := domain.DefaultConfig()
+	clusters := []domain.ClusterScanResult{
+		{Name: "Auth", Issues: []domain.IssueDetail{{ID: "T-1"}}},
+		{Name: "API", Issues: []domain.IssueDetail{{ID: "T-2"}}},
 	}
 
 	// when: dry-run wave generation via exported API

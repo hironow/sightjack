@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -46,13 +46,13 @@ for piping into 'select' or 'show'.`,
 				return fmt.Errorf("no input on stdin. Pipe scan result: sightjack scan --json | sightjack waves")
 			}
 
-			var scanResult sightjack.ScanResult
+			var scanResult domain.ScanResult
 			if err := json.Unmarshal(data, &scanResult); err != nil {
 				return fmt.Errorf("invalid ScanResult JSON: %w", err)
 			}
 
 			sessionID := fmt.Sprintf("waves-%d-%d", time.Now().UnixMilli(), os.Getpid())
-			scanDir := sightjack.ScanDir(baseDir, sessionID)
+			scanDir := domain.ScanDir(baseDir, sessionID)
 			if err := os.MkdirAll(scanDir, 0755); err != nil {
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
@@ -71,7 +71,7 @@ for piping into 'select' or 'show'.`,
 				return nil
 			}
 
-			plan := sightjack.WavePlan{
+			plan := domain.WavePlan{
 				Waves:      waves,
 				ScanResult: &scanResult,
 			}

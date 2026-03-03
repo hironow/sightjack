@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 
 	_ "modernc.org/sqlite"
@@ -218,16 +217,16 @@ func (s *SQLiteOutboxStore) Close() error {
 // derived from baseDir: DB at .siren/.run/outbox.db, targets at .siren/archive/
 // and .siren/outbox/.
 func NewOutboxStoreForBase(baseDir string) (*SQLiteOutboxStore, error) {
-	dbPath := filepath.Join(baseDir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(baseDir, sightjack.OutboxDir)
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(baseDir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(baseDir, domain.OutboxDir)
 	return NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 }
 
 // PruneFlushedOutbox opens the outbox DB, deletes flushed rows, runs
 // incremental vacuum, and closes the store. Returns 0 if the DB does not exist.
 func PruneFlushedOutbox(baseDir string) (int, error) {
-	dbPath := filepath.Join(baseDir, sightjack.StateDir, ".run", "outbox.db")
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "outbox.db")
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return 0, nil
 	}

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -214,7 +214,7 @@ strictness:
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != sightjack.StrictnessAlert {
+	if cfg.Strictness.Default != domain.StrictnessAlert {
 		t.Errorf("expected alert, got %s", cfg.Strictness.Default)
 	}
 }
@@ -233,7 +233,7 @@ linear:
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != sightjack.StrictnessFog {
+	if cfg.Strictness.Default != domain.StrictnessFog {
 		t.Errorf("expected fog default, got %s", cfg.Strictness.Default)
 	}
 }
@@ -254,7 +254,7 @@ strictness:
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != sightjack.StrictnessFog {
+	if cfg.Strictness.Default != domain.StrictnessFog {
 		t.Errorf("expected fog fallback for invalid value, got %s", cfg.Strictness.Default)
 	}
 }
@@ -274,7 +274,7 @@ strictness:
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Strictness.Default != sightjack.StrictnessFog {
+	if cfg.Strictness.Default != domain.StrictnessFog {
 		t.Errorf("expected fog fallback for empty strictness, got %s", cfg.Strictness.Default)
 	}
 }
@@ -448,10 +448,10 @@ strictness:
 	if len(cfg.Strictness.Overrides) != 2 {
 		t.Fatalf("expected 2 overrides, got %d", len(cfg.Strictness.Overrides))
 	}
-	if cfg.Strictness.Overrides["security"] != sightjack.StrictnessLockdown {
+	if cfg.Strictness.Overrides["security"] != domain.StrictnessLockdown {
 		t.Errorf("security: expected lockdown, got %s", cfg.Strictness.Overrides["security"])
 	}
-	if cfg.Strictness.Overrides["performance"] != sightjack.StrictnessAlert {
+	if cfg.Strictness.Overrides["performance"] != domain.StrictnessAlert {
 		t.Errorf("performance: expected alert, got %s", cfg.Strictness.Overrides["performance"])
 	}
 }

@@ -9,16 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
-func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if logger == nil {
 		logger = domain.NewLogger(nil, false)
 	}
@@ -80,28 +78,28 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 	// In dry-run mode, RunScan writes classify prompt but returns nil ScanResult.
 	// Continue to Pass 3 with sample cluster data so wave-generation prompts are also generated.
 	if dryRun {
-		sampleClusters := []sightjack.ClusterScanResult{{
+		sampleClusters := []domain.ClusterScanResult{{
 			Name:         "sample",
 			Completeness: 0.5,
-			Issues:       []sightjack.IssueDetail{{ID: "SAMPLE-1", Identifier: "SAMPLE-1", Title: "Sample issue", Completeness: 0.5}},
+			Issues:       []domain.IssueDetail{{ID: "SAMPLE-1", Identifier: "SAMPLE-1", Title: "Sample issue", Completeness: 0.5}},
 			Observations: []string{"sample observation for dry-run"},
 		}}
 		if _, _, _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
 			return fmt.Errorf("wave generate dry-run: %w", err)
 		}
 		// Also generate architect discuss prompt for dry-run
-		sampleWave := sightjack.Wave{
+		sampleWave := domain.Wave{
 			ID:          "sample-w1",
 			ClusterName: "sample",
 			Title:       "Sample Wave",
-			Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "SAMPLE-1", Description: "Sample DoD"}},
+			Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "SAMPLE-1", Description: "Sample DoD"}},
 		}
 		if err := RunArchitectDiscussDryRun(cfg, scanDir, sampleWave, "sample discussion topic", string(cfg.Strictness.Default), logger); err != nil {
 			return fmt.Errorf("architect discuss dry-run: %w", err)
 		}
 		// Also generate scribe ADR prompt for dry-run
 		if cfg.Scribe.Enabled {
-			sampleArchitectResp := &sightjack.ArchitectResponse{
+			sampleArchitectResp := &domain.ArchitectResponse{
 				Analysis:  "Sample architect analysis for dry-run",
 				Reasoning: "Sample reasoning",
 			}
@@ -110,8 +108,8 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 			}
 		}
 		// Also generate nextgen prompt for dry-run
-		sampleCompletedWaves := []sightjack.Wave{sampleWave}
-		sampleCluster := sightjack.ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
+		sampleCompletedWaves := []domain.Wave{sampleWave}
+		sampleCluster := domain.ClusterScanResult{Name: "sample", Completeness: 0.5, Issues: sampleClusters[0].Issues}
 		if err := GenerateNextWavesDryRun(cfg, scanDir, sampleWave, sampleCluster, sampleCompletedWaves, nil, nil, string(cfg.Strictness.Default), nil, nil, logger); err != nil {
 			return fmt.Errorf("nextgen dry-run: %w", err)
 		}
@@ -137,9 +135,9 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		Project:         cfg.Linear.Project,
 		StrictnessLevel: string(cfg.Strictness.Default),
 	})
-	var clusterStates []sightjack.ClusterState
+	var clusterStates []domain.ClusterState
 	for _, c := range scanResult.Clusters {
-		clusterStates = append(clusterStates, sightjack.ClusterState{
+		clusterStates = append(clusterStates, domain.ClusterState{
 			Name: c.Name, Completeness: c.Completeness, IssueCount: len(c.Issues),
 		})
 	}
@@ -147,7 +145,7 @@ func RunSession(ctx context.Context, cfg *sightjack.Config, baseDir string, sess
 		Clusters:       clusterStates,
 		Completeness:   scanResult.Completeness,
 		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
+		ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
 		LastScanned:    scanTime,
 	})
 
@@ -188,9 +186,9 @@ const (
 // wave selection prompt, go-back handling, and quit handling.
 // Returns the selected wave, a result code, and the updated shibitoShown flag.
 func selectPhase(ctx context.Context, scanner *bufio.Scanner,
-	scanResult *sightjack.ScanResult, cfg *sightjack.Config, available []sightjack.Wave, waves []sightjack.Wave,
+	scanResult *domain.ScanResult, cfg *domain.Config, available []domain.Wave, waves []domain.Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
-	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (sightjack.Wave, selectPhaseResult, bool) {
+	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (domain.Wave, selectPhaseResult, bool) {
 
 	// Auto-select first available wave when --auto-approve is set.
 	if cfg.Gate.AutoApprove {
@@ -198,7 +196,7 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 			logger.Info("Auto-selecting wave: %s", available[0].Title)
 			return available[0], selectChosen, shibitoShown
 		}
-		return sightjack.Wave{}, selectQuit, shibitoShown
+		return domain.Wave{}, selectQuit, shibitoShown
 	}
 
 	// Display Link Navigator
@@ -217,28 +215,28 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	if err == ErrQuit {
 		loopSpan.AddEvent("session.paused")
 		logger.Info("Session paused. State saved.")
-		return sightjack.Wave{}, selectQuit, shibitoShown
+		return domain.Wave{}, selectQuit, shibitoShown
 	}
 	if err == ErrGoBack {
 		completedList := CompletedWaves(waves)
 		if len(completedList) == 0 {
 			logger.Info("No completed waves to revisit.")
-			return sightjack.Wave{}, selectRetry, shibitoShown
+			return domain.Wave{}, selectRetry, shibitoShown
 		}
 		revisit, backErr := PromptCompletedWaveSelection(ctx, out, scanner, completedList)
 		if backErr == ErrQuit {
 			logger.Info("Session paused. State saved.")
-			return sightjack.Wave{}, selectQuit, shibitoShown
+			return domain.Wave{}, selectQuit, shibitoShown
 		}
 		if backErr != nil {
-			return sightjack.Wave{}, selectRetry, shibitoShown
+			return domain.Wave{}, selectRetry, shibitoShown
 		}
 		DisplayCompletedWaveActions(out, revisit)
-		return sightjack.Wave{}, selectRetry, shibitoShown
+		return domain.Wave{}, selectRetry, shibitoShown
 	}
 	if err != nil {
 		logger.Warn("Invalid selection: %v", err)
-		return sightjack.Wave{}, selectRetry, shibitoShown
+		return domain.Wave{}, selectRetry, shibitoShown
 	}
 
 	return selected, selectChosen, shibitoShown
@@ -257,11 +255,11 @@ const (
 // existing elements via PropagateWaveUpdate — it never appends or reassigns.
 // Returns the (possibly modified) wave and whether it was approved.
 func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
-	cfg *sightjack.Config, scanDir string, selected sightjack.Wave, resolvedStrictness string,
-	waves []sightjack.Wave, completed map[string]bool,
-	sessionRejected map[string][]sightjack.WaveAction, adrDir string, adrCount *int,
+	cfg *domain.Config, scanDir string, selected domain.Wave, resolvedStrictness string,
+	waves []domain.Wave, completed map[string]bool,
+	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
 	store domain.OutboxStore, recorder domain.Recorder,
-	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (sightjack.Wave, approvalPhaseResult) {
+	out io.Writer, loopSpan trace.Span, logger *domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	// Auto-approve when --auto-approve is set.
 	if cfg.Gate.AutoApprove {
@@ -295,7 +293,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		}
 
 		switch choice {
-		case sightjack.ApprovalApprove:
+		case domain.ApprovalApprove:
 			delete(sessionRejected, domain.WaveKey(selected))
 			loopSpan.AddEvent("wave.approved",
 				trace.WithAttributes(
@@ -314,7 +312,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				})
 			}
 			return selected, approvalApproved
-		case sightjack.ApprovalReject:
+		case domain.ApprovalReject:
 			delete(sessionRejected, domain.WaveKey(selected))
 			loopSpan.AddEvent("wave.rejected",
 				trace.WithAttributes(
@@ -328,7 +326,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			platform.RecordWave(ctx, "rejected")
 			logger.Info("Wave rejected.")
 			return selected, approvalRejected
-		case sightjack.ApprovalDiscuss:
+		case domain.ApprovalDiscuss:
 			topic, topicErr := PromptDiscussTopic(ctx, out, scanner)
 			if topicErr == ErrQuit {
 				continue
@@ -348,7 +346,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				domain.PropagateWaveUpdate(waves, selected)
 				recorder.Record(domain.EventWaveModified, domain.WaveModifiedPayload{
 					WaveID: selected.ID, ClusterName: selected.ClusterName,
-					UpdatedWave: sightjack.WaveState{
+					UpdatedWave: domain.WaveState{
 						ID: selected.ID, ClusterName: selected.ClusterName,
 						Title: selected.Title, Status: selected.Status,
 						Prerequisites: selected.Prerequisites,
@@ -377,7 +375,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				}
 			}
 			continue // back to approval prompt with (possibly modified) wave
-		case sightjack.ApprovalSelective:
+		case domain.ApprovalSelective:
 			approved, rejected, selErr := PromptSelectiveApproval(ctx, out, scanner, selected)
 			if selErr == ErrQuit {
 				return selected, approvalRejected
@@ -419,11 +417,11 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 // cluster completeness update, unlock evaluation, nextgen wave generation,
 // ready labels, and mid-session state save.
 // waves is passed as *[]Wave because append/EvaluateUnlocks may reallocate the slice.
-func applyPhase(ctx context.Context, cfg *sightjack.Config,
+func applyPhase(ctx context.Context, cfg *domain.Config,
 	scanDir, scanResultPath, adrDir string,
-	selected sightjack.Wave, resolvedStrictness string,
-	waves *[]sightjack.Wave, completed map[string]bool,
-	scanResult *sightjack.ScanResult, sessionRejected map[string][]sightjack.WaveAction,
+	selected domain.Wave, resolvedStrictness string,
+	waves *[]domain.Wave, completed map[string]bool,
+	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
 	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger *domain.Logger) {
 
@@ -564,7 +562,7 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 	// --- Post-completion: Generate next waves ---
-	var clusterForNextgen sightjack.ClusterScanResult
+	var clusterForNextgen domain.ClusterScanResult
 	for _, c := range scanResult.Clusters {
 		if c.Name == selected.ClusterName {
 			clusterForNextgen = c
@@ -641,8 +639,8 @@ func applyPhase(ctx context.Context, cfg *sightjack.Config,
 // RunSession, RunResumeSession, and RunRescanSession.
 // resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
-func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, sessionID, scanDir, scanResultPath string,
-	scanResult *sightjack.ScanResult, waves []sightjack.Wave, completed map[string]bool, adrCount int,
+func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
+	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
 	store domain.OutboxStore, recorder domain.Recorder, out io.Writer, logger *domain.Logger) error {
 
@@ -659,7 +657,7 @@ func runInteractiveLoop(ctx context.Context, cfg *sightjack.Config, baseDir, ses
 	// Scoped per-wave intentionally: rejected actions are only fed back to the
 	// nextgen call triggered by that specific wave's completion, not accumulated
 	// across the entire cluster.
-	sessionRejected := make(map[string][]sightjack.WaveAction)
+	sessionRejected := make(map[string][]domain.WaveAction)
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
 outerLoop:
 	for {
@@ -670,7 +668,7 @@ outerLoop:
 			break
 		}
 
-		var selected sightjack.Wave
+		var selected domain.Wave
 		var result selectPhaseResult
 		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, out, loopSpan, logger)
 		switch result {
@@ -680,7 +678,7 @@ outerLoop:
 			continue
 		}
 
-		resolvedStrictness := string(sightjack.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
+		resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
 		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, store, recorder, out, loopSpan, logger)
 		if approvalResult != approvalApproved {
@@ -704,17 +702,17 @@ outerLoop:
 		logger.Warn("Failed to update cached scan result: %v", err)
 	}
 
-	logger.OK("Session events saved to %s", filepath.Join(baseDir, sightjack.StateDir, "events"))
+	logger.OK("Session events saved to %s", filepath.Join(baseDir, domain.StateDir, "events"))
 	return nil
 }
 
 // ResumeSession loads a previous session's state and cached scan result,
 // restoring waves and completed map for the interactive loop.
-func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.ScanResult, []sightjack.Wave, map[string]bool, int, error) {
+func ResumeSession(baseDir string, state *domain.SessionState) (*domain.ScanResult, []domain.Wave, map[string]bool, int, error) {
 	if state.ScanResultPath == "" {
 		return nil, nil, nil, 0, fmt.Errorf("no cached scan result path in state")
 	}
-	resolvedPath := sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath)
+	resolvedPath := domain.ResolveScanResultPath(baseDir, state.ScanResultPath)
 	scanResult, err := LoadScanResult(resolvedPath)
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
@@ -730,15 +728,15 @@ func ResumeSession(baseDir string, state *sightjack.SessionState) (*sightjack.Sc
 // preserving the original path even if the directory layout has changed
 // (e.g. .siren/scans/ → .siren/.run/). Falls back to ScanDir() when
 // ScanResultPath is empty.
-func ResumeScanDir(state *sightjack.SessionState, baseDir string) string {
+func ResumeScanDir(state *domain.SessionState, baseDir string) string {
 	if state.ScanResultPath != "" {
-		return filepath.Dir(sightjack.ResolveScanResultPath(baseDir, state.ScanResultPath))
+		return filepath.Dir(domain.ResolveScanResultPath(baseDir, state.ScanResultPath))
 	}
-	return sightjack.ScanDir(baseDir, state.SessionID)
+	return domain.ScanDir(baseDir, state.SessionID)
 }
 
 // RunResumeSession resumes an existing session from saved state.
-func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string, state *sightjack.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if logger == nil {
 		logger = domain.NewLogger(nil, false)
 	}
@@ -805,7 +803,7 @@ func RunResumeSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
-func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string, oldState *sightjack.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
+func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger *domain.Logger) error {
 	if logger == nil {
 		logger = domain.NewLogger(nil, false)
 	}
@@ -899,9 +897,9 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		Project:         cfg.Linear.Project,
 		StrictnessLevel: string(cfg.Strictness.Default),
 	})
-	var clusterStates []sightjack.ClusterState
+	var clusterStates []domain.ClusterState
 	for _, c := range scanResult.Clusters {
-		clusterStates = append(clusterStates, sightjack.ClusterState{
+		clusterStates = append(clusterStates, domain.ClusterState{
 			Name: c.Name, Completeness: c.Completeness, IssueCount: len(c.Issues),
 		})
 	}
@@ -909,7 +907,7 @@ func RunRescanSession(ctx context.Context, cfg *sightjack.Config, baseDir string
 		Clusters:       clusterStates,
 		Completeness:   scanResult.Completeness,
 		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: sightjack.RelativeScanResultPath(baseDir, scanResultPath),
+		ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
 		LastScanned:    scanTime,
 	})
 	recorder.Record(domain.EventWavesGenerated, domain.WavesGeneratedPayload{

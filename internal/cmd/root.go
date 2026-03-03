@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -167,7 +166,7 @@ func resolveBaseDir(args []string) (string, error) {
 }
 
 // loadConfig loads the sightjack config, applying lang override if set.
-func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
+func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	resolved := resolveConfigPath(cmd, baseDir)
 	cfg, err := session.LoadConfig(resolved)
 	if err != nil {
@@ -196,7 +195,7 @@ func loggerFrom(cmd *cobra.Command) *domain.Logger {
 // When explicitly set with a relative path, resolves against baseDir.
 func resolveConfigPath(cmd *cobra.Command, baseDir string) string {
 	if !cmd.Flags().Changed("config") {
-		return sightjack.ConfigPath(baseDir)
+		return domain.ConfigPath(baseDir)
 	}
 	if !filepath.IsAbs(cfgPath) {
 		return filepath.Join(baseDir, cfgPath)

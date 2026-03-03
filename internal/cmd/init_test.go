@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestInitProject_CreatesConfigFile(t *testing.T) {
@@ -22,7 +22,7 @@ func TestInitProject_CreatesConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("initProject failed: %v", err)
 	}
-	data, readErr := os.ReadFile(sightjack.ConfigPath(dir))
+	data, readErr := os.ReadFile(domain.ConfigPath(dir))
 	if readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
 	}
@@ -53,7 +53,7 @@ func TestInitProject_DefaultLangAndStrictness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("initProject failed: %v", err)
 	}
-	data, _ := os.ReadFile(sightjack.ConfigPath(dir))
+	data, _ := os.ReadFile(domain.ConfigPath(dir))
 	content := string(data)
 	if !strings.Contains(content, `lang: "ja"`) {
 		t.Errorf("expected default lang 'ja' in config, got:\n%s", content)
@@ -67,7 +67,7 @@ func TestInitProject_AlreadyExists(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
-	os.WriteFile(sightjack.ConfigPath(dir), []byte("existing"), 0644)
+	os.WriteFile(domain.ConfigPath(dir), []byte("existing"), 0644)
 	var buf bytes.Buffer
 
 	// when
@@ -168,7 +168,7 @@ func TestInitCmd_FlagsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init with flags failed: %v", err)
 	}
-	cfgPath := sightjack.ConfigPath(dir)
+	cfgPath := domain.ConfigPath(dir)
 	data, readErr := os.ReadFile(cfgPath)
 	if readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
@@ -199,7 +199,7 @@ func TestInitCmd_MissingTeamFlag_UsesDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init with defaults failed: %v", err)
 	}
-	cfgPath := sightjack.ConfigPath(dir)
+	cfgPath := domain.ConfigPath(dir)
 	if _, readErr := os.Stat(cfgPath); readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
 	}

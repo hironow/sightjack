@@ -3,13 +3,13 @@ package session
 import (
 	"sort"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // ReadyIssueIDs returns issue IDs where ALL waves targeting them are completed.
 // An issue is ready when every wave containing that issue has status "completed".
 // Results are sorted for deterministic output.
-func ReadyIssueIDs(waves []sightjack.Wave) []string {
+func ReadyIssueIDs(waves []domain.Wave) []string {
 	// Track all waves per issue
 	issueWaves := make(map[string][]string) // issueID -> []waveStatus
 	for _, w := range waves {

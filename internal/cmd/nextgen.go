@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -47,7 +47,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				return fmt.Errorf("no input on stdin. Pipe apply result: sightjack apply | sightjack nextgen")
 			}
 
-			var applyResult sightjack.ApplyResult
+			var applyResult domain.ApplyResult
 			if err := json.Unmarshal(data, &applyResult); err != nil {
 				return fmt.Errorf("invalid ApplyResult JSON: %w", err)
 			}
@@ -56,13 +56,13 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			w := cmd.OutOrStdout()
 
 			sessionID := fmt.Sprintf("nextgen-%d-%d", time.Now().UnixMilli(), os.Getpid())
-			scanDir := sightjack.ScanDir(baseDir, sessionID)
+			scanDir := domain.ScanDir(baseDir, sessionID)
 			if err := os.MkdirAll(scanDir, 0755); err != nil {
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
 
 			// cacheAndPrint marshals a WavePlan, caches it for pipe replay, and prints to stdout.
-			cacheAndPrint := func(plan sightjack.WavePlan) error {
+			cacheAndPrint := func(plan domain.WavePlan) error {
 				out, jsonErr := json.MarshalIndent(plan, "", "  ")
 				if jsonErr != nil {
 					return fmt.Errorf("JSON marshal failed: %w", jsonErr)
@@ -77,24 +77,24 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			// If completeness target reached, output empty plan.
 			if applyResult.NewCompleteness >= 0.95 {
 				logger.OK("Completeness %.0f%% — no follow-up waves needed.", applyResult.NewCompleteness*100)
-				return cacheAndPrint(sightjack.WavePlan{Waves: []sightjack.Wave{}})
+				return cacheAndPrint(domain.WavePlan{Waves: []domain.Wave{}})
 			}
 
 			// Resolve wave and cluster context — prefer embedded CompletedWave (pipe),
 			// fall back to event replay (interactive session).
-			var completedWave sightjack.Wave
-			var cluster sightjack.ClusterScanResult
-			var allWaves []sightjack.Wave
+			var completedWave domain.Wave
+			var cluster domain.ClusterScanResult
+			var allWaves []domain.Wave
 
 			if applyResult.CompletedWave != nil {
 				completedWave = *applyResult.CompletedWave
 				if completedWave.ClusterContext != nil {
 					cluster = *completedWave.ClusterContext
 				} else {
-					cluster = sightjack.ClusterScanResult{Name: completedWave.ClusterName}
+					cluster = domain.ClusterScanResult{Name: completedWave.ClusterName}
 				}
 				cluster.Completeness = applyResult.NewCompleteness
-				allWaves = append([]sightjack.Wave{completedWave}, applyResult.RemainingWaves...)
+				allWaves = append([]domain.Wave{completedWave}, applyResult.RemainingWaves...)
 			} else {
 				state, _, stateErr := session.LoadLatestState(baseDir)
 				if stateErr != nil {
@@ -103,7 +103,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 
 				allWaves = session.RestoreWaves(state.Waves)
 
-				var candidates []sightjack.Wave
+				var candidates []domain.Wave
 				for _, w := range allWaves {
 					if w.ID == applyResult.WaveID {
 						candidates = append(candidates, w)
@@ -120,7 +120,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				found := false
 				for _, cs := range state.Clusters {
 					if cs.Name == completedWave.ClusterName {
-						cluster = sightjack.ClusterScanResult{
+						cluster = domain.ClusterScanResult{
 							Name:         cs.Name,
 							Completeness: cs.Completeness,
 							IssueCount:   cs.IssueCount,
@@ -136,13 +136,13 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 
 			if !session.NeedsMoreWaves(cluster, allWaves) {
 				logger.OK("No more waves needed for %s.", cluster.Name)
-				return cacheAndPrint(sightjack.WavePlan{Waves: []sightjack.Wave{}})
+				return cacheAndPrint(domain.WavePlan{Waves: []domain.Wave{}})
 			}
 
 			adrDir := session.ADRDir(baseDir)
 			existingADRs, _ := session.ReadExistingADRs(adrDir)
 			completedWaves := session.CompletedWavesForCluster(allWaves, cluster.Name)
-			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
+			strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 			if dryRun {
 				if err := session.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger); err != nil {
@@ -157,7 +157,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				return fmt.Errorf("nextgen failed: %w", err)
 			}
 
-			return cacheAndPrint(sightjack.WavePlan{Waves: newWaves})
+			return cacheAndPrint(domain.WavePlan{Waves: newWaves})
 		},
 	}
 }

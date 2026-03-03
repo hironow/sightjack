@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -36,7 +36,7 @@ for downstream commands (apply, discuss).`,
 				return fmt.Errorf("no input on stdin. Pipe wave plan: sightjack waves | sightjack select")
 			}
 
-			var plan sightjack.WavePlan
+			var plan domain.WavePlan
 			if err := json.Unmarshal(data, &plan); err != nil {
 				return fmt.Errorf("invalid WavePlan JSON: %w", err)
 			}
@@ -80,7 +80,7 @@ for downstream commands (apply, discuss).`,
 
 			// Build remaining waves (all plan waves except the selected one)
 			// so downstream apply → nextgen can accurately check NeedsMoreWaves.
-			var remaining []sightjack.Wave
+			var remaining []domain.Wave
 			selectedKey := session.WaveKey(selected)
 			for _, w := range plan.Waves {
 				if session.WaveKey(w) != selectedKey {
@@ -90,8 +90,8 @@ for downstream commands (apply, discuss).`,
 
 			// Output selected wave with remaining sibling context.
 			type selectOutput struct {
-				sightjack.Wave
-				RemainingWaves []sightjack.Wave `json:"remaining_waves,omitempty"`
+				domain.Wave
+				RemainingWaves []domain.Wave `json:"remaining_waves,omitempty"`
 			}
 			output := selectOutput{Wave: selected, RemainingWaves: remaining}
 			out, jsonErr := json.MarshalIndent(output, "", "  ")
