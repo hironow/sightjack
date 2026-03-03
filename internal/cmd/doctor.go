@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newDoctorCmd() *cobra.Command {
@@ -36,7 +36,7 @@ is working. Reports pass/fail/skip for each check.`,
 			jsonOut, _ := cmd.Flags().GetBool("json")
 
 			logger := loggerFrom(cmd)
-			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger)
+			results := usecase.RunDoctor(cmd.Context(), resolved, baseDir, logger)
 
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)

@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newNextgenCmd() *cobra.Command {
@@ -96,12 +96,12 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				cluster.Completeness = applyResult.NewCompleteness
 				allWaves = append([]domain.Wave{completedWave}, applyResult.RemainingWaves...)
 			} else {
-				state, _, stateErr := session.LoadLatestState(baseDir)
+				state, _, stateErr := usecase.LoadLatestState(baseDir)
 				if stateErr != nil {
 					return fmt.Errorf("cannot resolve wave context: no CompletedWave in ApplyResult and no event data.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first")
 				}
 
-				allWaves = session.RestoreWaves(state.Waves)
+				allWaves = usecase.RestoreWaves(state.Waves)
 
 				var candidates []domain.Wave
 				for _, w := range allWaves {
@@ -134,25 +134,25 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				}
 			}
 
-			if !session.NeedsMoreWaves(cluster, allWaves) {
+			if !usecase.NeedsMoreWaves(cluster, allWaves) {
 				logger.OK("No more waves needed for %s.", cluster.Name)
 				return cacheAndPrint(domain.WavePlan{Waves: []domain.Wave{}})
 			}
 
-			adrDir := session.ADRDir(baseDir)
-			existingADRs, _ := session.ReadExistingADRs(adrDir)
-			completedWaves := session.CompletedWavesForCluster(allWaves, cluster.Name)
+			adrDir := usecase.ADRDir(baseDir)
+			existingADRs, _ := usecase.ReadExistingADRs(adrDir)
+			completedWaves := usecase.CompletedWavesForCluster(allWaves, cluster.Name)
 			strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
 
 			if dryRun {
-				if err := session.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger); err != nil {
+				if err := usecase.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, logger); err != nil {
 					return fmt.Errorf("dry-run failed: %w", err)
 				}
 				logger.OK("Dry-run complete. Check %s for generated prompt.", scanDir)
 				return nil
 			}
 
-			newWaves, err := session.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger)
+			newWaves, err := usecase.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, logger)
 			if err != nil {
 				return fmt.Errorf("nextgen failed: %w", err)
 			}

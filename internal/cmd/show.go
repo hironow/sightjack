@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -66,7 +65,7 @@ func runShowFromStdin(w io.Writer) error {
 		if err := json.Unmarshal(data, &scanResult); err != nil {
 			return fmt.Errorf("parse ScanResult: %w", err)
 		}
-		nav := session.RenderNavigator(&scanResult, "")
+		nav := usecase.RenderNavigator(&scanResult, "")
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
@@ -81,7 +80,7 @@ func runShowFromStdin(w io.Writer) error {
 		} else {
 			result = &domain.ScanResult{}
 		}
-		nav := session.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
+		nav := usecase.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 

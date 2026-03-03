@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 // version, commit, date are set by -ldflags at build time (GoReleaser).
@@ -168,7 +168,7 @@ func resolveBaseDir(args []string) (string, error) {
 // loadConfig loads the sightjack config, applying lang override if set.
 func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	resolved := resolveConfigPath(cmd, baseDir)
-	cfg, err := session.LoadConfig(resolved)
+	cfg, err := usecase.LoadConfig(resolved)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("config not found: %s\nRun 'sightjack init' to create one", resolved)

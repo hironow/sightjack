@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newInitCmd() *cobra.Command {
@@ -75,13 +75,13 @@ func initProject(baseDir, team, project, lang, strictness string, w io.Writer) e
 		return fmt.Errorf("write config: %w", err)
 	}
 
-	_ = session.WriteGitIgnore(baseDir)
+	_ = usecase.WriteGitIgnore(baseDir)
 
-	if err := session.InstallSkills(baseDir, domain.SkillsFS); err != nil {
+	if err := usecase.InstallSkills(baseDir, domain.SkillsFS); err != nil {
 		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
 	}
 
-	if err := session.EnsureMailDirs(baseDir); err != nil {
+	if err := usecase.EnsureMailDirs(baseDir); err != nil {
 		fmt.Fprintf(w, "Warning: failed to create mail dirs: %v\n", err)
 	}
 

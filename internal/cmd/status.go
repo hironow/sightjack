@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 // newStatusCmd creates the status subcommand that displays operational status.
@@ -34,7 +34,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 
-			report := session.Status(baseDir)
+			report := usecase.GetStatus(baseDir)
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {

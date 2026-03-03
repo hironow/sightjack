@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -53,7 +52,7 @@ if event data is found in .siren/events/.`,
 			if !dryRun {
 				bins = append(bins, cfg.Claude.Command)
 			}
-			if err := session.PreflightCheck(bins...); err != nil {
+			if err := usecase.PreflightCheck(bins...); err != nil {
 				return err
 			}
 			// Override gate config from flags (Changed = user explicitly set the flag)
@@ -74,11 +73,11 @@ if event data is found in .siren/events/.`,
 			// state for rescan/new choices.
 			if !dryRun {
 				// Find best resumable session (may differ from the latest)
-				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(baseDir, func(s *domain.SessionState) bool {
-					return session.CanResume(baseDir, s)
+				resumableState, resumableSessionID, _ := usecase.LoadLatestResumableState(baseDir, func(s *domain.SessionState) bool {
+					return usecase.CanResume(baseDir, s)
 				})
 				// Find latest state for display and rescan (regardless of resumability)
-				displayState, _, stateErr := session.LoadLatestState(baseDir)
+				displayState, _, stateErr := usecase.LoadLatestState(baseDir)
 				if stateErr == nil {
 					// If a resumable session exists, prefer it for the prompt display
 					promptState := displayState
@@ -87,7 +86,7 @@ if event data is found in .siren/events/.`,
 					}
 					scanner := bufio.NewScanner(cmd.InOrStdin())
 					for {
-						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, baseDir, promptState)
+						choice, promptErr := usecase.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, baseDir, promptState)
 						if promptErr == domain.ErrQuit {
 							return nil
 						}
@@ -101,8 +100,8 @@ if event data is found in .siren/events/.`,
 								logger.Warn("No resumable session found — starting fresh session instead.")
 								goto freshSession
 							}
-							resumeStore := session.NewEventStore(baseDir, resumableSessionID)
-							resumeRecorder, recErr := session.NewSessionRecorder(resumeStore, resumableSessionID)
+							resumeStore := usecase.NewEventStore(baseDir, resumableSessionID)
+							resumeRecorder, recErr := usecase.NewSessionRecorder(resumeStore, resumableSessionID)
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
@@ -112,8 +111,8 @@ if event data is found in .siren/events/.`,
 							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
 						case domain.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
-							rescanStore := session.NewEventStore(baseDir, rescanID)
-							rescanRecorder, recErr := session.NewSessionRecorder(rescanStore, rescanID)
+							rescanStore := usecase.NewEventStore(baseDir, rescanID)
+							rescanRecorder, recErr := usecase.NewSessionRecorder(rescanStore, rescanID)
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
@@ -134,8 +133,8 @@ if event data is found in .siren/events/.`,
 			var recorder domain.Recorder = domain.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
-				sessionStore := session.NewEventStore(baseDir, sessionID)
-				rec, recErr := session.NewSessionRecorder(sessionStore, sessionID)
+				sessionStore := usecase.NewEventStore(baseDir, sessionID)
+				rec, recErr := usecase.NewSessionRecorder(sessionStore, sessionID)
 				if recErr != nil {
 					return fmt.Errorf("session recorder: %w", recErr)
 				}

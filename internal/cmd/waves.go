@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newWavesCmd() *cobra.Command {
@@ -59,7 +59,7 @@ for piping into 'select' or 'show'.`,
 
 			logger := loggerFrom(cmd)
 
-			waves, waveWarnings, _, err := session.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun, logger)
+			waves, waveWarnings, _, err := usecase.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun, logger)
 			if err != nil {
 				return fmt.Errorf("wave generation failed: %w", err)
 			}
