@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
@@ -14,12 +15,12 @@ func stateDir(baseDir string) string {
 
 // NewEventStore creates an event store for the given session.
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
-func NewEventStore(baseDir, sessionID string) sightjack.EventStore {
+func NewEventStore(baseDir, sessionID string) domain.EventStore {
 	return eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir(baseDir), sessionID))
 }
 
 // NewSessionRecorder creates a recorder for the given session.
-func NewSessionRecorder(store sightjack.EventStore, sessionID string) (sightjack.Recorder, error) {
+func NewSessionRecorder(store domain.EventStore, sessionID string) (domain.Recorder, error) {
 	return eventsource.NewSessionRecorder(store, sessionID)
 }
 
@@ -39,7 +40,7 @@ func LoadLatestResumableState(baseDir string, match func(*sightjack.SessionState
 }
 
 // LoadAllEvents aggregates events from all session stores.
-func LoadAllEvents(baseDir string) ([]sightjack.Event, error) {
+func LoadAllEvents(baseDir string) ([]domain.Event, error) {
 	return eventsource.LoadAllEventsAcrossSessions(stateDir(baseDir))
 }
 

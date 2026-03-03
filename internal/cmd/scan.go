@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
 )
@@ -54,7 +55,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if jsonOutput {
 				streamOut = cmd.ErrOrStderr()
 			}
-			result, err := usecase.RunScan(cmd.Context(), sightjack.RunScanCommand{
+			result, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
 				RepoPath:   baseDir,
 				Lang:       cfg.Lang,
 				Strictness: string(cfg.Strictness.Default),
@@ -102,13 +103,13 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if recErr != nil {
 				return fmt.Errorf("session recorder: %w", recErr)
 			}
-			if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
+			if err := recorder.Record(domain.EventSessionStarted, domain.SessionStartedPayload{
 				Project:         cfg.Linear.Project,
 				StrictnessLevel: string(cfg.Strictness.Default),
 			}); err != nil {
 				logger.Warn("Failed to record session start: %v", err)
 			}
-			if err := recorder.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{
+			if err := recorder.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{
 				Clusters:       clusters,
 				Completeness:   result.Completeness,
 				ShibitoCount:   len(result.ShibitoWarnings),

@@ -1,28 +1,29 @@
-package sightjack_test
+package domain_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
-func makeEvent(t EventType) sightjack.Event {
-	return sightjack.Event{ID: "test", Type: t, Timestamp: time.Now()}
+func makeEvent(t EventType) domain.Event {
+	return domain.Event{ID: "test", Type: t, Timestamp: time.Now()}
 }
 
-type EventType = sightjack.EventType
+type EventType = domain.EventType
 
 func TestSuccessRate_AllApplied(t *testing.T) {
-	events := []sightjack.Event{
-		makeEvent(sightjack.EventWaveApplied),
-		makeEvent(sightjack.EventWaveApplied),
+	events := []domain.Event{
+		makeEvent(domain.EventWaveApplied),
+		makeEvent(domain.EventWaveApplied),
 	}
 
-	rate := sightjack.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate != 1.0 {
 		t.Errorf("SuccessRate = %f, want 1.0", rate)
@@ -30,12 +31,12 @@ func TestSuccessRate_AllApplied(t *testing.T) {
 }
 
 func TestSuccessRate_AllRejected(t *testing.T) {
-	events := []sightjack.Event{
-		makeEvent(sightjack.EventWaveRejected),
-		makeEvent(sightjack.EventWaveRejected),
+	events := []domain.Event{
+		makeEvent(domain.EventWaveRejected),
+		makeEvent(domain.EventWaveRejected),
 	}
 
-	rate := sightjack.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate != 0.0 {
 		t.Errorf("SuccessRate = %f, want 0.0", rate)
@@ -43,13 +44,13 @@ func TestSuccessRate_AllRejected(t *testing.T) {
 }
 
 func TestSuccessRate_Mixed(t *testing.T) {
-	events := []sightjack.Event{
-		makeEvent(sightjack.EventWaveApplied),
-		makeEvent(sightjack.EventWaveRejected),
-		makeEvent(sightjack.EventWaveApplied),
+	events := []domain.Event{
+		makeEvent(domain.EventWaveApplied),
+		makeEvent(domain.EventWaveRejected),
+		makeEvent(domain.EventWaveApplied),
 	}
 
-	rate := sightjack.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate < 0.66 || rate > 0.67 {
 		t.Errorf("SuccessRate = %f, want ~0.666", rate)
@@ -57,7 +58,7 @@ func TestSuccessRate_Mixed(t *testing.T) {
 }
 
 func TestSuccessRate_NoEvents(t *testing.T) {
-	rate := sightjack.SuccessRate(nil)
+	rate := domain.SuccessRate(nil)
 
 	if rate != 0.0 {
 		t.Errorf("SuccessRate = %f, want 0.0", rate)
@@ -65,14 +66,14 @@ func TestSuccessRate_NoEvents(t *testing.T) {
 }
 
 func TestSuccessRate_IgnoresOtherEvents(t *testing.T) {
-	events := []sightjack.Event{
-		makeEvent(sightjack.EventSessionStarted),
-		makeEvent(sightjack.EventWaveApplied),
-		makeEvent(sightjack.EventScanCompleted),
-		makeEvent(sightjack.EventWaveRejected),
+	events := []domain.Event{
+		makeEvent(domain.EventSessionStarted),
+		makeEvent(domain.EventWaveApplied),
+		makeEvent(domain.EventScanCompleted),
+		makeEvent(domain.EventWaveRejected),
 	}
 
-	rate := sightjack.SuccessRate(events)
+	rate := domain.SuccessRate(events)
 
 	if rate != 0.5 {
 		t.Errorf("SuccessRate = %f, want 0.5", rate)
@@ -89,9 +90,9 @@ func TestRecordWave_IncreasesCounter(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	sightjack.RecordWave(ctx, "applied")
-	sightjack.RecordWave(ctx, "rejected")
-	sightjack.RecordWave(ctx, "applied")
+	domain.RecordWave(ctx, "applied")
+	domain.RecordWave(ctx, "rejected")
+	domain.RecordWave(ctx, "applied")
 
 	// then
 	var rm metricdata.ResourceMetrics
@@ -129,7 +130,7 @@ func TestFormatSuccessRate_WithEvents(t *testing.T) {
 	total := 7
 
 	// when
-	msg := sightjack.FormatSuccessRate(rate, success, total)
+	msg := domain.FormatSuccessRate(rate, success, total)
 
 	// then
 	if msg != "85.7% (6/7)" {
@@ -144,7 +145,7 @@ func TestFormatSuccessRate_NoEvents(t *testing.T) {
 	total := 0
 
 	// when
-	msg := sightjack.FormatSuccessRate(rate, success, total)
+	msg := domain.FormatSuccessRate(rate, success, total)
 
 	// then
 	if msg != "no events" {

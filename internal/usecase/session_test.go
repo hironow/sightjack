@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestRunSession_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := sightjack.RunSessionCommand{}
+	cmd := domain.RunSessionCommand{}
 
 	// when
 	err := RunSession(context.Background(), cmd, nil, "", "", false, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
@@ -27,7 +28,7 @@ func TestRunSession_InvalidCommand(t *testing.T) {
 
 func TestResumeSession_InvalidCommand(t *testing.T) {
 	// given: empty SessionID
-	cmd := sightjack.ResumeSessionCommand{RepoPath: "/tmp"}
+	cmd := domain.ResumeSessionCommand{RepoPath: "/tmp"}
 
 	// when
 	err := ResumeSession(context.Background(), cmd, nil, "", nil, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
@@ -43,7 +44,7 @@ func TestResumeSession_InvalidCommand(t *testing.T) {
 
 func TestRescanSession_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := sightjack.RunSessionCommand{}
+	cmd := domain.RunSessionCommand{}
 
 	// when
 	err := RescanSession(context.Background(), cmd, nil, "", nil, "", nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))

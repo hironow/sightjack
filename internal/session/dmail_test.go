@@ -11,6 +11,7 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -79,7 +80,7 @@ func TestMarshalDMail_SchemaVersion(t *testing.T) {
 }
 
 // testOutboxStore creates a SQLiteOutboxStore for testing and registers cleanup.
-func testOutboxStore(t *testing.T, dir string) sightjack.OutboxStore {
+func testOutboxStore(t *testing.T, dir string) domain.OutboxStore {
 	t.Helper()
 	store, err := session.NewOutboxStoreForBase(dir)
 	if err != nil {
@@ -888,7 +889,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	initial := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
 
 	// Start collector with initial feedback
-	collector := session.CollectFeedback(initial, ch, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, ch, &domain.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
 
 	// All() should return initial feedback
 	all := collector.All()
@@ -935,7 +936,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 		{Name: "fb-001", Kind: session.DMailFeedback, Description: "Item 1"},
 		{Name: "fb-002", Kind: session.DMailFeedback, Description: "Item 2"},
 	}
-	collector := session.CollectFeedback(initial, nil, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, nil, &domain.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
 
 	// when: call All() multiple times
 	first := collector.All()
@@ -952,7 +953,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 
 func TestFeedbackCollector_NilChannel(t *testing.T) {
 	// given: nil channel
-	collector := session.CollectFeedback(nil, nil, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, nil, &domain.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
 
 	// then: All() returns nil
 	if all := collector.All(); all != nil {
@@ -963,7 +964,7 @@ func TestFeedbackCollector_NilChannel(t *testing.T) {
 func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
 	// given: nil initial but channel that will receive items
 	ch := make(chan *session.DMail, 1)
-	collector := session.CollectFeedback(nil, ch, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, ch, &domain.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
 
 	// when: send one item
 	ch <- &session.DMail{Name: "fb-late", Kind: session.DMailFeedback, Description: "Late only"}
@@ -1046,7 +1047,7 @@ func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 		{Name: "conv-001", Kind: session.DMailConvergence, Description: "Convergence signal"},
 		{Name: "fb-002", Kind: session.DMailFeedback, Description: "Naming convention"},
 	}
-	c := session.CollectFeedback(initial, nil, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	c := session.CollectFeedback(initial, nil, &domain.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
 
 	// when
 	feedbackOnly := c.FeedbackOnly()
@@ -1800,7 +1801,7 @@ func TestCollectFeedback_MixedFeedbackAndConvergence(t *testing.T) {
 		{Name: "fb-init", Kind: session.DMailFeedback, Description: "initial"},
 	}
 	ch := make(chan *session.DMail, 1)
-	collector := session.CollectFeedback(initial, ch, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, ch, &domain.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
 
 	ch <- &session.DMail{Name: "conv-mix-001", Kind: session.DMailConvergence, Description: "convergence"}
 	close(ch)

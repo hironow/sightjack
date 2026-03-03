@@ -41,13 +41,13 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.S
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
+	if err := recorder.Record(domain.EventSessionStarted, domain.SessionStartedPayload{
 		Project:         state.Project,
 		StrictnessLevel: state.StrictnessLevel,
 	}); err != nil {
 		t.Fatalf("record SessionStarted: %v", err)
 	}
-	if err := recorder.Record(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{
+	if err := recorder.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{
 		Clusters:       state.Clusters,
 		Completeness:   state.Completeness,
 		ShibitoCount:   state.ShibitoCount,
@@ -57,7 +57,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.S
 		t.Fatalf("record ScanCompleted: %v", err)
 	}
 	if len(state.Waves) > 0 {
-		if err := recorder.Record(sightjack.EventWavesGenerated, sightjack.WavesGeneratedPayload{
+		if err := recorder.Record(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
 			Waves: state.Waves,
 		}); err != nil {
 			t.Fatalf("record WavesGenerated: %v", err)
@@ -66,7 +66,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.S
 	// Mark completed waves via separate events
 	for _, w := range state.Waves {
 		if w.Status == "completed" {
-			if err := recorder.Record(sightjack.EventWaveCompleted, sightjack.WaveCompletedPayload{
+			if err := recorder.Record(domain.EventWaveCompleted, domain.WaveCompletedPayload{
 				WaveID:      w.ID,
 				ClusterName: w.ClusterName,
 			}); err != nil {
@@ -77,7 +77,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *sightjack.S
 }
 
 // testRecorder creates a real Recorder backed by the event store for lifecycle tests.
-func testRecorder(baseDir, sessionID string) sightjack.Recorder {
+func testRecorder(baseDir, sessionID string) domain.Recorder {
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID))
 	rec, recErr := eventsource.NewSessionRecorder(store, sessionID)
 	if recErr != nil {

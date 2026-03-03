@@ -5,18 +5,18 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 // failOnceStore wraps a real EventStore and fails the first Append call,
 // then delegates to the real store for subsequent calls.
 type failOnceStore struct {
-	real   sightjack.EventStore
+	real   domain.EventStore
 	failed bool
 }
 
-func (s *failOnceStore) Append(events ...sightjack.Event) error {
+func (s *failOnceStore) Append(events ...domain.Event) error {
 	if !s.failed {
 		s.failed = true
 		return errors.New("simulated I/O error")
@@ -24,8 +24,8 @@ func (s *failOnceStore) Append(events ...sightjack.Event) error {
 	return s.real.Append(events...)
 }
 
-func (s *failOnceStore) LoadAll() ([]sightjack.Event, error) { return s.real.LoadAll() }
-func (s *failOnceStore) LoadSince(after time.Time) ([]sightjack.Event, error) {
+func (s *failOnceStore) LoadAll() ([]domain.Event, error) { return s.real.LoadAll() }
+func (s *failOnceStore) LoadSince(after time.Time) ([]domain.Event, error) {
 	return s.real.LoadSince(after)
 }
 
@@ -39,10 +39,10 @@ func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	}
 
 	// when
-	if err := recorder.Record(sightjack.EventSessionStarted, nil); err != nil {
+	if err := recorder.Record(domain.EventSessionStarted, nil); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
-	if err := recorder.Record(sightjack.EventScanCompleted, nil); err != nil {
+	if err := recorder.Record(domain.EventScanCompleted, nil); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
@@ -74,13 +74,13 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
-	payload := sightjack.SessionStartedPayload{
+	payload := domain.SessionStartedPayload{
 		Project:         "my-project",
 		StrictnessLevel: "fog",
 	}
 
 	// when
-	if err := recorder.Record(sightjack.EventSessionStarted, payload); err != nil {
+	if err := recorder.Record(domain.EventSessionStarted, payload); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
@@ -89,8 +89,8 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	var decoded sightjack.SessionStartedPayload
-	sightjack.UnmarshalEventPayload(events[0], &decoded)
+	var decoded domain.SessionStartedPayload
+	domain.UnmarshalEventPayload(events[0], &decoded)
 	if decoded.Project != "my-project" {
 		t.Errorf("expected my-project, got %s", decoded.Project)
 	}
@@ -106,8 +106,8 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	}
 
 	// when
-	recorder.Record(sightjack.EventSessionStarted, nil)
-	recorder.Record(sightjack.EventScanCompleted, nil)
+	recorder.Record(domain.EventSessionStarted, nil)
+	recorder.Record(domain.EventScanCompleted, nil)
 
 	// then: both events should have CorrelationID == sessionID
 	events, _ := store.LoadAll()
@@ -131,9 +131,9 @@ func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 	}
 
 	// when
-	recorder.Record(sightjack.EventSessionStarted, nil)
-	recorder.Record(sightjack.EventScanCompleted, nil)
-	recorder.Record(sightjack.EventWavesGenerated, nil)
+	recorder.Record(domain.EventSessionStarted, nil)
+	recorder.Record(domain.EventScanCompleted, nil)
+	recorder.Record(domain.EventWavesGenerated, nil)
 
 	// then
 	events, _ := store.LoadAll()
@@ -160,9 +160,9 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir)
 
 	rec1, _ := eventsource.NewSessionRecorder(store, "session-1")
-	rec1.Record(sightjack.EventSessionStarted, nil)
-	rec1.Record(sightjack.EventScanCompleted, nil)
-	rec1.Record(sightjack.EventWavesGenerated, nil)
+	rec1.Record(domain.EventSessionStarted, nil)
+	rec1.Record(domain.EventScanCompleted, nil)
+	rec1.Record(domain.EventWavesGenerated, nil)
 
 	events1, _ := store.LoadAll()
 	lastID := events1[len(events1)-1].ID
@@ -172,7 +172,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(sightjack.EventWaveApproved, nil); err != nil {
+	if err := recorder.Record(domain.EventWaveApproved, nil); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
@@ -200,13 +200,13 @@ func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	}
 
 	// when: first Record fails
-	err1 := recorder.Record(sightjack.EventSessionStarted, nil)
+	err1 := recorder.Record(domain.EventSessionStarted, nil)
 	if err1 == nil {
 		t.Fatal("expected error on first Record")
 	}
 
 	// when: second Record should succeed
-	err2 := recorder.Record(sightjack.EventSessionStarted, nil)
+	err2 := recorder.Record(domain.EventSessionStarted, nil)
 	if err2 != nil {
 		t.Fatalf("expected second Record to succeed, got: %v", err2)
 	}

@@ -1,13 +1,13 @@
-package sightjack_test
+package domain_test
 
 import (
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestPolicies_AllHaveValidTrigger(t *testing.T) {
-	for _, p := range sightjack.Policies {
+	for _, p := range domain.Policies {
 		if p.Name == "" {
 			t.Error("policy name must not be empty")
 		}
@@ -22,7 +22,7 @@ func TestPolicies_AllHaveValidTrigger(t *testing.T) {
 
 func TestPolicies_UniqueNames(t *testing.T) {
 	seen := make(map[string]bool)
-	for _, p := range sightjack.Policies {
+	for _, p := range domain.Policies {
 		if seen[p.Name] {
 			t.Errorf("duplicate policy name %q", p.Name)
 		}

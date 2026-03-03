@@ -12,7 +12,7 @@ import (
 
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
-func LoadState(store sightjack.EventStore) (*sightjack.SessionState, error) {
+func LoadState(store domain.EventStore) (*sightjack.SessionState, error) {
 	events, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)
@@ -81,7 +81,7 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 // LoadAllEventsAcrossSessions aggregates events from all session stores under
 // events/. stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
 // Returns nil, nil when the events directory does not exist.
-func LoadAllEventsAcrossSessions(stateDir string) ([]sightjack.Event, error) {
+func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, error) {
 	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
@@ -90,7 +90,7 @@ func LoadAllEventsAcrossSessions(stateDir string) ([]sightjack.Event, error) {
 		}
 		return nil, fmt.Errorf("load all events: %w", err)
 	}
-	var all []sightjack.Event
+	var all []domain.Event
 	for _, c := range candidates {
 		store := NewFileEventStore(EventStorePath(stateDir, c.name))
 		events, loadErr := store.LoadAll()

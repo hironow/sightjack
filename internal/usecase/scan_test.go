@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestRunScan_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := sightjack.RunScanCommand{}
+	cmd := domain.RunScanCommand{}
 
 	// when
 	_, err := RunScan(context.Background(), cmd, nil, "", "", false, io.Discard, sightjack.NewLogger(io.Discard, false))
@@ -26,7 +27,7 @@ func TestRunScan_InvalidCommand(t *testing.T) {
 
 func TestRunScan_InvalidLang(t *testing.T) {
 	// given: invalid lang
-	cmd := sightjack.RunScanCommand{
+	cmd := domain.RunScanCommand{
 		RepoPath: "/tmp",
 		Lang:     "invalid",
 	}

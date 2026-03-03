@@ -1,4 +1,4 @@
-package sightjack
+package domain
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	sightjack "github.com/hironow/sightjack"
 )
 
 // EventDispatcher dispatches domain events to policy handlers.
@@ -118,7 +119,7 @@ type SessionStartedPayload struct {
 
 // ScanCompletedPayload is the payload for EventScanCompleted.
 type ScanCompletedPayload struct {
-	Clusters       []ClusterState `json:"clusters"`
+	Clusters       []sightjack.ClusterState `json:"clusters"`
 	Completeness   float64        `json:"completeness"`
 	ShibitoCount   int            `json:"shibito_count"`
 	ScanResultPath string         `json:"scan_result_path"`
@@ -127,7 +128,7 @@ type ScanCompletedPayload struct {
 
 // WavesGeneratedPayload is the payload for EventWavesGenerated.
 type WavesGeneratedPayload struct {
-	Waves []WaveState `json:"waves"`
+	Waves []sightjack.WaveState `json:"waves"`
 }
 
 // WaveIdentityPayload is a shared payload for events that reference a single wave.
@@ -141,7 +142,7 @@ type WaveIdentityPayload struct {
 type WaveModifiedPayload struct {
 	WaveID      string    `json:"wave_id"`
 	ClusterName string    `json:"cluster_name"`
-	UpdatedWave WaveState `json:"updated_wave"`
+	UpdatedWave sightjack.WaveState `json:"updated_wave"`
 }
 
 // WaveAppliedPayload is the payload for EventWaveApplied.
@@ -176,7 +177,7 @@ type WavesUnlockedPayload struct {
 // NextGenWavesAddedPayload is the payload for EventNextGenWavesAdded.
 type NextGenWavesAddedPayload struct {
 	ClusterName string      `json:"cluster_name"`
-	Waves       []WaveState `json:"waves"`
+	Waves       []sightjack.WaveState `json:"waves"`
 }
 
 // ADRGeneratedPayload is the payload for EventADRGenerated.

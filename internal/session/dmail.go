@@ -126,7 +126,7 @@ func ParseDMail(data []byte) (*DMail, error) {
 
 // ComposeDMail stages a d-mail via the transactional outbox store, then
 // flushes it to archive/ and outbox/ using atomic file writes.
-func ComposeDMail(store sightjack.OutboxStore, mail *DMail) error {
+func ComposeDMail(store domain.OutboxStore, mail *DMail) error {
 	if err := ValidateDMail(mail); err != nil {
 		return err
 	}
@@ -379,16 +379,16 @@ type FeedbackCollector struct {
 	mu               sync.Mutex
 	items            []*DMail
 	convergenceNames []string
-	notifier         sightjack.Notifier
+	notifier         domain.Notifier
 }
 
 // CollectFeedback creates a FeedbackCollector seeded with initial feedback
 // and starts a background goroutine to accumulate late-arriving items
 // from the channel. Convergence d-mails trigger a notification via notifier.
 // Safe to call with nil initial, nil channel, or nil notifier.
-func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier sightjack.Notifier, logger *sightjack.Logger) *FeedbackCollector {
+func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier domain.Notifier, logger *sightjack.Logger) *FeedbackCollector {
 	if notifier == nil {
-		notifier = &sightjack.NopNotifier{}
+		notifier = &domain.NopNotifier{}
 	}
 	c := &FeedbackCollector{notifier: notifier}
 	if len(initial) > 0 {
@@ -584,7 +584,7 @@ func ReportBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string {
 }
 
 // ComposeReport creates and sends a report d-mail for a completed wave.
-func ComposeReport(store sightjack.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
+func ComposeReport(store domain.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
@@ -622,7 +622,7 @@ func FeedbackBody(wave sightjack.Wave, result *sightjack.WaveApplyResult) string
 
 // ComposeFeedback stages a feedback D-Mail for amadeus consumption.
 // Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
-func ComposeFeedback(store sightjack.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
+func ComposeFeedback(store domain.OutboxStore, wave sightjack.Wave, result *sightjack.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("feedback", key),
@@ -636,7 +636,7 @@ func ComposeFeedback(store sightjack.OutboxStore, wave sightjack.Wave, result *s
 }
 
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
-func ComposeSpecification(store sightjack.OutboxStore, wave sightjack.Wave) error {
+func ComposeSpecification(store domain.OutboxStore, wave sightjack.Wave) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),

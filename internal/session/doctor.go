@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // CheckStatus represents the outcome of a single doctor check.
@@ -289,21 +290,21 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger *s
 			Message: "no events",
 		})
 	} else {
-		rate := sightjack.SuccessRate(allEvents)
+		rate := domain.SuccessRate(allEvents)
 		var success, total int
 		for _, ev := range allEvents {
 			switch ev.Type {
-			case sightjack.EventWaveApplied:
+			case domain.EventWaveApplied:
 				success++
 				total++
-			case sightjack.EventWaveRejected:
+			case domain.EventWaveRejected:
 				total++
 			}
 		}
 		results = append(results, CheckResult{
 			Name:    "success-rate",
 			Status:  CheckOK,
-			Message: sightjack.FormatSuccessRate(rate, success, total),
+			Message: domain.FormatSuccessRate(rate, success, total),
 		})
 	}
 

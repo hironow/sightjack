@@ -1,9 +1,10 @@
-package sightjack
+package domain
 
 import (
 	"context"
 	"fmt"
 
+	sightjack "github.com/hironow/sightjack"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -19,7 +20,7 @@ func FormatSuccessRate(rate float64, success, total int) string {
 
 // RecordWave increments the sightjack.wave.total OTel counter.
 func RecordWave(ctx context.Context, status string) {
-	c, _ := Meter.Int64Counter("sightjack.wave.total",
+	c, _ := sightjack.Meter.Int64Counter("sightjack.wave.total",
 		metric.WithDescription("Total wave operations"),
 	)
 	c.Add(ctx, 1,

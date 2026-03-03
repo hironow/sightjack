@@ -8,12 +8,13 @@ import (
 	"path/filepath"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 
 	_ "modernc.org/sqlite"
 )
 
-// Compile-time check that SQLiteOutboxStore implements sightjack.OutboxStore.
-var _ sightjack.OutboxStore = (*SQLiteOutboxStore)(nil)
+// Compile-time check that SQLiteOutboxStore implements domain.OutboxStore.
+var _ domain.OutboxStore = (*SQLiteOutboxStore)(nil)
 
 // SQLiteOutboxStore implements OutboxStore using a SQLite database as the
 // transactional write-ahead log. Staged D-Mails are flushed to archive/ and

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
@@ -15,8 +15,8 @@ func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir)
 
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
 
 	// when
 	if err := store.Append(e1, e2); err != nil {
@@ -31,10 +31,10 @@ func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
-	if events[0].Type != sightjack.EventSessionStarted {
+	if events[0].Type != domain.EventSessionStarted {
 		t.Errorf("expected session_started, got %s", events[0].Type)
 	}
-	if events[1].Type != sightjack.EventScanCompleted {
+	if events[1].Type != domain.EventScanCompleted {
 		t.Errorf("expected scan_completed, got %s", events[1].Type)
 	}
 }
@@ -47,7 +47,7 @@ func TestFileEventStore_LoadSince_FiltersCorrectly(t *testing.T) {
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 	for i := range 5 {
 		ts := base.Add(time.Duration(i) * time.Minute)
-		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, ts)
+		e, _ := domain.NewEvent(domain.EventSessionStarted, nil, ts)
 		store.Append(e)
 	}
 
@@ -106,7 +106,7 @@ func TestFileEventStore_ManyEvents(t *testing.T) {
 	// when
 	base := time.Now()
 	for i := range count {
-		e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, base.Add(time.Duration(i)*time.Millisecond))
+		e, _ := domain.NewEvent(domain.EventSessionStarted, nil, base.Add(time.Duration(i)*time.Millisecond))
 		if err := store.Append(e); err != nil {
 			t.Fatalf("append event %d: %v", i, err)
 		}
@@ -126,10 +126,10 @@ func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
 	// given: a daily JSONL file with one corrupt line
 	dir := t.TempDir()
 
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
-	data1, _ := sightjack.MarshalEvent(e1)
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, time.Now())
-	data2, _ := sightjack.MarshalEvent(e2)
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	data1, _ := domain.MarshalEvent(e1)
+	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
+	data2, _ := domain.MarshalEvent(e2)
 
 	content := string(data1) + "\n" + "THIS IS NOT JSON\n" + string(data2) + "\n"
 	filename := time.Now().Format("2006-01-02") + ".jsonl"
@@ -155,7 +155,7 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "sub", "dir", "events")
 	store := eventsource.NewFileEventStore(dir)
 
-	e, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	e, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// when
 	err := store.Append(e)
@@ -176,9 +176,9 @@ func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir)
 
 	// when: append in separate calls
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 	store.Append(e1)
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
 	store.Append(e2)
 
 	// then
@@ -194,8 +194,8 @@ func TestFileEventStore_UUIDUniqueness(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir)
 
 	// when
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
-	e2, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 	store.Append(e1, e2)
 
 	// then
@@ -219,8 +219,8 @@ func TestFileEventStore_DailyFileRouting(t *testing.T) {
 	day1 := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
 	day2 := time.Date(2025, 3, 2, 10, 0, 0, 0, time.UTC)
 
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, day1)
-	e2, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, day2)
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, day1)
+	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, day2)
 
 	// when
 	store.Append(e1, e2)
@@ -249,7 +249,7 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "events")
 	store := eventsource.NewFileEventStore(dir)
 
-	invalid := sightjack.Event{} // all fields empty
+	invalid := domain.Event{} // all fields empty
 
 	// when
 	err := store.Append(invalid)
@@ -269,8 +269,8 @@ func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "events")
 	store := eventsource.NewFileEventStore(dir)
 
-	valid, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "data", time.Now())
-	invalid := sightjack.Event{SessionID: "s1"} // missing ID, Type, Timestamp, Data
+	valid, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
+	invalid := domain.Event{SessionID: "s1"} // missing ID, Type, Timestamp, Data
 
 	// when: batch append [valid, invalid]
 	err := store.Append(valid, invalid)
@@ -292,8 +292,8 @@ func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 	later := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
 	earlier := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
 
-	e1, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, later)
-	e2, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, earlier)
+	e1, _ := domain.NewEvent(domain.EventScanCompleted, nil, later)
+	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, earlier)
 
 	store.Append(e1)
 	store.Append(e2)
@@ -305,10 +305,10 @@ func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
-	if events[0].Type != sightjack.EventSessionStarted {
+	if events[0].Type != domain.EventSessionStarted {
 		t.Errorf("expected first event to be session_started (earlier), got %s", events[0].Type)
 	}
-	if events[1].Type != sightjack.EventScanCompleted {
+	if events[1].Type != domain.EventScanCompleted {
 		t.Errorf("expected second event to be scan_completed (later), got %s", events[1].Type)
 	}
 }

@@ -1,15 +1,16 @@
-package sightjack_test
+package domain_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestWaveAggregate_Approve_Available(t *testing.T) {
 	// given
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 	agg.SetWaves([]sightjack.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 	})
@@ -21,14 +22,14 @@ func TestWaveAggregate_Approve_Available(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != sightjack.EventWaveApproved {
+	if ev.Type != domain.EventWaveApproved {
 		t.Fatalf("expected wave_approved, got %s", ev.Type)
 	}
 }
 
 func TestWaveAggregate_Approve_NotFound(t *testing.T) {
 	// given
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 
 	// when
 	_, err := agg.Approve("nonexistent", "auth", time.Now().UTC())
@@ -41,7 +42,7 @@ func TestWaveAggregate_Approve_NotFound(t *testing.T) {
 
 func TestWaveAggregate_Reject(t *testing.T) {
 	// given
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 	agg.SetWaves([]sightjack.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 	})
@@ -53,20 +54,20 @@ func TestWaveAggregate_Reject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != sightjack.EventWaveRejected {
+	if ev.Type != domain.EventWaveRejected {
 		t.Fatalf("expected wave_rejected, got %s", ev.Type)
 	}
 }
 
 func TestWaveAggregate_RecordApplied(t *testing.T) {
 	// given
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 	agg.SetWaves([]sightjack.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available", Actions: []sightjack.WaveAction{{Type: "fix"}}},
 	})
 
 	// when
-	ev, err := agg.RecordApplied(sightjack.WaveAppliedPayload{
+	ev, err := agg.RecordApplied(domain.WaveAppliedPayload{
 		WaveID: "w1", ClusterName: "auth", Applied: 1, TotalCount: 1,
 	}, time.Now().UTC())
 
@@ -74,14 +75,14 @@ func TestWaveAggregate_RecordApplied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != sightjack.EventWaveApplied {
+	if ev.Type != domain.EventWaveApplied {
 		t.Fatalf("expected wave_applied, got %s", ev.Type)
 	}
 }
 
 func TestWaveAggregate_Complete(t *testing.T) {
 	// given
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 	agg.SetWaves([]sightjack.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available", Actions: []sightjack.WaveAction{{Type: "fix"}}},
 	})
@@ -93,7 +94,7 @@ func TestWaveAggregate_Complete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != sightjack.EventWaveCompleted {
+	if ev.Type != domain.EventWaveCompleted {
 		t.Fatalf("expected wave_completed, got %s", ev.Type)
 	}
 	// Completed map should be updated
@@ -104,7 +105,7 @@ func TestWaveAggregate_Complete(t *testing.T) {
 
 func TestWaveAggregate_EvaluateUnlocks(t *testing.T) {
 	// given: w2 depends on w1
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 	agg.SetWaves([]sightjack.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 		{ID: "w2", ClusterName: "auth", Status: "locked", Prerequisites: []string{"auth:w1"}},
@@ -121,14 +122,14 @@ func TestWaveAggregate_EvaluateUnlocks(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	if events[0].Type != sightjack.EventWavesUnlocked {
+	if events[0].Type != domain.EventWavesUnlocked {
 		t.Fatalf("expected waves_unlocked, got %s", events[0].Type)
 	}
 }
 
 func TestWaveAggregate_EvaluateUnlocks_NothingToUnlock(t *testing.T) {
 	// given: no locked waves
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 	agg.SetWaves([]sightjack.Wave{
 		{ID: "w1", ClusterName: "auth", Status: "available"},
 	})
@@ -147,7 +148,7 @@ func TestWaveAggregate_EvaluateUnlocks_NothingToUnlock(t *testing.T) {
 
 func TestWaveAggregate_AddNextGen(t *testing.T) {
 	// given
-	agg := sightjack.NewWaveAggregate()
+	agg := domain.NewWaveAggregate()
 	newWaves := []sightjack.WaveState{
 		{ID: "w2", ClusterName: "auth", Title: "Next wave", Status: "available"},
 	}
@@ -159,7 +160,7 @@ func TestWaveAggregate_AddNextGen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != sightjack.EventNextGenWavesAdded {
+	if ev.Type != domain.EventNextGenWavesAdded {
 		t.Fatalf("expected nextgen_waves_added, got %s", ev.Type)
 	}
 }

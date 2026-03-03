@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // StatusReport holds operational status information for the sightjack tool.
@@ -40,15 +41,15 @@ func Status(baseDir string) StatusReport {
 	var success, total int
 	for _, ev := range allEvents {
 		switch ev.Type {
-		case sightjack.EventWaveApplied:
+		case domain.EventWaveApplied:
 			success++
 			total++
-		case sightjack.EventWaveRejected:
+		case domain.EventWaveRejected:
 			total++
 		}
 	}
 	report.WavesTotal = total
-	report.SuccessRate = sightjack.SuccessRate(allEvents)
+	report.SuccessRate = domain.SuccessRate(allEvents)
 
 	// Find the most recent scan timestamp
 	report.LastScanned = latestScanTime(allEvents)
@@ -57,14 +58,14 @@ func Status(baseDir string) StatusReport {
 }
 
 // latestScanTime finds the most recent LastScanned from ScanCompletedPayload events.
-func latestScanTime(events []sightjack.Event) time.Time {
+func latestScanTime(events []domain.Event) time.Time {
 	var latest time.Time
 	for _, ev := range events {
-		if ev.Type != sightjack.EventScanCompleted {
+		if ev.Type != domain.EventScanCompleted {
 			continue
 		}
-		var payload sightjack.ScanCompletedPayload
-		if err := sightjack.UnmarshalEventPayload(ev, &payload); err != nil {
+		var payload domain.ScanCompletedPayload
+		if err := domain.UnmarshalEventPayload(ev, &payload); err != nil {
 			continue
 		}
 		if payload.LastScanned.After(latest) {

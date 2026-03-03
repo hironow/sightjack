@@ -1,21 +1,22 @@
-package sightjack_test
+package domain_test
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
+	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestNewEvent_SetsAllFields(t *testing.T) {
 	// given
-	eventType := sightjack.EventSessionStarted
+	eventType := domain.EventSessionStarted
 	payload := map[string]string{"project": "test"}
 	now := time.Now()
 
 	// when
-	event, err := sightjack.NewEvent(eventType, payload, now)
+	event, err := domain.NewEvent(eventType, payload, now)
 
 	// then
 	if err != nil {
@@ -24,8 +25,8 @@ func TestNewEvent_SetsAllFields(t *testing.T) {
 	if event.ID == "" {
 		t.Error("expected non-empty UUID ID")
 	}
-	if event.Type != sightjack.EventSessionStarted {
-		t.Errorf("expected type %s, got %s", sightjack.EventSessionStarted, event.Type)
+	if event.Type != domain.EventSessionStarted {
+		t.Errorf("expected type %s, got %s", domain.EventSessionStarted, event.Type)
 	}
 	if !event.Timestamp.Equal(now) {
 		t.Errorf("expected timestamp %v, got %v", now, event.Timestamp)
@@ -37,8 +38,8 @@ func TestNewEvent_SetsAllFields(t *testing.T) {
 
 func TestNewEvent_GeneratesUUID(t *testing.T) {
 	// given/when
-	e1, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
-	e2, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// then: each event gets a unique UUID
 	if e1.ID == e2.ID {
@@ -53,14 +54,14 @@ func TestMarshalEvent_JSONRoundTrip(t *testing.T) {
 	// given
 	payload := map[string]string{"project": "my-project"}
 	now := time.Now()
-	event, err := sightjack.NewEvent(sightjack.EventSessionStarted, payload, now)
+	event, err := domain.NewEvent(domain.EventSessionStarted, payload, now)
 	if err != nil {
 		t.Fatalf("NewEvent: %v", err)
 	}
 	event.SessionID = "session-1"
 
 	// when
-	data, err := sightjack.MarshalEvent(event)
+	data, err := domain.MarshalEvent(event)
 	if err != nil {
 		t.Fatalf("MarshalEvent: %v", err)
 	}
@@ -71,12 +72,12 @@ func TestMarshalEvent_JSONRoundTrip(t *testing.T) {
 	}
 
 	// round-trip: unmarshal back
-	var decoded sightjack.Event
+	var decoded domain.Event
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
-	if decoded.Type != sightjack.EventSessionStarted {
-		t.Errorf("expected type %s, got %s", sightjack.EventSessionStarted, decoded.Type)
+	if decoded.Type != domain.EventSessionStarted {
+		t.Errorf("expected type %s, got %s", domain.EventSessionStarted, decoded.Type)
 	}
 	if decoded.SessionID != "session-1" {
 		t.Errorf("expected session-1, got %s", decoded.SessionID)
@@ -88,10 +89,10 @@ func TestMarshalEvent_JSONRoundTrip(t *testing.T) {
 
 func TestMarshalEvent_NoTrailingNewline(t *testing.T) {
 	// given: JSONL format requires no trailing newline in the marshaled bytes
-	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// when
-	data, err := sightjack.MarshalEvent(event)
+	data, err := domain.MarshalEvent(event)
 
 	// then
 	if err != nil {
@@ -104,7 +105,7 @@ func TestMarshalEvent_NoTrailingNewline(t *testing.T) {
 
 func TestNewEvent_NilPayload(t *testing.T) {
 	// given/when
-	event, err := sightjack.NewEvent(sightjack.EventSessionStarted, nil, time.Now())
+	event, err := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// then
 	if err != nil {
@@ -117,27 +118,27 @@ func TestNewEvent_NilPayload(t *testing.T) {
 
 func TestEvent_AllEventTypes_Defined(t *testing.T) {
 	// Verify all 17 event types are defined and distinct
-	types := []sightjack.EventType{
-		sightjack.EventSessionStarted,
-		sightjack.EventScanCompleted,
-		sightjack.EventWavesGenerated,
-		sightjack.EventWaveApproved,
-		sightjack.EventWaveRejected,
-		sightjack.EventWaveModified,
-		sightjack.EventWaveApplied,
-		sightjack.EventWaveCompleted,
-		sightjack.EventCompletenessUpdated,
-		sightjack.EventWavesUnlocked,
-		sightjack.EventNextGenWavesAdded,
-		sightjack.EventADRGenerated,
-		sightjack.EventReadyLabelsApplied,
-		sightjack.EventSessionResumed,
-		sightjack.EventSessionRescanned,
-		sightjack.EventSpecificationSent,
-		sightjack.EventReportSent,
+	types := []domain.EventType{
+		domain.EventSessionStarted,
+		domain.EventScanCompleted,
+		domain.EventWavesGenerated,
+		domain.EventWaveApproved,
+		domain.EventWaveRejected,
+		domain.EventWaveModified,
+		domain.EventWaveApplied,
+		domain.EventWaveCompleted,
+		domain.EventCompletenessUpdated,
+		domain.EventWavesUnlocked,
+		domain.EventNextGenWavesAdded,
+		domain.EventADRGenerated,
+		domain.EventReadyLabelsApplied,
+		domain.EventSessionResumed,
+		domain.EventSessionRescanned,
+		domain.EventSpecificationSent,
+		domain.EventReportSent,
 	}
 
-	seen := make(map[sightjack.EventType]bool)
+	seen := make(map[domain.EventType]bool)
 	for _, et := range types {
 		if et == "" {
 			t.Error("found empty EventType")
@@ -156,11 +157,11 @@ func TestEvent_AllEventTypes_Defined(t *testing.T) {
 func TestEvent_TimestampPreservedInJSON(t *testing.T) {
 	// given
 	now := time.Now()
-	event, _ := sightjack.NewEvent(sightjack.EventScanCompleted, nil, now)
+	event, _ := domain.NewEvent(domain.EventScanCompleted, nil, now)
 
 	// when
-	data, _ := sightjack.MarshalEvent(event)
-	var decoded sightjack.Event
+	data, _ := domain.MarshalEvent(event)
+	var decoded domain.Event
 	json.Unmarshal(data, &decoded)
 
 	// then: timestamps should be equal within a second (JSON time precision)
@@ -175,10 +176,10 @@ func TestEvent_TimestampPreservedInJSON(t *testing.T) {
 
 func TestValidateEvent_Valid(t *testing.T) {
 	// given
-	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, map[string]string{"k": "v"}, time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, map[string]string{"k": "v"}, time.Now())
 
 	// when
-	err := sightjack.ValidateEvent(event)
+	err := domain.ValidateEvent(event)
 
 	// then
 	if err != nil {
@@ -188,11 +189,11 @@ func TestValidateEvent_Valid(t *testing.T) {
 
 func TestValidateEvent_EmptyType(t *testing.T) {
 	// given
-	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.Type = ""
 
 	// when
-	err := sightjack.ValidateEvent(event)
+	err := domain.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -202,11 +203,11 @@ func TestValidateEvent_EmptyType(t *testing.T) {
 
 func TestValidateEvent_EmptyID(t *testing.T) {
 	// given
-	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.ID = ""
 
 	// when
-	err := sightjack.ValidateEvent(event)
+	err := domain.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -216,11 +217,11 @@ func TestValidateEvent_EmptyID(t *testing.T) {
 
 func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 	// given
-	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.Timestamp = time.Time{}
 
 	// when
-	err := sightjack.ValidateEvent(event)
+	err := domain.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -230,11 +231,11 @@ func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 
 func TestValidateEvent_EmptyData(t *testing.T) {
 	// given
-	event, _ := sightjack.NewEvent(sightjack.EventSessionStarted, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.Data = nil
 
 	// when
-	err := sightjack.ValidateEvent(event)
+	err := domain.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -247,7 +248,7 @@ func TestEvent_UnknownType_Tolerance(t *testing.T) {
 	raw := `{"id":"test-uuid","type":"future_event","timestamp":"2026-01-01T00:00:00Z","session_id":"s1","data":{"foo":"bar"}}`
 
 	// when
-	var event sightjack.Event
+	var event domain.Event
 	err := json.Unmarshal([]byte(raw), &event)
 
 	// then
@@ -264,18 +265,18 @@ func TestEvent_UnknownType_Tolerance(t *testing.T) {
 
 func TestPayload_SessionStarted_RoundTrip(t *testing.T) {
 	// given
-	payload := sightjack.SessionStartedPayload{
+	payload := domain.SessionStartedPayload{
 		Project:         "my-project",
 		StrictnessLevel: "fog",
 	}
-	event, err := sightjack.NewEvent(sightjack.EventSessionStarted, payload, time.Now())
+	event, err := domain.NewEvent(domain.EventSessionStarted, payload, time.Now())
 	if err != nil {
 		t.Fatalf("NewEvent: %v", err)
 	}
 
 	// when
-	var decoded sightjack.SessionStartedPayload
-	if err := sightjack.UnmarshalEventPayload(event, &decoded); err != nil {
+	var decoded domain.SessionStartedPayload
+	if err := domain.UnmarshalEventPayload(event, &decoded); err != nil {
 		t.Fatalf("UnmarshalEventPayload: %v", err)
 	}
 
@@ -290,7 +291,7 @@ func TestPayload_SessionStarted_RoundTrip(t *testing.T) {
 
 func TestPayload_ScanCompleted_RoundTrip(t *testing.T) {
 	// given
-	payload := sightjack.ScanCompletedPayload{
+	payload := domain.ScanCompletedPayload{
 		Clusters: []sightjack.ClusterState{
 			{Name: "Auth", Completeness: 0.5, IssueCount: 3},
 		},
@@ -299,11 +300,11 @@ func TestPayload_ScanCompleted_RoundTrip(t *testing.T) {
 		ScanResultPath: "/path/to/scan.json",
 		LastScanned:    time.Date(2026, 2, 24, 10, 0, 0, 0, time.UTC),
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventScanCompleted, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventScanCompleted, payload, time.Now())
 
 	// when
-	var decoded sightjack.ScanCompletedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.ScanCompletedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	// then
 	if len(decoded.Clusters) != 1 {
@@ -319,16 +320,16 @@ func TestPayload_ScanCompleted_RoundTrip(t *testing.T) {
 
 func TestPayload_WavesGenerated_RoundTrip(t *testing.T) {
 	// given
-	payload := sightjack.WavesGeneratedPayload{
+	payload := domain.WavesGeneratedPayload{
 		Waves: []sightjack.WaveState{
 			{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available", ActionCount: 2},
 		},
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventWavesGenerated, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWavesGenerated, payload, time.Now())
 
 	// when
-	var decoded sightjack.WavesGeneratedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.WavesGeneratedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	// then
 	if len(decoded.Waves) != 1 {
@@ -340,11 +341,11 @@ func TestPayload_WavesGenerated_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_WaveApproved_RoundTrip(t *testing.T) {
-	payload := sightjack.WaveIdentityPayload{WaveID: "w1", ClusterName: "Auth"}
-	event, _ := sightjack.NewEvent(sightjack.EventWaveApproved, payload, time.Now())
+	payload := domain.WaveIdentityPayload{WaveID: "w1", ClusterName: "Auth"}
+	event, _ := domain.NewEvent(domain.EventWaveApproved, payload, time.Now())
 
-	var decoded sightjack.WaveIdentityPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.WaveIdentityPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if decoded.WaveID != "w1" || decoded.ClusterName != "Auth" {
 		t.Errorf("unexpected payload: %+v", decoded)
@@ -352,16 +353,16 @@ func TestPayload_WaveApproved_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_WaveCompleted_RoundTrip(t *testing.T) {
-	payload := sightjack.WaveCompletedPayload{
+	payload := domain.WaveCompletedPayload{
 		WaveID:      "w1",
 		ClusterName: "Auth",
 		Applied:     3,
 		TotalCount:  3,
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventWaveCompleted, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWaveCompleted, payload, time.Now())
 
-	var decoded sightjack.WaveCompletedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.WaveCompletedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if decoded.Applied != 3 {
 		t.Errorf("expected 3 applied, got %d", decoded.Applied)
@@ -369,15 +370,15 @@ func TestPayload_WaveCompleted_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_CompletenessUpdated_RoundTrip(t *testing.T) {
-	payload := sightjack.CompletenessUpdatedPayload{
+	payload := domain.CompletenessUpdatedPayload{
 		ClusterName:         "Auth",
 		ClusterCompleteness: 0.75,
 		OverallCompleteness: 0.60,
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventCompletenessUpdated, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventCompletenessUpdated, payload, time.Now())
 
-	var decoded sightjack.CompletenessUpdatedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.CompletenessUpdatedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if decoded.ClusterCompleteness != 0.75 {
 		t.Errorf("expected 0.75, got %f", decoded.ClusterCompleteness)
@@ -385,16 +386,16 @@ func TestPayload_CompletenessUpdated_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_NextGenWavesAdded_RoundTrip(t *testing.T) {
-	payload := sightjack.NextGenWavesAddedPayload{
+	payload := domain.NextGenWavesAddedPayload{
 		ClusterName: "Auth",
 		Waves: []sightjack.WaveState{
 			{ID: "w2", ClusterName: "Auth", Title: "Second", Status: "available"},
 		},
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventNextGenWavesAdded, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventNextGenWavesAdded, payload, time.Now())
 
-	var decoded sightjack.NextGenWavesAddedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.NextGenWavesAddedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if decoded.ClusterName != "Auth" || len(decoded.Waves) != 1 {
 		t.Errorf("unexpected: %+v", decoded)
@@ -402,17 +403,17 @@ func TestPayload_NextGenWavesAdded_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_WaveModified_RoundTrip(t *testing.T) {
-	payload := sightjack.WaveModifiedPayload{
+	payload := domain.WaveModifiedPayload{
 		WaveID:      "w1",
 		ClusterName: "Auth",
 		UpdatedWave: sightjack.WaveState{
 			ID: "w1", ClusterName: "Auth", Title: "Modified", Status: "available",
 		},
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventWaveModified, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWaveModified, payload, time.Now())
 
-	var decoded sightjack.WaveModifiedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.WaveModifiedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if decoded.UpdatedWave.Title != "Modified" {
 		t.Errorf("expected Modified, got %s", decoded.UpdatedWave.Title)
@@ -420,11 +421,11 @@ func TestPayload_WaveModified_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_ADRGenerated_RoundTrip(t *testing.T) {
-	payload := sightjack.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"}
-	event, _ := sightjack.NewEvent(sightjack.EventADRGenerated, payload, time.Now())
+	payload := domain.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"}
+	event, _ := domain.NewEvent(domain.EventADRGenerated, payload, time.Now())
 
-	var decoded sightjack.ADRGeneratedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.ADRGeneratedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if decoded.ADRID != "0008" {
 		t.Errorf("expected 0008, got %s", decoded.ADRID)
@@ -432,13 +433,13 @@ func TestPayload_ADRGenerated_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_WavesUnlocked_RoundTrip(t *testing.T) {
-	payload := sightjack.WavesUnlockedPayload{
+	payload := domain.WavesUnlockedPayload{
 		UnlockedWaveIDs: []string{"Auth:w2", "Auth:w3"},
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventWavesUnlocked, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWavesUnlocked, payload, time.Now())
 
-	var decoded sightjack.WavesUnlockedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.WavesUnlockedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if len(decoded.UnlockedWaveIDs) != 2 {
 		t.Errorf("expected 2 unlocked, got %d", len(decoded.UnlockedWaveIDs))
@@ -446,11 +447,11 @@ func TestPayload_WavesUnlocked_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_ReadyLabelsApplied_RoundTrip(t *testing.T) {
-	payload := sightjack.ReadyLabelsAppliedPayload{IssueIDs: []string{"ENG-101", "ENG-102"}}
-	event, _ := sightjack.NewEvent(sightjack.EventReadyLabelsApplied, payload, time.Now())
+	payload := domain.ReadyLabelsAppliedPayload{IssueIDs: []string{"ENG-101", "ENG-102"}}
+	event, _ := domain.NewEvent(domain.EventReadyLabelsApplied, payload, time.Now())
 
-	var decoded sightjack.ReadyLabelsAppliedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.ReadyLabelsAppliedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if len(decoded.IssueIDs) != 2 {
 		t.Errorf("expected 2 issues, got %d", len(decoded.IssueIDs))
@@ -458,17 +459,17 @@ func TestPayload_ReadyLabelsApplied_RoundTrip(t *testing.T) {
 }
 
 func TestPayload_WaveApplied_RoundTrip(t *testing.T) {
-	payload := sightjack.WaveAppliedPayload{
+	payload := domain.WaveAppliedPayload{
 		WaveID:      "w1",
 		ClusterName: "Auth",
 		Applied:     2,
 		TotalCount:  3,
 		Errors:      []string{"action 3 failed"},
 	}
-	event, _ := sightjack.NewEvent(sightjack.EventWaveApplied, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWaveApplied, payload, time.Now())
 
-	var decoded sightjack.WaveAppliedPayload
-	sightjack.UnmarshalEventPayload(event, &decoded)
+	var decoded domain.WaveAppliedPayload
+	domain.UnmarshalEventPayload(event, &decoded)
 
 	if decoded.Applied != 2 || len(decoded.Errors) != 1 {
 		t.Errorf("unexpected: %+v", decoded)

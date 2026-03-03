@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestNopNotifier_NoError(t *testing.T) {
 	// given
-	n := &sightjack.NopNotifier{}
+	n := &domain.NopNotifier{}
 
 	// when
 	err := n.Notify(context.Background(), "title", "message")
@@ -124,8 +124,8 @@ func TestLocalNotifier_UnsupportedOS(t *testing.T) {
 	err := n.Notify(context.Background(), "Title", "Message")
 
 	// then: should return ErrUnsupportedOS sentinel
-	if err != sightjack.ErrUnsupportedOS {
-		t.Errorf("err = %v, want sightjack.ErrUnsupportedOS", err)
+	if err != domain.ErrUnsupportedOS {
+		t.Errorf("err = %v, want domain.ErrUnsupportedOS", err)
 	}
 }
 

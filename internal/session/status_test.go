@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -80,36 +81,36 @@ func TestStatus_WithEvents(t *testing.T) {
 
 	// Create a scan_completed event with LastScanned
 	scanTime := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
-	scanPayload := sightjack.ScanCompletedPayload{
+	scanPayload := domain.ScanCompletedPayload{
 		Completeness: 0.75,
 		ShibitoCount: 2,
 		LastScanned:  scanTime,
 	}
-	scanEvent, err := sightjack.NewEvent(sightjack.EventScanCompleted, scanPayload, scanTime)
+	scanEvent, err := domain.NewEvent(domain.EventScanCompleted, scanPayload, scanTime)
 	if err != nil {
 		t.Fatal(err)
 	}
 	scanEvent.SessionID = sessionID
 
 	// Create wave_applied event
-	appliedPayload := sightjack.WaveAppliedPayload{
+	appliedPayload := domain.WaveAppliedPayload{
 		WaveID:      "w1",
 		ClusterName: "cluster-a",
 		Applied:     3,
 		TotalCount:  3,
 	}
-	appliedEvent, err := sightjack.NewEvent(sightjack.EventWaveApplied, appliedPayload, scanTime.Add(time.Minute))
+	appliedEvent, err := domain.NewEvent(domain.EventWaveApplied, appliedPayload, scanTime.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 	appliedEvent.SessionID = sessionID
 
 	// Create wave_rejected event
-	rejectedPayload := sightjack.WaveIdentityPayload{
+	rejectedPayload := domain.WaveIdentityPayload{
 		WaveID:      "w2",
 		ClusterName: "cluster-b",
 	}
-	rejectedEvent, err := sightjack.NewEvent(sightjack.EventWaveRejected, rejectedPayload, scanTime.Add(2*time.Minute))
+	rejectedEvent, err := domain.NewEvent(domain.EventWaveRejected, rejectedPayload, scanTime.Add(2*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}

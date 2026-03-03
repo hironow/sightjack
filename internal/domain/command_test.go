@@ -1,14 +1,14 @@
-package sightjack_test
+package domain_test
 
 import (
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestRunScanCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := sightjack.RunScanCommand{
+	cmd := domain.RunScanCommand{
 		RepoPath:   "/tmp/repo",
 		Lang:       "ja",
 		Strictness: "fog",
@@ -25,7 +25,7 @@ func TestRunScanCommand_Validate_Valid(t *testing.T) {
 
 func TestRunScanCommand_Validate_MissingRepoPath(t *testing.T) {
 	// given
-	cmd := sightjack.RunScanCommand{
+	cmd := domain.RunScanCommand{
 		Lang:       "ja",
 		Strictness: "fog",
 	}
@@ -41,7 +41,7 @@ func TestRunScanCommand_Validate_MissingRepoPath(t *testing.T) {
 
 func TestRunScanCommand_Validate_InvalidLang(t *testing.T) {
 	// given
-	cmd := sightjack.RunScanCommand{
+	cmd := domain.RunScanCommand{
 		RepoPath:   "/tmp/repo",
 		Lang:       "jp",
 		Strictness: "fog",
@@ -58,7 +58,7 @@ func TestRunScanCommand_Validate_InvalidLang(t *testing.T) {
 
 func TestRunSessionCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := sightjack.RunSessionCommand{
+	cmd := domain.RunSessionCommand{
 		RepoPath: "/tmp/repo",
 	}
 
@@ -73,7 +73,7 @@ func TestRunSessionCommand_Validate_Valid(t *testing.T) {
 
 func TestRunSessionCommand_Validate_MissingRepoPath(t *testing.T) {
 	// given
-	cmd := sightjack.RunSessionCommand{}
+	cmd := domain.RunSessionCommand{}
 
 	// when
 	errs := cmd.Validate()
@@ -86,7 +86,7 @@ func TestRunSessionCommand_Validate_MissingRepoPath(t *testing.T) {
 
 func TestResumeSessionCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := sightjack.ResumeSessionCommand{
+	cmd := domain.ResumeSessionCommand{
 		RepoPath:  "/tmp/repo",
 		SessionID: "session-123",
 	}
@@ -102,7 +102,7 @@ func TestResumeSessionCommand_Validate_Valid(t *testing.T) {
 
 func TestResumeSessionCommand_Validate_MissingSessionID(t *testing.T) {
 	// given
-	cmd := sightjack.ResumeSessionCommand{
+	cmd := domain.ResumeSessionCommand{
 		RepoPath: "/tmp/repo",
 	}
 
@@ -117,7 +117,7 @@ func TestResumeSessionCommand_Validate_MissingSessionID(t *testing.T) {
 
 func TestApplyWaveCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := sightjack.ApplyWaveCommand{
+	cmd := domain.ApplyWaveCommand{
 		RepoPath:    "/tmp/repo",
 		SessionID:   "session-123",
 		ClusterName: "C1",
@@ -134,7 +134,7 @@ func TestApplyWaveCommand_Validate_Valid(t *testing.T) {
 
 func TestApplyWaveCommand_Validate_MissingFields(t *testing.T) {
 	// given
-	cmd := sightjack.ApplyWaveCommand{}
+	cmd := domain.ApplyWaveCommand{}
 
 	// when
 	errs := cmd.Validate()
@@ -147,7 +147,7 @@ func TestApplyWaveCommand_Validate_MissingFields(t *testing.T) {
 
 func TestDiscussWaveCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := sightjack.DiscussWaveCommand{
+	cmd := domain.DiscussWaveCommand{
 		RepoPath:    "/tmp/repo",
 		SessionID:   "session-123",
 		ClusterName: "C1",
@@ -165,7 +165,7 @@ func TestDiscussWaveCommand_Validate_Valid(t *testing.T) {
 
 func TestDiscussWaveCommand_Validate_MissingTopic(t *testing.T) {
 	// given
-	cmd := sightjack.DiscussWaveCommand{
+	cmd := domain.DiscussWaveCommand{
 		RepoPath:    "/tmp/repo",
 		SessionID:   "session-123",
 		ClusterName: "C1",

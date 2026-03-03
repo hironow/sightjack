@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
 )
@@ -106,7 +107,7 @@ if event data is found in .siren/events/.`,
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
-							return usecase.ResumeSession(cmd.Context(), sightjack.ResumeSessionCommand{
+							return usecase.ResumeSession(cmd.Context(), domain.ResumeSessionCommand{
 								RepoPath:  baseDir,
 								SessionID: resumableSessionID,
 							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
@@ -117,7 +118,7 @@ if event data is found in .siren/events/.`,
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
-							return usecase.RescanSession(cmd.Context(), sightjack.RunSessionCommand{
+							return usecase.RescanSession(cmd.Context(), domain.RunSessionCommand{
 								RepoPath: baseDir,
 								DryRun:   dryRun,
 							}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
@@ -131,7 +132,7 @@ if event data is found in .siren/events/.`,
 
 			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 			var sessionInput io.Reader
-			var recorder sightjack.Recorder = session.NopRecorder{}
+			var recorder domain.Recorder = session.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
 				sessionStore := session.NewEventStore(baseDir, sessionID)
@@ -141,7 +142,7 @@ if event data is found in .siren/events/.`,
 				}
 				recorder = rec
 			}
-			return usecase.RunSession(cmd.Context(), sightjack.RunSessionCommand{
+			return usecase.RunSession(cmd.Context(), domain.RunSessionCommand{
 				RepoPath: baseDir,
 				DryRun:   dryRun,
 			}, cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
