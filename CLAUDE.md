@@ -8,14 +8,8 @@
 
 - Entry: `cmd/sightjack/main.go` (signal.NotifyContext + NeedsDefaultScan)
 - CLI: `internal/cmd/` (cobra v1.10.2, `NewRootCommand()` exported for testability)
-- Root package `sightjack`: types, interfaces, constants, go:embed templates, pure functions only (ADR 0011/0012)
-    - `types.go`, `interfaces.go`, `event.go`: 70+ types, 6 interfaces (incl. OutboxStore), Event system
-    - `config.go`: Config type group (8 structs) + pure functions (ResolveStrictness, DefaultConfig, ValidLang)
-    - `state.go`: constants (StateDir, InboxDir, etc.) + path helpers (MailDir, ConfigPath, ScanDir)
-    - `prompt.go`, `init.go`: go:embed templates + render/install functions
-    - `logger.go`: Logger type + methods (root infrastructure per S0005)
-    - `telemetry.go`: Tracer (noop default, root infrastructure per S0005)
-- Domain: `internal/domain/` (pure functions — wave scheduling, scan utils, event projection)
+- Root: `doc.go` only (root-zero: all code moved to internal/)
+- Domain: `internal/domain/` (types, interfaces, constants, go:embed, pure functions — wave scheduling, scan utils, event projection)
 - Session: `internal/session/` (I/O orchestration — Claude subprocess, file ops, scanner, dmail, archive, config loading, state I/O, outbox store)
     - `outbox_store.go`: SQLiteOutboxStore (transactional outbox pattern — Stage to SQLite, Flush with atomic writes to archive/ + outbox/)
 - Event sourcing: `internal/eventsource/` (event store infrastructure; per-session directory storage, `os.RemoveAll` pruning)

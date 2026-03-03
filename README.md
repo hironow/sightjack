@@ -496,22 +496,7 @@ just jaeger-down    # Stop Jaeger
 |   +-- recorder.go             Event recorder
 |   +-- path.go                 EventsDir path helper
 +-- internal/tools/docgen/      CLI doc generator
-+-- Root package (sightjack)    Types, interfaces, pure functions, go:embed
-|   +-- types.go                Core types (ScanResult, WavePlan, Wave, etc.)
-|   +-- interfaces.go           Port interfaces (OutboxStore, etc.)
-|   +-- config.go               Config type group + pure functions
-|   +-- state.go                Constants + path helpers (.siren/)
-|   +-- event.go                Event envelope, EventType constants
-|   +-- command.go              COMMAND types with Validate()
-|   +-- policy.go               Policy type definitions
-|   +-- prompt.go               Go template renderer for AI prompts
-|   +-- init.go                 Config scaffolding logic
-|   +-- sightjack.go            Core types
-|   +-- session_aggregate.go    SessionAggregate (domain aggregate)
-|   +-- wave_aggregate.go       WaveAggregate (domain aggregate)
-|   +-- metrics.go              OTel metric recording
-|   +-- logger.go               Structured logging
-|   +-- telemetry.go            OTel tracing (noop default)
++-- doc.go                      Package declaration (root-zero: all code in internal/)
 +-- tests/scenario/             Scenario tests (L1-L4, //go:build scenario)
 +-- tests/e2e/                  Docker E2E tests (//go:build e2e)
 +-- .semgrep/                   Semgrep rules (layer enforcement)
