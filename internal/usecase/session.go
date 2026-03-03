@@ -10,12 +10,13 @@ import (
 )
 
 // wrapRecorder wraps a Recorder with a DispatchingRecorder if not in dry-run mode.
-func wrapRecorder(recorder domain.Recorder, logger domain.Logger, dryRun bool) domain.Recorder {
+func wrapRecorder(recorder domain.Recorder, logger domain.Logger, dryRun bool, cfg *domain.Config) domain.Recorder {
 	if dryRun {
 		return recorder
 	}
 	engine := NewPolicyEngine(logger)
-	registerSessionPolicies(engine, logger)
+	notifier := session.BuildNotifier(cfg)
+	registerSessionPolicies(engine, logger, notifier)
 	return session.NewDispatchingRecorder(recorder, engine, logger)
 }
 
@@ -25,7 +26,7 @@ func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.C
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
-	return session.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, wrapRecorder(recorder, logger, dryRun), logger)
+	return session.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, wrapRecorder(recorder, logger, dryRun, cfg), logger)
 }
 
 // ResumeSession orchestrates the session resume pipeline.
@@ -34,7 +35,7 @@ func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *do
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
-	return session.RunResumeSession(ctx, cfg, baseDir, state, input, out, wrapRecorder(recorder, logger, false), logger)
+	return session.RunResumeSession(ctx, cfg, baseDir, state, input, out, wrapRecorder(recorder, logger, false, cfg), logger)
 }
 
 // RescanSession orchestrates the session rescan pipeline.
@@ -42,5 +43,5 @@ func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domai
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
-	return session.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, wrapRecorder(recorder, logger, false), logger)
+	return session.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, wrapRecorder(recorder, logger, false, cfg), logger)
 }
