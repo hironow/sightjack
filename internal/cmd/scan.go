@@ -48,7 +48,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if jsonOutput {
 				streamOut = cmd.ErrOrStderr()
 			}
-			result, sessionID, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
+			result, _, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
 				RepoPath:   baseDir,
 				Lang:       cfg.Lang,
 				Strictness: string(cfg.Strictness.Default),
@@ -75,9 +75,6 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				fmt.Fprintln(w)
 				fmt.Fprint(w, nav)
 			}
-
-			// Cache scan result + record events via usecase layer
-			usecase.RecordScanEvents(baseDir, sessionID, result, cfg, logger)
 
 			logger.OK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
 			return nil

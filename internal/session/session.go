@@ -124,30 +124,8 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	// Capture scan timestamp once so it stays stable across wave completions
 	scanTime := time.Now()
 
-	// Cache ScanResult for resume
-	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
-		logger.Warn("Failed to cache scan result: %v", err)
-	}
-
-	// Record session start + scan completed
-	recorder.Record(domain.EventSessionStarted, domain.SessionStartedPayload{
-		Project:         cfg.Linear.Project,
-		StrictnessLevel: string(cfg.Strictness.Default),
-	})
-	var clusterStates []domain.ClusterState
-	for _, c := range scanResult.Clusters {
-		clusterStates = append(clusterStates, domain.ClusterState{
-			Name: c.Name, Completeness: c.Completeness, IssueCount: len(c.Issues),
-		})
-	}
-	recorder.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{
-		Clusters:       clusterStates,
-		Completeness:   scanResult.Completeness,
-		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
-		LastScanned:    scanTime,
-	})
+	// Cache ScanResult + record session start / scan completed events
+	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, scanTime, logger)
 
 	// --- Pass 3: Wave Generate ---
 	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
@@ -860,10 +838,10 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 		logger.Warn("Partial scan: %s", w)
 	}
 	scanTime := time.Now()
-	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
-		logger.Warn("Failed to cache scan result: %v", err)
-	}
+
+	// Cache ScanResult + record session start / scan completed events
+	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, scanTime, logger)
+
 	waves, rescanWarnings, failedNames, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
@@ -889,26 +867,9 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	adrCount := CountADRFiles(adrDir)
 	scanner := bufio.NewScanner(input)
 
-	// Record rescan events
+	// Record rescan-specific events
 	recorder.Record(domain.EventSessionRescanned, domain.SessionRescannedPayload{
 		OriginalSessionID: oldState.SessionID,
-	})
-	recorder.Record(domain.EventSessionStarted, domain.SessionStartedPayload{
-		Project:         cfg.Linear.Project,
-		StrictnessLevel: string(cfg.Strictness.Default),
-	})
-	var clusterStates []domain.ClusterState
-	for _, c := range scanResult.Clusters {
-		clusterStates = append(clusterStates, domain.ClusterState{
-			Name: c.Name, Completeness: c.Completeness, IssueCount: len(c.Issues),
-		})
-	}
-	recorder.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{
-		Clusters:       clusterStates,
-		Completeness:   scanResult.Completeness,
-		ShibitoCount:   len(scanResult.ShibitoWarnings),
-		ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
-		LastScanned:    scanTime,
 	})
 	recorder.Record(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
