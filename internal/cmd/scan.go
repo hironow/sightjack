@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -81,43 +80,8 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				fmt.Fprint(w, nav)
 			}
 
-			// Cache scan result for pipe replay: cat .siren/.run/<id>/scan_result.json | sightjack waves
-			scanResultPath := filepath.Join(domain.ScanDir(baseDir, sessionID), "scan_result.json")
-			if err := usecase.WriteScanResult(scanResultPath, result); err != nil {
-				logger.Warn("Failed to cache scan result: %v", err)
-			}
-
-			// Record events for state reconstruction
-			var clusters []domain.ClusterState
-			for _, c := range result.Clusters {
-				clusters = append(clusters, domain.ClusterState{
-					Name:         c.Name,
-					Completeness: c.Completeness,
-					IssueCount:   len(c.Issues),
-				})
-			}
-			store := usecase.NewEventStore(baseDir, sessionID)
-			recorder, recErr := usecase.NewSessionRecorder(store, sessionID)
-			if recErr != nil {
-				return fmt.Errorf("session recorder: %w", recErr)
-			}
-			if err := recorder.Record(domain.EventSessionStarted, domain.SessionStartedPayload{
-				Project:         cfg.Linear.Project,
-				StrictnessLevel: string(cfg.Strictness.Default),
-			}); err != nil {
-				logger.Warn("Failed to record session start: %v", err)
-			}
-			if err := recorder.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{
-				Clusters:       clusters,
-				Completeness:   result.Completeness,
-				ShibitoCount:   len(result.ShibitoWarnings),
-				ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
-				LastScanned:    time.Now(),
-			}); err != nil {
-				logger.Warn("Failed to record scan completed: %v", err)
-			} else {
-				logger.OK("Events saved to %s", usecase.EventStorePath(baseDir, sessionID))
-			}
+			// Cache scan result + record events via usecase layer
+			usecase.RecordScanEvents(baseDir, sessionID, result, cfg, logger)
 
 			logger.OK("Scan complete. Overall completeness: %.0f%%", result.Completeness*100)
 			return nil

@@ -75,7 +75,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 
 	// --- Pass 1: Classify ---
 	logger.Info("Pass 1: Classifying issues...")
-	classifyCtx, classifySpan := platform.Tracer.Start(ctx, "classify")
+	classifyCtx, classifySpan := platform.Tracer.Start(ctx, "classify") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
 	classifyPrompt, err := domain.RenderClassifyPrompt(cfg.Lang, domain.ClassifyPromptData{
@@ -145,7 +145,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 	)
 
 	// --- Pass 2: Deep scan per cluster (parallel) ---
-	deepscanCtx, deepscanSpan := platform.Tracer.Start(ctx, "deepscan")
+	deepscanCtx, deepscanSpan := platform.Tracer.Start(ctx, "deepscan") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 208
 	logger.Info("Pass 2: Deep scanning %d clusters...", len(classify.Clusters))
 
 	// Build scan cluster list from classify results. The index parameter in
