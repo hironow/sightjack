@@ -12,10 +12,16 @@ func stateDir(baseDir string) string {
 	return filepath.Join(baseDir, domain.StateDir)
 }
 
-// NewEventStore creates an event store for the given session.
+// SessionEventsDir returns the events directory for a specific session.
+// Callers use this to compute the stateDir parameter for NewEventStore.
+func SessionEventsDir(baseDir, sessionID string) string {
+	return eventsource.EventStorePath(stateDir(baseDir), sessionID)
+}
+
+// NewEventStore creates an event store rooted at stateDir.
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
-func NewEventStore(baseDir, sessionID string) domain.EventStore {
-	return eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir(baseDir), sessionID))
+func NewEventStore(stateDir string) domain.EventStore {
+	return eventsource.NewFileEventStore(stateDir)
 }
 
 // NewSessionRecorder creates a recorder for the given session.

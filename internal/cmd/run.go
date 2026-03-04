@@ -101,7 +101,7 @@ if event data is found in .siren/events/.`,
 								logger.Warn("No resumable session found — starting fresh session instead.")
 								goto freshSession
 							}
-							resumeStore := usecase.NewEventStore(baseDir, resumableSessionID)
+							resumeStore := usecase.NewEventStore(usecase.SessionEventsDir(baseDir, resumableSessionID))
 							resumeRecorder, recErr := usecase.NewSessionRecorder(resumeStore, resumableSessionID)
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
@@ -112,7 +112,7 @@ if event data is found in .siren/events/.`,
 							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{})
 						case domain.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
-							rescanStore := usecase.NewEventStore(baseDir, rescanID)
+							rescanStore := usecase.NewEventStore(usecase.SessionEventsDir(baseDir, rescanID))
 							rescanRecorder, recErr := usecase.NewSessionRecorder(rescanStore, rescanID)
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
@@ -134,7 +134,7 @@ if event data is found in .siren/events/.`,
 			var recorder domain.Recorder = domain.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
-				sessionStore := usecase.NewEventStore(baseDir, sessionID)
+				sessionStore := usecase.NewEventStore(usecase.SessionEventsDir(baseDir, sessionID))
 				rec, recErr := usecase.NewSessionRecorder(sessionStore, sessionID)
 				if recErr != nil {
 					return fmt.Errorf("session recorder: %w", recErr)

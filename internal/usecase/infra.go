@@ -14,9 +14,14 @@ func PreflightCheck(binaries ...string) error {
 	return session.PreflightCheck(binaries...)
 }
 
-// NewEventStore creates an event store for the given session.
-func NewEventStore(baseDir, sessionID string) domain.EventStore {
-	return session.NewEventStore(baseDir, sessionID)
+// SessionEventsDir returns the events directory for a specific session.
+func SessionEventsDir(baseDir, sessionID string) string {
+	return session.SessionEventsDir(baseDir, sessionID)
+}
+
+// NewEventStore creates an event store rooted at stateDir.
+func NewEventStore(stateDir string) domain.EventStore {
+	return session.NewEventStore(stateDir)
 }
 
 // NewSessionRecorder creates a recorder for the given session.
