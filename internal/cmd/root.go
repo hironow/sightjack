@@ -58,6 +58,7 @@ func NewRootCommand() *cobra.Command {
 		Short: "SIREN-inspired issue architecture tool for Linear",
 		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse NeedsDefaultScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			applyOtelEnv(filepath.Dir(cfgPath))
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("sightjack", version)

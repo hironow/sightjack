@@ -39,13 +39,22 @@ d-mail skills, and sets up mail directories.`,
 			project, _ := cmd.Flags().GetString("project")
 			lang, _ := cmd.Flags().GetString("lang")
 			strictness, _ := cmd.Flags().GetString("strictness")
-			return initProject(baseDir, team, project, lang, strictness, cmd.OutOrStdout())
+			if err := initProject(baseDir, team, project, lang, strictness, cmd.OutOrStdout()); err != nil {
+				return err
+			}
+			otelBackend, _ := cmd.Flags().GetString("otel-backend")
+			otelEntity, _ := cmd.Flags().GetString("otel-entity")
+			otelProject, _ := cmd.Flags().GetString("otel-project")
+			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, cmd.OutOrStdout())
 		},
 	}
 	cmd.Flags().String("team", "", "Linear team name")
 	cmd.Flags().String("project", "", "Linear project name")
 	cmd.Flags().String("lang", "ja", "Language (ja/en)")
 	cmd.Flags().String("strictness", "fog", "Strictness level (fog/alert/lockdown)")
+	cmd.Flags().String("otel-backend", "", "OTel backend: jaeger, weave")
+	cmd.Flags().String("otel-entity", "", "Weave entity/team (required for weave)")
+	cmd.Flags().String("otel-project", "", "Weave project (required for weave)")
 	return cmd
 }
 
@@ -87,5 +96,23 @@ func initProject(baseDir, team, project, lang, strictness string, w io.Writer) e
 
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Created .siren/config.yaml\n")
+	return nil
+}
+
+// writeOtelEnv writes .otel.env to the siren state directory if backend is set.
+func writeOtelEnv(baseDir, backend, entity, project string, w io.Writer) error {
+	if backend == "" {
+		return nil
+	}
+	content, err := domain.OtelEnvContent(backend, entity, project)
+	if err != nil {
+		return err
+	}
+	stateDir := filepath.Join(baseDir, domain.StateDir)
+	otelPath := filepath.Join(stateDir, ".otel.env")
+	if err := os.WriteFile(otelPath, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("write .otel.env: %w", err)
+	}
+	fmt.Fprintf(w, "OTel backend configured: %s → %s\n", backend, otelPath)
 	return nil
 }
