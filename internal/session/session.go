@@ -137,10 +137,13 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 
 	logger.OK("%d clusters, %d waves generated", len(scanResult.Clusters), len(waves))
 
-	// Record waves generated
-	recorder.Record(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+	// Record waves generated via aggregate
+	agg := domain.NewSessionAggregate()
+	if evt, err := agg.RecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
-	})
+	}, time.Now().UTC()); err == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
 
 	completed := domain.BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
@@ -148,7 +151,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, agg, out, logger)
 }
 
 // selectPhaseResult describes the outcome of the wave selection phase.
@@ -236,7 +239,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *domain.Config, scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves []domain.Wave, completed map[string]bool,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
-	store domain.OutboxStore, recorder domain.Recorder,
+	store domain.OutboxStore, recorder domain.Recorder, agg *domain.SessionAggregate,
 	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	// Auto-approve when --auto-approve is set.
@@ -247,15 +250,15 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				attribute.String("wave.cluster_name", selected.ClusterName),
 			),
 		)
-		recorder.Record(domain.EventWaveApproved, domain.WaveIdentityPayload{
-			WaveID: selected.ID, ClusterName: selected.ClusterName,
-		})
+		if evt, err := agg.ApproveWave(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
+			recorder.Record(evt.Type, evt.Data)
+		}
 		if err := ComposeSpecification(store, selected); err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
-			recorder.Record(domain.EventSpecificationSent, domain.WaveIdentityPayload{
-				WaveID: selected.ID, ClusterName: selected.ClusterName,
-			})
+			if evt, err := agg.SendSpecification(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
+				recorder.Record(evt.Type, evt.Data)
+			}
 		}
 		return selected, approvalApproved
 	}
@@ -279,15 +282,15 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 					attribute.String("wave.cluster_name", selected.ClusterName),
 				),
 			)
-			recorder.Record(domain.EventWaveApproved, domain.WaveIdentityPayload{
-				WaveID: selected.ID, ClusterName: selected.ClusterName,
-			})
+			if evt, err := agg.ApproveWave(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
+				recorder.Record(evt.Type, evt.Data)
+			}
 			if err := ComposeSpecification(store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
-				recorder.Record(domain.EventSpecificationSent, domain.WaveIdentityPayload{
-					WaveID: selected.ID, ClusterName: selected.ClusterName,
-				})
+				if evt, err := agg.SendSpecification(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
+					recorder.Record(evt.Type, evt.Data)
+				}
 			}
 			return selected, approvalApproved
 		case domain.ApprovalReject:
@@ -298,9 +301,9 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 					attribute.String("wave.cluster_name", selected.ClusterName),
 				),
 			)
-			recorder.Record(domain.EventWaveRejected, domain.WaveIdentityPayload{
-				WaveID: selected.ID, ClusterName: selected.ClusterName,
-			})
+			if evt, err := agg.RejectWave(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
+				recorder.Record(evt.Type, evt.Data)
+			}
 			platform.RecordWave(ctx, "rejected")
 			logger.Info("Wave rejected.")
 			return selected, approvalRejected
@@ -322,7 +325,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			if result.ModifiedWave != nil {
 				selected = domain.ApplyModifiedWave(selected, *result.ModifiedWave, completed)
 				domain.PropagateWaveUpdate(waves, selected)
-				recorder.Record(domain.EventWaveModified, domain.WaveModifiedPayload{
+				if evt, evtErr := agg.ModifyWave(domain.WaveModifiedPayload{
 					WaveID: selected.ID, ClusterName: selected.ClusterName,
 					UpdatedWave: domain.WaveState{
 						ID: selected.ID, ClusterName: selected.ClusterName,
@@ -331,7 +334,9 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 						ActionCount:   len(selected.Actions), Actions: selected.Actions,
 						Description: selected.Description, Delta: selected.Delta,
 					},
-				})
+				}, time.Now().UTC()); evtErr == nil {
+					recorder.Record(evt.Type, evt.Data)
+				}
 				// Trigger Scribe to generate ADR for the modification
 				// (runs even for locked waves — the decision itself is worth recording)
 				if cfg.Scribe.Enabled {
@@ -342,9 +347,11 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 						DisplayScribeResponse(out, scribeResp)
 						DisplayADRConflicts(out, scribeResp.Conflicts)
 						*adrCount++
-						recorder.Record(domain.EventADRGenerated, domain.ADRGeneratedPayload{
+						if evt, evtErr := agg.GenerateADR(domain.ADRGeneratedPayload{
 							ADRID: scribeResp.ADRID, Title: scribeResp.Title,
-						})
+						}, time.Now().UTC()); evtErr == nil {
+							recorder.Record(evt.Type, evt.Data)
+						}
 					}
 				}
 				if selected.Status == "locked" {
@@ -375,15 +382,15 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			}
 			domain.PropagateWaveUpdate(waves, selected)
 			sessionRejected[domain.WaveKey(selected)] = rejected
-			recorder.Record(domain.EventWaveApproved, domain.WaveIdentityPayload{
-				WaveID: selected.ID, ClusterName: selected.ClusterName,
-			})
+			if evt, evtErr := agg.ApproveWave(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
+				recorder.Record(evt.Type, evt.Data)
+			}
 			if err := ComposeSpecification(store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
-				recorder.Record(domain.EventSpecificationSent, domain.WaveIdentityPayload{
-					WaveID: selected.ID, ClusterName: selected.ClusterName,
-				})
+				if evt, evtErr := agg.SendSpecification(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
+					recorder.Record(evt.Type, evt.Data)
+				}
 			}
 			return selected, approvalApproved
 		}
@@ -397,7 +404,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
-	recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
+	recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, loopSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
 
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
 	if err != nil {
@@ -407,11 +414,13 @@ func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 
 	oldAvailable := len(domain.AvailableWaves(*waves, completed))
 
-	recorder.Record(domain.EventWaveApplied, domain.WaveAppliedPayload{
+	if evt, evtErr := agg.ApplyWave(domain.WaveAppliedPayload{
 		WaveID: selected.ID, ClusterName: selected.ClusterName,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 		Errors: applyResult.Errors,
-	})
+	}, time.Now().UTC()); evtErr == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
 	platform.RecordWave(ctx, "applied")
 
 	if !domain.IsWaveApplyComplete(applyResult) {
@@ -436,7 +445,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	scanDir, adrDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
-	fbCollector *FeedbackCollector, recorder domain.Recorder, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, recorder domain.Recorder, agg *domain.SessionAggregate, loopSpan trace.Span, logger domain.Logger) {
 
 	var clusterForNextgen domain.ClusterScanResult
 	for _, c := range scanResult.Clusters {
@@ -477,10 +486,12 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	} else if len(newWaves) > 0 {
 		*waves = append(*waves, newWaves...)
 		*waves = domain.EvaluateUnlocks(*waves, completed)
-		recorder.Record(domain.EventNextGenWavesAdded, domain.NextGenWavesAddedPayload{
+		if evt, evtErr := agg.AddNextGenWaves(domain.NextGenWavesAddedPayload{
 			ClusterName: selected.ClusterName,
 			Waves:       domain.BuildWaveStates(newWaves),
-		})
+		}, time.Now().UTC()); evtErr == nil {
+			recorder.Record(evt.Type, evt.Data)
+		}
 	}
 }
 
@@ -489,7 +500,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 // in labeledReady to avoid redundant API calls.
 func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
-	labeledReady map[string]bool, recorder domain.Recorder, out io.Writer, logger domain.Logger) {
+	labeledReady map[string]bool, recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, logger domain.Logger) {
 
 	if !cfg.Labels.Enabled {
 		return
@@ -512,9 +523,11 @@ func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 	for _, id := range newlyReady {
 		labeledReady[id] = true
 	}
-	recorder.Record(domain.EventReadyLabelsApplied, domain.ReadyLabelsAppliedPayload{
+	if evt, evtErr := agg.ApplyReadyLabels(domain.ReadyLabelsAppliedPayload{
 		IssueIDs: newlyReady,
-	})
+	}, time.Now().UTC()); evtErr == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
 }
 
 // applyPhase handles wave apply, partial failure check, completion marking,
@@ -527,9 +540,9 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
 
-	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, recorder, out, loopSpan, logger)
+	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, recorder, agg, out, loopSpan, logger)
 	if !ok {
 		return
 	}
@@ -552,10 +565,12 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 		}
 	}
 
-	recorder.Record(domain.EventWaveCompleted, domain.WaveCompletedPayload{
+	if evt, evtErr := agg.CompleteWave(domain.WaveCompletedPayload{
 		WaveID: selected.ID, ClusterName: selected.ClusterName,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
-	})
+	}, time.Now().UTC()); evtErr == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
 
 	// Review gate: run review before composing report (outbox is read immediately by phonewave)
 	if cfg.Gate.ReviewCmd != "" {
@@ -573,18 +588,18 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	if err := ComposeReport(store, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
-		recorder.Record(domain.EventReportSent, domain.WaveIdentityPayload{
-			WaveID: selected.ID, ClusterName: selected.ClusterName,
-		})
+		if evt, evtErr := agg.SendReport(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
+			recorder.Record(evt.Type, evt.Data)
+		}
 	}
 
 	// O2: sightjack → amadeus feedback D-Mail
 	if feedbackErr := ComposeFeedback(store, selected, applyResult); feedbackErr != nil {
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
-		recorder.Record(domain.EventFeedbackSent, domain.WaveIdentityPayload{
-			WaveID: selected.ID, ClusterName: selected.ClusterName,
-		})
+		if evt, evtErr := agg.SendFeedback(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
+			recorder.Record(evt.Type, evt.Data)
+		}
 	}
 
 	// Update cluster completeness from delta, then recalculate overall
@@ -610,11 +625,9 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 			break
 		}
 	}
-	recorder.Record(domain.EventCompletenessUpdated, domain.CompletenessUpdatedPayload{
-		ClusterName:         selected.ClusterName,
-		ClusterCompleteness: updatedClusterCompleteness,
-		OverallCompleteness: scanResult.Completeness,
-	})
+	if evt, evtErr := agg.UpdateCompleteness(selected.ClusterName, updatedClusterCompleteness, scanResult.Completeness, time.Now().UTC()); evtErr == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
 
 	// Display rich completion summary with grouped ripple effects
 	// Capture available wave keys before unlock to compute the diff
@@ -633,16 +646,16 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 				unlockedIDs = append(unlockedIDs, key)
 			}
 		}
-		recorder.Record(domain.EventWavesUnlocked, domain.WavesUnlockedPayload{
-			UnlockedWaveIDs: unlockedIDs,
-		})
+		if evt, evtErr := agg.UnlockWaves(unlockedIDs, time.Now().UTC()); evtErr == nil {
+			recorder.Record(evt.Type, evt.Data)
+		}
 	}
 	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 	generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, selected, resolvedStrictness,
-		waves, completed, scanResult, sessionRejected, fbCollector, recorder, loopSpan, logger)
+		waves, completed, scanResult, sessionRejected, fbCollector, recorder, agg, loopSpan, logger)
 
-	applyReadyLabelsIfEnabled(ctx, cfg, waves, completed, labeledReady, recorder, out, logger)
+	applyReadyLabelsIfEnabled(ctx, cfg, waves, completed, labeledReady, recorder, agg, out, logger)
 
 	// Save scan result cache (crash resilience)
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
@@ -657,7 +670,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store domain.OutboxStore, recorder domain.Recorder, out io.Writer, logger domain.Logger) error {
+	store domain.OutboxStore, recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, logger domain.Logger) error {
 
 	ctx, loopSpan := platform.Tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
@@ -695,7 +708,7 @@ outerLoop:
 
 		resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, store, recorder, out, loopSpan, logger)
+		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, store, recorder, agg, out, loopSpan, logger)
 		if approvalResult != approvalApproved {
 			continue
 		}
@@ -703,7 +716,7 @@ outerLoop:
 		applyPhase(ctx, cfg, scanDir, scanResultPath, adrDir,
 			selected, resolvedStrictness,
 			&waves, completed, scanResult, sessionRejected,
-			labeledReady, fbCollector, store, recorder, out, loopSpan, logger)
+			labeledReady, fbCollector, store, recorder, agg, out, loopSpan, logger)
 	}
 
 	// Final consistency check
@@ -806,15 +819,16 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	adrDir := ADRDir(baseDir)
 	lastScanned := state.LastScanned
 
-	// Record resume event
-	recorder.Record(domain.EventSessionResumed, domain.SessionResumedPayload{
-		OriginalSessionID: state.SessionID,
-	})
+	// Record resume event via aggregate
+	agg := domain.NewSessionAggregate()
+	if evt, evtErr := agg.Resume(state.SessionID, time.Now().UTC()); evtErr == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
 
 	logger.OK("Resumed session: %d waves, %d completed", len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, recorder, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, recorder, agg, out, logger)
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
@@ -904,17 +918,20 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	adrCount := CountADRFiles(adrDir)
 	scanner := bufio.NewScanner(input)
 
-	// Record rescan-specific events
-	recorder.Record(domain.EventSessionRescanned, domain.SessionRescannedPayload{
-		OriginalSessionID: oldState.SessionID,
-	})
-	recorder.Record(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+	// Record rescan-specific events via aggregate
+	agg := domain.NewSessionAggregate()
+	if evt, evtErr := agg.Rescan(oldState.SessionID, time.Now().UTC()); evtErr == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
+	if evt, evtErr := agg.RecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
-	})
+	}, time.Now().UTC()); evtErr == nil {
+		recorder.Record(evt.Type, evt.Data)
+	}
 
 	logger.OK("Re-scanned: %d clusters, %d waves (%d previously completed)",
 		len(scanResult.Clusters), len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, agg, out, logger)
 }

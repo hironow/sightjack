@@ -59,3 +59,80 @@ func (a *SessionAggregate) Rescan(originalSessionID string, now time.Time) (Even
 		OriginalSessionID: originalSessionID,
 	}, now)
 }
+
+// RecordWavesGenerated produces a waves_generated event.
+func (a *SessionAggregate) RecordWavesGenerated(payload WavesGeneratedPayload, now time.Time) (Event, error) {
+	return NewEvent(EventWavesGenerated, payload, now)
+}
+
+// ApproveWave produces a wave_approved event.
+func (a *SessionAggregate) ApproveWave(waveID, clusterName string, now time.Time) (Event, error) {
+	return NewEvent(EventWaveApproved, WaveIdentityPayload{
+		WaveID: waveID, ClusterName: clusterName,
+	}, now)
+}
+
+// RejectWave produces a wave_rejected event.
+func (a *SessionAggregate) RejectWave(waveID, clusterName string, now time.Time) (Event, error) {
+	return NewEvent(EventWaveRejected, WaveIdentityPayload{
+		WaveID: waveID, ClusterName: clusterName,
+	}, now)
+}
+
+// ModifyWave produces a wave_modified event.
+func (a *SessionAggregate) ModifyWave(payload WaveModifiedPayload, now time.Time) (Event, error) {
+	return NewEvent(EventWaveModified, payload, now)
+}
+
+// ApplyWave produces a wave_applied event.
+func (a *SessionAggregate) ApplyWave(payload WaveAppliedPayload, now time.Time) (Event, error) {
+	return NewEvent(EventWaveApplied, payload, now)
+}
+
+// CompleteWave produces a wave_completed event.
+func (a *SessionAggregate) CompleteWave(payload WaveCompletedPayload, now time.Time) (Event, error) {
+	return NewEvent(EventWaveCompleted, payload, now)
+}
+
+// AddNextGenWaves produces a nextgen_waves_added event.
+func (a *SessionAggregate) AddNextGenWaves(payload NextGenWavesAddedPayload, now time.Time) (Event, error) {
+	return NewEvent(EventNextGenWavesAdded, payload, now)
+}
+
+// ApplyReadyLabels produces a ready_labels_applied event.
+func (a *SessionAggregate) ApplyReadyLabels(payload ReadyLabelsAppliedPayload, now time.Time) (Event, error) {
+	return NewEvent(EventReadyLabelsApplied, payload, now)
+}
+
+// SendSpecification produces a specification_sent event.
+func (a *SessionAggregate) SendSpecification(waveID, clusterName string, now time.Time) (Event, error) {
+	return NewEvent(EventSpecificationSent, WaveIdentityPayload{
+		WaveID: waveID, ClusterName: clusterName,
+	}, now)
+}
+
+// SendReport produces a report_sent event.
+func (a *SessionAggregate) SendReport(waveID, clusterName string, now time.Time) (Event, error) {
+	return NewEvent(EventReportSent, WaveIdentityPayload{
+		WaveID: waveID, ClusterName: clusterName,
+	}, now)
+}
+
+// SendFeedback produces a feedback_sent event.
+func (a *SessionAggregate) SendFeedback(waveID, clusterName string, now time.Time) (Event, error) {
+	return NewEvent(EventFeedbackSent, WaveIdentityPayload{
+		WaveID: waveID, ClusterName: clusterName,
+	}, now)
+}
+
+// GenerateADR produces an adr_generated event.
+func (a *SessionAggregate) GenerateADR(payload ADRGeneratedPayload, now time.Time) (Event, error) {
+	return NewEvent(EventADRGenerated, payload, now)
+}
+
+// UnlockWaves produces a waves_unlocked event.
+func (a *SessionAggregate) UnlockWaves(unlockedIDs []string, now time.Time) (Event, error) {
+	return NewEvent(EventWavesUnlocked, WavesUnlockedPayload{
+		UnlockedWaveIDs: unlockedIDs,
+	}, now)
+}
