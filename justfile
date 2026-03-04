@@ -121,6 +121,10 @@ jaeger-down:
 docgen:
     go run ./internal/tools/docgen/
 
+# Run live W&B Weave trace delivery test (requires WANDB_API_KEY)
+test-weave-live:
+    go test ./tests/integration/ -run TestWeave_LiveTraceDelivery -count=1 -v -timeout=60s
+
 # Run E2E tests in Docker
 test-e2e:
     docker compose -f tests/e2e/compose-e2e.yaml build
