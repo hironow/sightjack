@@ -11,38 +11,41 @@ import (
 )
 
 // wrapRecorder wraps a Recorder with a DispatchingRecorder if not in dry-run mode.
-func wrapRecorder(recorder domain.Recorder, logger domain.Logger, dryRun bool, cfg *domain.Config) domain.Recorder {
+func wrapRecorder(recorder domain.Recorder, logger domain.Logger, dryRun bool, cfg *domain.Config, metrics port.PolicyMetrics) domain.Recorder {
 	if dryRun {
 		return recorder
 	}
 	engine := NewPolicyEngine(logger)
 	notifier := session.BuildNotifier(cfg)
-	registerSessionPolicies(engine, logger, notifier, port.NopPolicyMetrics{})
+	if metrics == nil {
+		metrics = port.NopPolicyMetrics{}
+	}
+	registerSessionPolicies(engine, logger, notifier, metrics)
 	return session.NewDispatchingRecorder(recorder, engine, logger)
 }
 
 // RunSession orchestrates the sightjack session pipeline.
 // Validates the RunSessionCommand, then delegates to session.RunSession.
-func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger) error {
+func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
-	return session.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, wrapRecorder(recorder, logger, dryRun, cfg), logger)
+	return session.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, wrapRecorder(recorder, logger, dryRun, cfg, metrics), logger)
 }
 
 // ResumeSession orchestrates the session resume pipeline.
 // Validates the ResumeSessionCommand, then delegates to session.RunResumeSession.
-func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger) error {
+func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
-	return session.RunResumeSession(ctx, cfg, baseDir, state, input, out, wrapRecorder(recorder, logger, false, cfg), logger)
+	return session.RunResumeSession(ctx, cfg, baseDir, state, input, out, wrapRecorder(recorder, logger, false, cfg, metrics), logger)
 }
 
 // RescanSession orchestrates the session rescan pipeline.
-func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger) error {
+func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
-	return session.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, wrapRecorder(recorder, logger, false, cfg), logger)
+	return session.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, wrapRecorder(recorder, logger, false, cfg, metrics), logger)
 }

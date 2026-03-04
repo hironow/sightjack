@@ -13,13 +13,15 @@ import (
 // registerSessionPolicies registers POLICY handlers for session events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
 func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics) {
-	engine.Register(domain.EventWaveApplied, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventWaveApplied, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: wave applied (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "wave.applied", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventReportSent, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventReportSent, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: report sent (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "report.sent", "handled")
 		return nil
 	})
 
@@ -38,16 +40,19 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 				data.Completeness*100, len(data.Clusters), data.ShibitoCount)); err != nil {
 			logger.Debug("policy: notify error: %v", err)
 		}
+		metrics.RecordPolicyEvent(ctx, "scan.completed", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventWaveCompleted, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventWaveCompleted, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: wave completed (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "wave.completed", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventSpecificationSent, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventSpecificationSent, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: specification sent (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "specification.sent", "handled")
 		return nil
 	})
 }

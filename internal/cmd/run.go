@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -108,7 +109,7 @@ if event data is found in .siren/events/.`,
 							return usecase.ResumeSession(cmd.Context(), domain.ResumeSessionCommand{
 								RepoPath:  baseDir,
 								SessionID: resumableSessionID,
-							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger)
+							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{})
 						case domain.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 							rescanStore := usecase.NewEventStore(baseDir, rescanID)
@@ -119,7 +120,7 @@ if event data is found in .siren/events/.`,
 							return usecase.RescanSession(cmd.Context(), domain.RunSessionCommand{
 								RepoPath: baseDir,
 								DryRun:   dryRun,
-							}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger)
+							}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger, &platform.OTelPolicyMetrics{})
 						case domain.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -143,7 +144,7 @@ if event data is found in .siren/events/.`,
 			return usecase.RunSession(cmd.Context(), domain.RunSessionCommand{
 				RepoPath: baseDir,
 				DryRun:   dryRun,
-			}, cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger)
+			}, cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger, &platform.OTelPolicyMetrics{})
 		},
 	}
 
