@@ -244,15 +244,16 @@ func TestPolicyHandler_SpecificationSent_RecordsMetrics(t *testing.T) {
 	}
 }
 
-func TestPolicyHandler_WaveApplied_DebugOnly_NoInfoOutput(t *testing.T) {
-	// given: Debug-only handler should NOT produce output when verbose=false
+func TestPolicyHandler_WaveCompleted_NotifiesSideEffect(t *testing.T) {
+	// given
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
+	spy := &spyNotifier{}
 	engine := NewPolicyEngine(logger)
-	registerSessionPolicies(engine, logger, &port.NopNotifier{}, port.NopPolicyMetrics{})
+	registerSessionPolicies(engine, logger, spy, port.NopPolicyMetrics{})
 
-	ev, err := domain.NewEvent(domain.EventWaveApplied, map[string]string{
-		"wave_id": "test",
+	ev, err := domain.NewEvent(domain.EventWaveCompleted, map[string]string{
+		"wave_id": "w-001",
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -261,9 +262,46 @@ func TestPolicyHandler_WaveApplied_DebugOnly_NoInfoOutput(t *testing.T) {
 	// when
 	engine.Dispatch(context.Background(), ev)
 
-	// then: no output
-	output := buf.String()
-	if output != "" {
-		t.Errorf("expected no output for Debug-only handler with verbose=false, got: %s", output)
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 Notify call, got %d", len(spy.calls))
+	}
+	call := spy.calls[0]
+	if !strings.Contains(call.title, "Sightjack") {
+		t.Errorf("expected title to contain 'Sightjack', got: %s", call.title)
+	}
+	if !strings.Contains(call.message, "Wave completed") {
+		t.Errorf("expected message to contain 'Wave completed', got: %s", call.message)
+	}
+}
+
+func TestPolicyHandler_SpecificationSent_NotifiesSideEffect(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyNotifier{}
+	engine := NewPolicyEngine(logger)
+	registerSessionPolicies(engine, logger, spy, port.NopPolicyMetrics{})
+
+	ev, err := domain.NewEvent(domain.EventSpecificationSent, map[string]string{
+		"target": "architect",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 Notify call, got %d", len(spy.calls))
+	}
+	call := spy.calls[0]
+	if !strings.Contains(call.title, "Sightjack") {
+		t.Errorf("expected title to contain 'Sightjack', got: %s", call.title)
+	}
+	if !strings.Contains(call.message, "Specification sent") {
+		t.Errorf("expected message to contain 'Specification sent', got: %s", call.message)
 	}
 }

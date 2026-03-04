@@ -49,19 +49,27 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 		return nil
 	})
 
-	// POLICY CONTRACT: observation-only — debug log + metrics.
-	// Wave completion is an intermediate session step; individual wave
-	// outcomes feed into the scan.completed summary.
+	// POLICY: wave.completed → notify + metrics.
+	// Wave completion is a milestone in the session flow.
 	engine.Register(domain.EventWaveCompleted, func(ctx context.Context, event domain.Event) error {
-		logger.Debug("policy: wave completed (type=%s)", event.Type)
+		logger.Info("policy: wave completed (type=%s)", event.Type)
+		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := notifier.Notify(notifyCtx, "Sightjack", "Wave completed"); err != nil {
+			logger.Debug("policy: notify error: %v", err)
+		}
 		metrics.RecordPolicyEvent(ctx, "wave.completed", "handled")
 		return nil
 	})
 
-	// POLICY CONTRACT: observation-only — debug log + metrics.
-	// Specification delivery is part of the interactive session flow.
+	// POLICY: specification.sent → notify + metrics.
 	engine.Register(domain.EventSpecificationSent, func(ctx context.Context, event domain.Event) error {
-		logger.Debug("policy: specification sent (type=%s)", event.Type)
+		logger.Info("policy: specification sent (type=%s)", event.Type)
+		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := notifier.Notify(notifyCtx, "Sightjack", "Specification sent"); err != nil {
+			logger.Debug("policy: notify error: %v", err)
+		}
 		metrics.RecordPolicyEvent(ctx, "specification.sent", "handled")
 		return nil
 	})
