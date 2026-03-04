@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -16,7 +17,7 @@ func wrapRecorder(recorder domain.Recorder, logger domain.Logger, dryRun bool, c
 	}
 	engine := NewPolicyEngine(logger)
 	notifier := session.BuildNotifier(cfg)
-	registerSessionPolicies(engine, logger, notifier)
+	registerSessionPolicies(engine, logger, notifier, port.NopPolicyMetrics{})
 	return session.NewDispatchingRecorder(recorder, engine, logger)
 }
 
