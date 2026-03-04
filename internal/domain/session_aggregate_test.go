@@ -12,7 +12,7 @@ func TestSessionAggregate_Start(t *testing.T) {
 	agg := domain.NewSessionAggregate()
 
 	// when
-	ev, err := agg.Start("my-project", "standard", time.Now().UTC())
+	ev, err := agg.Start("my-project", "standard", time.Now().UTC()) // nosemgrep: adr0003-otel-span-without-defer-end -- not an OTel span; domain aggregate method
 
 	// then
 	if err != nil {

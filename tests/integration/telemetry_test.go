@@ -120,7 +120,7 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 
 	// Create a parent span so retry events have a recording span to attach to.
 	tr := otel.Tracer("sightjack-test")
-	ctx, parentSpan := tr.Start(context.Background(), "test-parent")
+	ctx, parentSpan := tr.Start(context.Background(), "test-parent") // nosemgrep: adr0003-otel-span-without-defer-end -- parentSpan.End() called explicitly after RunClaude
 	_, _ = session.RunClaude(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	parentSpan.End()
 

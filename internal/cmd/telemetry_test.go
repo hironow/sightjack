@@ -44,7 +44,7 @@ func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 
 	// Use the OTel global tracer (set by setupTestTracer) to create a span
 	tr := otel.Tracer("sightjack-test")
-	_, span := tr.Start(context.Background(), "flushed-span")
+	_, span := tr.Start(context.Background(), "flushed-span") // nosemgrep: adr0003-otel-span-without-defer-end -- span.End() called immediately below in test
 	span.End()
 
 	spans := exp.GetSpans()
@@ -74,7 +74,7 @@ func TestMultiExporter_BothReceive(t *testing.T) {
 		platform.Tracer = oldTracer
 	})
 
-	_, span := platform.Tracer.Start(context.Background(), "multi-span")
+	_, span := platform.Tracer.Start(context.Background(), "multi-span") // nosemgrep: adr0003-otel-span-without-defer-end -- span.End() called immediately below in test
 	span.End()
 
 	if len(exp1.GetSpans()) == 0 {

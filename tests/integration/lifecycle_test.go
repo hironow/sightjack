@@ -149,7 +149,7 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 
 	if outputPath != "" {
 		filename := filepath.Base(outputPath)
-		d.mu.Lock()
+		d.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- explicit Unlock after scoped block; defer would extend hold past return
 		for _, r := range d.responses {
 			matched, _ := filepath.Match(r.pattern, filename)
 			if matched {
