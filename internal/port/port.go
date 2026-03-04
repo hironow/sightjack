@@ -47,3 +47,13 @@ type Handoff interface {
 	// to the orchestrator for a specific issue during execution.
 	ReportIssue(ctx context.Context, issueID string, finding string) error
 }
+
+// PolicyMetrics records policy handler execution metrics.
+type PolicyMetrics interface {
+	RecordPolicyEvent(ctx context.Context, eventType string, status string)
+}
+
+// NopPolicyMetrics is a no-op metrics recorder for tests and quiet mode.
+type NopPolicyMetrics struct{}
+
+func (NopPolicyMetrics) RecordPolicyEvent(context.Context, string, string) {}
