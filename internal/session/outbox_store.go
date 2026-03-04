@@ -213,10 +213,10 @@ func (s *SQLiteOutboxStore) Close() error {
 	return s.db.Close()
 }
 
-// NewOutboxStoreForBase creates a SQLiteOutboxStore using conventional paths
+// NewOutboxStoreForDir creates a SQLiteOutboxStore using conventional paths
 // derived from baseDir: DB at .siren/.run/outbox.db, targets at .siren/archive/
 // and .siren/outbox/.
-func NewOutboxStoreForBase(baseDir string) (*SQLiteOutboxStore, error) {
+func NewOutboxStoreForDir(baseDir string) (*SQLiteOutboxStore, error) {
 	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "outbox.db")
 	archiveDir := domain.MailDir(baseDir, domain.ArchiveDir)
 	outboxDir := domain.MailDir(baseDir, domain.OutboxDir)
@@ -230,7 +230,7 @@ func PruneFlushedOutbox(baseDir string) (int, error) {
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return 0, nil
 	}
-	store, err := NewOutboxStoreForBase(baseDir)
+	store, err := NewOutboxStoreForDir(baseDir)
 	if err != nil {
 		return 0, fmt.Errorf("prune flushed outbox: open store: %w", err)
 	}

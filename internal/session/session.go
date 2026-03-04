@@ -31,7 +31,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	}
 
 	// Transactional outbox: SQLite-backed stage → atomic flush to archive/ + outbox/
-	outboxStore, err := NewOutboxStoreForBase(baseDir)
+	outboxStore, err := NewOutboxStoreForDir(baseDir)
 	if err != nil {
 		return fmt.Errorf("outbox store: %w", err)
 	}
@@ -766,7 +766,7 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	}
 
 	// Transactional outbox: SQLite-backed stage → atomic flush to archive/ + outbox/
-	outboxStore, err := NewOutboxStoreForBase(baseDir)
+	outboxStore, err := NewOutboxStoreForDir(baseDir)
 	if err != nil {
 		return fmt.Errorf("outbox store: %w", err)
 	}
@@ -833,7 +833,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	}
 
 	// Transactional outbox: SQLite-backed stage → atomic flush to archive/ + outbox/
-	outboxStore, err := NewOutboxStoreForBase(baseDir)
+	outboxStore, err := NewOutboxStoreForDir(baseDir)
 	if err != nil {
 		return fmt.Errorf("outbox store: %w", err)
 	}

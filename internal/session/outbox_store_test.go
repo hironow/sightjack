@@ -16,7 +16,7 @@ func TestSQLiteOutboxStore_PragmaSynchronousNormal(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
@@ -368,7 +368,7 @@ func TestSQLiteOutboxStore_FilePermission(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
@@ -565,7 +565,7 @@ func TestSQLiteOutboxStore_PruneFlushed(t *testing.T) {
 	// given: store with staged + flushed items
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
@@ -613,7 +613,7 @@ func TestSQLiteOutboxStore_PruneFlushed_KeepsUnflushed(t *testing.T) {
 	// given: store with mix of flushed and unflushed items
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
@@ -660,7 +660,7 @@ func TestSQLiteOutboxStore_IncrementalVacuum(t *testing.T) {
 	// given: store with auto_vacuum=INCREMENTAL
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
