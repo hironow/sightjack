@@ -54,11 +54,10 @@ func WithAllowedTools(tools ...string) RunOption {
 func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...RunOption) (string, error) {
 	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
-			attribute.String("claude.model", cfg.Claude.Model),
-			attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec),
-			attribute.String("gen_ai.operation.name", "chat"),
-			attribute.String("gen_ai.system", "anthropic"),
-			attribute.String("gen_ai.request.model", cfg.Claude.Model),
+			append([]attribute.KeyValue{
+				attribute.String("claude.model", cfg.Claude.Model),
+				attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec),
+			}, platform.GenAISpanAttrs(cfg.Claude.Model)...)...,
 		),
 	)
 	defer span.End()
