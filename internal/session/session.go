@@ -391,29 +391,22 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	}
 }
 
-// applyPhase handles wave apply, partial failure check, completion marking,
-// cluster completeness update, unlock evaluation, nextgen wave generation,
-// ready labels, and mid-session state save.
-// waves is passed as *[]Wave because append/EvaluateUnlocks may reallocate the slice.
-func applyPhase(ctx context.Context, cfg *domain.Config,
-	scanDir, scanResultPath, adrDir string,
-	selected domain.Wave, resolvedStrictness string,
+// executeAndRecordApply runs the wave apply step, records the event, and checks
+// for partial failure. Returns the apply result, the count of previously
+// available waves (needed for unlock diff), and whether the apply succeeded.
+func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
+	scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
-	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
-	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
+	recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
 
-	// --- Pass 4: Wave Apply ---
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
 	if err != nil {
 		logger.Error("Apply failed: %v", err)
-		return
+		return nil, 0, false
 	}
 
-	// Count new waves unlocked by this completion
 	oldAvailable := len(domain.AvailableWaves(*waves, completed))
 
-	// Record wave applied (always, even for partial failures)
 	recorder.Record(domain.EventWaveApplied, domain.WaveAppliedPayload{
 		WaveID: selected.ID, ClusterName: selected.ClusterName,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
@@ -431,6 +424,113 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 		)
 		logger.Warn("Wave %s partially failed (%d errors). Not marking as completed.", domain.WaveKey(selected), len(applyResult.Errors))
 		DisplayRippleEffects(out, applyResult.Ripples)
+		return applyResult, oldAvailable, false
+	}
+
+	return applyResult, oldAvailable, true
+}
+
+// generateNextWavesIfNeeded generates next-gen waves for the completed wave's
+// cluster if more waves are needed. Updates the waves slice in place.
+func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
+	scanDir, adrDir string, selected domain.Wave, resolvedStrictness string,
+	waves *[]domain.Wave, completed map[string]bool,
+	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
+	fbCollector *FeedbackCollector, recorder domain.Recorder, loopSpan trace.Span, logger domain.Logger) {
+
+	var clusterForNextgen domain.ClusterScanResult
+	for _, c := range scanResult.Clusters {
+		if c.Name == selected.ClusterName {
+			clusterForNextgen = c
+			break
+		}
+	}
+	if clusterForNextgen.Name == "" {
+		logger.Warn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
+		return
+	}
+	if !NeedsMoreWaves(clusterForNextgen, *waves) {
+		loopSpan.AddEvent("nextgen.skipped",
+			trace.WithAttributes(
+				attribute.String("wave.cluster_name", selected.ClusterName),
+			),
+		)
+		logger.Debug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
+		return
+	}
+
+	completedWavesForCluster := domain.CompletedWavesForCluster(*waves, selected.ClusterName)
+	existingADRs, adrErr := ReadExistingADRs(adrDir)
+	if adrErr != nil {
+		logger.Warn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
+	}
+	rejectedForWave := sessionRejected[domain.WaveKey(selected)]
+	var feedback []*DMail
+	var reports []*DMail
+	if fbCollector != nil {
+		feedback = fbCollector.FeedbackOnly()
+		reports = fbCollector.ReportsOnly()
+	}
+	newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, reports, logger)
+	if nextgenErr != nil {
+		logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
+	} else if len(newWaves) > 0 {
+		*waves = append(*waves, newWaves...)
+		*waves = domain.EvaluateUnlocks(*waves, completed)
+		recorder.Record(domain.EventNextGenWavesAdded, domain.NextGenWavesAddedPayload{
+			ClusterName: selected.ClusterName,
+			Waves:       domain.BuildWaveStates(newWaves),
+		})
+	}
+}
+
+// applyReadyLabelsIfEnabled applies "ready" labels to issues that are newly
+// ready (all prerequisite waves completed). Only labels issues not yet tracked
+// in labeledReady to avoid redundant API calls.
+func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
+	waves *[]domain.Wave, completed map[string]bool,
+	labeledReady map[string]bool, recorder domain.Recorder, out io.Writer, logger domain.Logger) {
+
+	if !cfg.Labels.Enabled {
+		return
+	}
+	readyIDs := ReadyIssueIDs(*waves)
+	var newlyReady []string
+	for _, id := range readyIDs {
+		if !labeledReady[id] {
+			newlyReady = append(newlyReady, id)
+		}
+	}
+	if len(newlyReady) == 0 {
+		return
+	}
+	readyIssueStr := strings.Join(newlyReady, ", ")
+	if err := RunReadyLabel(ctx, cfg, readyIssueStr, out, logger); err != nil {
+		logger.Warn("Ready label failed: %v", err)
+		return
+	}
+	for _, id := range newlyReady {
+		labeledReady[id] = true
+	}
+	recorder.Record(domain.EventReadyLabelsApplied, domain.ReadyLabelsAppliedPayload{
+		IssueIDs: newlyReady,
+	})
+}
+
+// applyPhase handles wave apply, partial failure check, completion marking,
+// cluster completeness update, unlock evaluation, nextgen wave generation,
+// ready labels, and mid-session state save.
+// waves is passed as *[]Wave because append/EvaluateUnlocks may reallocate the slice.
+func applyPhase(ctx context.Context, cfg *domain.Config,
+	scanDir, scanResultPath, adrDir string,
+	selected domain.Wave, resolvedStrictness string,
+	waves *[]domain.Wave, completed map[string]bool,
+	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
+	labeledReady map[string]bool,
+	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
+
+	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, recorder, out, loopSpan, logger)
+	if !ok {
 		return
 	}
 
@@ -539,73 +639,10 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}
 	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
-	// --- Post-completion: Generate next waves ---
-	var clusterForNextgen domain.ClusterScanResult
-	for _, c := range scanResult.Clusters {
-		if c.Name == selected.ClusterName {
-			clusterForNextgen = c
-			break
-		}
-	}
-	if clusterForNextgen.Name == "" {
-		logger.Warn("Cluster %q not found in scan results; skipping nextgen", selected.ClusterName)
-	} else if !NeedsMoreWaves(clusterForNextgen, *waves) {
-		loopSpan.AddEvent("nextgen.skipped",
-			trace.WithAttributes(
-				attribute.String("wave.cluster_name", selected.ClusterName),
-			),
-		)
-		logger.Debug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
-	} else {
-		completedWavesForCluster := domain.CompletedWavesForCluster(*waves, selected.ClusterName)
-		existingADRs, adrErr := ReadExistingADRs(adrDir)
-		if adrErr != nil {
-			logger.Warn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
-		}
-		rejectedForWave := sessionRejected[domain.WaveKey(selected)]
-		var feedback []*DMail
-		var reports []*DMail
-		if fbCollector != nil {
-			feedback = fbCollector.FeedbackOnly()
-			reports = fbCollector.ReportsOnly()
-		}
-		newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, reports, logger)
-		if nextgenErr != nil {
-			logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
-		} else if len(newWaves) > 0 {
-			*waves = append(*waves, newWaves...)
-			*waves = domain.EvaluateUnlocks(*waves, completed)
-			recorder.Record(domain.EventNextGenWavesAdded, domain.NextGenWavesAddedPayload{
-				ClusterName: selected.ClusterName,
-				Waves:       domain.BuildWaveStates(newWaves),
-			})
-		}
-	}
+	generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, selected, resolvedStrictness,
+		waves, completed, scanResult, sessionRejected, fbCollector, recorder, loopSpan, logger)
 
-	// Apply ready labels after nextgen so the final wave list is used.
-	// Only label newly ready issues to avoid redundant API calls.
-	if cfg.Labels.Enabled {
-		readyIDs := ReadyIssueIDs(*waves)
-		var newlyReady []string
-		for _, id := range readyIDs {
-			if !labeledReady[id] {
-				newlyReady = append(newlyReady, id)
-			}
-		}
-		if len(newlyReady) > 0 {
-			readyIssueStr := strings.Join(newlyReady, ", ")
-			if err := RunReadyLabel(ctx, cfg, readyIssueStr, out, logger); err != nil {
-				logger.Warn("Ready label failed: %v", err)
-			} else {
-				for _, id := range newlyReady {
-					labeledReady[id] = true
-				}
-				recorder.Record(domain.EventReadyLabelsApplied, domain.ReadyLabelsAppliedPayload{
-					IssueIDs: newlyReady,
-				})
-			}
-		}
-	}
+	applyReadyLabelsIfEnabled(ctx, cfg, waves, completed, labeledReady, recorder, out, logger)
 
 	// Save scan result cache (crash resilience)
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
