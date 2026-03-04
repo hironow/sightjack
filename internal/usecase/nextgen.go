@@ -14,12 +14,12 @@ func LoadLatestState(baseDir string) (*domain.SessionState, string, error) {
 
 // RestoreWaves converts WaveState slices back to Wave slices.
 func RestoreWaves(states []domain.WaveState) []domain.Wave {
-	return session.RestoreWaves(states)
+	return domain.RestoreWaves(states)
 }
 
 // NeedsMoreWaves returns true when post-completion wave generation should run.
 func NeedsMoreWaves(cluster domain.ClusterScanResult, waves []domain.Wave) bool {
-	return session.NeedsMoreWaves(cluster, waves)
+	return domain.NeedsMoreWaves(cluster, waves)
 }
 
 // ReadExistingADRs reads ADR files from the ADR directory.
@@ -29,7 +29,7 @@ func ReadExistingADRs(adrDir string) ([]domain.ExistingADR, error) {
 
 // CompletedWavesForCluster returns completed waves for a specific cluster.
 func CompletedWavesForCluster(waves []domain.Wave, clusterName string) []domain.Wave {
-	return session.CompletedWavesForCluster(waves, clusterName)
+	return domain.CompletedWavesForCluster(waves, clusterName)
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt without executing Claude.

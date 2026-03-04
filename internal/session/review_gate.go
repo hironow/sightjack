@@ -119,7 +119,7 @@ func runReviewFix(ctx context.Context, cfg *domain.Config, dir, comments string,
 	logger.Info("Review fix: running %s --model %s --continue", claudeCmd, model)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("claude fix: %w\noutput: %s", err, summarizeReview(string(out)))
+		return fmt.Errorf("claude fix: %w\noutput: %s", err, domain.SummarizeReview(string(out)))
 	}
 	return nil
 }

@@ -30,7 +30,7 @@ func ShowFromState(w io.Writer, baseDir string, logger domain.Logger) error {
 		result.TotalIssues += c.IssueCount
 	}
 
-	waves := session.RestoreWaves(state.Waves)
+	waves := domain.RestoreWaves(state.Waves)
 	strictness := state.StrictnessLevel
 	if strictness == "" {
 		strictness = "fog"

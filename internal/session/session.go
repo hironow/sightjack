@@ -170,9 +170,9 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 
 	// Auto-select first available wave when --auto-approve is set.
 	if cfg.Gate.AutoApprove {
-		if len(available) > 0 {
-			logger.Info("Auto-selecting wave: %s", available[0].Title)
-			return available[0], selectChosen, shibitoShown
+		if w, ok := domain.AutoSelectWave(available); ok {
+			logger.Info("Auto-selecting wave: %s", w.Title)
+			return w, selectChosen, shibitoShown
 		}
 		return domain.Wave{}, selectQuit, shibitoShown
 	}

@@ -15,5 +15,5 @@ func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 
 // ToApplyResult converts the internal WaveApplyResult to the pipe wire format ApplyResult.
 func ToApplyResult(wave domain.Wave, internal *domain.WaveApplyResult) domain.ApplyResult {
-	return session.ToApplyResult(wave, internal)
+	return domain.ToApplyResult(wave, internal)
 }

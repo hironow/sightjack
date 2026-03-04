@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -261,6 +262,66 @@ func CheckCompletenessConsistency(overall float64, clusters []ClusterScanResult)
 	return diff > 0.05
 }
 
+// ToApplyResult converts the internal WaveApplyResult to the pipe wire format ApplyResult.
+// It builds per-action results from the wave's actions and the internal result's error list.
+func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
+	actions := make([]ActionResult, 0, len(wave.Actions))
+
+	// Build per-action results: first N actions succeed (N = Applied),
+	// remaining get error messages from the Errors list.
+	for i, a := range wave.Actions {
+		ar := ActionResult{
+			Type:    a.Type,
+			IssueID: a.IssueID,
+			Success: i < internal.Applied,
+		}
+		if !ar.Success {
+			errIdx := i - internal.Applied
+			if errIdx >= 0 && errIdx < len(internal.Errors) {
+				ar.Error = internal.Errors[errIdx]
+			} else {
+				ar.Error = "unknown error"
+			}
+		}
+		actions = append(actions, ar)
+	}
+
+	// Interpolate completeness based on the ratio of successfully applied actions.
+	total := len(wave.Actions)
+	var completeness float64
+	if total == 0 {
+		completeness = wave.Delta.Before
+	} else if internal.Applied < total {
+		ratio := float64(internal.Applied) / float64(total)
+		completeness = wave.Delta.Before + (wave.Delta.After-wave.Delta.Before)*ratio
+	} else {
+		completeness = wave.Delta.After
+	}
+
+	if total == 0 || internal.Applied >= total {
+		wave.Status = "completed"
+	} else {
+		wave.Status = "partial"
+	}
+
+	return ApplyResult{
+		WaveID:          internal.WaveID,
+		AppliedActions:  actions,
+		RippleEffects:   internal.Ripples,
+		NewCompleteness: completeness,
+		CompletedWave:   &wave,
+	}
+}
+
+// AutoSelectWave selects the first available wave for auto-approve mode.
+// Returns the selected wave and true if one is available, or zero Wave and false if none.
+func AutoSelectWave(available []Wave) (Wave, bool) {
+	if len(available) > 0 {
+		return available[0], true
+	}
+	return Wave{}, false
+}
+
 // CompletedWavesForCluster returns all completed waves for the given cluster.
 func CompletedWavesForCluster(waves []Wave, clusterName string) []Wave {
 	var result []Wave
@@ -270,4 +331,66 @@ func CompletedWavesForCluster(waves []Wave, clusterName string) []Wave {
 		}
 	}
 	return result
+}
+
+// MaxWavesPerCluster is the cap on total waves per cluster.
+// Beyond this count, nextgen is skipped to prevent infinite wave growth.
+const MaxWavesPerCluster = 8
+
+// NeedsMoreWaves returns true when post-completion wave generation should run
+// for the given cluster. It returns false (skip nextgen) when any of:
+//   - cluster completeness >= 0.95 (effectively done)
+//   - available (non-completed) waves still remain for the cluster
+//   - total wave count for the cluster >= MaxWavesPerCluster
+func NeedsMoreWaves(cluster ClusterScanResult, waves []Wave) bool {
+	if cluster.Completeness >= 0.95 {
+		return false
+	}
+	var clusterTotal int
+	hasAvailable := false
+	for _, w := range waves {
+		if w.ClusterName != cluster.Name {
+			continue
+		}
+		clusterTotal++
+		if w.Status == "available" || w.Status == "locked" || w.Status == "partial" {
+			hasAvailable = true
+		}
+	}
+	if hasAvailable {
+		return false
+	}
+	if clusterTotal >= MaxWavesPerCluster {
+		return false
+	}
+	return true
+}
+
+// ReadyIssueIDs returns issue IDs where ALL waves targeting them are completed.
+// An issue is ready when every wave containing that issue has status "completed".
+// Results are sorted for deterministic output.
+func ReadyIssueIDs(waves []Wave) []string {
+	// Track all waves per issue
+	issueWaves := make(map[string][]string) // issueID -> []waveStatus
+	for _, w := range waves {
+		for _, a := range w.Actions {
+			issueWaves[a.IssueID] = append(issueWaves[a.IssueID], w.Status)
+		}
+	}
+
+	var ready []string
+	for issueID, statuses := range issueWaves {
+		allCompleted := true
+		for _, s := range statuses {
+			if s != "completed" {
+				allCompleted = false
+				break
+			}
+		}
+		if allCompleted {
+			ready = append(ready, issueID)
+		}
+	}
+	sort.Strings(ready)
+	return ready
 }

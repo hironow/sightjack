@@ -16,37 +16,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// maxWavesPerCluster is the cap on total waves per cluster.
-// Beyond this count, nextgen is skipped to prevent infinite wave growth.
-const maxWavesPerCluster = 8
-
-// NeedsMoreWaves returns true when post-completion wave generation should run
-// for the given cluster. It returns false (skip nextgen) when any of:
-//   - cluster completeness >= 0.95 (effectively done)
-//   - available (non-completed) waves still remain for the cluster
-//   - total wave count for the cluster >= maxWavesPerCluster
+// NeedsMoreWaves returns true when post-completion wave generation should run.
+// Delegates to domain.NeedsMoreWaves.
 func NeedsMoreWaves(cluster domain.ClusterScanResult, waves []domain.Wave) bool {
-	if cluster.Completeness >= 0.95 {
-		return false
-	}
-	var clusterTotal int
-	hasAvailable := false
-	for _, w := range waves {
-		if w.ClusterName != cluster.Name {
-			continue
-		}
-		clusterTotal++
-		if w.Status == "available" || w.Status == "locked" || w.Status == "partial" {
-			hasAvailable = true
-		}
-	}
-	if hasAvailable {
-		return false
-	}
-	if clusterTotal >= maxWavesPerCluster {
-		return false
-	}
-	return true
+	return domain.NeedsMoreWaves(cluster, waves)
 }
 
 // NextgenFileName returns the output filename for a nextgen wave generation run.

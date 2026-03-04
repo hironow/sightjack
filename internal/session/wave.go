@@ -43,76 +43,9 @@ func ParseWaveApplyResult(path string) (*domain.WaveApplyResult, error) {
 }
 
 // ToApplyResult converts the internal domain.WaveApplyResult to the pipe wire format domain.ApplyResult.
-// It builds per-action results from the wave's actions and the internal result's error list.
+// Delegates to domain.ToApplyResult.
 func ToApplyResult(wave domain.Wave, internal *domain.WaveApplyResult) domain.ApplyResult {
-	actions := make([]domain.ActionResult, 0, len(wave.Actions))
-
-	// Build per-action results: first N actions succeed (N = Applied),
-	// remaining get error messages from the Errors list.
-	for i, a := range wave.Actions {
-		ar := domain.ActionResult{
-			Type:    a.Type,
-			IssueID: a.IssueID,
-			Success: i < internal.Applied,
-		}
-		if !ar.Success {
-			errIdx := i - internal.Applied
-			if errIdx >= 0 && errIdx < len(internal.Errors) {
-				ar.Error = internal.Errors[errIdx]
-			} else {
-				ar.Error = "unknown error"
-			}
-		}
-		actions = append(actions, ar)
-	}
-
-	// Interpolate completeness based on the ratio of successfully applied actions.
-	total := len(wave.Actions)
-	var completeness float64
-	if total == 0 {
-		completeness = wave.Delta.Before
-	} else if internal.Applied < total {
-		ratio := float64(internal.Applied) / float64(total)
-		completeness = wave.Delta.Before + (wave.Delta.After-wave.Delta.Before)*ratio
-	} else {
-		completeness = wave.Delta.After
-	}
-
-	if total == 0 || internal.Applied >= total {
-		wave.Status = "completed"
-	} else {
-		wave.Status = "partial"
-	}
-
-	return domain.ApplyResult{
-		WaveID:          internal.WaveID,
-		AppliedActions:  actions,
-		RippleEffects:   internal.Ripples,
-		NewCompleteness: completeness,
-		CompletedWave:   &wave,
-	}
-}
-
-// --- Domain wrapper functions (cmd → session → domain) ---
-
-// WaveKey returns a globally unique key for a wave: "ClusterName:ID".
-func WaveKey(w domain.Wave) string {
-	return domain.WaveKey(w)
-}
-
-// AvailableWaves filters waves to those available and not completed.
-func AvailableWaves(waves []domain.Wave, completed map[string]bool) []domain.Wave {
-	return domain.AvailableWaves(waves, completed)
-}
-
-// RestoreWaves converts WaveState slices back to Wave slices.
-func RestoreWaves(states []domain.WaveState) []domain.Wave {
-	return domain.RestoreWaves(states)
-}
-
-// CompletedWavesForCluster returns completed waves for a specific cluster.
-func CompletedWavesForCluster(waves []domain.Wave, clusterName string) []domain.Wave {
-	return domain.CompletedWavesForCluster(waves, clusterName)
+	return domain.ToApplyResult(wave, internal)
 }
 
 // WaveApplyFileName returns the output filename for a wave apply result.

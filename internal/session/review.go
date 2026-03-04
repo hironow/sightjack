@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // ReviewResult holds the outcome of a code review execution.
@@ -36,7 +38,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			if isRateLimited(output) {
+			if domain.IsRateLimited(output) {
 				return nil, fmt.Errorf("review service rate/quota limited")
 			}
 			return &ReviewResult{
@@ -45,31 +47,13 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 				Comments: output,
 			}, nil
 		}
-		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, summarizeReview(output))
+		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, domain.SummarizeReview(output))
 	}
 
 	return &ReviewResult{
 		Passed: true,
 		Output: output,
 	}, nil
-}
-
-func isRateLimited(output string) bool {
-	lower := strings.ToLower(output)
-	signals := []string{
-		"rate limit",
-		"rate_limit",
-		"quota exceeded",
-		"quota limit",
-		"too many requests",
-		"usage limit",
-	}
-	for _, s := range signals {
-		if strings.Contains(lower, s) {
-			return true
-		}
-	}
-	return false
 }
 
 // BuildReviewFixPrompt creates a focused prompt for fixing review comments.
@@ -82,12 +66,3 @@ Fix all review comments above. Commit and push your changes.
 Keep fixes focused — only address the review comments, do not refactor unrelated code.`, branch, comments)
 }
 
-func summarizeReview(comments string) string {
-	normalized := strings.Join(strings.Fields(comments), " ")
-	const maxLen = 500
-	runes := []rune(normalized)
-	if len(runes) <= maxLen {
-		return normalized
-	}
-	return string(runes[:maxLen]) + "...(truncated)"
-}

@@ -11,7 +11,7 @@ import (
 
 // AvailableWaves filters waves to those available and not completed.
 func AvailableWaves(waves []domain.Wave, completed map[string]bool) []domain.Wave {
-	return session.AvailableWaves(waves, completed)
+	return domain.AvailableWaves(waves, completed)
 }
 
 // PromptWaveSelection displays available waves and reads the user's choice.
@@ -21,5 +21,5 @@ func PromptWaveSelection(ctx context.Context, w io.Writer, s *bufio.Scanner, wav
 
 // WaveKey returns a globally unique key for a wave: "ClusterName:ID".
 func WaveKey(w domain.Wave) string {
-	return session.WaveKey(w)
+	return domain.WaveKey(w)
 }
