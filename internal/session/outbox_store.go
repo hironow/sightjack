@@ -55,7 +55,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 			return nil, fmt.Errorf("outbox store: %s: %w", pragma, err)
 		}
 	}
-	if err := createSchema(db); err != nil {
+	if err := createOutboxSchema(db); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 // that exceed this limit are treated as dead-letter and skipped.
 const maxRetryCount = 3
 
-func createSchema(db *sql.DB) error {
+func createOutboxSchema(db *sql.DB) error {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS staged (
 		name        TEXT PRIMARY KEY,
 		data        BLOB    NOT NULL,
