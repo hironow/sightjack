@@ -5,19 +5,30 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/spf13/cobra"
 )
 
 func newCleanCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "clean",
+		Use:   "clean [path]",
 		Short: "Remove state directory (.siren/)",
 		Long:  "Delete the .siren/ directory to reset to a clean state. Use 'sightjack init' to reinitialize.",
 		Example: `  sightjack clean
+  sightjack clean /path/to/project
   sightjack clean --yes`,
-		Args: cobra.NoArgs,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			stateDir := filepath.Dir(cfgPath)
+			var stateDir string
+			if len(args) > 0 {
+				base, err := resolveBaseDir(args)
+				if err != nil {
+					return err
+				}
+				stateDir = filepath.Join(base, domain.StateDir)
+			} else {
+				stateDir = filepath.Dir(cfgPath)
+			}
 
 			info, err := os.Stat(stateDir)
 			if err != nil || !info.IsDir() {
