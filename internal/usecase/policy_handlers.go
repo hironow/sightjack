@@ -13,12 +13,17 @@ import (
 // registerSessionPolicies registers POLICY handlers for session events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
 func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics) {
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Wave application is an intermediate session step; user sees results
+	// interactively and scan.completed provides the summary notification.
 	engine.Register(domain.EventWaveApplied, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: wave applied (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "wave.applied", "handled")
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Report delivery is part of the session flow; user sees it inline.
 	engine.Register(domain.EventReportSent, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: report sent (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "report.sent", "handled")
@@ -44,12 +49,17 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Wave completion is an intermediate session step; individual wave
+	// outcomes feed into the scan.completed summary.
 	engine.Register(domain.EventWaveCompleted, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: wave completed (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "wave.completed", "handled")
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Specification delivery is part of the interactive session flow.
 	engine.Register(domain.EventSpecificationSent, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: specification sent (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "specification.sent", "handled")
