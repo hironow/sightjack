@@ -127,11 +127,7 @@ func DefaultConfig() Config {
 			ChunkSize:      20,
 			MaxConcurrency: 3,
 		},
-		Assistant: AIAssistantConfig{
-			Command:    "claude",
-			Model:      "opus",
-			TimeoutSec: 300,
-		},
+		Assistant: AIAssistantConfig{},
 		Scribe: ScribeConfig{
 			Enabled: true,
 		},

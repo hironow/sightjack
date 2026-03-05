@@ -28,6 +28,12 @@ func LoadConfig(path string) (*domain.Config, error) {
 	if cfg.Scan.MaxConcurrency < 1 {
 		cfg.Scan.MaxConcurrency = 1
 	}
+	if cfg.Assistant.Command == "" {
+		cfg.Assistant.Command = "claude"
+	}
+	if cfg.Assistant.Model == "" {
+		cfg.Assistant.Model = "opus"
+	}
 	if cfg.Assistant.TimeoutSec < 1 {
 		cfg.Assistant.TimeoutSec = 300
 	}
