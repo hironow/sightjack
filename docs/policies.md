@@ -14,11 +14,11 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 
 | Policy Name | WHEN [EVENT] | THEN [COMMAND] | Side Effects |
 |---|---|---|---|
-| WaveAppliedComposeReport | wave.applied | ComposeReport | Log (Debug) |
-| ReportSentDeliverToPhonewave | report.sent | DeliverViaPhonewave | Log (Debug) |
-| ScanCompletedGenerateWaves | scan.completed | GenerateWaves | Log (Info) + Desktop notification (5s timeout) |
-| WaveCompletedNextGen | wave.completed | GenerateNextWaves | Log (Debug) |
-| SpecificationSentDeliverToPhonewave | specification.sent | DeliverViaPhonewave | Log (Debug) |
+| WaveAppliedComposeReport | wave.applied | ComposeReport | Log (Debug) + Metrics |
+| ReportSentDeliverToPhonewave | report.sent | DeliverViaPhonewave | Log (Debug) + Metrics |
+| ScanCompletedGenerateWaves | scan.completed | GenerateWaves | Log (Info) + Desktop Notify + Metrics |
+| WaveCompletedNextGen | wave.completed | GenerateNextWaves | Log (Info) + Desktop Notify + Metrics |
+| SpecificationSentDeliverToPhonewave | specification.sent | DeliverViaPhonewave | Log (Info) + Desktop Notify + Metrics |
 
 ## Event Payload Format
 
@@ -37,5 +37,5 @@ No retry, no dead-letter queue, no error propagation to callers.
 
 ## Skeleton Handlers
 
-WaveAppliedComposeReport, ReportSentDeliverToPhonewave, WaveCompletedNextGen,
-and SpecificationSentDeliverToPhonewave are logging-only placeholders.
+WaveAppliedComposeReport and ReportSentDeliverToPhonewave are observation-only placeholders
+(Debug log + Metrics, no notification).
