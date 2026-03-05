@@ -182,6 +182,12 @@ test-scenario: check-go
 test-scenario-all: check-go
     mise exec -- go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
 
+# Check docs for stale references (e.g. deprecated internal/port path)
+docs-check:
+    @echo "Checking for stale references..."
+    @! grep -rn 'internal/port[^/]' docs/ internal/domain/doc.go 2>/dev/null || (echo "ERROR: stale internal/port references found" && exit 1)
+    @echo "docs-check passed"
+
 # Clean build artifacts
 clean:
     rm -rf dist/ coverage.out
