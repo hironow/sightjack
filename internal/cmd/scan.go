@@ -41,7 +41,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				return err
 			}
 			logger.Info("Starting sightjack scan...")
-			logger.Info("Team: %s | Project: %s | Lang: %s", cfg.Linear.Team, cfg.Linear.Project, cfg.Lang)
+			logger.Info("Team: %s | Project: %s | Lang: %s", cfg.Tracker.Team, cfg.Tracker.Project, cfg.Lang)
 
 			// When --json is set, stream Claude output to stderr so stdout stays clean for pipe.
 			streamOut := cmd.OutOrStdout()
@@ -71,7 +71,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				}
 				fmt.Fprintln(w, string(data))
 			} else {
-				nav := usecase.RenderNavigator(result, cfg.Linear.Project)
+				nav := usecase.RenderNavigator(result, cfg.Tracker.Project)
 				fmt.Fprintln(w)
 				fmt.Fprint(w, nav)
 			}

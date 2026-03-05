@@ -31,7 +31,7 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 
 	agg := domain.NewSessionAggregate()
 
-	startEvt, err := agg.Start(cfg.Linear.Project, string(cfg.Strictness.Default), scanTime) // nosemgrep: adr0003-otel-span-without-defer-end — SessionAggregate.Start, not tracer.Start
+	startEvt, err := agg.Start(cfg.Tracker.Project, string(cfg.Strictness.Default), scanTime) // nosemgrep: adr0003-otel-span-without-defer-end — SessionAggregate.Start, not tracer.Start
 	if err != nil {
 		logger.Warn("aggregate start: %v", err)
 		return scanResultPath

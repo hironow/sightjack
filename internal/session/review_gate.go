@@ -33,7 +33,7 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 		budget = maxReviewGateCycles
 	}
 
-	timeoutSec := cfg.Claude.TimeoutSec
+	timeoutSec := cfg.Assistant.TimeoutSec
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
@@ -88,18 +88,18 @@ func runReviewFix(ctx context.Context, cfg *domain.Config, dir, comments string,
 		return fmt.Errorf("detect branch: %w", err)
 	}
 
-	claudeCmd := cfg.Claude.Command
+	claudeCmd := cfg.Assistant.Command
 	if claudeCmd == "" {
 		claudeCmd = "claude"
 	}
-	model := cfg.Claude.Model
+	model := cfg.Assistant.Model
 	if model == "" {
 		model = "opus"
 	}
 
 	prompt := BuildReviewFixPrompt(branch, comments)
 
-	fixTimeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+	fixTimeout := time.Duration(cfg.Assistant.TimeoutSec) * time.Second
 	if fixTimeout <= 0 {
 		fixTimeout = 300 * time.Second
 	}

@@ -51,11 +51,11 @@ func TestRenderInitConfig_LoadableByLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig failed on rendered config: %v", err)
 	}
-	if cfg.Linear.Team != "TestTeam" {
-		t.Errorf("team: expected TestTeam, got %s", cfg.Linear.Team)
+	if cfg.Tracker.Team != "TestTeam" {
+		t.Errorf("team: expected TestTeam, got %s", cfg.Tracker.Team)
 	}
-	if cfg.Linear.Project != "Test Project" {
-		t.Errorf("project: expected Test Project, got %s", cfg.Linear.Project)
+	if cfg.Tracker.Project != "Test Project" {
+		t.Errorf("project: expected Test Project, got %s", cfg.Tracker.Project)
 	}
 	if cfg.Lang != "en" {
 		t.Errorf("lang: expected en, got %s", cfg.Lang)
@@ -164,7 +164,7 @@ func TestRenderInitConfig_DefaultsApplied(t *testing.T) {
 	if cfg.Scan.ChunkSize != 20 {
 		t.Errorf("expected default ChunkSize 20, got %d", cfg.Scan.ChunkSize)
 	}
-	if cfg.Claude.Command != "claude" {
-		t.Errorf("expected default command 'claude', got %s", cfg.Claude.Command)
+	if cfg.Assistant.Command != "claude" {
+		t.Errorf("expected default command 'claude', got %s", cfg.Assistant.Command)
 	}
 }

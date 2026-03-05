@@ -75,7 +75,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	baseDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang: "en",
-		Claude: domain.ClaudeConfig{
+		Assistant: domain.AIAssistantConfig{
 			Command:    "claude",
 			TimeoutSec: 60,
 		},
@@ -83,7 +83,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 			MaxConcurrency: 1,
 			ChunkSize:      50,
 		},
-		Linear: domain.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    "ENG",
 			Project: "Test",
 		},
@@ -131,7 +131,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	baseDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang: "en",
-		Claude: domain.ClaudeConfig{
+		Assistant: domain.AIAssistantConfig{
 			Command:    "claude",
 			TimeoutSec: 60,
 		},
@@ -139,7 +139,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 			MaxConcurrency: 1,
 			ChunkSize:      50,
 		},
-		Linear: domain.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    "ENG",
 			Project: "Test",
 		},
@@ -168,9 +168,9 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 	// given: non-dry-run session with nil input should return error early
 	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 		Scan:   domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Linear: domain.LinearConfig{Team: "ENG", Project: "Test"},
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 
 	// when
@@ -905,9 +905,9 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	baseDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 		Scan:   domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Linear: domain.LinearConfig{Team: "ENG", Project: "Test"},
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 		Scribe: domain.ScribeConfig{Enabled: true},
 	}
 	sessionID := "test-no-cache"
@@ -1080,8 +1080,8 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
 	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
-		Linear: domain.LinearConfig{Team: "ENG", Project: "Test"},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 	state := &domain.SessionState{
 		Version:        "0.5",
@@ -1105,8 +1105,8 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
 	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
-		Linear: domain.LinearConfig{Team: "ENG", Project: "Test"},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 	state := &domain.SessionState{
 		Version:   "0.5",

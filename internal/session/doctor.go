@@ -111,7 +111,7 @@ func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger domain.Logge
 		}
 	}
 
-	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Linear.Team)
+	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Tracker.Team)
 	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, WithAllowedTools(LinearMCPAllowedTools...))
 	if err != nil {
 		return domain.CheckResult{
@@ -125,7 +125,7 @@ func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger domain.Logge
 	return domain.CheckResult{
 		Name:    "Linear MCP",
 		Status:  domain.CheckOK,
-		Message: fmt.Sprintf("claude responded (team: %s)", cfg.Linear.Team),
+		Message: fmt.Sprintf("claude responded (team: %s)", cfg.Tracker.Team),
 	}
 }
 
@@ -218,8 +218,8 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 
 	// 3. claude binary check
 	claudeName := "claude"
-	if cfg != nil && cfg.Claude.Command != "" {
-		claudeName = cfg.Claude.Command
+	if cfg != nil && cfg.Assistant.Command != "" {
+		claudeName = cfg.Assistant.Command
 	}
 	claudeResult := CheckTool(ctx, claudeName)
 	results = append(results, claudeResult)

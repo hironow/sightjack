@@ -51,7 +51,7 @@ func TestRunReviewGate_PassingReview(t *testing.T) {
 	ctx := context.Background()
 	cfg := &domain.Config{
 		Gate:   domain.GateConfig{ReviewCmd: "echo 'all good'"},
-		Claude: domain.ClaudeConfig{Command: "true", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: "true", TimeoutSec: 30},
 	}
 
 	// when
@@ -71,7 +71,7 @@ func TestRunReviewGate_FailingReviewExhaustedCycles(t *testing.T) {
 	ctx := context.Background()
 	cfg := &domain.Config{
 		Gate:   domain.GateConfig{ReviewCmd: "echo 'found issues' && exit 1"},
-		Claude: domain.ClaudeConfig{Command: "true", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: "true", TimeoutSec: 30},
 	}
 	dir := t.TempDir()
 	initGitRepo(t, dir)
@@ -93,7 +93,7 @@ func TestRunReviewGate_BudgetExceeded(t *testing.T) {
 	ctx := context.Background()
 	cfg := &domain.Config{
 		Gate:   domain.GateConfig{ReviewCmd: "echo 'error' && exit 1", ReviewBudget: 1},
-		Claude: domain.ClaudeConfig{Command: "true", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: "true", TimeoutSec: 30},
 	}
 	dir := t.TempDir()
 	initGitRepo(t, dir)
@@ -115,7 +115,7 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 	ctx := context.Background()
 	cfg := &domain.Config{
 		Gate:   domain.GateConfig{ReviewCmd: "echo ok"},
-		Claude: domain.ClaudeConfig{TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{TimeoutSec: 30},
 	}
 
 	// when
@@ -155,7 +155,7 @@ exit 0
 
 	cfg := &domain.Config{
 		Gate:   domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2},
-		Claude: domain.ClaudeConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
 	}
 	ctx := context.Background()
 
@@ -199,7 +199,7 @@ exit 0
 
 	cfg := &domain.Config{
 		Gate:   domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 3},
-		Claude: domain.ClaudeConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
 	}
 	ctx := context.Background()
 
@@ -228,7 +228,7 @@ func TestRunReviewGate_FixFailure_ReturnsFalse(t *testing.T) {
 
 	cfg := &domain.Config{
 		Gate:   domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2},
-		Claude: domain.ClaudeConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
 	}
 	ctx := context.Background()
 

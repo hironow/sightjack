@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -104,7 +105,7 @@ func writeOtelEnv(baseDir, backend, entity, project string, w io.Writer) error {
 	if backend == "" {
 		return nil
 	}
-	content, err := domain.OtelEnvContent(backend, entity, project)
+	content, err := platform.OtelEnvContent(backend, entity, project)
 	if err != nil {
 		return err
 	}

@@ -42,7 +42,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "echo", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "echo", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
@@ -114,7 +114,7 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "false", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: "false", TimeoutSec: 30},
 		Retry:  domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
 

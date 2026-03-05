@@ -91,9 +91,9 @@ func testRecorder(baseDir, sessionID string) domain.Recorder {
 func testConfig() *domain.Config {
 	return &domain.Config{
 		Lang:       "en",
-		Claude:     domain.ClaudeConfig{Command: "claude", TimeoutSec: 30},
+		Assistant:     domain.AIAssistantConfig{Command: "claude", TimeoutSec: 30},
 		Scan:       domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Linear:     domain.LinearConfig{Team: "ENG", Project: "TestProject"},
+		Tracker:    domain.IssueTrackerConfig{Team: "ENG", Project: "TestProject"},
 		Scribe:     domain.ScribeConfig{Enabled: false},
 		Strictness: domain.StrictnessConfig{Default: domain.StrictnessFog},
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},

@@ -12,7 +12,7 @@ var SkillsFS embed.FS
 // Only user-specified values are written; remaining fields are filled
 // by DefaultConfig when LoadConfig reads the file.
 func RenderInitConfig(team, project, lang, strictness string) string {
-	return fmt.Sprintf(`linear:
+	return fmt.Sprintf(`tracker:
   team: %q
   project: %q
 

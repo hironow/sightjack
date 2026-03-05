@@ -28,8 +28,8 @@ func LoadConfig(path string) (*domain.Config, error) {
 	if cfg.Scan.MaxConcurrency < 1 {
 		cfg.Scan.MaxConcurrency = 1
 	}
-	if cfg.Claude.TimeoutSec < 1 {
-		cfg.Claude.TimeoutSec = 300
+	if cfg.Assistant.TimeoutSec < 1 {
+		cfg.Assistant.TimeoutSec = 300
 	}
 	if !cfg.Strictness.Default.Valid() {
 		cfg.Strictness.Default = domain.StrictnessFog

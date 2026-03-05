@@ -24,7 +24,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
@@ -53,7 +53,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", Model: "", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", Model: "", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
@@ -74,7 +74,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 
 func TestRunClaudeDryRun(t *testing.T) {
 	dir := t.TempDir()
-	cfg := &domain.Config{Claude: domain.ClaudeConfig{Command: "claude"}}
+	cfg := &domain.Config{Assistant: domain.AIAssistantConfig{Command: "claude"}}
 	prompt := "test prompt content"
 	outDir := dir + "/dryrun"
 
@@ -96,7 +96,7 @@ func TestRunClaudeDryRun(t *testing.T) {
 func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	// given: two dry-run calls with different names to the same dir
 	dir := t.TempDir()
-	cfg := &domain.Config{Claude: domain.ClaudeConfig{Command: "claude"}}
+	cfg := &domain.Config{Assistant: domain.AIAssistantConfig{Command: "claude"}}
 
 	// when
 	if err := session.RunClaudeDryRun(cfg, "prompt A", dir, "wave_00_auth", platform.NewLogger(io.Discard, false)); err != nil {
@@ -133,7 +133,7 @@ func TestRunClaudeOnceNoRetry(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
 
@@ -161,7 +161,7 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
 	}
 	output, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
@@ -188,7 +188,7 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 	cancel() // already cancelled
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
 	_, err := session.RunClaude(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
@@ -210,7 +210,7 @@ func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
@@ -245,7 +245,7 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
@@ -278,7 +278,7 @@ func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "sleep", TimeoutSec: 30},
+		Assistant: domain.AIAssistantConfig{Command: "sleep", TimeoutSec: 30},
 		Retry:  domain.RetryConfig{MaxAttempts: 1},
 	}
 
@@ -312,7 +312,7 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
 	_, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))

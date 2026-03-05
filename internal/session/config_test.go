@@ -13,7 +13,7 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-linear:
+tracker:
   team: "TEST-TEAM"
   project: "Test Project"
 `), 0644)
@@ -26,11 +26,11 @@ linear:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Linear.Team != "TEST-TEAM" {
-		t.Errorf("expected TEST-TEAM, got %s", cfg.Linear.Team)
+	if cfg.Tracker.Team != "TEST-TEAM" {
+		t.Errorf("expected TEST-TEAM, got %s", cfg.Tracker.Team)
 	}
-	if cfg.Linear.Project != "Test Project" {
-		t.Errorf("expected Test Project, got %s", cfg.Linear.Project)
+	if cfg.Tracker.Project != "Test Project" {
+		t.Errorf("expected Test Project, got %s", cfg.Tracker.Project)
 	}
 	if cfg.Scan.ChunkSize != 20 {
 		t.Errorf("expected default chunk_size 20, got %d", cfg.Scan.ChunkSize)
@@ -38,11 +38,11 @@ linear:
 	if cfg.Scan.MaxConcurrency != 3 {
 		t.Errorf("expected default max_concurrency 3, got %d", cfg.Scan.MaxConcurrency)
 	}
-	if cfg.Claude.Command != "claude" {
-		t.Errorf("expected default command 'claude', got %s", cfg.Claude.Command)
+	if cfg.Assistant.Command != "claude" {
+		t.Errorf("expected default command 'claude', got %s", cfg.Assistant.Command)
 	}
-	if cfg.Claude.TimeoutSec != 300 {
-		t.Errorf("expected default timeout 300, got %d", cfg.Claude.TimeoutSec)
+	if cfg.Assistant.TimeoutSec != 300 {
+		t.Errorf("expected default timeout 300, got %d", cfg.Assistant.TimeoutSec)
 	}
 	if cfg.Lang != "ja" {
 		t.Errorf("expected default lang 'ja', got %s", cfg.Lang)
@@ -53,14 +53,14 @@ func TestLoadConfig_FullOverride(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-linear:
+tracker:
   team: "MY-TEAM"
   project: "My Project"
   cycle: "Sprint 5"
 scan:
   chunk_size: 50
   max_concurrency: 5
-claude:
+assistant:
   command: "cc-p"
   model: "sonnet"
   timeout_sec: 600
@@ -78,8 +78,8 @@ lang: "en"
 	if cfg.Scan.ChunkSize != 50 {
 		t.Errorf("expected 50, got %d", cfg.Scan.ChunkSize)
 	}
-	if cfg.Claude.Model != "sonnet" {
-		t.Errorf("expected sonnet, got %s", cfg.Claude.Model)
+	if cfg.Assistant.Model != "sonnet" {
+		t.Errorf("expected sonnet, got %s", cfg.Assistant.Model)
 	}
 	if cfg.Lang != "en" {
 		t.Errorf("expected en, got %s", cfg.Lang)
@@ -132,7 +132,7 @@ func TestLoadConfig_ZeroTimeout_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-claude:
+assistant:
   timeout_sec: 0
 `), 0644)
 	if err != nil {
@@ -144,8 +144,8 @@ claude:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Claude.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Claude.TimeoutSec)
+	if cfg.Assistant.TimeoutSec != 300 {
+		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Assistant.TimeoutSec)
 	}
 }
 
@@ -153,7 +153,7 @@ func TestLoadConfig_NegativeTimeout_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-claude:
+assistant:
   timeout_sec: -10
 `), 0644)
 	if err != nil {
@@ -165,8 +165,8 @@ claude:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Claude.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Claude.TimeoutSec)
+	if cfg.Assistant.TimeoutSec != 300 {
+		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Assistant.TimeoutSec)
 	}
 }
 
@@ -202,7 +202,7 @@ func TestLoadConfig_StrictnessAlert(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(`
-linear:
+tracker:
   team: TEST
   project: Test
 strictness:
@@ -223,7 +223,7 @@ func TestLoadConfig_StrictnessMissing_DefaultsFog(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(`
-linear:
+tracker:
   team: TEST
   project: Test
 `), 0644)
@@ -242,7 +242,7 @@ func TestLoadConfig_StrictnessInvalid_FallsBackToFog(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(`
-linear:
+tracker:
   team: TEST
   project: Test
 strictness:
@@ -263,7 +263,7 @@ func TestLoadConfig_StrictnessEmpty_FallsBackToFog(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(`
-linear:
+tracker:
   team: TEST
   project: Test
 strictness:
@@ -281,7 +281,7 @@ strictness:
 
 func TestLoadConfigWithDoDTemplates(t *testing.T) {
 	content := `
-linear:
+tracker:
   team: test
   project: test
 dod_templates:
@@ -321,7 +321,7 @@ dod_templates:
 
 func TestLoadConfigWithRetry(t *testing.T) {
 	content := `
-linear:
+tracker:
   team: test
   project: test
 retry:
@@ -346,7 +346,7 @@ retry:
 
 func TestLoadConfigRetryValidation(t *testing.T) {
 	content := `
-linear:
+tracker:
   team: test
   project: test
 retry:
@@ -371,7 +371,7 @@ retry:
 
 func TestLoadConfigWithLabels(t *testing.T) {
 	content := `
-linear:
+tracker:
   team: test
   project: test
 labels:
@@ -400,7 +400,7 @@ labels:
 
 func TestLoadConfigLabelsEnabled_EmptyValues_FallsBackToDefaults(t *testing.T) {
 	content := `
-linear:
+tracker:
   team: test
   project: test
 labels:
@@ -427,7 +427,7 @@ labels:
 
 func TestLoadConfig_StrictnessOverrides(t *testing.T) {
 	content := `
-linear:
+tracker:
   team: test
   project: test
 strictness:
@@ -458,7 +458,7 @@ strictness:
 
 func TestLoadConfig_StrictnessOverrides_InvalidValueReturnsError(t *testing.T) {
 	content := `
-linear:
+tracker:
   team: test
   project: test
 strictness:
@@ -481,7 +481,7 @@ func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-linear:
+tracker:
   team: "TEST"
 `), 0644)
 	if err != nil {

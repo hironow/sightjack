@@ -79,9 +79,9 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
 	classifyPrompt, err := domain.RenderClassifyPrompt(cfg.Lang, domain.ClassifyPromptData{
-		TeamFilter:      cfg.Linear.Team,
-		ProjectFilter:   cfg.Linear.Project,
-		CycleFilter:     cfg.Linear.Cycle,
+		TeamFilter:      cfg.Tracker.Team,
+		ProjectFilter:   cfg.Tracker.Project,
+		CycleFilter:     cfg.Tracker.Cycle,
 		OutputPath:      classifyOutput,
 		StrictnessLevel: string(cfg.Strictness.Default),
 		LabelsEnabled:   cfg.Labels.Enabled,

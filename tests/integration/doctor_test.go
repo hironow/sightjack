@@ -19,7 +19,7 @@ func TestCheckConfig_ValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(`
-linear:
+tracker:
   team: "Test"
   project: "Project"
 `), 0644)
@@ -116,7 +116,7 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
@@ -141,7 +141,7 @@ func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
@@ -166,7 +166,7 @@ func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
@@ -203,8 +203,8 @@ func TestCheckLinearMCP_Success(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Linear: domain.LinearConfig{Team: "Engineering"},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
+		Tracker: domain.IssueTrackerConfig{Team: "Engineering"},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
@@ -226,8 +226,8 @@ func TestCheckLinearMCP_Failure(t *testing.T) {
 	defer cleanup()
 
 	cfg := &domain.Config{
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 10},
-		Linear: domain.LinearConfig{Team: "Engineering"},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
+		Tracker: domain.IssueTrackerConfig{Team: "Engineering"},
 		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
@@ -401,10 +401,10 @@ func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(cfgPath, []byte(`
-linear:
+tracker:
   team: "Test"
   project: "Project"
-claude:
+assistant:
   command: "nonexistent-claude-binary-xyz"
 `), 0644)
 
@@ -450,7 +450,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(cfgPath, []byte(`
-linear:
+tracker:
   team: "Test"
   project: "Project"
 `), 0644)
@@ -499,7 +499,7 @@ func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(cfgPath, []byte(`
-linear:
+tracker:
   team: "Test"
   project: "Project"
 `), 0644)

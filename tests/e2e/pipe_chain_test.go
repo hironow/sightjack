@@ -24,13 +24,13 @@ func initDir(t *testing.T) string {
 		t.Fatal(err)
 	}
 	cfg := `lang: en
-claude:
+assistant:
   command: claude
   timeout_sec: 30
 scan:
   max_concurrency: 1
   chunk_size: 50
-linear:
+tracker:
   team: ENG
   project: TestProject
 strictness:

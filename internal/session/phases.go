@@ -41,7 +41,7 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	}
 
 	// Display Link Navigator
-	nav := RenderMatrixNavigator(scanResult, cfg.Linear.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
+	nav := RenderMatrixNavigator(scanResult, cfg.Tracker.Project, waves, adrCount, resumedAt, string(cfg.Strictness.Default), len(scanResult.ShibitoWarnings))
 	fmt.Fprintln(out)
 	fmt.Fprint(out, nav)
 

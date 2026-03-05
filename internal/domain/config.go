@@ -41,9 +41,9 @@ type GateConfig struct {
 
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
-	Linear       LinearConfig           `yaml:"linear"`
+	Tracker      IssueTrackerConfig     `yaml:"tracker"`
 	Scan         ScanConfig             `yaml:"scan"`
-	Claude       ClaudeConfig           `yaml:"claude"`
+	Assistant    AIAssistantConfig      `yaml:"assistant"`
 	Scribe       ScribeConfig           `yaml:"scribe"`
 	Strictness   StrictnessConfig       `yaml:"strictness"`
 	Retry        RetryConfig            `yaml:"retry"`
@@ -58,8 +58,8 @@ type ScribeConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-// LinearConfig holds Linear integration settings.
-type LinearConfig struct {
+// IssueTrackerConfig holds issue tracker integration settings.
+type IssueTrackerConfig struct {
 	Team    string `yaml:"team"`
 	Project string `yaml:"project"`
 	Cycle   string `yaml:"cycle"`
@@ -71,8 +71,8 @@ type ScanConfig struct {
 	MaxConcurrency int `yaml:"max_concurrency"`
 }
 
-// ClaudeConfig holds Claude Code invocation settings.
-type ClaudeConfig struct {
+// AIAssistantConfig holds AI assistant invocation settings.
+type AIAssistantConfig struct {
 	Command    string `yaml:"command"`
 	Model      string `yaml:"model"`
 	TimeoutSec int    `yaml:"timeout_sec"`
@@ -127,7 +127,7 @@ func DefaultConfig() Config {
 			ChunkSize:      20,
 			MaxConcurrency: 3,
 		},
-		Claude: ClaudeConfig{
+		Assistant: AIAssistantConfig{
 			Command:    "claude",
 			Model:      "opus",
 			TimeoutSec: 300,

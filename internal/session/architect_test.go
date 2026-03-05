@@ -109,7 +109,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	scanDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 	}
 	wave := domain.Wave{
 		ID:          "auth-w1",
@@ -194,7 +194,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	scanDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang:   "en",
-		Claude: domain.ClaudeConfig{Command: "claude", TimeoutSec: 60},
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 	}
 	wave := domain.Wave{
 		ID:          "auth-w1",
