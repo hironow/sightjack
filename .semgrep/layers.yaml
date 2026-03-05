@@ -486,3 +486,26 @@ rules:
         - "*_test.go"
     message: |
       曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。
+
+  # --- Rule 22: Domain must not use embed or text/template ---
+
+  - id: domain-no-embed-template
+    languages: [go]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: "^(embed|text/template)$"
+    paths:
+      include:
+        - "/internal/domain/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      domain 層で embed / text/template の import は禁止です。
+      template 責務は platform 層に配置してください。
