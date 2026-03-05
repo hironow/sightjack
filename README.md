@@ -508,19 +508,12 @@ just jaeger-down    # Stop Jaeger
 
 ## What / Why / How
 
-| Aspect | Description |
-|--------|-------------|
-| **What** | Interactive AI session that analyzes Linear issues for completeness, dependencies, and architectural gaps |
-| **Why** | Bring issue completeness from ~30% to ~85% before autonomous execution begins |
-| **How** | Claude MCP tools scan issues → cluster analysis → wave generation → interactive approval → apply to Linear |
-| **Input** | Linear issues via Claude MCP tools, user approval via stdin |
-| **Output** | Updated Linear issues, D-Mail reports to downstream tools |
-| **Telemetry** | OTel spans: `sightjack.scan`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |
-| **External Systems** | Linear (via Claude MCP), Claude Code subprocess, OTel exporter (Jaeger/Weave) |
+See [docs/conformance.md](docs/conformance.md) for the full conformance table (single source).
 
 ## Documentation
 
 - [docs/](docs/README.md) — Full documentation index
+- [docs/conformance.md](docs/conformance.md) — What/Why/How conformance table
 - [docs/siren-directory.md](docs/siren-directory.md) — `.siren/` directory structure
 - [docs/policies.md](docs/policies.md) — Event → Policy mapping
 - [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration

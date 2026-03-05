@@ -2,6 +2,7 @@
 
 ## Architecture
 
+- [conformance.md](conformance.md) — What/Why/How conformance table (single source)
 - [siren-directory.md](siren-directory.md) — `.siren/` directory structure specification
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
