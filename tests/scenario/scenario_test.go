@@ -82,10 +82,10 @@ func repoPath(envKey, name string) string {
 	if v := os.Getenv(envKey); v != "" {
 		return v
 	}
-	// go test sets cwd to package dir: /Users/nino/tap/sightjack/tests/scenario
-	// Dir(1): /Users/nino/tap/sightjack/tests
-	// Dir(2): /Users/nino/tap/sightjack
-	// Dir(3): /Users/nino/tap              <- sibling repos live here
+	// go test sets cwd to package dir: ~/tap/sightjack/tests/scenario
+	// Dir(1): ~/tap/sightjack/tests
+	// Dir(2): ~/tap/sightjack
+	// Dir(3): ~/tap              <- sibling repos live here
 	here, _ := os.Getwd()
 	tapRoot := filepath.Dir(filepath.Dir(filepath.Dir(here)))
 	return filepath.Join(tapRoot, name)
