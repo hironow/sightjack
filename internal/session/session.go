@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
-func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger) error {
+func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -122,7 +122,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	scanTime := time.Now()
 
 	// Cache ScanResult + record session start / scan completed events
-	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, scanTime, logger)
+	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, agg, scanTime, logger)
 
 	// --- Pass 3: Wave Generate ---
 	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
@@ -135,7 +135,6 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	logger.OK("%d clusters, %d waves generated", len(scanResult.Clusters), len(waves))
 
 	// Record waves generated via aggregate
-	agg := domain.NewSessionAggregate()
 	if evt, err := agg.RecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
 	}, time.Now().UTC()); err == nil {
@@ -181,7 +180,7 @@ func ResumeScanDir(state *domain.SessionState, baseDir string) string {
 }
 
 // RunResumeSession resumes an existing session from saved state.
-func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger) error {
+func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -237,7 +236,6 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	lastScanned := state.LastScanned
 
 	// Record resume event via aggregate
-	agg := domain.NewSessionAggregate()
 	if evt, evtErr := agg.Resume(state.SessionID, time.Now().UTC()); evtErr == nil {
 		recorder.Record(evt)
 	}
@@ -249,7 +247,7 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
-func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger) error {
+func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -308,7 +306,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	scanTime := time.Now()
 
 	// Cache ScanResult + record session start / scan completed events
-	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, scanTime, logger)
+	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, agg, scanTime, logger)
 
 	waves, rescanWarnings, failedNames, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
@@ -336,7 +334,6 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	scanner := bufio.NewScanner(input)
 
 	// Record rescan-specific events via aggregate
-	agg := domain.NewSessionAggregate()
 	if evt, evtErr := agg.Rescan(oldState.SessionID, time.Now().UTC()); evtErr == nil {
 		recorder.Record(evt)
 	}

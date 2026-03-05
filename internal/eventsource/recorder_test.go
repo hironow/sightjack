@@ -42,7 +42,7 @@ func mustEvent(t *testing.T, eventType domain.EventType, payload any) domain.Eve
 func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -78,7 +78,7 @@ func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -109,7 +109,7 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-42")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -134,7 +134,7 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -167,7 +167,7 @@ func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	// given: store with existing events
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	rec1, _ := eventsource.NewSessionRecorder(store, "session-1")
 	rec1.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
@@ -202,7 +202,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	// given: a store that fails the first Append, then succeeds
 	dir := t.TempDir()
-	real := eventsource.NewFileEventStore(dir)
+	real := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	fos := &failOnceStore{real: real}
 	recorder, err := eventsource.NewSessionRecorder(fos, "session-1")
 	if err != nil {

@@ -14,7 +14,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -94,7 +94,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, port.NopRecorder{}, domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -150,7 +150,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, port.NopRecorder{}, domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -175,7 +175,7 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := session.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false))
+	err := session.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, port.NopRecorder{}, domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then: should get an input-related error, not a panic or scan error
 	if err == nil {
@@ -915,7 +915,7 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, port.NopRecorder{}, domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1091,7 +1091,7 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := session.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false))
+	err := session.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, port.NopRecorder{}, domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1115,7 +1115,7 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	}
 
 	// when
-	err := session.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false))
+	err := session.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, port.NopRecorder{}, domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {

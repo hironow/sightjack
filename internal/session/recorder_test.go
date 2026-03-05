@@ -9,7 +9,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 

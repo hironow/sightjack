@@ -14,7 +14,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	// given: aggregate + recorder wired to a temp event store
 	baseDir := t.TempDir()
 	sessionID := "test-scan-001"
-	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID))
+	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID), &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, sessionID)
 	if err != nil {
 		t.Fatalf("new recorder: %v", err)

@@ -15,7 +15,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"gopkg.in/yaml.v3"
 )
 

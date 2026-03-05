@@ -13,8 +13,8 @@ func TestRunScan_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
 	cmd := domain.RunScanCommand{}
 
-	// when
-	_, _, err := RunScan(context.Background(), cmd, nil, "", false, io.Discard, platform.NewLogger(io.Discard, false))
+	// when: scanner and factory are nil because validation should fail before they are used
+	_, _, err := RunScan(context.Background(), cmd, nil, "", false, io.Discard, platform.NewLogger(io.Discard, false), nil, nil)
 
 	// then
 	if err == nil {
@@ -32,8 +32,8 @@ func TestRunScan_InvalidLang(t *testing.T) {
 		Lang:     "invalid",
 	}
 
-	// when
-	_, _, err := RunScan(context.Background(), cmd, nil, "", false, io.Discard, platform.NewLogger(io.Discard, false))
+	// when: scanner and factory are nil because validation should fail before they are used
+	_, _, err := RunScan(context.Background(), cmd, nil, "", false, io.Discard, platform.NewLogger(io.Discard, false), nil, nil)
 
 	// then
 	if err == nil {

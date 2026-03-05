@@ -3,6 +3,7 @@ package port
 import (
 	"context"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -97,3 +98,32 @@ type NopRecorder struct{}
 
 // Record always returns nil without recording anything.
 func (NopRecorder) Record(domain.Event) error { return nil }
+
+// SessionRunner runs interactive sightjack sessions (scan->waves->select->apply->nextgen loop).
+type SessionRunner interface {
+	RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder Recorder, agg *domain.SessionAggregate, logger domain.Logger) error
+	RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder Recorder, agg *domain.SessionAggregate, logger domain.Logger) error
+	RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder Recorder, agg *domain.SessionAggregate, logger domain.Logger) error
+	BuildNotifier(cfg *domain.Config) Notifier
+	NewDispatchingRecorder(inner Recorder, dispatcher EventDispatcher, logger domain.Logger) Recorder
+}
+
+// ScanRunner executes scans and records scan state.
+type ScanRunner interface {
+	RunScan(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger domain.Logger) (*domain.ScanResult, error)
+	RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, recorder Recorder, agg *domain.SessionAggregate, ts time.Time, logger domain.Logger)
+}
+
+// RecorderFactory creates session recorders and resolves event directories.
+type RecorderFactory interface {
+	SessionEventsDir(baseDir, sessionID string) string
+	NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (Recorder, error)
+	NewEventStore(stateDir string, logger domain.Logger) EventStore
+}
+
+// StateLoader loads session state from the filesystem.
+type StateLoader interface {
+	LoadLatestState(baseDir string) (*domain.SessionState, string, error)
+	LoadLatestResumableState(baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error)
+	CanResume(baseDir string, state *domain.SessionState) bool
+}

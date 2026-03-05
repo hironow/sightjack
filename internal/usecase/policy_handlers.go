@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // registerSessionPolicies registers POLICY handlers for session events.

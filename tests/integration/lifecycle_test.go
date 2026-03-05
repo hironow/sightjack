@@ -16,7 +16,7 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -48,7 +48,7 @@ func mustTestEvent(t *testing.T, eventType domain.EventType, payload any) domain
 // writeTestEvents creates an event store to simulate a pre-existing session state.
 func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.SessionState) {
 	t.Helper()
-	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID))
+	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, sessionID)
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
@@ -90,7 +90,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 
 // testRecorder creates a real Recorder backed by the event store for lifecycle tests.
 func testRecorder(baseDir, sessionID string) port.Recorder {
-	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID))
+	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
 	rec, recErr := eventsource.NewSessionRecorder(store, sessionID)
 	if recErr != nil {
 		panic("NewSessionRecorder: " + recErr.Error())
@@ -580,7 +580,7 @@ func TestLifecycle_HappyPath(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -636,7 +636,7 @@ func TestLifecycle_RejectThenApprove(t *testing.T) {
 	input := strings.NewReader("1\nr\n1\na\nq\n")
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -676,7 +676,7 @@ func TestLifecycle_PartialApplyNotCompleted(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -773,7 +773,7 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err = session.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, testRecorder(baseDir, state.SessionID), platform.NewLogger(io.Discard, false))
+	err = session.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, testRecorder(baseDir, state.SessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -817,7 +817,7 @@ func TestLifecycle_QuitAndResume(t *testing.T) {
 	// stdin: select wave 1, approve, quit
 	input := strings.NewReader("1\na\nq\n")
 
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("Phase 1 RunSession failed: %v", err)
 	}
@@ -841,7 +841,7 @@ func TestLifecycle_QuitAndResume(t *testing.T) {
 	defer cleanup2()
 
 	input2 := strings.NewReader("1\na\nq\n")
-	err = session.RunResumeSession(ctx, cfg, baseDir, state, input2, io.Discard, testRecorder(baseDir, state.SessionID), platform.NewLogger(io.Discard, false))
+	err = session.RunResumeSession(ctx, cfg, baseDir, state, input2, io.Discard, testRecorder(baseDir, state.SessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("Phase 2 RunResumeSession failed: %v", err)
 	}
@@ -888,7 +888,7 @@ func TestLifecycle_MultiCluster(t *testing.T) {
 	input := strings.NewReader("1\na\n1\na\nq\n")
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -988,7 +988,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err = session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), platform.NewLogger(io.Discard, false))
+	err = session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then: session completes without error
 	if err != nil {
@@ -1169,7 +1169,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err = session.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, testRecorder(baseDir, state.SessionID), platform.NewLogger(io.Discard, false))
+	err = session.RunResumeSession(ctx, cfg, baseDir, state, input, io.Discard, testRecorder(baseDir, state.SessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1248,7 +1248,7 @@ func TestLifecycle_DMailNoFeedback_StillGeneratesSpecAndReport(t *testing.T) {
 	input := strings.NewReader("1\na\nq\n")
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), platform.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, false, input, io.Discard, testRecorder(baseDir, sessionID), domain.NewSessionAggregate(), platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {

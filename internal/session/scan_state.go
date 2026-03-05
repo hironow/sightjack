@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // RecordScanState caches the scan result and records session start + scan
@@ -14,7 +14,7 @@ import (
 // converge here.
 //
 // Returns the cached scan result path for downstream use (e.g. interactive loop).
-func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, recorder port.Recorder, scanTime time.Time, logger domain.Logger) string {
+func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, recorder port.Recorder, agg *domain.SessionAggregate, scanTime time.Time, logger domain.Logger) string {
 	scanDir := domain.ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	if err := WriteScanResult(scanResultPath, result); err != nil {
@@ -29,8 +29,6 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 			IssueCount:   len(c.Issues),
 		})
 	}
-
-	agg := domain.NewSessionAggregate()
 
 	startEvt, err := agg.Start(cfg.Tracker.Project, string(cfg.Strictness.Default), scanTime) // nosemgrep: adr0003-otel-span-without-defer-end — SessionAggregate.Start, not tracer.Start
 	if err != nil {

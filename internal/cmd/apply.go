@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/usecase"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newApplyCmd() *cobra.Command {
@@ -73,12 +73,12 @@ generation.`,
 				return nil
 			}
 
-			internal, err := usecase.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness, cmd.OutOrStdout(), logger)
+			internal, err := session.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness, cmd.OutOrStdout(), logger)
 			if err != nil {
 				return fmt.Errorf("apply failed: %w", err)
 			}
 
-			result := usecase.ToApplyResult(wave, internal)
+			result := domain.ToApplyResult(wave, internal)
 			result.RemainingWaves = input.RemainingWaves
 			out, jsonErr := json.MarshalIndent(result, "", "  ")
 			if jsonErr != nil {

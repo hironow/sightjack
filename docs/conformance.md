@@ -13,6 +13,25 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 | **Telemetry** | OTel spans: `sightjack.scan`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |
 | **External Systems** | Linear (via Claude MCP), Claude Code subprocess, OTel exporter (Jaeger/Weave) |
 
+## Layer Architecture
+
+```
+cmd              --> usecase, session, usecase/port, platform, domain  (composition root)
+usecase          --> usecase/port, domain                              (output port only)
+usecase/port     --> domain (+ stdlib)                                 (interface contracts)
+session          --> eventsource, usecase/port, platform, domain       (adapter impl)
+eventsource      --> domain                                            (event store infra)
+platform         --> domain (+ stdlib)                                 (cross-cutting infra)
+domain           --> (nothing internal, stdlib only)                   (pure types/logic)
+```
+
+Key constraints enforced by semgrep (ERROR severity):
+- `usecase --> session` PROHIBITED (must use output port interfaces)
+- `cmd --> eventsource` PROHIBITED (ADR S0008)
+- `domain` has no I/O, no `context.Context`
+
+Ref: `.semgrep/layers.yaml`, ADR 0013
+
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.

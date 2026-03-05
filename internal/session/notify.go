@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // cmdFactoryFunc creates an *exec.Cmd — injectable for testing.

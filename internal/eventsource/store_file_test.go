@@ -13,7 +13,7 @@ import (
 func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
@@ -42,7 +42,7 @@ func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 func TestFileEventStore_LoadSince_FiltersCorrectly(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 	for i := range 5 {
@@ -67,7 +67,7 @@ func TestFileEventStore_LoadSince_FiltersCorrectly(t *testing.T) {
 func TestFileEventStore_LoadAll_EmptyDir(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
 	events, err := store.LoadAll()
@@ -83,7 +83,7 @@ func TestFileEventStore_LoadAll_EmptyDir(t *testing.T) {
 
 func TestFileEventStore_LoadAll_NonExistentDir(t *testing.T) {
 	// given
-	store := eventsource.NewFileEventStore(filepath.Join(t.TempDir(), "does-not-exist"))
+	store := eventsource.NewFileEventStore(filepath.Join(t.TempDir(), "does-not-exist"), &domain.NopLogger{})
 
 	// when
 	events, err := store.LoadAll()
@@ -100,7 +100,7 @@ func TestFileEventStore_LoadAll_NonExistentDir(t *testing.T) {
 func TestFileEventStore_ManyEvents(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	count := 50
 
 	// when
@@ -136,7 +136,7 @@ func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
 	os.MkdirAll(dir, 0o755)
 	os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644)
 
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
 	events, err := store.LoadAll()
@@ -153,7 +153,7 @@ func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
 func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 	// given: store with non-existent directory
 	dir := filepath.Join(t.TempDir(), "sub", "dir", "events")
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	e, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
@@ -173,7 +173,7 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when: append in separate calls
 	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
@@ -191,7 +191,7 @@ func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 func TestFileEventStore_UUIDUniqueness(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
 	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
@@ -214,7 +214,7 @@ func TestFileEventStore_UUIDUniqueness(t *testing.T) {
 func TestFileEventStore_DailyFileRouting(t *testing.T) {
 	// given: events with different dates
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	day1 := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
 	day2 := time.Date(2025, 3, 2, 10, 0, 0, 0, time.UTC)
@@ -247,7 +247,7 @@ func TestFileEventStore_DailyFileRouting(t *testing.T) {
 func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	// given
 	dir := filepath.Join(t.TempDir(), "events")
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	invalid := domain.Event{} // all fields empty
 
@@ -267,7 +267,7 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
 	// given: a valid event followed by an invalid event
 	dir := filepath.Join(t.TempDir(), "events")
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	valid, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	invalid := domain.Event{SessionID: "s1"} // missing ID, Type, Timestamp, Data
@@ -287,7 +287,7 @@ func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
 func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 	// given: events appended in reverse chronological order
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	later := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
 	earlier := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)

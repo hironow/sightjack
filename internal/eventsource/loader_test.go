@@ -351,7 +351,7 @@ func TestLoadState_RoundTrip(t *testing.T) {
 	// given: store with events
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "events", "s1.jsonl")
-	store := eventsource.NewFileEventStore(storePath)
+	store := eventsource.NewFileEventStore(storePath, &domain.NopLogger{})
 	recorder, recErr := eventsource.NewSessionRecorder(store, "s1")
 	if recErr != nil {
 		t.Fatalf("NewSessionRecorder: %v", recErr)
@@ -380,7 +380,7 @@ func TestLoadState_RoundTrip(t *testing.T) {
 func TestLoadState_EmptyStore_ReturnsError(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"))
+	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"), &domain.NopLogger{})
 
 	// when
 	_, err := eventsource.LoadState(store)
@@ -399,7 +399,7 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	os.MkdirAll(eventsDir, 0755)
 
 	// Older session
-	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-1000-1"))
+	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-1000-1"), &domain.NopLogger{})
 	rec1, err1 := eventsource.NewSessionRecorder(store1, "session-1000-1")
 	if err1 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err1)
@@ -410,7 +410,7 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 		domain.ScanCompletedPayload{Completeness: 0.3}))
 
 	// Newer session
-	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-2000-2"))
+	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-2000-2"), &domain.NopLogger{})
 	rec2, err2 := eventsource.NewSessionRecorder(store2, "session-2000-2")
 	if err2 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err2)

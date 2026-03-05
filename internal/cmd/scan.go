@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -53,7 +54,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				Lang:       cfg.Lang,
 				Strictness: string(cfg.Strictness.Default),
 				DryRun:     dryRun,
-			}, cfg, baseDir, dryRun, streamOut, logger)
+			}, cfg, baseDir, dryRun, streamOut, logger, session.NewScanRunnerAdapter(), session.NewRecorderFactoryAdapter())
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}
@@ -71,7 +72,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				}
 				fmt.Fprintln(w, string(data))
 			} else {
-				nav := usecase.RenderNavigator(result, cfg.Tracker.Project)
+				nav := session.RenderNavigator(result, cfg.Tracker.Project)
 				fmt.Fprintln(w)
 				fmt.Fprint(w, nav)
 			}

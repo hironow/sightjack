@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 

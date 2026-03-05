@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // Compile-time check: PolicyEngine implements port.EventDispatcher.

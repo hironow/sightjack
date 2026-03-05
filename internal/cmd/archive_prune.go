@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hironow/sightjack/internal/usecase"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newArchivePruneCmd() *cobra.Command {
@@ -49,12 +49,12 @@ Pass --execute to actually remove the files.`,
 			logger := loggerFrom(cmd)
 			outputFmt, _ := cmd.Flags().GetString("output")
 
-			files, err := usecase.ListExpiredArchive(baseDir, days, logger)
+			files, err := session.ListExpiredArchive(baseDir, days, logger)
 			if err != nil {
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
 
-			eventFiles, eventErr := usecase.ListExpiredEventFiles(baseDir, days)
+			eventFiles, eventErr := session.ListExpiredEventFiles(baseDir, days)
 			if eventErr != nil {
 				logger.Warn("Failed to list expired events: %v", eventErr)
 			}
@@ -75,14 +75,14 @@ Pass --execute to actually remove the files.`,
 				}
 				if execute {
 					if len(files) > 0 {
-						deleted, delErr := usecase.DeleteArchiveFiles(baseDir, files)
+						deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
 						if delErr != nil {
 							return fmt.Errorf("archive prune failed: %w", delErr)
 						}
 						out.ArchiveDeleted = len(deleted)
 					}
 					if len(eventFiles) > 0 {
-						deleted, delErr := usecase.PruneEventFiles(baseDir, eventFiles)
+						deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
 						if delErr != nil {
 							return fmt.Errorf("event prune failed: %w", delErr)
 						}
@@ -149,7 +149,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			if len(files) > 0 {
-				deleted, delErr := usecase.DeleteArchiveFiles(baseDir, files)
+				deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
 				if delErr != nil {
 					return fmt.Errorf("archive prune failed: %w", delErr)
 				}
@@ -157,7 +157,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			if len(eventFiles) > 0 {
-				deleted, delErr := usecase.PruneEventFiles(baseDir, eventFiles)
+				deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
 				if delErr != nil {
 					return fmt.Errorf("event prune failed: %w", delErr)
 				}
@@ -165,7 +165,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			// Prune flushed outbox DB rows + incremental vacuum.
-			pruned, pruneErr := usecase.PruneFlushedOutbox(baseDir)
+			pruned, pruneErr := session.PruneFlushedOutbox(baseDir)
 			if pruneErr != nil {
 				logger.Warn("Failed to prune outbox DB: %v", pruneErr)
 			} else if pruned > 0 {

@@ -7,15 +7,15 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/port"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestRunSession_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
 	cmd := domain.RunSessionCommand{}
 
-	// when
-	err := RunSession(context.Background(), cmd, nil, "", "", false, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil)
+	// when: runner is nil because validation should fail before it is used
+	err := RunSession(context.Background(), cmd, nil, "", "", false, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil, nil)
 
 	// then
 	if err == nil {
@@ -30,8 +30,8 @@ func TestResumeSession_InvalidCommand(t *testing.T) {
 	// given: empty SessionID
 	cmd := domain.ResumeSessionCommand{RepoPath: "/tmp"}
 
-	// when
-	err := ResumeSession(context.Background(), cmd, nil, "", nil, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil)
+	// when: runner is nil because validation should fail before it is used
+	err := ResumeSession(context.Background(), cmd, nil, "", nil, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil, nil)
 
 	// then
 	if err == nil {
@@ -46,8 +46,8 @@ func TestRescanSession_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
 	cmd := domain.RunSessionCommand{}
 
-	// when
-	err := RescanSession(context.Background(), cmd, nil, "", nil, "", nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil)
+	// when: runner is nil because validation should fail before it is used
+	err := RescanSession(context.Background(), cmd, nil, "", nil, "", nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil, nil)
 
 	// then
 	if err == nil {

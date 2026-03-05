@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/usecase"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func newShowCmd() *cobra.Command {
@@ -40,7 +41,7 @@ replays events from .siren/events/ and displays the matrix navigator.`,
 			if stdinIsPipe() {
 				return runShowFromStdin(w)
 			}
-			return usecase.ShowFromState(w, baseDir, logger)
+			return showFromState(w, baseDir, logger)
 		},
 	}
 }
@@ -51,6 +52,41 @@ func stdinIsPipe() bool {
 		return false
 	}
 	return fi.Mode()&os.ModeCharDevice == 0
+}
+
+// showFromState loads the latest session state and renders the matrix navigator.
+// This is the READ MODEL path for the show command — inlined from the deleted
+// usecase.ShowFromState to avoid usecase→session dependency.
+func showFromState(w io.Writer, baseDir string, logger domain.Logger) error {
+	state, _, err := session.LoadLatestState(baseDir)
+	if err != nil {
+		logger.Info("Run 'sightjack scan' first.")
+		return fmt.Errorf("no previous scan found: %w", err)
+	}
+
+	result := &domain.ScanResult{
+		Completeness: state.Completeness,
+	}
+	for _, c := range state.Clusters {
+		result.Clusters = append(result.Clusters, domain.ClusterScanResult{
+			Name:         c.Name,
+			Completeness: c.Completeness,
+			IssueCount:   c.IssueCount,
+		})
+		result.TotalIssues += c.IssueCount
+	}
+
+	waves := domain.RestoreWaves(state.Waves)
+	strictness := state.StrictnessLevel
+	if strictness == "" {
+		strictness = "fog"
+	}
+	adrCount := session.CountADRFiles(session.ADRDir(baseDir))
+	nav := session.RenderMatrixNavigator(result, state.Project, waves, adrCount, (*time.Time)(nil), strictness, state.ShibitoCount)
+	fmt.Fprintln(w)
+	fmt.Fprint(w, nav)
+	logger.Info("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
+	return nil
 }
 
 func runShowFromStdin(w io.Writer) error {
@@ -65,7 +101,7 @@ func runShowFromStdin(w io.Writer) error {
 		if err := json.Unmarshal(data, &scanResult); err != nil {
 			return fmt.Errorf("parse ScanResult: %w", err)
 		}
-		nav := usecase.RenderNavigator(&scanResult, "")
+		nav := session.RenderNavigator(&scanResult, "")
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
@@ -80,7 +116,7 @@ func runShowFromStdin(w io.Writer) error {
 		} else {
 			result = &domain.ScanResult{}
 		}
-		nav := usecase.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
+		nav := session.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 

@@ -9,6 +9,12 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
+// loaderLogger is a package-level NopLogger for loader functions that read
+// event stores internally. Corrupt-line warnings are suppressed here because
+// these are batch-read paths; production code that constructs stores explicitly
+// should pass a real logger via NewFileEventStore.
+var loaderLogger domain.Logger = &domain.NopLogger{}
+
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
 func LoadState(store *FileEventStore) (*domain.SessionState, error) {
@@ -91,7 +97,7 @@ func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, error) {
 	}
 	var all []domain.Event
 	for _, c := range candidates {
-		store := NewFileEventStore(EventStorePath(stateDir, c.name))
+		store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
 		events, loadErr := store.LoadAll()
 		if loadErr != nil {
 			continue
@@ -115,7 +121,7 @@ func loadLatestStateMatching(stateDir string, match func(*domain.SessionState) b
 
 	for _, c := range candidates {
 		sessionID := c.name
-		store := NewFileEventStore(EventStorePath(stateDir, sessionID))
+		store := NewFileEventStore(EventStorePath(stateDir, sessionID), loaderLogger)
 		state, loadErr := LoadState(store)
 		if loadErr != nil {
 			continue
