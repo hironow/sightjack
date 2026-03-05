@@ -125,7 +125,7 @@ func badSessionNewEvent() {
 // --- Rule: session-no-direct-new-aggregate (pattern-regex) ---
 
 func badSessionNewAggregate() {
-	// ruleid: session-no-direct-new-aggregate
+	// ruleid: session-no-direct-new-aggregate, session-no-aggregate-type
 	_ = domain.NewReviewAggregate()
 }
 
@@ -226,6 +226,24 @@ type TaskOrchestrator struct{}
 
 // ok: no-ambiguous-type-names
 type ReviewEngine struct{}
+
+// --- Rule 20: session-no-aggregate-type ---
+
+// ruleid: session-no-aggregate-type
+var badAgg *domain.SessionAggregate
+
+// ok: session-no-aggregate-type
+var goodEmitter port.SessionEventEmitter
+
+// --- Rule 21: session-no-aggregate-method-call ---
+
+func badAggCall(p struct{ Aggregate interface{ RecordScan() } }) {
+	// ruleid: session-no-aggregate-method-call
+	p.Aggregate.RecordScan()
+}
+
+// ok: session-no-aggregate-method-call
+func goodEmitterCall(e port.SessionEventEmitter) {}
 
 // suppress unused import warnings for test fixture
 var (

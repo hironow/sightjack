@@ -443,6 +443,36 @@ rules:
       shell 経由のコマンド実行は禁止です。
       exec.Command で直接実行可能ファイルを指定してください。
 
+  # --- Rule 20: Session layer must not use aggregate types ---
+
+  - id: session-no-aggregate-type
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '\*?domain\.\w+Aggregate'
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層で *domain.*Aggregate 型の直接使用は禁止です。
+      usecase/port の EventEmitter interface を経由してください。
+
+  # --- Rule 21: Session layer must not call aggregate methods ---
+
+  - id: session-no-aggregate-method-call
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '\.Aggregate\.\w+\('
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層から aggregate のメソッド直接呼び出しは禁止です。
+      usecase/port の EventEmitter interface を経由してください。
+
   # --- Rule 18: No ambiguous type names ---
 
   - id: no-ambiguous-type-names
