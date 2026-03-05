@@ -29,6 +29,16 @@ func (s *failOnceStore) LoadSince(after time.Time) ([]domain.Event, error) {
 	return s.real.LoadSince(after)
 }
 
+// mustEvent is a test helper that creates a domain.Event and fails on error.
+func mustEvent(t *testing.T, eventType domain.EventType, payload any) domain.Event {
+	t.Helper()
+	ev, err := domain.NewEvent(eventType, payload, time.Now())
+	if err != nil {
+		t.Fatalf("NewEvent(%s): %v", eventType, err)
+	}
+	return ev
+}
+
 func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	// given
 	dir := t.TempDir()
@@ -39,10 +49,10 @@ func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	}
 
 	// when
-	if err := recorder.Record(domain.EventSessionStarted, nil); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
-	if err := recorder.Record(domain.EventScanCompleted, nil); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
@@ -80,7 +90,7 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	}
 
 	// when
-	if err := recorder.Record(domain.EventSessionStarted, payload); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventSessionStarted, payload)); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
@@ -106,8 +116,8 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	}
 
 	// when
-	recorder.Record(domain.EventSessionStarted, nil)
-	recorder.Record(domain.EventScanCompleted, nil)
+	recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
 
 	// then: both events should have CorrelationID == sessionID
 	events, _ := store.LoadAll()
@@ -131,9 +141,9 @@ func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 	}
 
 	// when
-	recorder.Record(domain.EventSessionStarted, nil)
-	recorder.Record(domain.EventScanCompleted, nil)
-	recorder.Record(domain.EventWavesGenerated, nil)
+	recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
+	recorder.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
 	// then
 	events, _ := store.LoadAll()
@@ -160,9 +170,9 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir)
 
 	rec1, _ := eventsource.NewSessionRecorder(store, "session-1")
-	rec1.Record(domain.EventSessionStarted, nil)
-	rec1.Record(domain.EventScanCompleted, nil)
-	rec1.Record(domain.EventWavesGenerated, nil)
+	rec1.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	rec1.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
+	rec1.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
 	events1, _ := store.LoadAll()
 	lastID := events1[len(events1)-1].ID
@@ -172,7 +182,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(domain.EventWaveApproved, nil); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventWaveApproved, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
@@ -200,13 +210,13 @@ func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	}
 
 	// when: first Record fails
-	err1 := recorder.Record(domain.EventSessionStarted, nil)
+	err1 := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
 	if err1 == nil {
 		t.Fatal("expected error on first Record")
 	}
 
 	// when: second Record should succeed
-	err2 := recorder.Record(domain.EventSessionStarted, nil)
+	err2 := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
 	if err2 != nil {
 		t.Fatalf("expected second Record to succeed, got: %v", err2)
 	}

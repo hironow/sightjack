@@ -89,11 +89,11 @@ type OutboxStore interface {
 
 // Recorder records domain events during a session.
 type Recorder interface {
-	Record(eventType domain.EventType, payload any) error
+	Record(ev domain.Event) error
 }
 
 // NopRecorder is a no-op Recorder for dry-run mode and testing.
 type NopRecorder struct{}
 
 // Record always returns nil without recording anything.
-func (NopRecorder) Record(domain.EventType, any) error { return nil }
+func (NopRecorder) Record(domain.Event) error { return nil }

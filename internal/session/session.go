@@ -139,7 +139,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	if evt, err := agg.RecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
 	}, time.Now().UTC()); err == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 
 	completed := domain.BuildCompletedWaveMap(waves)
@@ -239,7 +239,7 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	// Record resume event via aggregate
 	agg := domain.NewSessionAggregate()
 	if evt, evtErr := agg.Resume(state.SessionID, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 
 	logger.OK("Resumed session: %d waves, %d completed", len(waves), len(completed))
@@ -338,12 +338,12 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	// Record rescan-specific events via aggregate
 	agg := domain.NewSessionAggregate()
 	if evt, evtErr := agg.Rescan(oldState.SessionID, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 	if evt, evtErr := agg.RecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
 	}, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 
 	logger.OK("Re-scanned: %d clusters, %d waves (%d previously completed)",

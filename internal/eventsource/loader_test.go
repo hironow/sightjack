@@ -357,10 +357,10 @@ func TestLoadState_RoundTrip(t *testing.T) {
 		t.Fatalf("NewSessionRecorder: %v", recErr)
 	}
 
-	recorder.Record(domain.EventSessionStarted,
-		domain.SessionStartedPayload{Project: "test"})
-	recorder.Record(domain.EventScanCompleted,
-		domain.ScanCompletedPayload{Completeness: 0.4})
+	recorder.Record(mustNewEvent(t, domain.EventSessionStarted, "s1", 0,
+		domain.SessionStartedPayload{Project: "test"}))
+	recorder.Record(mustNewEvent(t, domain.EventScanCompleted, "s1", 0,
+		domain.ScanCompletedPayload{Completeness: 0.4}))
 
 	// when
 	state, err := eventsource.LoadState(store)
@@ -404,8 +404,10 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	if err1 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err1)
 	}
-	rec1.Record(domain.EventSessionStarted, domain.SessionStartedPayload{Project: "old-project"})
-	rec1.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{Completeness: 0.3})
+	rec1.Record(mustNewEvent(t, domain.EventSessionStarted, "session-1000-1", 0,
+		domain.SessionStartedPayload{Project: "old-project"}))
+	rec1.Record(mustNewEvent(t, domain.EventScanCompleted, "session-1000-1", 0,
+		domain.ScanCompletedPayload{Completeness: 0.3}))
 
 	// Newer session
 	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-2000-2"))
@@ -413,8 +415,10 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	if err2 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err2)
 	}
-	rec2.Record(domain.EventSessionStarted, domain.SessionStartedPayload{Project: "new-project"})
-	rec2.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{Completeness: 0.7})
+	rec2.Record(mustNewEvent(t, domain.EventSessionStarted, "session-2000-2", 0,
+		domain.SessionStartedPayload{Project: "new-project"}))
+	rec2.Record(mustNewEvent(t, domain.EventScanCompleted, "session-2000-2", 0,
+		domain.ScanCompletedPayload{Completeness: 0.7}))
 
 	// when
 	state, sessionID, err := eventsource.LoadLatestState(stateDir)

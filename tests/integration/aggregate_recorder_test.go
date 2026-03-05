@@ -27,7 +27,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aggregate start: %v", err)
 	}
-	if err := recorder.Record(startEvt.Type, startEvt.Data); err != nil {
+	if err := recorder.Record(startEvt); err != nil {
 		t.Fatalf("record start: %v", err)
 	}
 
@@ -44,7 +44,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aggregate scan: %v", err)
 	}
-	if err := recorder.Record(scanEvt.Type, scanEvt.Data); err != nil {
+	if err := recorder.Record(scanEvt); err != nil {
 		t.Fatalf("record scan: %v", err)
 	}
 

@@ -112,13 +112,13 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			),
 		)
 		if evt, err := agg.ApproveWave(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
-			recorder.Record(evt.Type, evt.Data)
+			recorder.Record(evt)
 		}
 		if err := ComposeSpecification(store, selected); err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
 			if evt, err := agg.SendSpecification(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
-				recorder.Record(evt.Type, evt.Data)
+				recorder.Record(evt)
 			}
 		}
 		return selected, approvalApproved
@@ -144,13 +144,13 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				),
 			)
 			if evt, err := agg.ApproveWave(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
-				recorder.Record(evt.Type, evt.Data)
+				recorder.Record(evt)
 			}
 			if err := ComposeSpecification(store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				if evt, err := agg.SendSpecification(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
-					recorder.Record(evt.Type, evt.Data)
+					recorder.Record(evt)
 				}
 			}
 			return selected, approvalApproved
@@ -163,7 +163,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				),
 			)
 			if evt, err := agg.RejectWave(selected.ID, selected.ClusterName, time.Now().UTC()); err == nil {
-				recorder.Record(evt.Type, evt.Data)
+				recorder.Record(evt)
 			}
 			platform.RecordWave(ctx, "rejected")
 			logger.Info("Wave rejected.")
@@ -196,7 +196,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 						Description: selected.Description, Delta: selected.Delta,
 					},
 				}, time.Now().UTC()); evtErr == nil {
-					recorder.Record(evt.Type, evt.Data)
+					recorder.Record(evt)
 				}
 				// Trigger Scribe to generate ADR for the modification
 				// (runs even for locked waves — the decision itself is worth recording)
@@ -211,7 +211,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 						if evt, evtErr := agg.GenerateADR(domain.ADRGeneratedPayload{
 							ADRID: scribeResp.ADRID, Title: scribeResp.Title,
 						}, time.Now().UTC()); evtErr == nil {
-							recorder.Record(evt.Type, evt.Data)
+							recorder.Record(evt)
 						}
 					}
 				}
@@ -244,13 +244,13 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			domain.PropagateWaveUpdate(waves, selected)
 			sessionRejected[domain.WaveKey(selected)] = rejected
 			if evt, evtErr := agg.ApproveWave(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
-				recorder.Record(evt.Type, evt.Data)
+				recorder.Record(evt)
 			}
 			if err := ComposeSpecification(store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				if evt, evtErr := agg.SendSpecification(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
-					recorder.Record(evt.Type, evt.Data)
+					recorder.Record(evt)
 				}
 			}
 			return selected, approvalApproved
@@ -280,7 +280,7 @@ func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 		Errors: applyResult.Errors,
 	}, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 	platform.RecordWave(ctx, "applied")
 
@@ -351,7 +351,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 			ClusterName: selected.ClusterName,
 			Waves:       domain.BuildWaveStates(newWaves),
 		}, time.Now().UTC()); evtErr == nil {
-			recorder.Record(evt.Type, evt.Data)
+			recorder.Record(evt)
 		}
 	}
 }
@@ -387,7 +387,7 @@ func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 	if evt, evtErr := agg.ApplyReadyLabels(domain.ReadyLabelsAppliedPayload{
 		IssueIDs: newlyReady,
 	}, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 }
 
@@ -430,7 +430,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 		WaveID: selected.ID, ClusterName: selected.ClusterName,
 		Applied: applyResult.Applied, TotalCount: applyResult.TotalCount,
 	}, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 
 	// Review gate: run review before composing report (outbox is read immediately by phonewave)
@@ -450,7 +450,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
 		if evt, evtErr := agg.SendReport(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
-			recorder.Record(evt.Type, evt.Data)
+			recorder.Record(evt)
 		}
 	}
 
@@ -459,7 +459,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
 		if evt, evtErr := agg.SendFeedback(selected.ID, selected.ClusterName, time.Now().UTC()); evtErr == nil {
-			recorder.Record(evt.Type, evt.Data)
+			recorder.Record(evt)
 		}
 	}
 
@@ -487,7 +487,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 		}
 	}
 	if evt, evtErr := agg.UpdateCompleteness(selected.ClusterName, updatedClusterCompleteness, scanResult.Completeness, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt.Type, evt.Data)
+		recorder.Record(evt)
 	}
 
 	// Display rich completion summary with grouped ripple effects
@@ -508,7 +508,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 			}
 		}
 		if evt, evtErr := agg.UnlockWaves(unlockedIDs, time.Now().UTC()); evtErr == nil {
-			recorder.Record(evt.Type, evt.Data)
+			recorder.Record(evt)
 		}
 	}
 	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)

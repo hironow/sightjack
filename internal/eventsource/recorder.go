@@ -3,7 +3,6 @@ package eventsource
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 )
@@ -43,25 +42,21 @@ func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, e
 	}, nil
 }
 
-// Record creates and appends an event with a new UUID.
+// Record appends a pre-built event, enriching it with session metadata.
 // SessionID and CorrelationID are set to the session ID.
 // CausationID is set to the previous event's ID.
-func (r *SessionRecorder) Record(eventType domain.EventType, payload any) error {
+func (r *SessionRecorder) Record(ev domain.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	event, err := domain.NewEvent(eventType, payload, time.Now())
-	if err != nil {
-		return fmt.Errorf("recorder new event: %w", err)
-	}
-	event.SessionID = r.sessionID
-	event.CorrelationID = r.sessionID
+	ev.SessionID = r.sessionID
+	ev.CorrelationID = r.sessionID
 	if r.prevID != "" {
-		event.CausationID = r.prevID
+		ev.CausationID = r.prevID
 	}
-	if err := r.store.Append(event); err != nil {
+	if err := r.store.Append(ev); err != nil {
 		return err
 	}
-	r.prevID = event.ID
+	r.prevID = ev.ID
 	return nil
 }

@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/port"
@@ -25,15 +24,15 @@ func NewLoggingRecorder(inner port.Recorder, logger domain.Logger) *LoggingRecor
 }
 
 // Record delegates to the inner Recorder. On error, it logs a warning and returns nil.
-func (r *LoggingRecorder) Record(eventType domain.EventType, payload any) error {
-	if err := r.inner.Record(eventType, payload); err != nil {
-		r.logger.Warn("record event %s: %v", eventType, err)
+func (r *LoggingRecorder) Record(ev domain.Event) error {
+	if err := r.inner.Record(ev); err != nil {
+		r.logger.Warn("record event %s: %v", ev.Type, err)
 	}
 	return nil
 }
 
 // DispatchingRecorder wraps a Recorder and dispatches events to an EventDispatcher.
-// Record is delegated to inner first; then an Event is constructed and dispatched best-effort.
+// Record is delegated to inner first; then the event is dispatched best-effort.
 type DispatchingRecorder struct {
 	inner      port.Recorder
 	dispatcher port.EventDispatcher
@@ -47,21 +46,14 @@ func NewDispatchingRecorder(inner port.Recorder, dispatcher port.EventDispatcher
 }
 
 // Record delegates to the inner Recorder, then dispatches the event best-effort.
-func (r *DispatchingRecorder) Record(eventType domain.EventType, payload any) error {
-	if err := r.inner.Record(eventType, payload); err != nil {
+func (r *DispatchingRecorder) Record(ev domain.Event) error {
+	if err := r.inner.Record(ev); err != nil {
 		return err
 	}
 	if r.dispatcher != nil {
-		ev, err := domain.NewEvent(eventType, payload, time.Now().UTC())
-		if err != nil {
-			if r.logger != nil {
-				r.logger.Warn("policy dispatch build event %s: %v", eventType, err)
-			}
-			return nil
-		}
 		if dispatchErr := r.dispatcher.Dispatch(context.Background(), ev); dispatchErr != nil {
 			if r.logger != nil {
-				r.logger.Warn("policy dispatch %s: %v", eventType, dispatchErr)
+				r.logger.Warn("policy dispatch %s: %v", ev.Type, dispatchErr)
 			}
 		}
 	}

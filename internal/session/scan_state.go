@@ -37,7 +37,7 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 		logger.Warn("aggregate start: %v", err)
 		return scanResultPath
 	}
-	if err := recorder.Record(startEvt.Type, startEvt.Data); err != nil {
+	if err := recorder.Record(startEvt); err != nil {
 		logger.Warn("Failed to record session start: %v", err)
 	}
 
@@ -53,7 +53,7 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 		logger.Warn("aggregate scan: %v", err)
 		return scanResultPath
 	}
-	if err := recorder.Record(scanEvt.Type, scanEvt.Data); err != nil {
+	if err := recorder.Record(scanEvt); err != nil {
 		logger.Warn("Failed to record scan completed: %v", err)
 	} else {
 		logger.OK("Events saved to %s", EventStorePath(baseDir, sessionID))

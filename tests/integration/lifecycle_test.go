@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
@@ -34,6 +35,16 @@ func loadTestState(t *testing.T, baseDir string) *domain.SessionState {
 	return state
 }
 
+// mustTestEvent is a test helper that creates a domain.Event and fails on error.
+func mustTestEvent(t *testing.T, eventType domain.EventType, payload any) domain.Event {
+	t.Helper()
+	ev, err := domain.NewEvent(eventType, payload, time.Now())
+	if err != nil {
+		t.Fatalf("NewEvent(%s): %v", eventType, err)
+	}
+	return ev
+}
+
 // writeTestEvents creates an event store to simulate a pre-existing session state.
 func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.SessionState) {
 	t.Helper()
@@ -42,35 +53,35 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(domain.EventSessionStarted, domain.SessionStartedPayload{
+	if err := recorder.Record(mustTestEvent(t, domain.EventSessionStarted, domain.SessionStartedPayload{
 		Project:         state.Project,
 		StrictnessLevel: state.StrictnessLevel,
-	}); err != nil {
+	})); err != nil {
 		t.Fatalf("record SessionStarted: %v", err)
 	}
-	if err := recorder.Record(domain.EventScanCompleted, domain.ScanCompletedPayload{
+	if err := recorder.Record(mustTestEvent(t, domain.EventScanCompleted, domain.ScanCompletedPayload{
 		Clusters:       state.Clusters,
 		Completeness:   state.Completeness,
 		ShibitoCount:   state.ShibitoCount,
 		ScanResultPath: state.ScanResultPath,
 		LastScanned:    state.LastScanned,
-	}); err != nil {
+	})); err != nil {
 		t.Fatalf("record ScanCompleted: %v", err)
 	}
 	if len(state.Waves) > 0 {
-		if err := recorder.Record(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+		if err := recorder.Record(mustTestEvent(t, domain.EventWavesGenerated, domain.WavesGeneratedPayload{
 			Waves: state.Waves,
-		}); err != nil {
+		})); err != nil {
 			t.Fatalf("record WavesGenerated: %v", err)
 		}
 	}
 	// Mark completed waves via separate events
 	for _, w := range state.Waves {
 		if w.Status == "completed" {
-			if err := recorder.Record(domain.EventWaveCompleted, domain.WaveCompletedPayload{
+			if err := recorder.Record(mustTestEvent(t, domain.EventWaveCompleted, domain.WaveCompletedPayload{
 				WaveID:      w.ID,
 				ClusterName: w.ClusterName,
-			}); err != nil {
+			})); err != nil {
 				t.Fatalf("record WaveCompleted: %v", err)
 			}
 		}
