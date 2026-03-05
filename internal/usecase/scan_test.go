@@ -14,7 +14,7 @@ func TestRunScan_InvalidCommand(t *testing.T) {
 	cmd := domain.RunScanCommand{}
 
 	// when: scanner and factory are nil because validation should fail before they are used
-	_, _, err := RunScan(context.Background(), cmd, nil, "", false, io.Discard, platform.NewLogger(io.Discard, false), nil, nil)
+	_, err := RunScan(context.Background(), cmd, nil, "", "test-session", false, io.Discard, platform.NewLogger(io.Discard, false), nil, nil)
 
 	// then
 	if err == nil {
@@ -33,7 +33,7 @@ func TestRunScan_InvalidLang(t *testing.T) {
 	}
 
 	// when: scanner and factory are nil because validation should fail before they are used
-	_, _, err := RunScan(context.Background(), cmd, nil, "", false, io.Discard, platform.NewLogger(io.Discard, false), nil, nil)
+	_, err := RunScan(context.Background(), cmd, nil, "", "test-session", false, io.Discard, platform.NewLogger(io.Discard, false), nil, nil)
 
 	// then
 	if err == nil {

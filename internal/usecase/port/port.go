@@ -99,11 +99,75 @@ type NopRecorder struct{}
 // Record always returns nil without recording anything.
 func (NopRecorder) Record(domain.Event) error { return nil }
 
+// SessionEventEmitter wraps aggregate event production + recording.
+// Implemented in usecase layer, injected into session by cmd (composition root).
+// Record errors are best-effort (logged, not propagated) to preserve session continuity.
+type SessionEventEmitter interface {
+	EmitStart(project, strictness string, now time.Time) error
+	EmitRecordScan(payload domain.ScanCompletedPayload, now time.Time) error
+	EmitResume(originalSessionID string, now time.Time) error
+	EmitRescan(originalSessionID string, now time.Time) error
+	EmitRecordWavesGenerated(payload domain.WavesGeneratedPayload, now time.Time) error
+	EmitApproveWave(waveID, clusterName string, now time.Time) error
+	EmitRejectWave(waveID, clusterName string, now time.Time) error
+	EmitModifyWave(payload domain.WaveModifiedPayload, now time.Time) error
+	EmitApplyWave(payload domain.WaveAppliedPayload, now time.Time) error
+	EmitCompleteWave(payload domain.WaveCompletedPayload, now time.Time) error
+	EmitUpdateCompleteness(clusterName string, clusterC, overallC float64, now time.Time) error
+	EmitUnlockWaves(unlockedIDs []string, now time.Time) error
+	EmitAddNextGenWaves(payload domain.NextGenWavesAddedPayload, now time.Time) error
+	EmitApplyReadyLabels(payload domain.ReadyLabelsAppliedPayload, now time.Time) error
+	EmitSendSpecification(waveID, clusterName string, now time.Time) error
+	EmitSendReport(waveID, clusterName string, now time.Time) error
+	EmitSendFeedback(waveID, clusterName string, now time.Time) error
+	EmitGenerateADR(payload domain.ADRGeneratedPayload, now time.Time) error
+}
+
+// NopSessionEventEmitter is a no-op emitter for tests and dry-run mode.
+type NopSessionEventEmitter struct{}
+
+func (*NopSessionEventEmitter) EmitStart(string, string, time.Time) error             { return nil }
+func (*NopSessionEventEmitter) EmitRecordScan(domain.ScanCompletedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitResume(string, time.Time) error  { return nil }
+func (*NopSessionEventEmitter) EmitRescan(string, time.Time) error  { return nil }
+func (*NopSessionEventEmitter) EmitRecordWavesGenerated(domain.WavesGeneratedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitApproveWave(string, string, time.Time) error       { return nil }
+func (*NopSessionEventEmitter) EmitRejectWave(string, string, time.Time) error        { return nil }
+func (*NopSessionEventEmitter) EmitModifyWave(domain.WaveModifiedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitApplyWave(domain.WaveAppliedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitCompleteWave(domain.WaveCompletedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitUpdateCompleteness(string, float64, float64, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitUnlockWaves([]string, time.Time) error             { return nil }
+func (*NopSessionEventEmitter) EmitAddNextGenWaves(domain.NextGenWavesAddedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitApplyReadyLabels(domain.ReadyLabelsAppliedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitSendSpecification(string, string, time.Time) error { return nil }
+func (*NopSessionEventEmitter) EmitSendReport(string, string, time.Time) error        { return nil }
+func (*NopSessionEventEmitter) EmitSendFeedback(string, string, time.Time) error      { return nil }
+func (*NopSessionEventEmitter) EmitGenerateADR(domain.ADRGeneratedPayload, time.Time) error {
+	return nil
+}
+
 // SessionRunner runs interactive sightjack sessions (scan->waves->select->apply->nextgen loop).
 type SessionRunner interface {
-	RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder Recorder, agg *domain.SessionAggregate, logger domain.Logger) error
-	RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder Recorder, agg *domain.SessionAggregate, logger domain.Logger) error
-	RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder Recorder, agg *domain.SessionAggregate, logger domain.Logger) error
+	RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
+	RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
+	RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
 	BuildNotifier(cfg *domain.Config) Notifier
 	NewDispatchingRecorder(inner Recorder, dispatcher EventDispatcher, logger domain.Logger) Recorder
 }
@@ -111,7 +175,7 @@ type SessionRunner interface {
 // ScanRunner executes scans and records scan state.
 type ScanRunner interface {
 	RunScan(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger domain.Logger) (*domain.ScanResult, error)
-	RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, recorder Recorder, agg *domain.SessionAggregate, ts time.Time, logger domain.Logger)
+	RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, emitter SessionEventEmitter, ts time.Time, logger domain.Logger)
 }
 
 // RecorderFactory creates session recorders and resolves event directories.

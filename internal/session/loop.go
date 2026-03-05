@@ -21,7 +21,7 @@ import (
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store port.OutboxStore, recorder port.Recorder, agg *domain.SessionAggregate, out io.Writer, logger domain.Logger) error {
+	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) error {
 
 	ctx, loopSpan := platform.Tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(
@@ -59,7 +59,7 @@ outerLoop:
 
 		resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, store, recorder, agg, out, loopSpan, logger)
+		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, store, emitter, out, loopSpan, logger)
 		if approvalResult != approvalApproved {
 			continue
 		}
@@ -67,7 +67,7 @@ outerLoop:
 		applyPhase(ctx, cfg, scanDir, scanResultPath, adrDir,
 			selected, resolvedStrictness,
 			&waves, completed, scanResult, sessionRejected,
-			labeledReady, fbCollector, store, recorder, agg, out, loopSpan, logger)
+			labeledReady, fbCollector, store, emitter, out, loopSpan, logger)
 	}
 
 	// Final consistency check

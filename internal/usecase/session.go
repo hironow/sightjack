@@ -30,7 +30,8 @@ func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.C
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
 	agg := domain.NewSessionAggregate()
-	return runner.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, wrapRecorder(recorder, logger, dryRun, cfg, metrics, runner), agg, logger)
+	emitter := NewSessionEventEmitter(agg, wrapRecorder(recorder, logger, dryRun, cfg, metrics, runner), logger)
+	return runner.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, emitter, logger)
 }
 
 // ResumeSession orchestrates the session resume pipeline.
@@ -40,7 +41,8 @@ func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *do
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
 	agg := domain.NewSessionAggregate()
-	return runner.RunResumeSession(ctx, cfg, baseDir, state, input, out, wrapRecorder(recorder, logger, false, cfg, metrics, runner), agg, logger)
+	emitter := NewSessionEventEmitter(agg, wrapRecorder(recorder, logger, false, cfg, metrics, runner), logger)
+	return runner.RunResumeSession(ctx, cfg, baseDir, state, input, out, emitter, logger)
 }
 
 // RescanSession orchestrates the session rescan pipeline.
@@ -49,5 +51,6 @@ func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domai
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
 	agg := domain.NewSessionAggregate()
-	return runner.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, wrapRecorder(recorder, logger, false, cfg, metrics, runner), agg, logger)
+	emitter := NewSessionEventEmitter(agg, wrapRecorder(recorder, logger, false, cfg, metrics, runner), logger)
+	return runner.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, emitter, logger)
 }

@@ -14,7 +14,7 @@ import (
 // converge here.
 //
 // Returns the cached scan result path for downstream use (e.g. interactive loop).
-func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, recorder port.Recorder, agg *domain.SessionAggregate, scanTime time.Time, logger domain.Logger) string {
+func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, emitter port.SessionEventEmitter, scanTime time.Time, logger domain.Logger) string {
 	scanDir := domain.ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	if err := WriteScanResult(scanResultPath, result); err != nil {
@@ -30,13 +30,9 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 		})
 	}
 
-	startEvt, err := agg.Start(cfg.Tracker.Project, string(cfg.Strictness.Default), scanTime) // nosemgrep: adr0003-otel-span-without-defer-end — SessionAggregate.Start, not tracer.Start
-	if err != nil {
-		logger.Warn("aggregate start: %v", err)
+	if err := emitter.EmitStart(cfg.Tracker.Project, string(cfg.Strictness.Default), scanTime); err != nil { // nosemgrep: adr0003-otel-span-without-defer-end — SessionEventEmitter.EmitStart, not tracer.Start
+		logger.Warn("emit start: %v", err)
 		return scanResultPath
-	}
-	if err := recorder.Record(startEvt); err != nil {
-		logger.Warn("Failed to record session start: %v", err)
 	}
 
 	scanPayload := domain.ScanCompletedPayload{
@@ -46,16 +42,11 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 		ScanResultPath: domain.RelativeScanResultPath(baseDir, scanResultPath),
 		LastScanned:    scanTime,
 	}
-	scanEvt, err := agg.RecordScan(scanPayload, scanTime)
-	if err != nil {
-		logger.Warn("aggregate scan: %v", err)
+	if err := emitter.EmitRecordScan(scanPayload, scanTime); err != nil {
+		logger.Warn("emit scan: %v", err)
 		return scanResultPath
 	}
-	if err := recorder.Record(scanEvt); err != nil {
-		logger.Warn("Failed to record scan completed: %v", err)
-	} else {
-		logger.OK("Events saved to %s", EventStorePath(baseDir, sessionID))
-	}
+	logger.OK("Events saved to %s", EventStorePath(baseDir, sessionID))
 
 	return scanResultPath
 }

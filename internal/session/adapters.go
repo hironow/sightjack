@@ -17,16 +17,16 @@ type SessionRunnerAdapter struct{}
 // NewSessionRunnerAdapter creates a new SessionRunnerAdapter.
 func NewSessionRunnerAdapter() *SessionRunnerAdapter { return &SessionRunnerAdapter{} }
 
-func (a *SessionRunnerAdapter) RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
-	return RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, recorder, agg, logger)
+func (a *SessionRunnerAdapter) RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
+	return RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, emitter, logger)
 }
 
-func (a *SessionRunnerAdapter) RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
-	return RunResumeSession(ctx, cfg, baseDir, state, input, out, recorder, agg, logger)
+func (a *SessionRunnerAdapter) RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
+	return RunResumeSession(ctx, cfg, baseDir, state, input, out, emitter, logger)
 }
 
-func (a *SessionRunnerAdapter) RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
-	return RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, recorder, agg, logger)
+func (a *SessionRunnerAdapter) RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
+	return RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, emitter, logger)
 }
 
 func (a *SessionRunnerAdapter) BuildNotifier(cfg *domain.Config) port.Notifier {
@@ -49,8 +49,8 @@ func (a *ScanRunnerAdapter) RunScan(ctx context.Context, cfg *domain.Config, bas
 	return RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, logger)
 }
 
-func (a *ScanRunnerAdapter) RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, recorder port.Recorder, agg *domain.SessionAggregate, ts time.Time, logger domain.Logger) {
-	RecordScanState(baseDir, sessionID, result, cfg, recorder, agg, ts, logger)
+func (a *ScanRunnerAdapter) RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, emitter port.SessionEventEmitter, ts time.Time, logger domain.Logger) {
+	RecordScanState(baseDir, sessionID, result, cfg, emitter, ts, logger)
 }
 
 // --- RecorderFactory adapter ---

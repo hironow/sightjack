@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -49,12 +51,13 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if jsonOutput {
 				streamOut = cmd.ErrOrStderr()
 			}
-			result, _, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
+			sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
+			result, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
 				RepoPath:   baseDir,
 				Lang:       cfg.Lang,
 				Strictness: string(cfg.Strictness.Default),
 				DryRun:     dryRun,
-			}, cfg, baseDir, dryRun, streamOut, logger, session.NewScanRunnerAdapter(), session.NewRecorderFactoryAdapter())
+			}, cfg, baseDir, sessionID, dryRun, streamOut, logger, session.NewScanRunnerAdapter(), session.NewRecorderFactoryAdapter())
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}

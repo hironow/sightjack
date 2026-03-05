@@ -13,11 +13,10 @@ import (
 )
 
 // RunSession runs the full session: Pass 1-3 (auto), then interactive wave loop.
-func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
+func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
-	recorder = NewLoggingRecorder(recorder, logger)
 	if !dryRun && input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -122,7 +121,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	scanTime := time.Now()
 
 	// Cache ScanResult + record session start / scan completed events
-	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, agg, scanTime, logger)
+	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, emitter, scanTime, logger)
 
 	// --- Pass 3: Wave Generate ---
 	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
@@ -134,12 +133,10 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 
 	logger.OK("%d clusters, %d waves generated", len(scanResult.Clusters), len(waves))
 
-	// Record waves generated via aggregate
-	if evt, err := agg.RecordWavesGenerated(domain.WavesGeneratedPayload{
+	// Record waves generated via emitter
+	emitter.EmitRecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
-	}, time.Now().UTC()); err == nil {
-		recorder.Record(evt)
-	}
+	}, time.Now().UTC())
 
 	completed := domain.BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
@@ -147,7 +144,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	adrCount := CountADRFiles(adrDir)
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, agg, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, emitter, out, logger)
 }
 
 // ResumeSession loads a previous session's state and cached scan result,
@@ -180,11 +177,10 @@ func ResumeScanDir(state *domain.SessionState, baseDir string) string {
 }
 
 // RunResumeSession resumes an existing session from saved state.
-func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
+func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
-	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -235,23 +231,20 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	adrDir := ADRDir(baseDir)
 	lastScanned := state.LastScanned
 
-	// Record resume event via aggregate
-	if evt, evtErr := agg.Resume(state.SessionID, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt)
-	}
+	// Record resume event via emitter
+	emitter.EmitResume(state.SessionID, time.Now().UTC())
 
 	logger.OK("Resumed session: %d waves, %d completed", len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, recorder, agg, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, emitter, out, logger)
 }
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
-func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder port.Recorder, agg *domain.SessionAggregate, logger domain.Logger) error {
+func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
-	recorder = NewLoggingRecorder(recorder, logger)
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
@@ -306,7 +299,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	scanTime := time.Now()
 
 	// Cache ScanResult + record session start / scan completed events
-	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, recorder, agg, scanTime, logger)
+	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, emitter, scanTime, logger)
 
 	waves, rescanWarnings, failedNames, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
@@ -333,19 +326,15 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	adrCount := CountADRFiles(adrDir)
 	scanner := bufio.NewScanner(input)
 
-	// Record rescan-specific events via aggregate
-	if evt, evtErr := agg.Rescan(oldState.SessionID, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt)
-	}
-	if evt, evtErr := agg.RecordWavesGenerated(domain.WavesGeneratedPayload{
+	// Record rescan-specific events via emitter
+	emitter.EmitRescan(oldState.SessionID, time.Now().UTC())
+	emitter.EmitRecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
-	}, time.Now().UTC()); evtErr == nil {
-		recorder.Record(evt)
-	}
+	}, time.Now().UTC())
 
 	logger.OK("Re-scanned: %d clusters, %d waves (%d previously completed)",
 		len(scanResult.Clusters), len(waves), len(completed))
 
 	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, recorder, agg, out, logger)
+		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, emitter, out, logger)
 }
