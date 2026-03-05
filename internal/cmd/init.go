@@ -75,19 +75,19 @@ func initProject(baseDir, team, project, lang, strictness string, w io.Writer) e
 		return fmt.Errorf(".siren/config.yaml already exists in %s", baseDir)
 	}
 
-	sirenDir := filepath.Join(baseDir, ".siren")
+	sirenDir := filepath.Join(baseDir, domain.StateDir)
 	if err := os.MkdirAll(sirenDir, 0755); err != nil {
 		return fmt.Errorf("create .siren dir: %w", err)
 	}
 
-	content := domain.RenderInitConfig(team, project, lang, strictness)
+	content := platform.RenderInitConfig(team, project, lang, strictness)
 	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 
 	_ = session.WriteGitIgnore(baseDir)
 
-	if err := session.InstallSkills(baseDir, domain.SkillsFS); err != nil {
+	if err := session.InstallSkills(baseDir, platform.SkillsFS); err != nil {
 		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
 	}
 

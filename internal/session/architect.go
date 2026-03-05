@@ -97,7 +97,7 @@ func RunArchitectDiscussDryRun(cfg *domain.Config, scanDir string, wave domain.W
 	}
 
 	outputFile := filepath.Join(scanDir, ArchitectDiscussFileName(wave))
-	prompt, err := domain.RenderArchitectDiscussPrompt(cfg.Lang, domain.ArchitectDiscussPromptData{
+	prompt, err := platform.RenderArchitectDiscussPrompt(cfg.Lang, domain.ArchitectDiscussPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),
@@ -139,7 +139,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *domain.Config, scanDir string
 		return nil, fmt.Errorf("marshal wave actions: %w", err)
 	}
 
-	prompt, err := domain.RenderArchitectDiscussPrompt(cfg.Lang, domain.ArchitectDiscussPromptData{
+	prompt, err := platform.RenderArchitectDiscussPrompt(cfg.Lang, domain.ArchitectDiscussPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),

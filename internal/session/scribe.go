@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 const ADRSubdir = "docs/adr"
@@ -171,7 +172,7 @@ func RunScribeADRDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, ar
 
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, ScribeFileName(wave))
-	prompt, err := domain.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
+	prompt, err := platform.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),
@@ -236,7 +237,7 @@ func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, ScribeFileName(wave))
-	prompt, err := domain.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
+	prompt, err := platform.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),

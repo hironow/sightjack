@@ -75,7 +75,7 @@ func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 
 	dodSection := domain.ResolveDoDSection(cfg.DoDTemplates, wave.ClusterName)
 
-	prompt, err := domain.RenderWaveApplyPrompt(cfg.Lang, domain.WaveApplyPromptData{
+	prompt, err := platform.RenderWaveApplyPrompt(cfg.Lang, domain.WaveApplyPromptData{
 		WaveID:          wave.ID,
 		ClusterName:     wave.ClusterName,
 		Title:           wave.Title,
@@ -125,7 +125,7 @@ func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 // RunReadyLabel applies the ready label to issues whose all waves have completed.
 // This must only be called after a successful wave apply.
 func RunReadyLabel(ctx context.Context, cfg *domain.Config, readyIssueIDs string, out io.Writer, logger domain.Logger) error {
-	prompt, err := domain.RenderReadyLabelPrompt(cfg.Lang, domain.ReadyLabelPromptData{
+	prompt, err := platform.RenderReadyLabelPrompt(cfg.Lang, domain.ReadyLabelPromptData{
 		ReadyLabel:    cfg.Labels.ReadyLabel,
 		ReadyIssueIDs: readyIssueIDs,
 	})

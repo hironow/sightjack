@@ -78,7 +78,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 	classifyCtx, classifySpan := platform.Tracer.Start(ctx, "classify") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
 	classifyOutput := filepath.Join(scanDir, "classify.json")
 
-	classifyPrompt, err := domain.RenderClassifyPrompt(cfg.Lang, domain.ClassifyPromptData{
+	classifyPrompt, err := platform.RenderClassifyPrompt(cfg.Lang, domain.ClassifyPromptData{
 		TeamFilter:      cfg.Tracker.Team,
 		ProjectFilter:   cfg.Tracker.Project,
 		CycleFilter:     cfg.Tracker.Cycle,
@@ -168,7 +168,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 
 		for j, chunk := range chunks {
 			chunkFile := filepath.Join(scanDir, fmt.Sprintf("cluster_%02d_%s_c%02d.json", index, domain.SanitizeName(cc.Name), j))
-			prompt, renderErr := domain.RenderDeepScanPrompt(cfg.Lang, domain.DeepScanPromptData{
+			prompt, renderErr := platform.RenderDeepScanPrompt(cfg.Lang, domain.DeepScanPromptData{
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
 				OutputPath:      chunkFile,
@@ -293,7 +293,7 @@ func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir str
 		return domain.WaveGenerateResult{}, fmt.Errorf("marshal issues for %s: %w", cluster.Name, err)
 	}
 
-	prompt, err := domain.RenderWaveGeneratePrompt(cfg.Lang, domain.WaveGeneratePromptData{
+	prompt, err := platform.RenderWaveGeneratePrompt(cfg.Lang, domain.WaveGeneratePromptData{
 		ClusterName:     cluster.Name,
 		Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
 		Issues:          string(issuesJSON),

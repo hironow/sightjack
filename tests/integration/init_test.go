@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -18,7 +19,7 @@ func TestRenderInitConfig_BasicOutput(t *testing.T) {
 	strictness := "alert"
 
 	// when
-	output := domain.RenderInitConfig(team, project, lang, strictness)
+	output := platform.RenderInitConfig(team, project, lang, strictness)
 
 	// then
 	if !strings.Contains(output, `team: "Engineering"`) {
@@ -37,7 +38,7 @@ func TestRenderInitConfig_BasicOutput(t *testing.T) {
 
 func TestRenderInitConfig_LoadableByLoadConfig(t *testing.T) {
 	// given: rendered config written to temp file
-	output := domain.RenderInitConfig("TestTeam", "Test Project", "en", "fog")
+	output := platform.RenderInitConfig("TestTeam", "Test Project", "en", "fog")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	if err := os.WriteFile(path, []byte(output), 0644); err != nil {
@@ -67,7 +68,7 @@ func TestRenderInitConfig_LoadableByLoadConfig(t *testing.T) {
 
 func TestRenderInitConfig_DefaultStrictness(t *testing.T) {
 	// given: fog strictness (default)
-	output := domain.RenderInitConfig("Team", "Project", "ja", "fog")
+	output := platform.RenderInitConfig("Team", "Project", "ja", "fog")
 
 	// when/then: strictness section present with fog
 	if !strings.Contains(output, "default: fog") {
@@ -80,7 +81,7 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	err := session.InstallSkills(baseDir, domain.SkillsFS)
+	err := session.InstallSkills(baseDir, platform.SkillsFS)
 
 	// then: no error
 	if err != nil {
@@ -130,12 +131,12 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 func TestInstallSkills_Idempotent(t *testing.T) {
 	// given: install once
 	baseDir := t.TempDir()
-	if err := session.InstallSkills(baseDir, domain.SkillsFS); err != nil {
+	if err := session.InstallSkills(baseDir, platform.SkillsFS); err != nil {
 		t.Fatalf("first install: %v", err)
 	}
 
 	// when: install again
-	err := session.InstallSkills(baseDir, domain.SkillsFS)
+	err := session.InstallSkills(baseDir, platform.SkillsFS)
 
 	// then: no error, files still correct
 	if err != nil {
@@ -149,7 +150,7 @@ func TestInstallSkills_Idempotent(t *testing.T) {
 
 func TestRenderInitConfig_DefaultsApplied(t *testing.T) {
 	// given: rendered config with minimal values
-	output := domain.RenderInitConfig("Team", "Project", "ja", "fog")
+	output := platform.RenderInitConfig("Team", "Project", "ja", "fog")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(path, []byte(output), 0644)
