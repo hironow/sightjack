@@ -5,6 +5,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/port"
 )
 
 // stateDir converts a repo-root baseDir to the tool's state directory.
@@ -20,12 +21,13 @@ func SessionEventsDir(baseDir, sessionID string) string {
 
 // NewEventStore creates an event store rooted at stateDir.
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
-func NewEventStore(stateDir string) domain.EventStore {
+func NewEventStore(stateDir string) port.EventStore {
 	return eventsource.NewFileEventStore(stateDir)
 }
 
 // NewSessionRecorder creates a recorder for the given session.
-func NewSessionRecorder(store domain.EventStore, sessionID string) (domain.Recorder, error) {
+func NewSessionRecorder(stateDir, sessionID string) (port.Recorder, error) {
+	store := eventsource.NewFileEventStore(stateDir)
 	return eventsource.NewSessionRecorder(store, sessionID)
 }
 

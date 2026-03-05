@@ -10,6 +10,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -99,7 +100,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *domain.Config, scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves []domain.Wave, completed map[string]bool,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
-	store domain.OutboxStore, recorder domain.Recorder, agg *domain.SessionAggregate,
+	store port.OutboxStore, recorder port.Recorder, agg *domain.SessionAggregate,
 	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	// Auto-approve when --auto-approve is set.
@@ -264,7 +265,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
-	recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, loopSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
+	recorder port.Recorder, agg *domain.SessionAggregate, out io.Writer, loopSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
 
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
 	if err != nil {
@@ -305,7 +306,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	scanDir, adrDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
-	fbCollector *FeedbackCollector, recorder domain.Recorder, agg *domain.SessionAggregate, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, recorder port.Recorder, agg *domain.SessionAggregate, loopSpan trace.Span, logger domain.Logger) {
 
 	var clusterForNextgen domain.ClusterScanResult
 	for _, c := range scanResult.Clusters {
@@ -360,7 +361,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 // in labeledReady to avoid redundant API calls.
 func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
-	labeledReady map[string]bool, recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, logger domain.Logger) {
+	labeledReady map[string]bool, recorder port.Recorder, agg *domain.SessionAggregate, out io.Writer, logger domain.Logger) {
 
 	if !cfg.Labels.Enabled {
 		return
@@ -400,7 +401,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store domain.OutboxStore, recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, store port.OutboxStore, recorder port.Recorder, agg *domain.SessionAggregate, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
 
 	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, recorder, agg, out, loopSpan, logger)
 	if !ok {

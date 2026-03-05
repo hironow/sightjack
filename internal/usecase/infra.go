@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -20,13 +21,13 @@ func SessionEventsDir(baseDir, sessionID string) string {
 }
 
 // NewEventStore creates an event store rooted at stateDir.
-func NewEventStore(stateDir string) domain.EventStore {
+func NewEventStore(stateDir string) port.EventStore {
 	return session.NewEventStore(stateDir)
 }
 
 // NewSessionRecorder creates a recorder for the given session.
-func NewSessionRecorder(store domain.EventStore, sessionID string) (domain.Recorder, error) {
-	return session.NewSessionRecorder(store, sessionID)
+func NewSessionRecorder(stateDir, sessionID string) (port.Recorder, error) {
+	return session.NewSessionRecorder(stateDir, sessionID)
 }
 
 // LoadLatestResumableState loads the latest session state that matches the predicate.

@@ -81,7 +81,7 @@ func TestMarshalDMail_SchemaVersion(t *testing.T) {
 }
 
 // testOutboxStore creates a SQLiteOutboxStore for testing and registers cleanup.
-func testOutboxStore(t *testing.T, dir string) domain.OutboxStore {
+func testOutboxStore(t *testing.T, dir string) port.OutboxStore {
 	t.Helper()
 	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {

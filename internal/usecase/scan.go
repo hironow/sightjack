@@ -30,8 +30,7 @@ func RunScan(ctx context.Context, cmd domain.RunScanCommand, cfg *domain.Config,
 	}
 
 	// Record scan state: cache result + session start/scan completed events
-	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID))
-	recorder, recErr := session.NewSessionRecorder(store, sessionID)
+	recorder, recErr := session.NewSessionRecorder(session.SessionEventsDir(baseDir, sessionID), sessionID)
 	if recErr != nil {
 		logger.Warn("session recorder: %v", recErr)
 		return result, sessionID, nil

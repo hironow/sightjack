@@ -19,9 +19,6 @@ type FileEventStore struct {
 	dir string
 }
 
-// Compile-time check that FileEventStore implements domain.EventStore.
-var _ domain.EventStore = (*FileEventStore)(nil)
-
 // NewFileEventStore creates a FileEventStore rooted at the given directory.
 func NewFileEventStore(dir string) *FileEventStore {
 	return &FileEventStore{dir: dir}

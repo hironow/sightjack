@@ -11,7 +11,7 @@ import (
 )
 
 // wrapRecorder wraps a Recorder with a DispatchingRecorder if not in dry-run mode.
-func wrapRecorder(recorder domain.Recorder, logger domain.Logger, dryRun bool, cfg *domain.Config, metrics port.PolicyMetrics) domain.Recorder {
+func wrapRecorder(recorder port.Recorder, logger domain.Logger, dryRun bool, cfg *domain.Config, metrics port.PolicyMetrics) port.Recorder {
 	if dryRun {
 		return recorder
 	}
@@ -26,7 +26,7 @@ func wrapRecorder(recorder domain.Recorder, logger domain.Logger, dryRun bool, c
 
 // RunSession orchestrates the sightjack session pipeline.
 // Validates the RunSessionCommand, then delegates to session.RunSession.
-func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
+func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
@@ -35,7 +35,7 @@ func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.C
 
 // ResumeSession orchestrates the session resume pipeline.
 // Validates the ResumeSessionCommand, then delegates to session.RunResumeSession.
-func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
+func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}
@@ -43,7 +43,7 @@ func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *do
 }
 
 // RescanSession orchestrates the session rescan pipeline.
-func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder domain.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
+func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger, metrics port.PolicyMetrics) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}

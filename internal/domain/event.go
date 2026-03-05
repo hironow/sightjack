@@ -16,13 +16,6 @@ type EventApplier interface {
 	Rebuild(events []Event) error
 }
 
-// EventStore is the interface for an append-only event log.
-type EventStore interface {
-	Append(events ...Event) error
-	LoadAll() ([]Event, error)
-	LoadSince(after time.Time) ([]Event, error)
-}
-
 // EventType identifies the kind of domain event.
 type EventType string
 

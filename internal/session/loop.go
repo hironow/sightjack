@@ -9,6 +9,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -20,7 +21,7 @@ import (
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store domain.OutboxStore, recorder domain.Recorder, agg *domain.SessionAggregate, out io.Writer, logger domain.Logger) error {
+	store port.OutboxStore, recorder port.Recorder, agg *domain.SessionAggregate, out io.Writer, logger domain.Logger) error {
 
 	ctx, loopSpan := platform.Tracer.Start(ctx, "interactive.loop",
 		trace.WithAttributes(

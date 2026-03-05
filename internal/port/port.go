@@ -3,6 +3,7 @@ package port
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 )
@@ -57,3 +58,42 @@ type PolicyMetrics interface {
 type NopPolicyMetrics struct{}
 
 func (NopPolicyMetrics) RecordPolicyEvent(context.Context, string, string) {}
+
+// EventStore is the append-only event persistence interface.
+type EventStore interface {
+	// Append persists one or more events. Validation is performed before any writes.
+	Append(events ...domain.Event) error
+
+	// LoadAll returns all events in chronological order.
+	LoadAll() ([]domain.Event, error)
+
+	// LoadSince returns events with timestamps after the given time.
+	LoadSince(after time.Time) ([]domain.Event, error)
+}
+
+// OutboxStore provides transactional outbox semantics for D-Mail delivery.
+// Stage records intent in a durable store; Flush materializes staged items
+// to the filesystem (archive/ + outbox/) using atomic writes.
+type OutboxStore interface {
+	// Stage atomically records a D-Mail for delivery. Idempotent: re-staging
+	// the same name is a no-op.
+	Stage(name string, data []byte) error
+
+	// Flush writes all staged-but-unflushed D-Mails to archive/ and outbox/.
+	// Returns the number of items flushed.
+	Flush() (int, error)
+
+	// Close releases database resources.
+	Close() error
+}
+
+// Recorder records domain events during a session.
+type Recorder interface {
+	Record(eventType domain.EventType, payload any) error
+}
+
+// NopRecorder is a no-op Recorder for dry-run mode and testing.
+type NopRecorder struct{}
+
+// Record always returns nil without recording anything.
+func (NopRecorder) Record(domain.EventType, any) error { return nil }

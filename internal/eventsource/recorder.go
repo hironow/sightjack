@@ -8,17 +8,25 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-// SessionRecorder wraps an EventStore with automatic SessionID assignment.
+// eventStore is the package-local interface for SessionRecorder's store
+// dependency. Kept unexported to avoid importing port from eventsource
+// (prohibited by semgrep Rule 5). FileEventStore satisfies this via duck typing.
+type eventStore interface {
+	Append(events ...domain.Event) error
+	LoadAll() ([]domain.Event, error)
+}
+
+// SessionRecorder wraps a FileEventStore with automatic SessionID assignment.
 // It is safe for concurrent use within a single process.
 type SessionRecorder struct {
-	store     domain.EventStore
+	store     eventStore
 	sessionID string
 	prevID    string // ID of the previous event for CausationID chaining
 	mu        sync.Mutex
 }
 
 // NewSessionRecorder creates a SessionRecorder for the given session.
-func NewSessionRecorder(store domain.EventStore, sessionID string) (*SessionRecorder, error) {
+func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, error) {
 	// Load existing events to resume CausationID chain.
 	events, err := store.LoadAll()
 	if err != nil {

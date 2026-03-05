@@ -8,12 +8,13 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestNopRecorder_NoOp(t *testing.T) {
 	// given
-	var r domain.Recorder = domain.NopRecorder{}
+	var r port.Recorder = port.NopRecorder{}
 
 	// when/then: should return nil without recording anything
 	if err := r.Record(domain.EventSessionStarted, nil); err != nil {
@@ -53,7 +54,7 @@ func TestLoggingRecorder_PassesThroughOnSuccess(t *testing.T) {
 	// given
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, true)
-	recorder := session.NewLoggingRecorder(domain.NopRecorder{}, logger)
+	recorder := session.NewLoggingRecorder(port.NopRecorder{}, logger)
 
 	// when
 	err := recorder.Record(domain.EventSessionStarted, nil)

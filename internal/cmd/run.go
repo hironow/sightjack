@@ -11,6 +11,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -101,8 +102,7 @@ if event data is found in .siren/events/.`,
 								logger.Warn("No resumable session found — starting fresh session instead.")
 								goto freshSession
 							}
-							resumeStore := usecase.NewEventStore(usecase.SessionEventsDir(baseDir, resumableSessionID))
-							resumeRecorder, recErr := usecase.NewSessionRecorder(resumeStore, resumableSessionID)
+							resumeRecorder, recErr := usecase.NewSessionRecorder(usecase.SessionEventsDir(baseDir, resumableSessionID), resumableSessionID)
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
@@ -112,8 +112,7 @@ if event data is found in .siren/events/.`,
 							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{})
 						case domain.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
-							rescanStore := usecase.NewEventStore(usecase.SessionEventsDir(baseDir, rescanID))
-							rescanRecorder, recErr := usecase.NewSessionRecorder(rescanStore, rescanID)
+							rescanRecorder, recErr := usecase.NewSessionRecorder(usecase.SessionEventsDir(baseDir, rescanID), rescanID)
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
@@ -131,11 +130,10 @@ if event data is found in .siren/events/.`,
 
 			sessionID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 			var sessionInput io.Reader
-			var recorder domain.Recorder = domain.NopRecorder{}
+			var recorder port.Recorder = port.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
-				sessionStore := usecase.NewEventStore(usecase.SessionEventsDir(baseDir, sessionID))
-				rec, recErr := usecase.NewSessionRecorder(sessionStore, sessionID)
+				rec, recErr := usecase.NewSessionRecorder(usecase.SessionEventsDir(baseDir, sessionID), sessionID)
 				if recErr != nil {
 					return fmt.Errorf("session recorder: %w", recErr)
 				}

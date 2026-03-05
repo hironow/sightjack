@@ -9,10 +9,10 @@ import (
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
-// failOnceStore wraps a real EventStore and fails the first Append call,
+// failOnceStore wraps a real FileEventStore and fails the first Append call,
 // then delegates to the real store for subsequent calls.
 type failOnceStore struct {
-	real   domain.EventStore
+	real   *eventsource.FileEventStore
 	failed bool
 }
 

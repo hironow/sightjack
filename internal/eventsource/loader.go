@@ -11,7 +11,7 @@ import (
 
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
-func LoadState(store domain.EventStore) (*domain.SessionState, error) {
+func LoadState(store *FileEventStore) (*domain.SessionState, error) {
 	events, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)

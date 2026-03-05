@@ -13,8 +13,9 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/port"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -77,7 +78,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 }
 
 // testRecorder creates a real Recorder backed by the event store for lifecycle tests.
-func testRecorder(baseDir, sessionID string) domain.Recorder {
+func testRecorder(baseDir, sessionID string) port.Recorder {
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID))
 	rec, recErr := eventsource.NewSessionRecorder(store, sessionID)
 	if recErr != nil {

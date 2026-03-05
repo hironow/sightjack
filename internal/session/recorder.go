@@ -11,15 +11,15 @@ import (
 // LoggingRecorder wraps a Recorder and logs errors instead of propagating them.
 // This ensures callers never need to handle Record errors at every call site.
 type LoggingRecorder struct {
-	inner  domain.Recorder
+	inner  port.Recorder
 	logger domain.Logger
 }
 
 // NewLoggingRecorder creates a LoggingRecorder that wraps the given Recorder.
 // If inner is nil, NopRecorder is used to prevent panics.
-func NewLoggingRecorder(inner domain.Recorder, logger domain.Logger) *LoggingRecorder {
+func NewLoggingRecorder(inner port.Recorder, logger domain.Logger) *LoggingRecorder {
 	if inner == nil {
-		inner = domain.NopRecorder{}
+		inner = port.NopRecorder{}
 	}
 	return &LoggingRecorder{inner: inner, logger: logger}
 }
@@ -35,14 +35,14 @@ func (r *LoggingRecorder) Record(eventType domain.EventType, payload any) error 
 // DispatchingRecorder wraps a Recorder and dispatches events to an EventDispatcher.
 // Record is delegated to inner first; then an Event is constructed and dispatched best-effort.
 type DispatchingRecorder struct {
-	inner      domain.Recorder
+	inner      port.Recorder
 	dispatcher port.EventDispatcher
 	logger     domain.Logger
 }
 
 // NewDispatchingRecorder creates a DispatchingRecorder.
 // If dispatcher is nil, Record simply delegates to inner.
-func NewDispatchingRecorder(inner domain.Recorder, dispatcher port.EventDispatcher, logger domain.Logger) *DispatchingRecorder {
+func NewDispatchingRecorder(inner port.Recorder, dispatcher port.EventDispatcher, logger domain.Logger) *DispatchingRecorder {
 	return &DispatchingRecorder{inner: inner, dispatcher: dispatcher, logger: logger}
 }
 
