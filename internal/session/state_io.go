@@ -5,9 +5,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
 )
+
+// sirenGitignoreEntries lists paths that must be gitignored in .siren/.
+var sirenGitignoreEntries = []string{
+	"events/",
+	".run/",
+	"inbox/",
+	"outbox/",
+	".otel.env",
+}
 
 // EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.
 func EnsureMailDirs(baseDir string) error {
@@ -19,13 +29,55 @@ func EnsureMailDirs(baseDir string) error {
 	return nil
 }
 
-// WriteGitIgnore writes a .gitignore inside .siren/ that excludes ephemeral
-// files (events/ and .run/) from version control.
-// The write is idempotent — the file is always overwritten with the canonical content.
+// WriteGitIgnore ensures a .gitignore inside .siren/ excludes ephemeral files
+// from version control. Uses append-only pattern: existing user entries are preserved.
 func WriteGitIgnore(baseDir string) error {
-	content := "events/\n.run/\ninbox/\noutbox/\n"
-	path := filepath.Join(baseDir, domain.StateDir, ".gitignore")
-	return os.WriteFile(path, []byte(content), 0644)
+	return ensureGitignoreEntries(
+		filepath.Join(baseDir, domain.StateDir, ".gitignore"),
+		sirenGitignoreEntries,
+	)
+}
+
+// ensureGitignoreEntries reads an existing .gitignore (if any) and appends
+// any missing entries. Creates the file with all entries if it does not exist.
+func ensureGitignoreEntries(path string, required []string) error {
+	existing := ""
+	if data, err := os.ReadFile(path); err == nil {
+		existing = string(data)
+	}
+
+	var missing []string
+	for _, entry := range required {
+		if !strings.Contains(existing, entry) {
+			missing = append(missing, entry)
+		}
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	if existing == "" {
+		// New file: write all entries
+		var buf strings.Builder
+		for _, entry := range required {
+			buf.WriteString(entry)
+			buf.WriteByte('\n')
+		}
+		return os.WriteFile(path, []byte(buf.String()), 0o644)
+	}
+
+	// Existing file: append missing entries
+	if !strings.HasSuffix(existing, "\n") {
+		existing += "\n"
+	}
+	var buf strings.Builder
+	buf.WriteString(existing)
+	for _, entry := range missing {
+		buf.WriteString(entry)
+		buf.WriteByte('\n')
+	}
+	return os.WriteFile(path, []byte(buf.String()), 0o644)
 }
 
 // EnsureScanDir creates the scan directory for a session and returns its path.

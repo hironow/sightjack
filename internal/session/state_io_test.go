@@ -196,6 +196,47 @@ func TestLoadScanResult_MalformedJSON(t *testing.T) {
 	}
 }
 
+func TestWriteGitIgnore_AppendsMissing(t *testing.T) {
+	// given: pre-existing gitignore with partial entries + user custom entry
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, domain.StateDir)
+	os.MkdirAll(sirenDir, 0755)
+	gitignorePath := filepath.Join(sirenDir, ".gitignore")
+	os.WriteFile(gitignorePath, []byte("events/\nuser-custom-entry\n"), 0644)
+
+	// when
+	err := session.WriteGitIgnore(dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("WriteGitIgnore: %v", err)
+	}
+	data, _ := os.ReadFile(gitignorePath)
+	content := string(data)
+	if !strings.Contains(content, "user-custom-entry") {
+		t.Error("user-custom-entry should be preserved")
+	}
+	if !strings.Contains(content, ".run/") {
+		t.Error(".run/ should be appended")
+	}
+	if strings.Count(content, "events/") != 1 {
+		t.Errorf("events/ should appear once, got:\n%s", content)
+	}
+}
+
+func TestWriteGitIgnore_IncludesOtelEnv(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, domain.StateDir), 0755)
+	if err := session.WriteGitIgnore(dir); err != nil {
+		t.Fatalf("WriteGitIgnore: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, domain.StateDir, ".gitignore"))
+	content := string(data)
+	if !strings.Contains(content, ".otel.env") {
+		t.Error("expected .otel.env in .gitignore")
+	}
+}
+
 func TestWriteGitIgnore_IncludesMailDirs(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, domain.StateDir), 0755)
