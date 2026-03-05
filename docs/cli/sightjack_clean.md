@@ -7,13 +7,14 @@ Remove state directory (.siren/)
 Delete the .siren/ directory to reset to a clean state. Use 'sightjack init' to reinitialize.
 
 ```
-sightjack clean [flags]
+sightjack clean [path] [flags]
 ```
 
 ### Examples
 
 ```
   sightjack clean
+  sightjack clean /path/to/project
   sightjack clean --yes
 ```
 
@@ -36,4 +37,5 @@ sightjack clean [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+

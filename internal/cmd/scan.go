@@ -18,7 +18,7 @@ func newScanCmd() *cobra.Command {
 		Short: "Classify and deep-scan Linear issues",
 		Long: `Classify and deep-scan Linear issues in the configured project.
 
-Connects to the Linear API, fetches issues, and produces a ScanResult
+Queries Linear issues via Claude MCP tools and produces a ScanResult
 with cluster classification, completeness scores, and shibito warnings.
 Use --json to output structured JSON for piping into downstream commands.`,
 		Example: `  # Interactive scan with navigator display

@@ -6,7 +6,7 @@ Classify and deep-scan Linear issues
 
 Classify and deep-scan Linear issues in the configured project.
 
-Queries Linear issues via Claude MCP tools, and produces a ScanResult
+Queries Linear issues via Claude MCP tools and produces a ScanResult
 with cluster classification, completeness scores, and shibito warnings.
 Use --json to output structured JSON for piping into downstream commands.
 
@@ -46,4 +46,5 @@ sightjack scan [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+

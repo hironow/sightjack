@@ -21,8 +21,9 @@ func newApplyCmd() *cobra.Command {
 		Long: `Apply a wave to Linear issues from stdin Wave JSON.
 
 Reads a Wave JSON (from 'select') and executes the wave plan against
-the Linear API. Outputs an ApplyResult JSON with updated completeness,
-suitable for piping into 'nextgen' for follow-up wave generation.`,
+Linear via Claude MCP tools. Outputs an ApplyResult JSON with updated
+completeness, suitable for piping into 'nextgen' for follow-up wave
+generation.`,
 		Example: `  # Apply a selected wave and generate follow-ups
   sightjack select | sightjack apply | sightjack nextgen
 

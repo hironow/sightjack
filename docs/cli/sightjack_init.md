@@ -30,11 +30,14 @@ sightjack init [path] [flags]
 ### Options
 
 ```
-  -h, --help                help for init
-      --lang string         Language (ja/en) (default "ja")
-      --project string      Linear project name
-      --strictness string   Strictness level (fog/alert/lockdown) (default "fog")
-      --team string         Linear team name
+  -h, --help                  help for init
+      --lang string           Language (ja/en) (default "ja")
+      --otel-backend string   OTel backend: jaeger, weave
+      --otel-entity string    Weave entity/team (required for weave)
+      --otel-project string   Weave project (required for weave)
+      --project string        Linear project name
+      --strictness string     Strictness level (fog/alert/lockdown) (default "fog")
+      --team string           Linear team name
 ```
 
 ### Options inherited from parent commands
@@ -48,4 +51,5 @@ sightjack init [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+
