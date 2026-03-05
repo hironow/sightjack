@@ -6,7 +6,7 @@ Classify and deep-scan Linear issues
 
 Classify and deep-scan Linear issues in the configured project.
 
-Connects to the Linear API, fetches issues, and produces a ScanResult
+Queries Linear issues via Claude MCP tools, and produces a ScanResult
 with cluster classification, completeness scores, and shibito warnings.
 Use --json to output structured JSON for piping into downstream commands.
 

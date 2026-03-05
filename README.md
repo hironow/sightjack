@@ -506,6 +506,14 @@ just jaeger-down    # Stop Jaeger
     +-- skills/                 D-Mail SKILL.md templates
 ```
 
+## Documentation
+
+- [docs/](docs/README.md) — Full documentation index
+- [docs/siren-directory.md](docs/siren-directory.md) — `.siren/` directory structure
+- [docs/policies.md](docs/policies.md) — Event → Policy mapping
+- [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/adr/](docs/adr/README.md) — Architecture Decision Records
+
 ## Prerequisites
 
 - Go 1.26+
