@@ -11,6 +11,7 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newInitCmd() *cobra.Command {
@@ -40,13 +41,29 @@ d-mail skills, and sets up mail directories.`,
 			project, _ := cmd.Flags().GetString("project")
 			lang, _ := cmd.Flags().GetString("lang")
 			strictness, _ := cmd.Flags().GetString("strictness")
-			if err := initProject(baseDir, team, project, lang, strictness, cmd.OutOrStdout()); err != nil {
-				return err
+
+			initCmd := domain.InitCommand{
+				BaseDir:    baseDir,
+				Team:       team,
+				Project:    project,
+				Lang:       lang,
+				Strictness: strictness,
 			}
+			warnings, initErr := usecase.RunInit(initCmd, &session.InitAdapter{})
+			if initErr != nil {
+				return initErr
+			}
+			w := cmd.OutOrStdout()
+			for _, warn := range warnings {
+				fmt.Fprintf(w, "Warning: %s\n", warn)
+			}
+			fmt.Fprintln(w)
+			fmt.Fprintf(w, "Created .siren/config.yaml\n")
+
 			otelBackend, _ := cmd.Flags().GetString("otel-backend")
 			otelEntity, _ := cmd.Flags().GetString("otel-entity")
 			otelProject, _ := cmd.Flags().GetString("otel-project")
-			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, cmd.OutOrStdout())
+			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, w)
 		},
 	}
 	cmd.Flags().String("team", "", "Linear team name")
@@ -57,47 +74,6 @@ d-mail skills, and sets up mail directories.`,
 	cmd.Flags().String("otel-entity", "", "Weave entity/team (required for weave)")
 	cmd.Flags().String("otel-project", "", "Weave project (required for weave)")
 	return cmd
-}
-
-// initProject creates .siren/config.yaml and supporting files using the
-// provided values directly (no interactive prompts). Empty lang or strictness
-// are filled with defaults ("ja" and "fog").
-func initProject(baseDir, team, project, lang, strictness string, w io.Writer) error {
-	if lang == "" {
-		lang = "ja"
-	}
-	if strictness == "" {
-		strictness = "fog"
-	}
-
-	cfgPath := domain.ConfigPath(baseDir)
-	if _, err := os.Stat(cfgPath); err == nil {
-		return fmt.Errorf(".siren/config.yaml already exists in %s", baseDir)
-	}
-
-	sirenDir := filepath.Join(baseDir, domain.StateDir)
-	if err := os.MkdirAll(sirenDir, 0755); err != nil {
-		return fmt.Errorf("create .siren dir: %w", err)
-	}
-
-	content := platform.RenderInitConfig(team, project, lang, strictness)
-	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("write config: %w", err)
-	}
-
-	_ = session.WriteGitIgnore(baseDir)
-
-	if err := session.InstallSkills(baseDir, platform.SkillsFS); err != nil {
-		fmt.Fprintf(w, "Warning: failed to install skills: %v\n", err)
-	}
-
-	if err := session.EnsureMailDirs(baseDir); err != nil {
-		fmt.Fprintf(w, "Warning: failed to create mail dirs: %v\n", err)
-	}
-
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Created .siren/config.yaml\n")
-	return nil
 }
 
 // writeOtelEnv writes .otel.env to the siren state directory if backend is set.

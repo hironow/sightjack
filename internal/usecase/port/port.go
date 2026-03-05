@@ -12,6 +12,12 @@ import (
 // ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
 var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
+// InitRunner handles project initialization I/O.
+// Returns warnings for non-fatal errors (e.g. skill install failures).
+type InitRunner interface {
+	InitProject(baseDir, team, project, lang, strictness string) (warnings []string, err error)
+}
+
 // EventDispatcher dispatches domain events to policy handlers.
 // Implemented by usecase.PolicyEngine; injected into session via struct field.
 type EventDispatcher interface {

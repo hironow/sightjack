@@ -10,17 +10,22 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-func TestInitProject_CreatesConfigFile(t *testing.T) {
+func TestInitCmd_CreatesConfigFile(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	var buf bytes.Buffer
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Engineering", "--project", "Hades", "--lang", "en", "--strictness", "alert", dir})
 
 	// when
-	err := initProject(dir, "Engineering", "Hades", "en", "alert", &buf)
+	err := cmd.Execute()
 
 	// then
 	if err != nil {
-		t.Fatalf("initProject failed: %v", err)
+		t.Fatalf("init failed: %v", err)
 	}
 	data, readErr := os.ReadFile(domain.ConfigPath(dir))
 	if readErr != nil {
@@ -41,17 +46,22 @@ func TestInitProject_CreatesConfigFile(t *testing.T) {
 	}
 }
 
-func TestInitProject_DefaultLangAndStrictness(t *testing.T) {
+func TestInitCmd_DefaultLangAndStrictness(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	var buf bytes.Buffer
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := initProject(dir, "Team", "Project", "", "", &buf)
+	err := cmd.Execute()
 
 	// then
 	if err != nil {
-		t.Fatalf("initProject failed: %v", err)
+		t.Fatalf("init failed: %v", err)
 	}
 	data, _ := os.ReadFile(domain.ConfigPath(dir))
 	content := string(data)
@@ -63,15 +73,20 @@ func TestInitProject_DefaultLangAndStrictness(t *testing.T) {
 	}
 }
 
-func TestInitProject_AlreadyExists(t *testing.T) {
+func TestInitCmd_AlreadyExists(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 	os.WriteFile(domain.ConfigPath(dir), []byte("existing"), 0644)
-	var buf bytes.Buffer
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := initProject(dir, "Team", "Project", "", "", &buf)
+	err := cmd.Execute()
 
 	// then
 	if err == nil {
@@ -82,17 +97,22 @@ func TestInitProject_AlreadyExists(t *testing.T) {
 	}
 }
 
-func TestInitProject_CreatesGitIgnore(t *testing.T) {
+func TestInitCmd_CreatesGitIgnore(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	var buf bytes.Buffer
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := initProject(dir, "Team", "Project", "", "", &buf)
+	err := cmd.Execute()
 
 	// then
 	if err != nil {
-		t.Fatalf("initProject failed: %v", err)
+		t.Fatalf("init failed: %v", err)
 	}
 	data, readErr := os.ReadFile(filepath.Join(dir, ".siren", ".gitignore"))
 	if readErr != nil {
@@ -103,17 +123,22 @@ func TestInitProject_CreatesGitIgnore(t *testing.T) {
 	}
 }
 
-func TestInitProject_InstallsSkills(t *testing.T) {
+func TestInitCmd_InstallsSkills(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	var buf bytes.Buffer
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := initProject(dir, "Team", "Project", "", "", &buf)
+	err := cmd.Execute()
 
 	// then
 	if err != nil {
-		t.Fatalf("initProject failed: %v", err)
+		t.Fatalf("init failed: %v", err)
 	}
 	data, readErr := os.ReadFile(filepath.Join(dir, ".siren", "skills", "dmail-sendable", "SKILL.md"))
 	if readErr != nil {
@@ -124,17 +149,22 @@ func TestInitProject_InstallsSkills(t *testing.T) {
 	}
 }
 
-func TestInitProject_CreatesMailDirs(t *testing.T) {
+func TestInitCmd_CreatesMailDirs(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	var buf bytes.Buffer
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := initProject(dir, "Team", "Project", "", "", &buf)
+	err := cmd.Execute()
 
 	// then
 	if err != nil {
-		t.Fatalf("initProject failed: %v", err)
+		t.Fatalf("init failed: %v", err)
 	}
 	for _, sub := range []string{"inbox", "outbox", "archive"} {
 		path := filepath.Join(dir, ".siren", sub)
@@ -148,8 +178,6 @@ func TestInitProject_CreatesMailDirs(t *testing.T) {
 		}
 	}
 }
-
-// === P1-5: Flag-based init (no interactive prompts) ===
 
 func TestInitCmd_FlagsOnly(t *testing.T) {
 	// given — init via cobra command with flags, no stdin

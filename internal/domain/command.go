@@ -4,6 +4,35 @@ import (
 	"fmt"
 )
 
+// InitCommand represents the intent to initialize a sightjack project.
+type InitCommand struct {
+	BaseDir    string
+	Team       string
+	Project    string
+	Lang       string
+	Strictness string
+}
+
+// WithDefaults returns a copy with empty Lang/Strictness filled in.
+func (c InitCommand) WithDefaults() InitCommand {
+	if c.Lang == "" {
+		c.Lang = "ja"
+	}
+	if c.Strictness == "" {
+		c.Strictness = "fog"
+	}
+	return c
+}
+
+// Validate checks that the command has valid required fields.
+func (c *InitCommand) Validate() []error {
+	var errs []error
+	if c.BaseDir == "" {
+		errs = append(errs, fmt.Errorf("BaseDir is required"))
+	}
+	return errs
+}
+
 // RunScanCommand represents the intent to run a sightjack scan.
 // Independent of cobra — framework concerns are separated at the cmd layer.
 type RunScanCommand struct {
