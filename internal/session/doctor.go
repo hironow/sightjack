@@ -20,6 +20,7 @@ func CheckConfig(configPath string) domain.CheckResult {
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", configPath, err),
+			Hint:    `run "sightjack init --team <TEAM> --project <PROJECT>" to create a config file`,
 		}
 	}
 	return domain.CheckResult{
@@ -38,6 +39,7 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: "command not found",
+			Hint:    fmt.Sprintf("install %s and ensure it is in PATH", name),
 		}
 	}
 
@@ -47,6 +49,7 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("found at %s but --version failed: %v", path, err),
+			Hint:    fmt.Sprintf("%s may be corrupted; reinstall it", name),
 		}
 	}
 
@@ -85,6 +88,7 @@ func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger domain.Logg
 			Name:    "Claude Auth",
 			Status:  domain.CheckFail,
 			Message: hint,
+			Hint:    `check Claude CLI with "claude --version"; if auth issue, run "claude login"`,
 		}
 	}
 
@@ -134,6 +138,7 @@ func CheckStateDir(baseDir string) domain.CheckResult {
 			Name:    "State Dir",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("cannot create %s: %v", dir, err),
+			Hint:    `check directory permissions or run "sightjack init"`,
 		}
 	}
 	probe := filepath.Join(dir, ".doctor_probe")
@@ -142,6 +147,7 @@ func CheckStateDir(baseDir string) domain.CheckResult {
 			Name:    "State Dir",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s is not writable: %v", dir, err),
+			Hint:    "check file permissions on the .siren/ directory",
 		}
 	}
 	_ = os.Remove(probe)
@@ -166,6 +172,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 				Name:    "Skills",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md: %v", name, err),
+				Hint:    `run "sightjack init" to regenerate skill files`,
 			}
 		}
 		content := string(data)
@@ -174,6 +181,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 				Name:    "Skills",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md: missing dmail-schema-version", name),
+				Hint:    `run "sightjack init" to regenerate skill files`,
 			}
 		}
 	}
