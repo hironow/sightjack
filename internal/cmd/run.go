@@ -72,6 +72,12 @@ if event data is found in .siren/events/.`,
 				cfg.Gate.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
 			}
 
+			// Parse base directory into domain primitive (used by all command constructions below)
+			rp, rpErr := domain.NewRepoPath(baseDir)
+			if rpErr != nil {
+				return rpErr
+			}
+
 			runner := session.NewSessionRunnerAdapter()
 			factory := session.NewRecorderFactoryAdapter()
 
@@ -111,20 +117,15 @@ if event data is found in .siren/events/.`,
 							if recErr != nil {
 								return fmt.Errorf("resume recorder: %w", recErr)
 							}
-							return usecase.ResumeSession(cmd.Context(), domain.ResumeSessionCommand{
-								RepoPath:  baseDir,
-								SessionID: resumableSessionID,
-							}, cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
+							resumeSID, _ := domain.NewSessionID(resumableSessionID)
+							return usecase.ResumeSession(cmd.Context(), domain.NewResumeSessionCommand(rp, resumeSID), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
 						case domain.ResumeChoiceRescan:
 							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 							rescanRecorder, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, rescanID), rescanID, logger)
 							if recErr != nil {
 								return fmt.Errorf("rescan recorder: %w", recErr)
 							}
-							return usecase.RescanSession(cmd.Context(), domain.RunSessionCommand{
-								RepoPath: baseDir,
-								DryRun:   dryRun,
-							}, cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
+							return usecase.RescanSession(cmd.Context(), domain.NewRunSessionCommand(rp, dryRun), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
 						case domain.ResumeChoiceNew:
 							goto freshSession
 						}
@@ -144,10 +145,7 @@ if event data is found in .siren/events/.`,
 				}
 				recorder = rec
 			}
-			return usecase.RunSession(cmd.Context(), domain.RunSessionCommand{
-				RepoPath: baseDir,
-				DryRun:   dryRun,
-			}, cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger, &platform.OTelPolicyMetrics{}, runner)
+			return usecase.RunSession(cmd.Context(), domain.NewRunSessionCommand(rp, dryRun), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), recorder, logger, &platform.OTelPolicyMetrics{}, runner)
 		},
 	}
 

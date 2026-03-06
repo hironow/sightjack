@@ -42,13 +42,19 @@ d-mail skills, and sets up mail directories.`,
 			lang, _ := cmd.Flags().GetString("lang")
 			strictness, _ := cmd.Flags().GetString("strictness")
 
-			initCmd := domain.InitCommand{
-				BaseDir:    baseDir,
-				Team:       team,
-				Project:    project,
-				Lang:       lang,
-				Strictness: strictness,
+			// Apply defaults at cmd layer (previously done by WithDefaults)
+			if lang == "" {
+				lang = "ja"
 			}
+			if strictness == "" {
+				strictness = "fog"
+			}
+
+			rp, rpErr := domain.NewRepoPath(baseDir)
+			if rpErr != nil {
+				return rpErr
+			}
+			initCmd := domain.NewInitCommand(rp, team, project, lang, strictness)
 			warnings, initErr := usecase.RunInit(initCmd, &session.InitAdapter{})
 			if initErr != nil {
 				return initErr

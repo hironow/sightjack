@@ -31,7 +31,8 @@ func (s *stubInitRunner) InitProject(baseDir, team, project, lang, strictness st
 
 func TestRunInit_ValidCommand(t *testing.T) {
 	runner := &stubInitRunner{}
-	cmd := domain.InitCommand{BaseDir: "/tmp/repo", Team: "Eng", Project: "Hades", Lang: "en", Strictness: "alert"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp, "Eng", "Hades", "en", "alert")
 
 	warnings, err := usecase.RunInit(cmd, runner)
 
@@ -54,7 +55,9 @@ func TestRunInit_ValidCommand(t *testing.T) {
 
 func TestRunInit_WithDefaults(t *testing.T) {
 	runner := &stubInitRunner{}
-	cmd := domain.InitCommand{BaseDir: "/tmp/repo"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	// Defaults applied at cmd layer: lang="ja", strictness="fog"
+	cmd := domain.NewInitCommand(rp, "", "", "ja", "fog")
 
 	_, err := usecase.RunInit(cmd, runner)
 
@@ -69,23 +72,10 @@ func TestRunInit_WithDefaults(t *testing.T) {
 	}
 }
 
-func TestRunInit_EmptyBaseDir(t *testing.T) {
-	runner := &stubInitRunner{}
-	cmd := domain.InitCommand{BaseDir: ""}
-
-	_, err := usecase.RunInit(cmd, runner)
-
-	if err == nil {
-		t.Fatal("expected error for empty BaseDir")
-	}
-	if runner.called {
-		t.Fatal("expected InitProject not to be called")
-	}
-}
-
 func TestRunInit_PropagatesWarnings(t *testing.T) {
 	runner := &stubInitRunner{warnings: []string{"skills install failed"}}
-	cmd := domain.InitCommand{BaseDir: "/tmp/repo"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp, "", "", "ja", "fog")
 
 	warnings, err := usecase.RunInit(cmd, runner)
 
@@ -99,7 +89,8 @@ func TestRunInit_PropagatesWarnings(t *testing.T) {
 
 func TestRunInit_RunnerError(t *testing.T) {
 	runner := &stubInitRunner{err: fmt.Errorf("config exists")}
-	cmd := domain.InitCommand{BaseDir: "/tmp/repo"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp, "", "", "ja", "fog")
 
 	_, err := usecase.RunInit(cmd, runner)
 
@@ -108,26 +99,5 @@ func TestRunInit_RunnerError(t *testing.T) {
 	}
 }
 
-func TestInitCommand_WithDefaults(t *testing.T) {
-	cmd := domain.InitCommand{BaseDir: "/tmp", Lang: "", Strictness: ""}
-	got := cmd.WithDefaults()
-
-	if got.Lang != "ja" {
-		t.Errorf("expected ja, got %q", got.Lang)
-	}
-	if got.Strictness != "fog" {
-		t.Errorf("expected fog, got %q", got.Strictness)
-	}
-}
-
-func TestInitCommand_WithDefaults_PreservesExplicit(t *testing.T) {
-	cmd := domain.InitCommand{BaseDir: "/tmp", Lang: "en", Strictness: "lockdown"}
-	got := cmd.WithDefaults()
-
-	if got.Lang != "en" {
-		t.Errorf("expected en preserved, got %q", got.Lang)
-	}
-	if got.Strictness != "lockdown" {
-		t.Errorf("expected lockdown preserved, got %q", got.Strictness)
-	}
-}
+// Validation tests (empty BaseDir) are now in domain/primitives_test.go.
+// WithDefaults tests removed — defaults are applied at cmd layer before construction.

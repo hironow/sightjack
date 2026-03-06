@@ -1,56 +1,5 @@
 package usecase
 
-import (
-	"context"
-	"io"
-	"testing"
-
-	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/usecase/port"
-)
-
-func TestRunSession_InvalidCommand(t *testing.T) {
-	// given: empty RepoPath
-	cmd := domain.RunSessionCommand{}
-
-	// when: runner is nil because validation should fail before it is used
-	err := RunSession(context.Background(), cmd, nil, "", "", false, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil, nil)
-
-	// then
-	if err == nil {
-		t.Fatal("expected validation error for empty RepoPath")
-	}
-	if got := err.Error(); got != "command validation: RepoPath is required" {
-		t.Fatalf("unexpected error: %s", got)
-	}
-}
-
-func TestResumeSession_InvalidCommand(t *testing.T) {
-	// given: empty SessionID
-	cmd := domain.ResumeSessionCommand{RepoPath: "/tmp"}
-
-	// when: runner is nil because validation should fail before it is used
-	err := ResumeSession(context.Background(), cmd, nil, "", nil, nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil, nil)
-
-	// then
-	if err == nil {
-		t.Fatal("expected validation error for empty SessionID")
-	}
-	if got := err.Error(); got != "command validation: SessionID is required" {
-		t.Fatalf("unexpected error: %s", got)
-	}
-}
-
-func TestRescanSession_InvalidCommand(t *testing.T) {
-	// given: empty RepoPath
-	cmd := domain.RunSessionCommand{}
-
-	// when: runner is nil because validation should fail before it is used
-	err := RescanSession(context.Background(), cmd, nil, "", nil, "", nil, io.Discard, port.NopRecorder{}, platform.NewLogger(io.Discard, false), nil, nil)
-
-	// then
-	if err == nil {
-		t.Fatal("expected validation error for empty RepoPath")
-	}
-}
+// Validation tests for RunSessionCommand, ResumeSessionCommand, and RescanSession
+// have been moved to domain/primitives_test.go (parse-don't-validate).
+// The usecase layer no longer calls Validate() — commands are always-valid by construction.

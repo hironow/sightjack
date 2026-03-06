@@ -1,145 +1,91 @@
 package domain
 
-import (
-	"fmt"
-)
-
 // InitCommand represents the intent to initialize a sightjack project.
 type InitCommand struct {
-	BaseDir    string
-	Team       string
-	Project    string
-	Lang       string
-	Strictness string
+	baseDir    RepoPath
+	team       string
+	project    string
+	lang       string
+	strictness string
 }
 
-// WithDefaults returns a copy with empty Lang/Strictness filled in.
-func (c InitCommand) WithDefaults() InitCommand {
-	if c.Lang == "" {
-		c.Lang = "ja"
-	}
-	if c.Strictness == "" {
-		c.Strictness = "fog"
-	}
-	return c
+func NewInitCommand(baseDir RepoPath, team, project, lang, strictness string) InitCommand {
+	return InitCommand{baseDir: baseDir, team: team, project: project, lang: lang, strictness: strictness}
 }
 
-// Validate checks that the command has valid required fields.
-func (c *InitCommand) Validate() []error {
-	var errs []error
-	if c.BaseDir == "" {
-		errs = append(errs, fmt.Errorf("BaseDir is required"))
-	}
-	return errs
-}
+func (c InitCommand) BaseDir() RepoPath  { return c.baseDir }
+func (c InitCommand) Team() string        { return c.team }
+func (c InitCommand) Project() string     { return c.project }
+func (c InitCommand) Lang() string        { return c.lang }
+func (c InitCommand) Strictness() string  { return c.strictness }
 
 // RunScanCommand represents the intent to run a sightjack scan.
-// Independent of cobra — framework concerns are separated at the cmd layer.
 type RunScanCommand struct {
-	RepoPath   string
-	Lang       string
-	Strictness string
-	DryRun     bool
+	repoPath RepoPath
+	dryRun   bool
 }
 
-// Validate checks that the command has valid required fields.
-func (c *RunScanCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	if c.Lang != "" && !ValidLang(c.Lang) {
-		errs = append(errs, fmt.Errorf("invalid lang %q (valid: ja, en)", c.Lang))
-	}
-	if c.Strictness != "" {
-		if _, err := ParseStrictnessLevel(c.Strictness); err != nil {
-			errs = append(errs, fmt.Errorf("invalid strictness %q", c.Strictness))
-		}
-	}
-	return errs
+func NewRunScanCommand(repoPath RepoPath, dryRun bool) RunScanCommand {
+	return RunScanCommand{repoPath: repoPath, dryRun: dryRun}
 }
+
+func (c RunScanCommand) RepoPath() RepoPath { return c.repoPath }
+func (c RunScanCommand) DryRun() bool        { return c.dryRun }
 
 // RunSessionCommand represents the intent to start an interactive session.
 type RunSessionCommand struct {
-	RepoPath    string
-	DryRun      bool
-	AutoApprove bool
-	NotifyCmd   string
-	ApproveCmd  string
-	ReviewCmd   string
+	repoPath RepoPath
+	dryRun   bool
 }
 
-// Validate checks that the command has valid required fields.
-func (c *RunSessionCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	return errs
+func NewRunSessionCommand(repoPath RepoPath, dryRun bool) RunSessionCommand {
+	return RunSessionCommand{repoPath: repoPath, dryRun: dryRun}
 }
+
+func (c RunSessionCommand) RepoPath() RepoPath { return c.repoPath }
+func (c RunSessionCommand) DryRun() bool        { return c.dryRun }
 
 // ResumeSessionCommand represents the intent to resume an existing session.
 type ResumeSessionCommand struct {
-	RepoPath  string
-	SessionID string
+	repoPath  RepoPath
+	sessionID SessionID
 }
 
-// Validate checks that the command has valid required fields.
-func (c *ResumeSessionCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	if c.SessionID == "" {
-		errs = append(errs, fmt.Errorf("SessionID is required"))
-	}
-	return errs
+func NewResumeSessionCommand(repoPath RepoPath, sessionID SessionID) ResumeSessionCommand {
+	return ResumeSessionCommand{repoPath: repoPath, sessionID: sessionID}
 }
+
+func (c ResumeSessionCommand) RepoPath() RepoPath    { return c.repoPath }
+func (c ResumeSessionCommand) SessionID() SessionID   { return c.sessionID }
 
 // ApplyWaveCommand represents the intent to approve and apply a wave.
 type ApplyWaveCommand struct {
-	RepoPath    string
-	SessionID   string
-	ClusterName string
+	repoPath    RepoPath
+	sessionID   SessionID
+	clusterName ClusterName
 }
 
-// Validate checks that the command has valid required fields.
-func (c *ApplyWaveCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	if c.SessionID == "" {
-		errs = append(errs, fmt.Errorf("SessionID is required"))
-	}
-	if c.ClusterName == "" {
-		errs = append(errs, fmt.Errorf("ClusterName is required"))
-	}
-	return errs
+func NewApplyWaveCommand(repoPath RepoPath, sessionID SessionID, clusterName ClusterName) ApplyWaveCommand {
+	return ApplyWaveCommand{repoPath: repoPath, sessionID: sessionID, clusterName: clusterName}
 }
+
+func (c ApplyWaveCommand) RepoPath() RepoPath        { return c.repoPath }
+func (c ApplyWaveCommand) SessionID() SessionID       { return c.sessionID }
+func (c ApplyWaveCommand) ClusterName() ClusterName   { return c.clusterName }
 
 // DiscussWaveCommand represents the intent to discuss a specific wave topic.
 type DiscussWaveCommand struct {
-	RepoPath    string
-	SessionID   string
-	ClusterName string
-	Topic       string
+	repoPath    RepoPath
+	sessionID   SessionID
+	clusterName ClusterName
+	topic       Topic
 }
 
-// Validate checks that the command has valid required fields.
-func (c *DiscussWaveCommand) Validate() []error {
-	var errs []error
-	if c.RepoPath == "" {
-		errs = append(errs, fmt.Errorf("RepoPath is required"))
-	}
-	if c.SessionID == "" {
-		errs = append(errs, fmt.Errorf("SessionID is required"))
-	}
-	if c.ClusterName == "" {
-		errs = append(errs, fmt.Errorf("ClusterName is required"))
-	}
-	if c.Topic == "" {
-		errs = append(errs, fmt.Errorf("Topic is required"))
-	}
-	return errs
+func NewDiscussWaveCommand(repoPath RepoPath, sessionID SessionID, clusterName ClusterName, topic Topic) DiscussWaveCommand {
+	return DiscussWaveCommand{repoPath: repoPath, sessionID: sessionID, clusterName: clusterName, topic: topic}
 }
+
+func (c DiscussWaveCommand) RepoPath() RepoPath        { return c.repoPath }
+func (c DiscussWaveCommand) SessionID() SessionID       { return c.sessionID }
+func (c DiscussWaveCommand) ClusterName() ClusterName   { return c.clusterName }
+func (c DiscussWaveCommand) Topic() Topic               { return c.topic }

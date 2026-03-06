@@ -6,176 +6,98 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-func TestRunScanCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.RunScanCommand{
-		RepoPath:   "/tmp/repo",
-		Lang:       "ja",
-		Strictness: "fog",
+func TestNewInitCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp, "Eng", "Hades", "en", "alert")
+
+	if cmd.BaseDir().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %q", cmd.BaseDir().String())
 	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	if cmd.Team() != "Eng" {
+		t.Errorf("expected Eng, got %q", cmd.Team())
 	}
-}
-
-func TestRunScanCommand_Validate_MissingRepoPath(t *testing.T) {
-	// given
-	cmd := domain.RunScanCommand{
-		Lang:       "ja",
-		Strictness: "fog",
+	if cmd.Project() != "Hades" {
+		t.Errorf("expected Hades, got %q", cmd.Project())
 	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for missing RepoPath")
+	if cmd.Lang() != "en" {
+		t.Errorf("expected en, got %q", cmd.Lang())
+	}
+	if cmd.Strictness() != "alert" {
+		t.Errorf("expected alert, got %q", cmd.Strictness())
 	}
 }
 
-func TestRunScanCommand_Validate_InvalidLang(t *testing.T) {
-	// given
-	cmd := domain.RunScanCommand{
-		RepoPath:   "/tmp/repo",
-		Lang:       "jp",
-		Strictness: "fog",
+func TestNewRunScanCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewRunScanCommand(rp, true)
+
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %q", cmd.RepoPath().String())
 	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for invalid lang")
+	if !cmd.DryRun() {
+		t.Error("expected DryRun to be true")
 	}
 }
 
-func TestRunSessionCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.RunSessionCommand{
-		RepoPath: "/tmp/repo",
+func TestNewRunSessionCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewRunSessionCommand(rp, false)
+
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %q", cmd.RepoPath().String())
 	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	if cmd.DryRun() {
+		t.Error("expected DryRun to be false")
 	}
 }
 
-func TestRunSessionCommand_Validate_MissingRepoPath(t *testing.T) {
-	// given
-	cmd := domain.RunSessionCommand{}
+func TestNewResumeSessionCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	sid, _ := domain.NewSessionID("session-123")
+	cmd := domain.NewResumeSessionCommand(rp, sid)
 
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for missing RepoPath")
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %q", cmd.RepoPath().String())
+	}
+	if cmd.SessionID().String() != "session-123" {
+		t.Errorf("expected session-123, got %q", cmd.SessionID().String())
 	}
 }
 
-func TestResumeSessionCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.ResumeSessionCommand{
-		RepoPath:  "/tmp/repo",
-		SessionID: "session-123",
+func TestNewApplyWaveCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	sid, _ := domain.NewSessionID("session-123")
+	cn, _ := domain.NewClusterName("C1")
+	cmd := domain.NewApplyWaveCommand(rp, sid, cn)
+
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %q", cmd.RepoPath().String())
 	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	if cmd.SessionID().String() != "session-123" {
+		t.Errorf("expected session-123, got %q", cmd.SessionID().String())
 	}
-}
-
-func TestResumeSessionCommand_Validate_MissingSessionID(t *testing.T) {
-	// given
-	cmd := domain.ResumeSessionCommand{
-		RepoPath: "/tmp/repo",
-	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for missing SessionID")
+	if cmd.ClusterName().String() != "C1" {
+		t.Errorf("expected C1, got %q", cmd.ClusterName().String())
 	}
 }
 
-func TestApplyWaveCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.ApplyWaveCommand{
-		RepoPath:    "/tmp/repo",
-		SessionID:   "session-123",
-		ClusterName: "C1",
+func TestNewDiscussWaveCommand(t *testing.T) {
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	sid, _ := domain.NewSessionID("session-123")
+	cn, _ := domain.NewClusterName("C1")
+	tp, _ := domain.NewTopic("design question")
+	cmd := domain.NewDiscussWaveCommand(rp, sid, cn, tp)
+
+	if cmd.RepoPath().String() != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %q", cmd.RepoPath().String())
 	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	if cmd.SessionID().String() != "session-123" {
+		t.Errorf("expected session-123, got %q", cmd.SessionID().String())
 	}
-}
-
-func TestApplyWaveCommand_Validate_MissingFields(t *testing.T) {
-	// given
-	cmd := domain.ApplyWaveCommand{}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) < 2 {
-		t.Fatalf("expected at least 2 validation errors, got %d: %v", len(errs), errs)
+	if cmd.ClusterName().String() != "C1" {
+		t.Errorf("expected C1, got %q", cmd.ClusterName().String())
 	}
-}
-
-func TestDiscussWaveCommand_Validate_Valid(t *testing.T) {
-	// given
-	cmd := domain.DiscussWaveCommand{
-		RepoPath:    "/tmp/repo",
-		SessionID:   "session-123",
-		ClusterName: "C1",
-		Topic:       "design question",
-	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) > 0 {
-		t.Errorf("expected no errors, got %v", errs)
-	}
-}
-
-func TestDiscussWaveCommand_Validate_MissingTopic(t *testing.T) {
-	// given
-	cmd := domain.DiscussWaveCommand{
-		RepoPath:    "/tmp/repo",
-		SessionID:   "session-123",
-		ClusterName: "C1",
-	}
-
-	// when
-	errs := cmd.Validate()
-
-	// then
-	if len(errs) == 0 {
-		t.Fatal("expected validation error for missing Topic")
+	if cmd.Topic().String() != "design question" {
+		t.Errorf("expected 'design question', got %q", cmd.Topic().String())
 	}
 }

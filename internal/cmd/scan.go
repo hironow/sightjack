@@ -52,12 +52,12 @@ Use --json to output structured JSON for piping into downstream commands.`,
 				streamOut = cmd.ErrOrStderr()
 			}
 			sessionID := fmt.Sprintf("scan-%d-%d", time.Now().UnixMilli(), os.Getpid())
-			result, err := usecase.RunScan(cmd.Context(), domain.RunScanCommand{
-				RepoPath:   baseDir,
-				Lang:       cfg.Lang,
-				Strictness: string(cfg.Strictness.Default),
-				DryRun:     dryRun,
-			}, cfg, baseDir, sessionID, dryRun, streamOut, logger, session.NewScanRunnerAdapter(), session.NewRecorderFactoryAdapter())
+			rp, rpErr := domain.NewRepoPath(baseDir)
+			if rpErr != nil {
+				return rpErr
+			}
+			scanCmd := domain.NewRunScanCommand(rp, dryRun)
+			result, err := usecase.RunScan(cmd.Context(), scanCmd, cfg, baseDir, sessionID, dryRun, streamOut, logger, session.NewScanRunnerAdapter(), session.NewRecorderFactoryAdapter())
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
 			}

@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -10,13 +9,9 @@ import (
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
-// RunScan validates the RunScanCommand, executes the scan, caches the result,
-// and records session events — all in a single atomic usecase call.
-// The sessionID is provided by the caller (typically generated in cmd layer).
+// RunScan executes the scan, caches the result, and records session events.
+// The command is always-valid by construction — no validation needed.
 func RunScan(ctx context.Context, cmd domain.RunScanCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger domain.Logger, scanner port.ScanRunner, factory port.RecorderFactory) (*domain.ScanResult, error) {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return nil, fmt.Errorf("command validation: %w", errs[0])
-	}
 	result, err := scanner.RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, logger)
 	if err != nil {
 		return nil, err
