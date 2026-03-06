@@ -489,7 +489,7 @@ just jaeger-down    # Stop Jaeger
 |   +-- projection.go           Event projection
 |   +-- scan.go                 Scan utilities
 |   +-- wave.go                 Wave scheduling
-+-- internal/eventsource/       Event store infrastructure
++-- internal/eventsource/       Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
 |   +-- store_file.go           FileEventStore (JSONL append-only)
 |   +-- lifecycle.go            Event file expiry + pruning
 |   +-- loader.go               Event loader
