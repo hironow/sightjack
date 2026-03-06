@@ -502,7 +502,7 @@ just jaeger-down    # Stop Jaeger
 +-- .semgrep/                   Semgrep rules (layer enforcement)
 +-- docs/cli/                   Auto-generated CLI reference
 +-- docker/                     Jaeger v2 for trace viewing
-+-- templates/                  AI prompt templates ({en,ja})
++-- internal/platform/templates/    AI prompt templates ({en,ja})
     +-- skills/                 D-Mail SKILL.md templates
 ```
 
