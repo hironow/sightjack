@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-
-	sightjack "github.com/hironow/sightjack"
 )
 
 // FilterConvergence returns convergence-kind D-Mails from the slice.
@@ -27,13 +28,13 @@ func FilterConvergence(dmails []*DMail) []*DMail {
 // RunConvergenceGate checks for convergence D-Mails and runs the
 // notify + approve flow. Returns true if approved or no convergence found.
 // Returns false if denied. Returns error on failure (fail-closed).
-func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (bool, error) {
+func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Notifier, approver port.Approver, logger domain.Logger) (bool, error) {
 	convergence := FilterConvergence(dmails)
 	if len(convergence) == 0 {
 		return true, nil
 	}
 
-	ctx, gateSpan := sightjack.Tracer.Start(ctx, "gate.convergence",
+	ctx, gateSpan := platform.Tracer.Start(ctx, "gate.convergence",
 		trace.WithAttributes(
 			attribute.Int("gate.convergence.count", len(convergence)),
 		),
@@ -53,7 +54,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier sightjack
 	if notifier != nil {
 		notifySpanCtx := trace.ContextWithSpan(context.Background(), trace.SpanFromContext(ctx))
 		go func(spanCtx context.Context, title, msg string) {
-			_, notifySpan := sightjack.Tracer.Start(spanCtx, "notify.convergence")
+			_, notifySpan := platform.Tracer.Start(spanCtx, "notify.convergence")
 			defer notifySpan.End()
 			notifyCtx, cancel := context.WithTimeout(spanCtx, 30*time.Second)
 			defer cancel()
@@ -91,7 +92,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier sightjack
 // and any error. The loop exits when no new convergence D-Mails arrived
 // during the approval prompt.
 func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
-	notifier sightjack.Notifier, approver sightjack.Approver, logger *sightjack.Logger) (dmails []*DMail, approved bool, err error) {
+	notifier port.Notifier, approver port.Approver, logger domain.Logger) (dmails []*DMail, approved bool, err error) {
 	all := append([]*DMail{}, initial...)
 	for {
 		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)
@@ -112,21 +113,21 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 
 // BuildNotifier creates the appropriate Notifier based on config.
 // If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
-func BuildNotifier(cfg *sightjack.Config) sightjack.Notifier {
-	if cfg.Gate.NotifyCmd != "" {
-		return NewCmdNotifier(cfg.Gate.NotifyCmd)
+func BuildNotifier(gate domain.GateConfig) port.Notifier {
+	if gate.HasNotifyCmd() {
+		return NewCmdNotifier(gate.NotifyCmdString())
 	}
 	return &LocalNotifier{}
 }
 
 // BuildApprover creates the appropriate Approver based on config.
 // Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(cfg *sightjack.Config, input io.Reader, out io.Writer) sightjack.Approver {
-	if cfg.Gate.AutoApprove {
-		return &sightjack.AutoApprover{}
+func BuildApprover(gate domain.GateConfig, input io.Reader, out io.Writer) port.Approver {
+	if gate.IsAutoApprove() {
+		return &port.AutoApprover{}
 	}
-	if cfg.Gate.ApproveCmd != "" {
-		return NewCmdApprover(cfg.Gate.ApproveCmd)
+	if gate.HasApproveCmd() {
+		return NewCmdApprover(gate.ApproveCmdString())
 	}
 	return NewStdinApprover(input, out)
 }

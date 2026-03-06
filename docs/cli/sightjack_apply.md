@@ -7,8 +7,9 @@ Apply a wave to Linear from stdin Wave JSON
 Apply a wave to Linear issues from stdin Wave JSON.
 
 Reads a Wave JSON (from 'select') and executes the wave plan against
-the Linear API. Outputs an ApplyResult JSON with updated completeness,
-suitable for piping into 'nextgen' for follow-up wave generation.
+Linear via Claude MCP tools. Outputs an ApplyResult JSON with updated
+completeness, suitable for piping into 'nextgen' for follow-up wave
+generation.
 
 ```
 sightjack apply [path] [flags]
@@ -36,6 +37,7 @@ sightjack apply [path] [flags]
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```
 

@@ -6,18 +6,18 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // LoadConfig reads a YAML config file and returns a Config with defaults
 // applied for any fields not specified in the file.
-func LoadConfig(path string) (*sightjack.Config, error) {
+func LoadConfig(path string) (*domain.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
 
-	cfg := sightjack.DefaultConfig()
+	cfg := domain.DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
@@ -28,11 +28,17 @@ func LoadConfig(path string) (*sightjack.Config, error) {
 	if cfg.Scan.MaxConcurrency < 1 {
 		cfg.Scan.MaxConcurrency = 1
 	}
-	if cfg.Claude.TimeoutSec < 1 {
-		cfg.Claude.TimeoutSec = 300
+	if cfg.Assistant.Command == "" {
+		cfg.Assistant.Command = "claude"
 	}
-	if !cfg.Strictness.Default.Valid() {
-		cfg.Strictness.Default = sightjack.StrictnessFog
+	if cfg.Assistant.Model == "" {
+		cfg.Assistant.Model = "opus"
+	}
+	if cfg.Assistant.TimeoutSec < 1 {
+		cfg.Assistant.TimeoutSec = 300
+	}
+	if !cfg.Strictness.Default.Valid() { // nosemgrep: lod-excessive-dot-chain [permanent]
+		cfg.Strictness.Default = domain.StrictnessFog
 	}
 	for label, level := range cfg.Strictness.Overrides {
 		if !level.Valid() {
@@ -46,7 +52,7 @@ func LoadConfig(path string) (*sightjack.Config, error) {
 		cfg.Retry.BaseDelaySec = 2
 	}
 	if cfg.Labels.Enabled {
-		defCfg := sightjack.DefaultConfig()
+		defCfg := domain.DefaultConfig()
 		if cfg.Labels.Prefix == "" {
 			cfg.Labels.Prefix = defCfg.Labels.Prefix
 		}

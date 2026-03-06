@@ -40,6 +40,7 @@ sightjack run [path] [flags]
       --auto-approve         Skip approval gate for convergence D-Mail
   -h, --help                 help for run
       --notify-cmd string    Notification command ({title}, {message} placeholders)
+      --review-cmd string    Review command (exit 0 = pass, non-zero = comments found)
 ```
 
 ### Options inherited from parent commands
@@ -48,6 +49,7 @@ sightjack run [path] [flags]
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```
 

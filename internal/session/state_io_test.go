@@ -6,14 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestWriteGitIgnore(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	sirenDir := filepath.Join(dir, sightjack.StateDir)
+	sirenDir := filepath.Join(dir, domain.StateDir)
 	os.MkdirAll(sirenDir, 0755)
 
 	// when
@@ -39,7 +39,7 @@ func TestWriteGitIgnore(t *testing.T) {
 func TestWriteGitIgnore_Idempotent(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	sirenDir := filepath.Join(dir, sightjack.StateDir)
+	sirenDir := filepath.Join(dir, domain.StateDir)
 	os.MkdirAll(sirenDir, 0755)
 
 	// when: call twice
@@ -72,7 +72,7 @@ func TestEnsureScanDir_CreatesGitIgnore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureScanDir failed: %v", err)
 	}
-	data, readErr := os.ReadFile(filepath.Join(dir, sightjack.StateDir, ".gitignore"))
+	data, readErr := os.ReadFile(filepath.Join(dir, domain.StateDir, ".gitignore"))
 	if readErr != nil {
 		t.Fatalf(".gitignore not created: %v", readErr)
 	}
@@ -86,12 +86,12 @@ func TestWriteAndLoadScanResult_RoundTrip(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	path := filepath.Join(dir, "scan_result.json")
-	original := &sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
+	original := &domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
 			{
 				Name:         "Auth",
 				Completeness: 0.25,
-				Issues: []sightjack.IssueDetail{
+				Issues: []domain.IssueDetail{
 					{ID: "ENG-101", Identifier: "ENG-101", Title: "Login", Completeness: 0.30},
 				},
 				Observations: []string{"Missing MFA"},
@@ -99,7 +99,7 @@ func TestWriteAndLoadScanResult_RoundTrip(t *testing.T) {
 			{
 				Name:         "API",
 				Completeness: 0.40,
-				Issues: []sightjack.IssueDetail{
+				Issues: []domain.IssueDetail{
 					{ID: "ENG-201", Identifier: "ENG-201", Title: "Rate limit", Completeness: 0.40},
 				},
 				Observations: []string{"No throttling"},
@@ -196,13 +196,54 @@ func TestLoadScanResult_MalformedJSON(t *testing.T) {
 	}
 }
 
-func TestWriteGitIgnore_IncludesMailDirs(t *testing.T) {
+func TestWriteGitIgnore_AppendsMissing(t *testing.T) {
+	// given: pre-existing gitignore with partial entries + user custom entry
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, sightjack.StateDir), 0755)
+	sirenDir := filepath.Join(dir, domain.StateDir)
+	os.MkdirAll(sirenDir, 0755)
+	gitignorePath := filepath.Join(sirenDir, ".gitignore")
+	os.WriteFile(gitignorePath, []byte("events/\nuser-custom-entry\n"), 0644)
+
+	// when
+	err := session.WriteGitIgnore(dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("WriteGitIgnore: %v", err)
+	}
+	data, _ := os.ReadFile(gitignorePath)
+	content := string(data)
+	if !strings.Contains(content, "user-custom-entry") {
+		t.Error("user-custom-entry should be preserved")
+	}
+	if !strings.Contains(content, ".run/") {
+		t.Error(".run/ should be appended")
+	}
+	if strings.Count(content, "events/") != 1 {
+		t.Errorf("events/ should appear once, got:\n%s", content)
+	}
+}
+
+func TestWriteGitIgnore_IncludesOtelEnv(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, domain.StateDir), 0755)
 	if err := session.WriteGitIgnore(dir); err != nil {
 		t.Fatalf("WriteGitIgnore: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(dir, sightjack.StateDir, ".gitignore"))
+	data, _ := os.ReadFile(filepath.Join(dir, domain.StateDir, ".gitignore"))
+	content := string(data)
+	if !strings.Contains(content, ".otel.env") {
+		t.Error("expected .otel.env in .gitignore")
+	}
+}
+
+func TestWriteGitIgnore_IncludesMailDirs(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, domain.StateDir), 0755)
+	if err := session.WriteGitIgnore(dir); err != nil {
+		t.Fatalf("WriteGitIgnore: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, domain.StateDir, ".gitignore"))
 	content := string(data)
 	if !strings.Contains(content, "inbox/") {
 		t.Error("expected inbox/ in .gitignore")

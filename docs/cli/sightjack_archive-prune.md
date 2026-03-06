@@ -24,6 +24,9 @@ sightjack archive-prune [path] [flags]
   # Delete expired files
   sightjack archive-prune --execute
 
+  # JSON output for scripting
+  sightjack archive-prune -o json
+
   # Custom retention period
   sightjack archive-prune --days 7 --execute
 ```
@@ -34,6 +37,7 @@ sightjack archive-prune [path] [flags]
   -d, --days int   Retention days for archive-prune (default 30)
   -x, --execute    Execute archive pruning (default: dry-run)
   -h, --help       help for archive-prune
+  -y, --yes        Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
@@ -42,6 +46,7 @@ sightjack archive-prune [path] [flags]
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```
 

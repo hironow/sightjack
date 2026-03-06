@@ -207,6 +207,8 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime.
 | `sightjack doctor` | Check environment and tool availability |
 | `sightjack version` | Print version, commit, date, and Go version (`-j` for JSON) |
 | `sightjack update` | Self-update to the latest GitHub release (`-C` to check only) |
+| `sightjack status` | Show sightjack operational status |
+| `sightjack clean` | Remove state directory (`.siren/`) |
 | `sightjack archive-prune` | Remove expired scan archives (`-x` to execute, default: dry-run) |
 
 ### Pipe-friendly (Unix pipeline)
@@ -311,6 +313,7 @@ cat wave.json | sightjack apply | sightjack nextgen
 | `--config` | `-c` | `.siren/config.yaml` | Config file path |
 | `--lang` | `-l` | config (`ja`) | Language override (`en` / `ja`) |
 | `--verbose` | `-v` | `false` | Verbose logging |
+| `--output` | `-o` | `text` | Output format: `text` or `json` |
 | `--dry-run` | `-n` | `false` | Generate prompts without executing Claude |
 
 ### Subcommand flags
@@ -486,29 +489,14 @@ just jaeger-down    # Stop Jaeger
 |   +-- projection.go           Event projection
 |   +-- scan.go                 Scan utilities
 |   +-- wave.go                 Wave scheduling
-+-- internal/eventsource/       Event store infrastructure
++-- internal/eventsource/       Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
 |   +-- store_file.go           FileEventStore (JSONL append-only)
 |   +-- lifecycle.go            Event file expiry + pruning
 |   +-- loader.go               Event loader
 |   +-- recorder.go             Event recorder
 |   +-- path.go                 EventsDir path helper
 +-- internal/tools/docgen/      CLI doc generator
-+-- Root package (sightjack)    Types, interfaces, pure functions, go:embed
-|   +-- types.go                Core types (ScanResult, WavePlan, Wave, etc.)
-|   +-- interfaces.go           Port interfaces (OutboxStore, etc.)
-|   +-- config.go               Config type group + pure functions
-|   +-- state.go                Constants + path helpers (.siren/)
-|   +-- event.go                Event envelope, EventType constants
-|   +-- command.go              COMMAND types with Validate()
-|   +-- policy.go               Policy type definitions
-|   +-- prompt.go               Go template renderer for AI prompts
-|   +-- init.go                 Config scaffolding logic
-|   +-- sightjack.go            Core types
-|   +-- session_aggregate.go    SessionAggregate (domain aggregate)
-|   +-- wave_aggregate.go       WaveAggregate (domain aggregate)
-|   +-- metrics.go              OTel metric recording
-|   +-- logger.go               Structured logging
-|   +-- telemetry.go            OTel tracing (noop default)
++-- doc.go                      Package declaration (root-zero: all code in internal/)
 +-- tests/scenario/             Scenario tests (L1-L4, //go:build scenario)
 +-- tests/e2e/                  Docker E2E tests (//go:build e2e)
 +-- .semgrep/                   Semgrep rules (layer enforcement)
@@ -517,6 +505,19 @@ just jaeger-down    # Stop Jaeger
 +-- templates/                  AI prompt templates ({en,ja})
     +-- skills/                 D-Mail SKILL.md templates
 ```
+
+## What / Why / How
+
+See [docs/conformance.md](docs/conformance.md) for the full conformance table (single source).
+
+## Documentation
+
+- [docs/](docs/README.md) — Full documentation index
+- [docs/conformance.md](docs/conformance.md) — What/Why/How conformance table
+- [docs/siren-directory.md](docs/siren-directory.md) — `.siren/` directory structure
+- [docs/policies.md](docs/policies.md) — Event → Policy mapping
+- [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/adr/](docs/adr/README.md) — Architecture Decision Records
 
 ## Prerequisites
 

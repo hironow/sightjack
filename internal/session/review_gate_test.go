@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -32,10 +32,11 @@ func initGitRepo(t *testing.T, dir string) {
 func TestRunReviewGate_SkippedWhenNoCmd(t *testing.T) {
 	// given
 	ctx := context.Background()
-	cfg := &sightjack.Config{} // ReviewCmd empty
+	gate := domain.GateConfig{} // ReviewCmd empty
+	assistant := domain.AIAssistantConfig{}
 
 	// when
-	passed, err := session.RunReviewGate(ctx, cfg, t.TempDir(), nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
 
 	// then
 	if err != nil {
@@ -49,13 +50,11 @@ func TestRunReviewGate_SkippedWhenNoCmd(t *testing.T) {
 func TestRunReviewGate_PassingReview(t *testing.T) {
 	// given
 	ctx := context.Background()
-	cfg := &sightjack.Config{
-		Gate:   sightjack.GateConfig{ReviewCmd: "echo 'all good'"},
-		Claude: sightjack.ClaudeConfig{Command: "true", TimeoutSec: 30},
-	}
+	gate := domain.GateConfig{ReviewCmd: "echo 'all good'"}
+	assistant := domain.AIAssistantConfig{Command: "true", TimeoutSec: 30}
 
 	// when
-	passed, err := session.RunReviewGate(ctx, cfg, t.TempDir(), nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
 
 	// then
 	if err != nil {
@@ -69,15 +68,13 @@ func TestRunReviewGate_PassingReview(t *testing.T) {
 func TestRunReviewGate_FailingReviewExhaustedCycles(t *testing.T) {
 	// given — review always fails (exit 1), claude fix is "true" (noop, does nothing)
 	ctx := context.Background()
-	cfg := &sightjack.Config{
-		Gate:   sightjack.GateConfig{ReviewCmd: "echo 'found issues' && exit 1"},
-		Claude: sightjack.ClaudeConfig{Command: "true", TimeoutSec: 30},
-	}
+	gate := domain.GateConfig{ReviewCmd: "echo 'found issues' && exit 1"}
+	assistant := domain.AIAssistantConfig{Command: "true", TimeoutSec: 30}
 	dir := t.TempDir()
 	initGitRepo(t, dir)
 
 	// when
-	passed, err := session.RunReviewGate(ctx, cfg, dir, nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
 
 	// then — should return false (not passed), no error
 	if err != nil {
@@ -91,15 +88,13 @@ func TestRunReviewGate_FailingReviewExhaustedCycles(t *testing.T) {
 func TestRunReviewGate_BudgetExceeded(t *testing.T) {
 	// given — budget=1, review always fails
 	ctx := context.Background()
-	cfg := &sightjack.Config{
-		Gate:   sightjack.GateConfig{ReviewCmd: "echo 'error' && exit 1", ReviewBudget: 1},
-		Claude: sightjack.ClaudeConfig{Command: "true", TimeoutSec: 30},
-	}
+	gate := domain.GateConfig{ReviewCmd: "echo 'error' && exit 1", ReviewBudget: 1}
+	assistant := domain.AIAssistantConfig{Command: "true", TimeoutSec: 30}
 	dir := t.TempDir()
 	initGitRepo(t, dir)
 
 	// when
-	passed, err := session.RunReviewGate(ctx, cfg, dir, nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
 
 	// then
 	if err != nil {
@@ -113,13 +108,11 @@ func TestRunReviewGate_BudgetExceeded(t *testing.T) {
 func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 	// given — budget=0 means use default (3)
 	ctx := context.Background()
-	cfg := &sightjack.Config{
-		Gate:   sightjack.GateConfig{ReviewCmd: "echo ok"},
-		Claude: sightjack.ClaudeConfig{TimeoutSec: 30},
-	}
+	gate := domain.GateConfig{ReviewCmd: "echo ok"}
+	assistant := domain.AIAssistantConfig{TimeoutSec: 30}
 
 	// when
-	passed, err := session.RunReviewGate(ctx, cfg, t.TempDir(), nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
 
 	// then
 	if err != nil {
@@ -153,14 +146,12 @@ done
 exit 0
 `), 0755)
 
-	cfg := &sightjack.Config{
-		Gate:   sightjack.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2},
-		Claude: sightjack.ClaudeConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
-	}
+	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2}
+	assistant := domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
 	ctx := context.Background()
 
 	// when — review fails, fix is called with review comments in prompt
-	session.RunReviewGate(ctx, cfg, dir, nil)
+	session.RunReviewGate(ctx, gate, assistant, dir, nil)
 
 	// then — captured prompt should contain the review comments
 	captured, err := os.ReadFile(promptCapture)
@@ -197,14 +188,12 @@ exit 0
 	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
 	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 0\n"), 0755)
 
-	cfg := &sightjack.Config{
-		Gate:   sightjack.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 3},
-		Claude: sightjack.ClaudeConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
-	}
+	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 3}
+	assistant := domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
 	ctx := context.Background()
 
 	// when — review fail → fix (fake claude) → review pass
-	passed, err := session.RunReviewGate(ctx, cfg, dir, nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
 
 	// then
 	if err != nil {
@@ -226,14 +215,12 @@ func TestRunReviewGate_FixFailure_ReturnsFalse(t *testing.T) {
 	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
 	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 1\n"), 0755)
 
-	cfg := &sightjack.Config{
-		Gate:   sightjack.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2},
-		Claude: sightjack.ClaudeConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30},
-	}
+	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2}
+	assistant := domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
 	ctx := context.Background()
 
 	// when — fix fails
-	passed, err := session.RunReviewGate(ctx, cfg, dir, nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
 
 	// then — should return false (not error)
 	if err != nil {

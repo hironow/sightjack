@@ -5,49 +5,61 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
 
-// failOnceStore wraps a real EventStore and fails the first Append call,
+// failOnceStore wraps a real FileEventStore and fails the first Append call,
 // then delegates to the real store for subsequent calls.
 type failOnceStore struct {
-	real   sightjack.EventStore
+	real   *eventsource.FileEventStore
 	failed bool
 }
 
-func (s *failOnceStore) Append(events ...sightjack.Event) error {
+func (s *failOnceStore) Append(events ...domain.Event) (domain.AppendResult, error) {
 	if !s.failed {
 		s.failed = true
-		return errors.New("simulated I/O error")
+		return domain.AppendResult{}, errors.New("simulated I/O error")
 	}
 	return s.real.Append(events...)
 }
 
-func (s *failOnceStore) LoadAll() ([]sightjack.Event, error) { return s.real.LoadAll() }
-func (s *failOnceStore) LoadSince(after time.Time) ([]sightjack.Event, error) {
+func (s *failOnceStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
+	return s.real.LoadAll()
+}
+func (s *failOnceStore) LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error) {
 	return s.real.LoadSince(after)
+}
+
+// mustEvent is a test helper that creates a domain.Event and fails on error.
+func mustEvent(t *testing.T, eventType domain.EventType, payload any) domain.Event {
+	t.Helper()
+	ev, err := domain.NewEvent(eventType, payload, time.Now())
+	if err != nil {
+		t.Fatalf("NewEvent(%s): %v", eventType, err)
+	}
+	return ev
 }
 
 func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
 	// when
-	if err := recorder.Record(sightjack.EventSessionStarted, nil); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
-	if err := recorder.Record(sightjack.EventScanCompleted, nil); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
 	// then
-	events, _ := store.LoadAll()
+	events, _, _ := store.LoadAll()
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -68,29 +80,29 @@ func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
-	payload := sightjack.SessionStartedPayload{
+	payload := domain.SessionStartedPayload{
 		Project:         "my-project",
 		StrictnessLevel: "fog",
 	}
 
 	// when
-	if err := recorder.Record(sightjack.EventSessionStarted, payload); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventSessionStarted, payload)); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
 	// then
-	events, _ := store.LoadAll()
+	events, _, _ := store.LoadAll()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	var decoded sightjack.SessionStartedPayload
-	sightjack.UnmarshalEventPayload(events[0], &decoded)
+	var decoded domain.SessionStartedPayload
+	domain.UnmarshalEventPayload(events[0], &decoded)
 	if decoded.Project != "my-project" {
 		t.Errorf("expected my-project, got %s", decoded.Project)
 	}
@@ -99,18 +111,18 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-42")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
 	// when
-	recorder.Record(sightjack.EventSessionStarted, nil)
-	recorder.Record(sightjack.EventScanCompleted, nil)
+	recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
 
 	// then: both events should have CorrelationID == sessionID
-	events, _ := store.LoadAll()
+	events, _, _ := store.LoadAll()
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -124,19 +136,19 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
 	// when
-	recorder.Record(sightjack.EventSessionStarted, nil)
-	recorder.Record(sightjack.EventScanCompleted, nil)
-	recorder.Record(sightjack.EventWavesGenerated, nil)
+	recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
+	recorder.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
 	// then
-	events, _ := store.LoadAll()
+	events, _, _ := store.LoadAll()
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
@@ -157,14 +169,14 @@ func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	// given: store with existing events
 	dir := t.TempDir()
-	store := eventsource.NewFileEventStore(dir)
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	rec1, _ := eventsource.NewSessionRecorder(store, "session-1")
-	rec1.Record(sightjack.EventSessionStarted, nil)
-	rec1.Record(sightjack.EventScanCompleted, nil)
-	rec1.Record(sightjack.EventWavesGenerated, nil)
+	rec1.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	rec1.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
+	rec1.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
-	events1, _ := store.LoadAll()
+	events1, _, _ := store.LoadAll()
 	lastID := events1[len(events1)-1].ID
 
 	// when: create new recorder from same store
@@ -172,12 +184,12 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(sightjack.EventWaveApproved, nil); err != nil {
+	if err := recorder.Record(mustEvent(t, domain.EventWaveApproved, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
 	// then: new event should chain from last existing event
-	events, _ := store.LoadAll()
+	events, _, _ := store.LoadAll()
 	if len(events) != 4 {
 		t.Fatalf("expected 4 events, got %d", len(events))
 	}
@@ -192,7 +204,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	// given: a store that fails the first Append, then succeeds
 	dir := t.TempDir()
-	real := eventsource.NewFileEventStore(dir)
+	real := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	fos := &failOnceStore{real: real}
 	recorder, err := eventsource.NewSessionRecorder(fos, "session-1")
 	if err != nil {
@@ -200,19 +212,19 @@ func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	}
 
 	// when: first Record fails
-	err1 := recorder.Record(sightjack.EventSessionStarted, nil)
+	err1 := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
 	if err1 == nil {
 		t.Fatal("expected error on first Record")
 	}
 
 	// when: second Record should succeed
-	err2 := recorder.Record(sightjack.EventSessionStarted, nil)
+	err2 := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
 	if err2 != nil {
 		t.Fatalf("expected second Record to succeed, got: %v", err2)
 	}
 
 	// then: the store should have exactly 1 event
-	events, _ := real.LoadAll()
+	events, _, _ := real.LoadAll()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}

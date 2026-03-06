@@ -8,12 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestNextgenFileName(t *testing.T) {
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w2"}
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w2"}
 	got := session.NextgenFileName(wave)
 	want := "nextgen_auth_auth-w2.json"
 	if got != want {
@@ -23,7 +24,7 @@ func TestNextgenFileName(t *testing.T) {
 
 func TestClearNextgenOutput_RemovesFile(t *testing.T) {
 	dir := t.TempDir()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
 	path := filepath.Join(dir, session.NextgenFileName(wave))
 	if err := os.WriteFile(path, []byte("old"), 0644); err != nil {
 		t.Fatal(err)
@@ -36,7 +37,7 @@ func TestClearNextgenOutput_RemovesFile(t *testing.T) {
 
 func TestClearNextgenOutput_NoopIfMissing(t *testing.T) {
 	dir := t.TempDir()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
 	session.ClearNextgenOutput(dir, wave) // should not panic
 }
 
@@ -106,15 +107,15 @@ func TestBuildNextGenPrompt_WithDoDTemplates(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	cfg.DoDTemplates = map[string]sightjack.DoDTemplate{
+	cfg := domain.DefaultConfig()
+	cfg.DoDTemplates = map[string]domain.DoDTemplate{
 		"Auth": {Must: []string{"Unit tests required"}, Should: []string{"Integration tests"}},
 	}
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
 	}
 
 	// when
@@ -138,14 +139,14 @@ func TestBuildNextGenPrompt_WithRejectedActions(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
-	rejected := []sightjack.WaveAction{
+	rejected := []domain.WaveAction{
 		{Type: "add_dod", IssueID: "ENG-101", Description: "Rejected DoD"},
 	}
 
@@ -170,12 +171,12 @@ func TestBuildNextGenPrompt_NilOptionals(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.5,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
 	}
 
 	// when: nil DoD, nil ADRs, nil rejected, nil completedWaves
@@ -199,14 +200,14 @@ func TestBuildNextGenPrompt_WithExistingADRs(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
-	adrs := []sightjack.ExistingADR{
+	adrs := []domain.ExistingADR{
 		{Filename: "0001-use-jwt.md", Content: "We chose JWT for auth tokens."},
 	}
 
@@ -231,12 +232,12 @@ func TestBuildNextGenPrompt_WithFeedback(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
 	feedback := []*session.DMail{
 		{Name: "fb-arch-001", Kind: session.DMailFeedback, Description: "Architecture drift in auth module", Severity: "high", Body: "Token rotation not aligned with JWT spec."},
@@ -269,12 +270,12 @@ func TestBuildNextGenPrompt_NilFeedback(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.5,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
 	}
 
 	// when
@@ -295,12 +296,12 @@ func TestBuildNextGenPrompt_WithReports(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.5,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
 	}
 	reports := []*session.DMail{
 		{Name: "rp-amadeus-001", Kind: session.DMailReport, Description: "Drift detected in auth module", Body: "Scoring threshold exceeded."},
@@ -330,12 +331,12 @@ func TestBuildNextGenPrompt_NilReports(t *testing.T) {
 	scanDir := filepath.Join(dir, "scans")
 	os.MkdirAll(scanDir, 0755)
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.5,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
 	}
 
 	// when
@@ -352,8 +353,8 @@ func TestBuildNextGenPrompt_NilReports(t *testing.T) {
 
 func TestNeedsMoreWaves_HighCompleteness_False(t *testing.T) {
 	// given: cluster completeness >= 0.95
-	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.96}
-	waves := []sightjack.Wave{
+	cluster := domain.ClusterScanResult{Name: "Auth", Completeness: 0.96}
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 	}
 
@@ -368,8 +369,8 @@ func TestNeedsMoreWaves_HighCompleteness_False(t *testing.T) {
 
 func TestNeedsMoreWaves_RemainingWaves_False(t *testing.T) {
 	// given: available waves still exist
-	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.5}
-	waves := []sightjack.Wave{
+	cluster := domain.ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "auth-w2", ClusterName: "Auth", Status: "available"},
 	}
@@ -385,10 +386,10 @@ func TestNeedsMoreWaves_RemainingWaves_False(t *testing.T) {
 
 func TestNeedsMoreWaves_WaveCapReached_False(t *testing.T) {
 	// given: 8 waves already exist for this cluster
-	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.6}
-	var waves []sightjack.Wave
+	cluster := domain.ClusterScanResult{Name: "Auth", Completeness: 0.6}
+	var waves []domain.Wave
 	for i := range 8 {
-		waves = append(waves, sightjack.Wave{
+		waves = append(waves, domain.Wave{
 			ID:          fmt.Sprintf("auth-w%d", i+1),
 			ClusterName: "Auth",
 			Status:      "completed",
@@ -406,8 +407,8 @@ func TestNeedsMoreWaves_WaveCapReached_False(t *testing.T) {
 
 func TestNeedsMoreWaves_LowCompleteness_NoRemaining_True(t *testing.T) {
 	// given: low completeness, all waves completed, under cap
-	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.5}
-	waves := []sightjack.Wave{
+	cluster := domain.ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 	}
 
@@ -422,8 +423,8 @@ func TestNeedsMoreWaves_LowCompleteness_NoRemaining_True(t *testing.T) {
 
 func TestNeedsMoreWaves_IgnoresOtherClusterWaves(t *testing.T) {
 	// given: waves from other clusters should not affect count
-	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.5}
-	waves := []sightjack.Wave{
+	cluster := domain.ClusterScanResult{Name: "Auth", Completeness: 0.5}
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "infra-w1", ClusterName: "Infra", Status: "available"},
 	}
@@ -439,8 +440,8 @@ func TestNeedsMoreWaves_IgnoresOtherClusterWaves(t *testing.T) {
 
 func TestNeedsMoreWaves_PartialWaveIsPending(t *testing.T) {
 	// given: only wave is "partial" (failed apply), no other available/locked
-	cluster := sightjack.ClusterScanResult{Name: "Auth", Completeness: 0.4}
-	waves := []sightjack.Wave{
+	cluster := domain.ClusterScanResult{Name: "Auth", Completeness: 0.4}
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "partial"},
 	}
 
@@ -460,16 +461,16 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := sightjack.DefaultConfig()
-	wave := sightjack.Wave{ClusterName: "Auth", ID: "auth-w1"}
-	cluster := sightjack.ClusterScanResult{
+	cfg := domain.DefaultConfig()
+	wave := domain.Wave{ClusterName: "Auth", ID: "auth-w1"}
+	cluster := domain.ClusterScanResult{
 		Name:         "Auth",
 		Completeness: 0.65,
-		Issues:       []sightjack.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
+		Issues:       []domain.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth issue", Completeness: 0.5}},
 	}
-	completedWaves := []sightjack.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
+	completedWaves := []domain.Wave{{ID: "auth-w1", ClusterName: "Auth", Title: "Initial setup", Status: "completed"}}
 
-	err := session.GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, nil, sightjack.NewLogger(io.Discard, false))
+	err := session.GenerateNextWavesDryRun(&cfg, scanDir, wave, cluster, completedWaves, nil, nil, "fog", nil, nil, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}

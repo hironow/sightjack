@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 // RenderNavigator produces an ASCII Link Navigator display inspired by
 // the PS2 game SIREN's sight-jack interface. It visualises cluster
 // completeness in a fixed-width text matrix.
-func RenderNavigator(result *sightjack.ScanResult, projectName string) string {
+func RenderNavigator(result *domain.ScanResult, projectName string) string {
 	var b strings.Builder
 
 	completePct := int(result.Completeness * 100)
@@ -68,9 +68,9 @@ func RenderNavigator(result *sightjack.ScanResult, projectName string) string {
 
 // RenderMatrixNavigator renders the Link Navigator as a Pure ASCII matrix grid.
 // Wave status symbols: [ ] available  [x] locked  [=] completed  [?] unknown
-func RenderMatrixNavigator(result *sightjack.ScanResult, projectName string, waves []sightjack.Wave, adrCount int, lastScanned *time.Time, strictnessLevel string, shibitoCount int) string {
+func RenderMatrixNavigator(result *domain.ScanResult, projectName string, waves []domain.Wave, adrCount int, lastScanned *time.Time, strictnessLevel string, shibitoCount int) string {
 	// Group waves by cluster name
-	wavesByCluster := make(map[string][]sightjack.Wave)
+	wavesByCluster := make(map[string][]domain.Wave)
 	for _, w := range waves {
 		wavesByCluster[w.ClusterName] = append(wavesByCluster[w.ClusterName], w)
 	}
@@ -280,7 +280,7 @@ func Truncate(s string, maxWidth int) string {
 }
 
 // DisplayRippleEffects shows cross-cluster effects after a wave is applied.
-func DisplayRippleEffects(w io.Writer, ripples []sightjack.Ripple) {
+func DisplayRippleEffects(w io.Writer, ripples []domain.Ripple) {
 	if len(ripples) == 0 {
 		return
 	}
@@ -291,7 +291,7 @@ func DisplayRippleEffects(w io.Writer, ripples []sightjack.Ripple) {
 }
 
 // DisplayArchitectResponse shows the architect's analysis and any wave modifications.
-func DisplayArchitectResponse(w io.Writer, resp *sightjack.ArchitectResponse) {
+func DisplayArchitectResponse(w io.Writer, resp *domain.ArchitectResponse) {
 	fmt.Fprintf(w, "\n  [Architect] %s\n", resp.Analysis)
 	if resp.Reasoning != "" {
 		fmt.Fprintf(w, "\n  Reasoning: %s\n", resp.Reasoning)
@@ -302,12 +302,12 @@ func DisplayArchitectResponse(w io.Writer, resp *sightjack.ArchitectResponse) {
 			fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
 		}
 		fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n",
-			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100)
+			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100) // nosemgrep: lod-excessive-dot-chain [permanent]
 	}
 }
 
 // DisplayShibitoWarnings shows shibito resurrection detection warnings.
-func DisplayShibitoWarnings(w io.Writer, warnings []sightjack.ShibitoWarning) {
+func DisplayShibitoWarnings(w io.Writer, warnings []domain.ShibitoWarning) {
 	if len(warnings) == 0 {
 		return
 	}
@@ -319,7 +319,7 @@ func DisplayShibitoWarnings(w io.Writer, warnings []sightjack.ShibitoWarning) {
 }
 
 // DisplayADRConflicts shows potential conflicts between new and existing ADRs.
-func DisplayADRConflicts(w io.Writer, conflicts []sightjack.ADRConflict) {
+func DisplayADRConflicts(w io.Writer, conflicts []domain.ADRConflict) {
 	if len(conflicts) == 0 {
 		return
 	}
@@ -329,26 +329,26 @@ func DisplayADRConflicts(w io.Writer, conflicts []sightjack.ADRConflict) {
 }
 
 // DisplayCompletedWaveActions shows the actions that were applied in a completed wave.
-func DisplayCompletedWaveActions(w io.Writer, wave sightjack.Wave) {
+func DisplayCompletedWaveActions(w io.Writer, wave domain.Wave) {
 	fmt.Fprintf(w, "\n  --- %s - %s (completed) ---\n", wave.ClusterName, wave.Title)
 	fmt.Fprintf(w, "  Actions applied (%d):\n", len(wave.Actions))
 	for i, a := range wave.Actions {
 		fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
 	}
-	if wave.Delta != (sightjack.WaveDelta{}) {
+	if wave.Delta != (domain.WaveDelta{}) {
 		fmt.Fprintf(w, "\n  Result: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
 	}
 }
 
 // DisplayWaveCompletion shows a rich wave completion summary with grouped ripple effects.
-func DisplayWaveCompletion(w io.Writer, wave sightjack.Wave, ripples []sightjack.Ripple, overallCompleteness float64, newWavesAvailable int) {
+func DisplayWaveCompletion(w io.Writer, wave domain.Wave, ripples []domain.Ripple, overallCompleteness float64, newWavesAvailable int) {
 	fmt.Fprintf(w, "\n  Wave completed: %s - %s\n", wave.ClusterName, wave.Title)
 	fmt.Fprintf(w, "  Completeness: %.0f%% -> %.0f%%\n", wave.Delta.Before*100, wave.Delta.After*100)
 
 	if len(ripples) > 0 {
 		fmt.Fprintln(w, "\n  Ripple effects:")
 		// Group by cluster
-		grouped := make(map[string][]sightjack.Ripple)
+		grouped := make(map[string][]domain.Ripple)
 		var order []string
 		for _, r := range ripples {
 			if _, seen := grouped[r.ClusterName]; !seen {
@@ -372,7 +372,7 @@ func DisplayWaveCompletion(w io.Writer, wave sightjack.Wave, ripples []sightjack
 }
 
 // DisplayScribeResponse shows the scribe's ADR generation result.
-func DisplayScribeResponse(w io.Writer, resp *sightjack.ScribeResponse) {
+func DisplayScribeResponse(w io.Writer, resp *domain.ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
 	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", ADRSubdir, resp.ADRID, SanitizeADRTitle(resp.Title))
 }

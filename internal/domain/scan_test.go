@@ -3,7 +3,6 @@ package domain_test
 import (
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -42,10 +41,10 @@ func TestDetectFailedClusterNames(t *testing.T) {
 	t.Run("all_succeeded", func(t *testing.T) {
 		t.Parallel()
 		// given
-		clusters := []sightjack.ClusterScanResult{
+		clusters := []domain.ClusterScanResult{
 			{Name: "auth"}, {Name: "billing"},
 		}
-		successes := []sightjack.WaveGenerateResult{
+		successes := []domain.WaveGenerateResult{
 			{ClusterName: "auth"}, {ClusterName: "billing"},
 		}
 
@@ -61,10 +60,10 @@ func TestDetectFailedClusterNames(t *testing.T) {
 	t.Run("one_failed", func(t *testing.T) {
 		t.Parallel()
 		// given
-		clusters := []sightjack.ClusterScanResult{
+		clusters := []domain.ClusterScanResult{
 			{Name: "auth"}, {Name: "billing"},
 		}
-		successes := []sightjack.WaveGenerateResult{
+		successes := []domain.WaveGenerateResult{
 			{ClusterName: "auth"},
 		}
 
@@ -83,10 +82,10 @@ func TestDetectFailedClusterNames(t *testing.T) {
 	t.Run("duplicate_cluster_partial_failure", func(t *testing.T) {
 		t.Parallel()
 		// given — two instances of "auth", only one succeeded
-		clusters := []sightjack.ClusterScanResult{
+		clusters := []domain.ClusterScanResult{
 			{Name: "auth"}, {Name: "auth"},
 		}
-		successes := []sightjack.WaveGenerateResult{
+		successes := []domain.WaveGenerateResult{
 			{ClusterName: "auth"},
 		}
 
@@ -141,15 +140,15 @@ func TestMergeClusterChunks(t *testing.T) {
 	t.Run("merges_issues_and_observations", func(t *testing.T) {
 		t.Parallel()
 		// given
-		chunks := []sightjack.ClusterScanResult{
+		chunks := []domain.ClusterScanResult{
 			{
 				Name:         "auth",
-				Issues:       []sightjack.IssueDetail{{ID: "1", Completeness: 0.8}},
+				Issues:       []domain.IssueDetail{{ID: "1", Completeness: 0.8}},
 				Observations: []string{"obs1"},
 			},
 			{
 				Name:         "auth",
-				Issues:       []sightjack.IssueDetail{{ID: "2", Completeness: 0.6}},
+				Issues:       []domain.IssueDetail{{ID: "2", Completeness: 0.6}},
 				Observations: []string{"obs2"},
 			},
 		}
@@ -176,7 +175,7 @@ func TestMergeClusterChunks(t *testing.T) {
 	t.Run("empty_issues_zero_completeness", func(t *testing.T) {
 		t.Parallel()
 		// given
-		chunks := []sightjack.ClusterScanResult{
+		chunks := []domain.ClusterScanResult{
 			{Name: "empty", Observations: []string{"obs"}},
 		}
 

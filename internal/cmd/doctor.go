@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -56,7 +57,7 @@ type doctorJSONCheck struct {
 	Hint    string `json:"hint,omitempty"`
 }
 
-func printDoctorJSON(w io.Writer, results []session.CheckResult) error {
+func printDoctorJSON(w io.Writer, results []domain.CheckResult) error {
 	checks := make([]doctorJSONCheck, len(results))
 	hasFail := false
 	for i, r := range results {
@@ -66,7 +67,7 @@ func printDoctorJSON(w io.Writer, results []session.CheckResult) error {
 			Message: r.Message,
 			Hint:    r.Hint,
 		}
-		if r.Status == session.CheckFail {
+		if r.Status == domain.CheckFail {
 			hasFail = true
 		}
 	}
@@ -83,7 +84,7 @@ func printDoctorJSON(w io.Writer, results []session.CheckResult) error {
 	return nil
 }
 
-func printDoctorText(w io.Writer, results []session.CheckResult) error {
+func printDoctorText(w io.Writer, results []domain.CheckResult) error {
 	fmt.Fprintln(w, "sightjack doctor — environment health check")
 	fmt.Fprintln(w)
 
@@ -94,9 +95,9 @@ func printDoctorText(w io.Writer, results []session.CheckResult) error {
 			fmt.Fprintf(w, "  hint: %s\n", r.Hint)
 		}
 		switch r.Status {
-		case session.CheckFail:
+		case domain.CheckFail:
 			fails++
-		case session.CheckSkip:
+		case domain.CheckSkip:
 			skips++
 		}
 	}

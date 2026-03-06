@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // ListExpiredArchive returns filenames in .siren/archive/ whose mtime exceeds
 // the given number of days. Only .md files are considered.
 // Returns an empty slice (not error) when the archive directory does not exist.
-func ListExpiredArchive(baseDir string, days int, logger *sightjack.Logger) ([]string, error) {
+func ListExpiredArchive(baseDir string, days int, logger domain.Logger) ([]string, error) {
 	if days < 0 {
 		return nil, fmt.Errorf("days must be non-negative, got %d", days)
 	}
-	dir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	dir := domain.MailDir(baseDir, domain.ArchiveDir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -49,7 +49,7 @@ func ListExpiredArchive(baseDir string, days int, logger *sightjack.Logger) ([]s
 // Files that no longer exist are silently skipped (ErrNotExist is not an error).
 // Returns the list of filenames that were processed.
 func DeleteArchiveFiles(baseDir string, files []string) ([]string, error) {
-	dir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	dir := domain.MailDir(baseDir, domain.ArchiveDir)
 	var deleted []string
 	for _, name := range files {
 		path := filepath.Join(dir, name)
@@ -64,7 +64,7 @@ func DeleteArchiveFiles(baseDir string, files []string) ([]string, error) {
 // PruneArchive deletes expired .md files from .siren/archive/ and returns the
 // list of deleted filenames. Uses the same criteria as ListExpiredArchive.
 // Returns an empty slice (not error) when the archive directory does not exist.
-func PruneArchive(baseDir string, days int, logger *sightjack.Logger) ([]string, error) {
+func PruneArchive(baseDir string, days int, logger domain.Logger) ([]string, error) {
 	files, err := ListExpiredArchive(baseDir, days, logger)
 	if err != nil {
 		return nil, err

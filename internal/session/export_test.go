@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: bridge constructor: exposes unexported symbols for external test packages
+
 import (
 	"context"
 	"database/sql"

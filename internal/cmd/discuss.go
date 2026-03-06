@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -48,7 +48,7 @@ suitable for piping into 'adr' for ADR generation.`,
 				return fmt.Errorf("no input on stdin. Pipe a wave: sightjack select | sightjack discuss")
 			}
 
-			var wave sightjack.Wave
+			var wave domain.Wave
 			if err := json.Unmarshal(data, &wave); err != nil {
 				return fmt.Errorf("invalid Wave JSON: %w", err)
 			}
@@ -56,7 +56,7 @@ suitable for piping into 'adr' for ADR generation.`,
 			// Open terminal for interactive input (stdin is consumed by pipe).
 			// cmd.InOrStdin() is already exhausted after io.ReadAll above,
 			// so we must open the controlling terminal directly.
-			tty, err := openTTY() // nosemgrep: devtty-hard-fail-needs-fallback
+			tty, err := openTTY() // nosemgrep: devtty-hard-fail-needs-fallback [permanent]
 			if err != nil {
 				return fmt.Errorf("cannot open terminal for interactive input (stdin consumed by pipe): %w", err)
 			}
@@ -76,12 +76,12 @@ suitable for piping into 'adr' for ADR generation.`,
 			}
 
 			sessionID := fmt.Sprintf("discuss-%d-%d", time.Now().UnixMilli(), os.Getpid())
-			scanDir := sightjack.ScanDir(baseDir, sessionID)
+			scanDir := domain.ScanDir(baseDir, sessionID)
 			if err := os.MkdirAll(scanDir, 0755); err != nil {
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
 
-			strictness := string(sightjack.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+			strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
 
 			logger := loggerFrom(cmd)
 

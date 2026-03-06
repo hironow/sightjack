@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -16,7 +17,7 @@ func TestSQLiteOutboxStore_PragmaSynchronousNormal(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
@@ -67,14 +68,16 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 
+	ctx := context.Background()
+
 	// when: stage a d-mail
-	err := store.Stage("test-mail.md", []byte("hello"))
+	err := store.Stage(ctx, "test-mail.md", []byte("hello"))
 	if err != nil {
 		t.Fatalf("Stage: %v", err)
 	}
 
 	// when: flush
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -85,7 +88,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	}
 
 	// then: archive file exists with correct content
-	archivePath := filepath.Join(sightjack.MailDir(dir, sightjack.ArchiveDir), "test-mail.md")
+	archivePath := filepath.Join(domain.MailDir(dir, domain.ArchiveDir), "test-mail.md")
 	data, err := os.ReadFile(archivePath)
 	if err != nil {
 		t.Fatalf("read archive: %v", err)
@@ -95,7 +98,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	}
 
 	// then: outbox file exists with correct content
-	outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), "test-mail.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "test-mail.md")
 	data, err = os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -111,16 +114,18 @@ func TestSQLiteOutboxStore_StageIdempotent(t *testing.T) {
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 
+	ctx := context.Background()
+
 	// when: stage the same name twice with different data
-	if err := store.Stage("dup.md", []byte("first")); err != nil {
+	if err := store.Stage(ctx, "dup.md", []byte("first")); err != nil {
 		t.Fatalf("Stage 1: %v", err)
 	}
-	if err := store.Stage("dup.md", []byte("second")); err != nil {
+	if err := store.Stage(ctx, "dup.md", []byte("second")); err != nil {
 		t.Fatalf("Stage 2: %v", err)
 	}
 
 	// when: flush
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
@@ -131,7 +136,7 @@ func TestSQLiteOutboxStore_StageIdempotent(t *testing.T) {
 	}
 
 	// then: content is the first version (INSERT OR IGNORE)
-	outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), "dup.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "dup.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -146,9 +151,10 @@ func TestSQLiteOutboxStore_FlushEmpty(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
+	ctx := context.Background()
 
 	// when
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 
 	// then: no error, zero items
 	if err != nil {
@@ -164,14 +170,15 @@ func TestSQLiteOutboxStore_FlushOnlyUnflushed(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
+	ctx := context.Background()
 
-	store.Stage("first.md", []byte("one"))
-	store.Flush()
+	store.Stage(ctx, "first.md", []byte("one"))
+	store.Flush(ctx)
 
-	store.Stage("second.md", []byte("two"))
+	store.Stage(ctx, "second.md", []byte("two"))
 
 	// when: flush again
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 
 	// then: only the new item is flushed
 	if err != nil {
@@ -183,7 +190,7 @@ func TestSQLiteOutboxStore_FlushOnlyUnflushed(t *testing.T) {
 
 	// then: both files exist
 	for _, name := range []string{"first.md", "second.md"} {
-		outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), name)
+		outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), name)
 		if _, err := os.Stat(outboxPath); err != nil {
 			t.Errorf("outbox %s missing: %v", name, err)
 		}
@@ -201,9 +208,9 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	storeA, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -218,6 +225,7 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	defer storeB.Close()
 
 	const itemsPerStore = 10
+	ctx := context.Background()
 
 	// when: both stores Stage + Flush concurrently
 	var wg sync.WaitGroup
@@ -229,11 +237,11 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 		defer wg.Done()
 		for i := range itemsPerStore {
 			name := fmt.Sprintf("a-%03d.md", i)
-			if err := storeA.Stage(name, []byte("from-A-"+name)); err != nil {
+			if err := storeA.Stage(ctx, name, []byte("from-A-"+name)); err != nil {
 				errA <- err
 				return
 			}
-			if _, err := storeA.Flush(); err != nil {
+			if _, err := storeA.Flush(ctx); err != nil {
 				errA <- err
 				return
 			}
@@ -244,11 +252,11 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 		defer wg.Done()
 		for i := range itemsPerStore {
 			name := fmt.Sprintf("b-%03d.md", i)
-			if err := storeB.Stage(name, []byte("from-B-"+name)); err != nil {
+			if err := storeB.Stage(ctx, name, []byte("from-B-"+name)); err != nil {
 				errB <- err
 				return
 			}
-			if _, err := storeB.Flush(); err != nil {
+			if _, err := storeB.Flush(ctx); err != nil {
 				errB <- err
 				return
 			}
@@ -269,8 +277,8 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	for _, prefix := range []string{"a", "b"} {
 		for i := range itemsPerStore {
 			name := fmt.Sprintf("%s-%03d.md", prefix, i)
-			for _, sub := range []string{sightjack.ArchiveDir, sightjack.OutboxDir} {
-				p := filepath.Join(sightjack.MailDir(dir, sub), name)
+			for _, sub := range []string{domain.ArchiveDir, domain.OutboxDir} {
+				p := filepath.Join(domain.MailDir(dir, sub), name)
 				data, readErr := os.ReadFile(p)
 				if readErr != nil {
 					t.Errorf("%s/%s missing: %v", sub, name, readErr)
@@ -294,15 +302,16 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	storeSetup, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create setup store: %v", err)
 	}
-	if err := storeSetup.Stage("shared.md", []byte("shared-content")); err != nil {
+	ctx := context.Background()
+	if err := storeSetup.Stage(ctx, "shared.md", []byte("shared-content")); err != nil {
 		t.Fatalf("stage: %v", err)
 	}
 	storeSetup.Close()
@@ -327,11 +336,11 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		nA, eA = storeA.Flush()
+		nA, eA = storeA.Flush(ctx)
 	}()
 	go func() {
 		defer wg.Done()
-		nB, eB = storeB.Flush()
+		nB, eB = storeB.Flush(ctx)
 	}()
 	wg.Wait()
 
@@ -350,7 +359,7 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	}
 
 	// then: file exists with correct content
-	outboxPath := filepath.Join(sightjack.MailDir(dir, sightjack.OutboxDir), "shared.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "shared.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -368,14 +377,14 @@ func TestSQLiteOutboxStore_FilePermission(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
 	defer store.Close()
 
 	// when
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
 	info, err := os.Stat(dbPath)
 	if err != nil {
 		t.Fatalf("stat db: %v", err)
@@ -393,9 +402,9 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -403,8 +412,10 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	}
 	defer store.Close()
 
+	ctx := context.Background()
+
 	// Stage an item
-	if err := store.Stage("fail.md", []byte("data")); err != nil {
+	if err := store.Stage(ctx, "fail.md", []byte("data")); err != nil {
 		t.Fatalf("Stage: %v", err)
 	}
 
@@ -414,7 +425,7 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 
 	// when: flush 3 times (each fails, incrementing retry_count to 3)
 	for i := range 3 {
-		n, _ := store.Flush()
+		n, _ := store.Flush(ctx)
 		if n != 0 {
 			t.Errorf("flush %d: expected 0 flushed (write should fail), got %d", i+1, n)
 		}
@@ -424,7 +435,7 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	os.Chmod(archiveDir, 0o755)
 
 	// when: flush again — item should be dead-letter (retry_count >= 3, skipped)
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 
 	// then: no items flushed
 	if err != nil {
@@ -440,9 +451,9 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -450,14 +461,16 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 	}
 	defer store.Close()
 
+	ctx := context.Background()
+
 	// Stage an item
-	store.Stage("retry.md", []byte("retry-data"))
+	store.Stage(ctx, "retry.md", []byte("retry-data"))
 
 	// Make archive dir read-only for first flush
 	os.Chmod(archiveDir, 0o444)
 
 	// when: first flush fails
-	n, _ := store.Flush()
+	n, _ := store.Flush(ctx)
 	if n != 0 {
 		t.Errorf("first flush: expected 0 flushed, got %d", n)
 	}
@@ -466,7 +479,7 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 	os.Chmod(archiveDir, 0o755)
 
 	// when: second flush should succeed (retry_count = 1, below max)
-	n, err = store.Flush()
+	n, err = store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("second Flush: %v", err)
 	}
@@ -490,9 +503,9 @@ func TestSQLiteOutboxStore_RetryCount_MixedItems(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -500,19 +513,21 @@ func TestSQLiteOutboxStore_RetryCount_MixedItems(t *testing.T) {
 	}
 	defer store.Close()
 
+	ctx := context.Background()
+
 	// Stage first item, make it exhaust retries
-	store.Stage("bad.md", []byte("bad"))
+	store.Stage(ctx, "bad.md", []byte("bad"))
 	os.Chmod(archiveDir, 0o444)
 	for range 3 {
-		store.Flush()
+		store.Flush(ctx)
 	}
 	os.Chmod(archiveDir, 0o755)
 
 	// Stage second item (good)
-	store.Stage("good.md", []byte("good"))
+	store.Stage(ctx, "good.md", []byte("good"))
 
 	// when: flush
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 
 	// then: only the good item flushed (bad is dead-letter)
 	if err != nil {
@@ -534,13 +549,14 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
+	ctx := context.Background()
 
-	store.Stage("a.md", []byte("aaa"))
-	store.Stage("b.md", []byte("bbb"))
-	store.Stage("c.md", []byte("ccc"))
+	store.Stage(ctx, "a.md", []byte("aaa"))
+	store.Stage(ctx, "b.md", []byte("bbb"))
+	store.Stage(ctx, "c.md", []byte("ccc"))
 
 	// when
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 
 	// then: all three flushed
 	if err != nil {
@@ -552,8 +568,8 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 
 	// then: all files exist in both dirs
 	for _, name := range []string{"a.md", "b.md", "c.md"} {
-		for _, sub := range []string{sightjack.ArchiveDir, sightjack.OutboxDir} {
-			p := filepath.Join(sightjack.MailDir(dir, sub), name)
+		for _, sub := range []string{domain.ArchiveDir, domain.OutboxDir} {
+			p := filepath.Join(domain.MailDir(dir, sub), name)
 			if _, err := os.Stat(p); err != nil {
 				t.Errorf("%s/%s missing: %v", sub, name, err)
 			}
@@ -565,22 +581,23 @@ func TestSQLiteOutboxStore_PruneFlushed(t *testing.T) {
 	// given: store with staged + flushed items
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
 	defer store.Close()
+	ctx := context.Background()
 
 	// Stage 3 items
 	for i := 0; i < 3; i++ {
 		name := fmt.Sprintf("test-%d.dmail", i)
-		if err := store.Stage(name, []byte(`{"kind":"feedback"}`)); err != nil {
+		if err := store.Stage(ctx, name, []byte(`{"kind":"feedback"}`)); err != nil {
 			t.Fatalf("stage %s: %v", name, err)
 		}
 	}
 
 	// Flush to mark items as flushed=1
-	flushed, err := store.Flush()
+	flushed, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("flush: %v", err)
 	}
@@ -589,7 +606,7 @@ func TestSQLiteOutboxStore_PruneFlushed(t *testing.T) {
 	}
 
 	// when: prune flushed items
-	pruned, err := store.PruneFlushed()
+	pruned, err := store.PruneFlushed(ctx)
 	if err != nil {
 		t.Fatalf("PruneFlushed: %v", err)
 	}
@@ -613,30 +630,31 @@ func TestSQLiteOutboxStore_PruneFlushed_KeepsUnflushed(t *testing.T) {
 	// given: store with mix of flushed and unflushed items
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
 	defer store.Close()
+	ctx := context.Background()
 
 	// Stage 2 items, flush them
 	for i := 0; i < 2; i++ {
 		name := fmt.Sprintf("flushed-%d.dmail", i)
-		if err := store.Stage(name, []byte(`{"kind":"feedback"}`)); err != nil {
+		if err := store.Stage(ctx, name, []byte(`{"kind":"feedback"}`)); err != nil {
 			t.Fatalf("stage %s: %v", name, err)
 		}
 	}
-	if _, err := store.Flush(); err != nil {
+	if _, err := store.Flush(ctx); err != nil {
 		t.Fatalf("flush: %v", err)
 	}
 
 	// Stage 1 more item (unflushed)
-	if err := store.Stage("unflushed.dmail", []byte(`{"kind":"report"}`)); err != nil {
+	if err := store.Stage(ctx, "unflushed.dmail", []byte(`{"kind":"report"}`)); err != nil {
 		t.Fatalf("stage unflushed: %v", err)
 	}
 
 	// when
-	pruned, err := store.PruneFlushed()
+	pruned, err := store.PruneFlushed(ctx)
 	if err != nil {
 		t.Fatalf("PruneFlushed: %v", err)
 	}
@@ -660,7 +678,7 @@ func TestSQLiteOutboxStore_IncrementalVacuum(t *testing.T) {
 	// given: store with auto_vacuum=INCREMENTAL
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}

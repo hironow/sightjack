@@ -17,7 +17,7 @@ func newStatusCmd() *cobra.Command {
 		Long: `Display operational status including scan history, wave statistics,
 success rate, and pending d-mail counts.
 
-Output goes to stderr (human-readable) by default.
+Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.`,
 		Example: `  # Show status for current directory
   sightjack status
@@ -34,7 +34,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 
-			report := session.Status(baseDir)
+			report := session.Status(cmd.Context(), baseDir)
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {
@@ -46,8 +46,8 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return nil
 			}
 
-			// Text output to stderr (human-readable metadata)
-			fmt.Fprint(cmd.ErrOrStderr(), report.FormatText())
+			// Text output to stdout (human-readable, per S0027)
+			fmt.Fprint(cmd.OutOrStdout(), report.FormatText())
 			return nil
 		},
 	}

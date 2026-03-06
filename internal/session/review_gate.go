@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 const (
@@ -19,21 +22,21 @@ const (
 // Returns (true, nil) if review passes or is skipped (no ReviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logger *sightjack.Logger) (bool, error) {
-	if strings.TrimSpace(cfg.Gate.ReviewCmd) == "" {
+func RunReviewGate(ctx context.Context, gate domain.GateConfig, assistant domain.AIAssistantConfig, dir string, logger domain.Logger) (bool, error) {
+	ctx, span := platform.Tracer.Start(ctx, "sightjack.review")
+	defer span.End()
+
+	if !gate.HasReviewCmd() {
 		return true, nil
 	}
 
 	if logger == nil {
-		logger = sightjack.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 
-	budget := cfg.Gate.ReviewBudget
-	if budget <= 0 {
-		budget = maxReviewGateCycles
-	}
+	budget := gate.EffectiveReviewBudget()
 
-	timeoutSec := cfg.Claude.TimeoutSec
+	timeoutSec := assistant.TimeoutSec
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
@@ -48,12 +51,19 @@ func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logge
 			return false, fmt.Errorf("review gate canceled: %w", ctx.Err())
 		}
 
+		span.SetAttributes(attribute.Int("review.cycle", cycle))
 		logger.Info("Review gate: cycle %d/%d", cycle, maxReviewGateCycles)
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		result, err := RunReview(reviewCtx, cfg.Gate.ReviewCmd, dir)
+		reviewStart := time.Now()
+		result, err := RunReview(reviewCtx, gate.ReviewCmdString(), dir)
 		reviewCancel()
+		if platform.IsDetailDebug() {
+			span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
+		}
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "sightjack.review"))
 			return false, fmt.Errorf("review gate cycle %d: %w", cycle, err)
 		}
 
@@ -71,7 +81,7 @@ func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logge
 		}
 
 		// Run Claude --continue to fix review comments
-		if err := runReviewFix(ctx, cfg, dir, lastComments, logger); err != nil {
+		if err := runReviewFix(ctx, assistant, dir, lastComments, logger); err != nil {
 			logger.Warn("Review fix failed: %v", err)
 			return false, nil
 		}
@@ -82,24 +92,24 @@ func RunReviewGate(ctx context.Context, cfg *sightjack.Config, dir string, logge
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, cfg *sightjack.Config, dir, comments string, logger *sightjack.Logger) error {
+func runReviewFix(ctx context.Context, assistant domain.AIAssistantConfig, dir, comments string, logger domain.Logger) error {
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)
 	}
 
-	claudeCmd := cfg.Claude.Command
+	claudeCmd := assistant.Command
 	if claudeCmd == "" {
 		claudeCmd = "claude"
 	}
-	model := cfg.Claude.Model
+	model := assistant.Model
 	if model == "" {
 		model = "opus"
 	}
 
 	prompt := BuildReviewFixPrompt(branch, comments)
 
-	fixTimeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+	fixTimeout := time.Duration(assistant.TimeoutSec) * time.Second
 	if fixTimeout <= 0 {
 		fixTimeout = 300 * time.Second
 	}
@@ -119,7 +129,7 @@ func runReviewFix(ctx context.Context, cfg *sightjack.Config, dir, comments stri
 	logger.Info("Review fix: running %s --model %s --continue", claudeCmd, model)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("claude fix: %w\noutput: %s", err, summarizeReview(string(out)))
+		return fmt.Errorf("claude fix: %w\noutput: %s", err, domain.SummarizeReview(string(out)))
 	}
 	return nil
 }

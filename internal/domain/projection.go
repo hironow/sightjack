@@ -1,9 +1,5 @@
 package domain
 
-import (
-	sightjack "github.com/hironow/sightjack"
-)
-
 // projectionContext tracks seen entities during replay to ensure idempotency.
 type projectionContext struct {
 	seenWaves map[string]bool // key = ClusterName:WaveID
@@ -13,8 +9,8 @@ type projectionContext struct {
 // ProjectState replays a sequence of events to produce a SessionState.
 // Unknown event types are silently skipped.
 // Returns a zero-value SessionState for nil/empty input.
-func ProjectState(events []sightjack.Event) *sightjack.SessionState {
-	state := &sightjack.SessionState{}
+func ProjectState(events []Event) *SessionState {
+	state := &SessionState{}
 	ctx := &projectionContext{
 		seenWaves: make(map[string]bool),
 		seenADRs:  make(map[string]bool),
@@ -27,19 +23,19 @@ func ProjectState(events []sightjack.Event) *sightjack.SessionState {
 
 // applyEvent mutates state according to the event type.
 // The projectionContext tracks seen entities to ensure idempotent replay.
-func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightjack.Event) {
+func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 	switch e.Type {
-	case sightjack.EventSessionStarted:
-		var p sightjack.SessionStartedPayload
+	case EventSessionStarted:
+		var p SessionStartedPayload
 		if unmarshalPayload(e, &p) {
-			state.Version = sightjack.StateFormatVersion
+			state.Version = StateFormatVersion
 			state.SessionID = e.SessionID
 			state.Project = p.Project
 			state.StrictnessLevel = p.StrictnessLevel
 		}
 
-	case sightjack.EventScanCompleted:
-		var p sightjack.ScanCompletedPayload
+	case EventScanCompleted:
+		var p ScanCompletedPayload
 		if unmarshalPayload(e, &p) {
 			state.Clusters = p.Clusters
 			state.Completeness = p.Completeness
@@ -48,8 +44,8 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			state.LastScanned = p.LastScanned
 		}
 
-	case sightjack.EventWavesGenerated:
-		var p sightjack.WavesGeneratedPayload
+	case EventWavesGenerated:
+		var p WavesGeneratedPayload
 		if unmarshalPayload(e, &p) {
 			for _, w := range p.Waves {
 				key := w.ClusterName + ":" + w.ID
@@ -60,8 +56,8 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			}
 		}
 
-	case sightjack.EventWaveCompleted:
-		var p sightjack.WaveCompletedPayload
+	case EventWaveCompleted:
+		var p WaveCompletedPayload
 		if unmarshalPayload(e, &p) {
 			key := p.ClusterName + ":" + p.WaveID
 			for i, w := range state.Waves {
@@ -72,8 +68,8 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			}
 		}
 
-	case sightjack.EventCompletenessUpdated:
-		var p sightjack.CompletenessUpdatedPayload
+	case EventCompletenessUpdated:
+		var p CompletenessUpdatedPayload
 		if unmarshalPayload(e, &p) {
 			state.Completeness = p.OverallCompleteness
 			for i, c := range state.Clusters {
@@ -84,8 +80,8 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			}
 		}
 
-	case sightjack.EventWavesUnlocked:
-		var p sightjack.WavesUnlockedPayload
+	case EventWavesUnlocked:
+		var p WavesUnlockedPayload
 		if unmarshalPayload(e, &p) {
 			unlocked := make(map[string]bool, len(p.UnlockedWaveIDs))
 			for _, id := range p.UnlockedWaveIDs {
@@ -99,8 +95,8 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			}
 		}
 
-	case sightjack.EventNextGenWavesAdded:
-		var p sightjack.NextGenWavesAddedPayload
+	case EventNextGenWavesAdded:
+		var p NextGenWavesAddedPayload
 		if unmarshalPayload(e, &p) {
 			for _, w := range p.Waves {
 				key := w.ClusterName + ":" + w.ID
@@ -111,8 +107,8 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			}
 		}
 
-	case sightjack.EventWaveModified:
-		var p sightjack.WaveModifiedPayload
+	case EventWaveModified:
+		var p WaveModifiedPayload
 		if unmarshalPayload(e, &p) {
 			key := p.ClusterName + ":" + p.WaveID
 			for i, w := range state.Waves {
@@ -123,8 +119,8 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			}
 		}
 
-	case sightjack.EventADRGenerated:
-		var p sightjack.ADRGeneratedPayload
+	case EventADRGenerated:
+		var p ADRGeneratedPayload
 		if unmarshalPayload(e, &p) {
 			if !ctx.seenADRs[p.ADRID] {
 				ctx.seenADRs[p.ADRID] = true
@@ -132,9 +128,9 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 			}
 		}
 
-	case sightjack.EventWaveApproved, sightjack.EventWaveRejected, sightjack.EventWaveApplied,
-		sightjack.EventSpecificationSent, sightjack.EventReportSent,
-		sightjack.EventReadyLabelsApplied, sightjack.EventSessionResumed, sightjack.EventSessionRescanned:
+	case EventWaveApproved, EventWaveRejected, EventWaveApplied,
+		EventSpecificationSent, EventReportSent,
+		EventReadyLabelsApplied, EventSessionResumed, EventSessionRescanned:
 		// Audit-only events: no state mutation needed.
 
 	default:
@@ -143,6 +139,6 @@ func applyEvent(state *sightjack.SessionState, ctx *projectionContext, e sightja
 }
 
 // unmarshalPayload is a helper that returns false on unmarshal failure.
-func unmarshalPayload(e sightjack.Event, target any) bool {
-	return sightjack.UnmarshalEventPayload(e, target) == nil
+func unmarshalPayload(e Event, target any) bool {
+	return UnmarshalEventPayload(e, target) == nil
 }

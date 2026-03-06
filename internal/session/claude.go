@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
-
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -51,14 +51,13 @@ func WithAllowedTools(tools ...string) RunOption {
 // Use this for prompts that perform non-idempotent mutations (e.g. applying
 // labels or updating descriptions via Linear MCP) where retrying after a
 // partial success could duplicate side effects.
-func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *sightjack.Logger, opts ...RunOption) (string, error) {
-	ctx, span := sightjack.Tracer.Start(ctx, "claude.invoke",
+func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...RunOption) (string, error) {
+	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
-			attribute.String("claude.model", cfg.Claude.Model),
-			attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec),
-			attribute.String("gen_ai.operation.name", "chat"),
-			attribute.String("gen_ai.system", "anthropic"),
-			attribute.String("gen_ai.request.model", cfg.Claude.Model),
+			append([]attribute.KeyValue{
+				attribute.String("claude.model", cfg.Assistant.Model),
+				attribute.Int("claude.timeout_sec", cfg.Assistant.TimeoutSec),
+			}, platform.GenAISpanAttrs(cfg.Assistant.Model)...)...,
 		),
 	)
 	defer span.End()
@@ -67,7 +66,7 @@ func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w 
 	// RunClaude wraps the entire retry loop in a single timeout, so individual
 	// attempts inherit the remaining budget without resetting it.
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+		timeout := time.Duration(cfg.Assistant.TimeoutSec) * time.Second
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
@@ -79,14 +78,14 @@ func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w 
 	}
 
 	var args []string
-	if cfg.Claude.Model != "" {
-		args = append(args, "--model", cfg.Claude.Model)
+	if cfg.Assistant.Model != "" {
+		args = append(args, "--model", cfg.Assistant.Model)
 	}
 	if len(o.allowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(o.allowedTools, ","))
 	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
-	cmd := newCmd(ctx, cfg.Claude.Command, args...)
+	cmd := newCmd(ctx, cfg.Assistant.Command, args...)
 	cmd.Cancel = cancelFunc(cmd)
 	cmd.WaitDelay = 3 * time.Second
 
@@ -130,7 +129,7 @@ func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w 
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			span.AddEvent("claude.timeout",
-				trace.WithAttributes(attribute.Int("claude.timeout_sec", cfg.Claude.TimeoutSec)),
+				trace.WithAttributes(attribute.Int("claude.timeout_sec", cfg.Assistant.TimeoutSec)),
 			)
 		}
 		return output.String(), fmt.Errorf("claude exit: %w", err)
@@ -144,7 +143,7 @@ func RunClaudeOnce(ctx context.Context, cfg *sightjack.Config, prompt string, w 
 // complete.
 // Pass os.Stdout for interactive single-process usage, or io.Discard for
 // parallel invocations where interleaved output would be unreadable.
-func RunClaude(ctx context.Context, cfg *sightjack.Config, prompt string, w io.Writer, logger *sightjack.Logger, opts ...RunOption) (string, error) {
+func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...RunOption) (string, error) {
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
@@ -153,7 +152,7 @@ func RunClaude(ctx context.Context, cfg *sightjack.Config, prompt string, w io.W
 
 	// Wrap the entire retry loop in a single timeout so total wall time
 	// is bounded by TimeoutSec regardless of MaxAttempts.
-	timeout := time.Duration(cfg.Claude.TimeoutSec) * time.Second
+	timeout := time.Duration(cfg.Assistant.TimeoutSec) * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -198,7 +197,7 @@ func RunClaude(ctx context.Context, cfg *sightjack.Config, prompt string, w io.W
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
-func RunClaudeDryRun(cfg *sightjack.Config, prompt, outputPath string, name string, logger *sightjack.Logger) error {
+func RunClaudeDryRun(cfg *domain.Config, prompt, outputPath string, name string, logger domain.Logger) error {
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return fmt.Errorf("create dry-run dir: %w", err)
 	}

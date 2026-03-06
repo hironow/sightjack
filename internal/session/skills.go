@@ -6,14 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // InstallSkills copies embedded skill templates into baseDir/.siren/skills/.
 // Existing files are overwritten (idempotent). Directories are created as needed.
 func InstallSkills(baseDir string, skillsFS fs.FS) error {
 	const srcPrefix = "templates/skills"
-	destRoot := filepath.Join(baseDir, sightjack.StateDir, "skills")
+	destRoot := filepath.Join(baseDir, domain.StateDir, "skills")
 
 	return fs.WalkDir(skillsFS, srcPrefix, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

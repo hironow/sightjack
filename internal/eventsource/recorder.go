@@ -3,24 +3,31 @@ package eventsource
 import (
 	"fmt"
 	"sync"
-	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
-// SessionRecorder wraps an EventStore with automatic SessionID assignment.
+// eventStore is the package-local interface for SessionRecorder's store
+// dependency. Kept unexported to avoid importing port from eventsource
+// (prohibited by semgrep Rule 5). FileEventStore satisfies this via duck typing.
+type eventStore interface {
+	Append(events ...domain.Event) (domain.AppendResult, error)
+	LoadAll() ([]domain.Event, domain.LoadResult, error)
+}
+
+// SessionRecorder wraps a FileEventStore with automatic SessionID assignment.
 // It is safe for concurrent use within a single process.
 type SessionRecorder struct {
-	store     sightjack.EventStore
+	store     eventStore
 	sessionID string
 	prevID    string // ID of the previous event for CausationID chaining
 	mu        sync.Mutex
 }
 
 // NewSessionRecorder creates a SessionRecorder for the given session.
-func NewSessionRecorder(store sightjack.EventStore, sessionID string) (*SessionRecorder, error) {
+func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, error) {
 	// Load existing events to resume CausationID chain.
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
 	}
@@ -35,25 +42,21 @@ func NewSessionRecorder(store sightjack.EventStore, sessionID string) (*SessionR
 	}, nil
 }
 
-// Record creates and appends an event with a new UUID.
+// Record appends a pre-built event, enriching it with session metadata.
 // SessionID and CorrelationID are set to the session ID.
 // CausationID is set to the previous event's ID.
-func (r *SessionRecorder) Record(eventType sightjack.EventType, payload any) error {
+func (r *SessionRecorder) Record(ev domain.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	event, err := sightjack.NewEvent(eventType, payload, time.Now())
-	if err != nil {
-		return fmt.Errorf("recorder new event: %w", err)
-	}
-	event.SessionID = r.sessionID
-	event.CorrelationID = r.sessionID
+	ev.SessionID = r.sessionID
+	ev.CorrelationID = r.sessionID
 	if r.prevID != "" {
-		event.CausationID = r.prevID
+		ev.CausationID = r.prevID
 	}
-	if err := r.store.Append(event); err != nil {
+	if _, err := r.store.Append(ev); err != nil {
 		return err
 	}
-	r.prevID = event.ID
+	r.prevID = ev.ID
 	return nil
 }

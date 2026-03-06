@@ -2,45 +2,46 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 	"io"
 
-	sightjack "github.com/hironow/sightjack"
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // wrapRecorder wraps a Recorder with a DispatchingRecorder if not in dry-run mode.
-func wrapRecorder(recorder sightjack.Recorder, logger *sightjack.Logger, dryRun bool) sightjack.Recorder {
+func wrapRecorder(recorder port.Recorder, logger domain.Logger, dryRun bool, cfg *domain.Config, metrics port.PolicyMetrics, runner port.SessionRunner) port.Recorder {
 	if dryRun {
 		return recorder
 	}
 	engine := NewPolicyEngine(logger)
-	registerSessionPolicies(engine, logger)
-	return session.NewDispatchingRecorder(recorder, engine, logger)
+	notifier := runner.BuildNotifier(cfg.Gate)
+	if metrics == nil {
+		metrics = port.NopPolicyMetrics{}
+	}
+	registerSessionPolicies(engine, logger, notifier, metrics)
+	return runner.NewDispatchingRecorder(recorder, engine, logger)
 }
 
 // RunSession orchestrates the sightjack session pipeline.
-// Validates the RunSessionCommand, then delegates to session.RunSession.
-func RunSession(ctx context.Context, cmd sightjack.RunSessionCommand, cfg *sightjack.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder sightjack.Recorder, logger *sightjack.Logger) error {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return fmt.Errorf("command validation: %w", errs[0])
-	}
-	return session.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, wrapRecorder(recorder, logger, dryRun), logger)
+// The command is always-valid by construction — no validation needed.
+func RunSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger, metrics port.PolicyMetrics, runner port.SessionRunner) error {
+	agg := domain.NewSessionAggregate()
+	emitter := NewSessionEventEmitter(agg, wrapRecorder(recorder, logger, dryRun, cfg, metrics, runner), logger)
+	return runner.RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, emitter, logger)
 }
 
 // ResumeSession orchestrates the session resume pipeline.
-// Validates the ResumeSessionCommand, then delegates to session.RunResumeSession.
-func ResumeSession(ctx context.Context, cmd sightjack.ResumeSessionCommand, cfg *sightjack.Config, baseDir string, state *sightjack.SessionState, input io.Reader, out io.Writer, recorder sightjack.Recorder, logger *sightjack.Logger) error {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return fmt.Errorf("command validation: %w", errs[0])
-	}
-	return session.RunResumeSession(ctx, cfg, baseDir, state, input, out, wrapRecorder(recorder, logger, false), logger)
+// The command is always-valid by construction — no validation needed.
+func ResumeSession(ctx context.Context, cmd domain.ResumeSessionCommand, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger, metrics port.PolicyMetrics, runner port.SessionRunner) error {
+	agg := domain.NewSessionAggregate()
+	emitter := NewSessionEventEmitter(agg, wrapRecorder(recorder, logger, false, cfg, metrics, runner), logger)
+	return runner.RunResumeSession(ctx, cfg, baseDir, state, input, out, emitter, logger)
 }
 
 // RescanSession orchestrates the session rescan pipeline.
-func RescanSession(ctx context.Context, cmd sightjack.RunSessionCommand, cfg *sightjack.Config, baseDir string, oldState *sightjack.SessionState, sessionID string, input io.Reader, out io.Writer, recorder sightjack.Recorder, logger *sightjack.Logger) error {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return fmt.Errorf("command validation: %w", errs[0])
-	}
-	return session.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, wrapRecorder(recorder, logger, false), logger)
+// The command is always-valid by construction — no validation needed.
+func RescanSession(ctx context.Context, cmd domain.RunSessionCommand, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, recorder port.Recorder, logger domain.Logger, metrics port.PolicyMetrics, runner port.SessionRunner) error {
+	agg := domain.NewSessionAggregate()
+	emitter := NewSessionEventEmitter(agg, wrapRecorder(recorder, logger, false, cfg, metrics, runner), logger)
+	return runner.RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, emitter, logger)
 }

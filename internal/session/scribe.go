@@ -15,8 +15,10 @@ import (
 	"strings"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 const ADRSubdir = "docs/adr"
@@ -71,9 +73,9 @@ func SanitizeADRTitle(title string) string {
 	return s
 }
 
-// RenderADRFromDiscuss generates an ADR Markdown document from a sightjack.DiscussResult.
+// RenderADRFromDiscuss generates an ADR Markdown document from a domain.DiscussResult.
 // This is a pure transformer — no Claude invocation needed.
-func RenderADRFromDiscuss(dr sightjack.DiscussResult, adrNum int) string {
+func RenderADRFromDiscuss(dr domain.DiscussResult, adrNum int) string {
 	title := dr.ADRTitle
 	if title == "" {
 		title = dr.WaveID
@@ -115,7 +117,7 @@ func CountADRFiles(adrDir string) int {
 
 // ReadExistingADRs reads all NNNN-*.md files from adrDir and returns their content.
 // Returns empty slice if directory doesn't exist or is empty.
-func ReadExistingADRs(adrDir string) ([]sightjack.ExistingADR, error) {
+func ReadExistingADRs(adrDir string) ([]domain.ExistingADR, error) {
 	entries, err := os.ReadDir(adrDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -124,7 +126,7 @@ func ReadExistingADRs(adrDir string) ([]sightjack.ExistingADR, error) {
 		return nil, err
 	}
 
-	var adrs []sightjack.ExistingADR
+	var adrs []domain.ExistingADR
 	for _, e := range entries {
 		if e.IsDir() || !adrPattern.MatchString(e.Name()) {
 			continue
@@ -133,7 +135,7 @@ func ReadExistingADRs(adrDir string) ([]sightjack.ExistingADR, error) {
 		if readErr != nil {
 			return nil, fmt.Errorf("read ADR %s: %w", e.Name(), readErr)
 		}
-		adrs = append(adrs, sightjack.ExistingADR{
+		adrs = append(adrs, domain.ExistingADR{
 			Filename: e.Name(),
 			Content:  string(content),
 		})
@@ -142,19 +144,19 @@ func ReadExistingADRs(adrDir string) ([]sightjack.ExistingADR, error) {
 }
 
 // ScribeFileName returns the output filename for a scribe run.
-func ScribeFileName(wave sightjack.Wave) string {
+func ScribeFileName(wave domain.Wave) string {
 	return fmt.Sprintf("scribe_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))
 }
 
 // ClearScribeOutput removes any existing scribe output file to prevent
 // stale results from a prior run being parsed if Claude fails to write a new file.
-func ClearScribeOutput(scanDir string, wave sightjack.Wave) {
+func ClearScribeOutput(scanDir string, wave domain.Wave) {
 	path := filepath.Join(scanDir, ScribeFileName(wave))
 	_ = os.Remove(path)
 }
 
 // RunScribeADRDryRun saves the scribe prompt to a file instead of executing Claude.
-func RunScribeADRDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wave, architectResp *sightjack.ArchitectResponse, adrDir string, strictness string, logger *sightjack.Logger) error {
+func RunScribeADRDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, logger domain.Logger) error {
 	adrNum, err := NextADRNumber(adrDir)
 	if err != nil {
 		return fmt.Errorf("next adr number: %w", err)
@@ -172,7 +174,7 @@ func RunScribeADRDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wa
 
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, ScribeFileName(wave))
-	prompt, err := sightjack.RenderScribeADRPrompt(cfg.Lang, sightjack.ScribeADRPromptData{
+	prompt, err := platform.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),
@@ -194,7 +196,7 @@ func RunScribeADRDryRun(cfg *sightjack.Config, scanDir string, wave sightjack.Wa
 // NormalizeScribeResult ensures the parsed ADRID matches the filesystem-derived
 // adrID. Claude may return a mismatched or empty adr_id; the generated ID is
 // authoritative because it is used to name the ADR file on disk.
-func NormalizeScribeResult(result *sightjack.ScribeResponse, adrID string, logger *sightjack.Logger) {
+func NormalizeScribeResult(result *domain.ScribeResponse, adrID string, logger domain.Logger) {
 	if result.ADRID != adrID {
 		if result.ADRID != "" {
 			logger.Info("Scribe ADR ID mismatch: generated %s, parsed %s; using %s", adrID, result.ADRID, adrID)
@@ -204,12 +206,12 @@ func NormalizeScribeResult(result *sightjack.ScribeResponse, adrID string, logge
 }
 
 // ParseScribeResult reads and parses a scribe response JSON file.
-func ParseScribeResult(path string) (*sightjack.ScribeResponse, error) {
+func ParseScribeResult(path string) (*domain.ScribeResponse, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read scribe result: %w", err)
 	}
-	var result sightjack.ScribeResponse
+	var result domain.ScribeResponse
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parse scribe result: %w", err)
 	}
@@ -217,7 +219,10 @@ func ParseScribeResult(path string) (*sightjack.ScribeResponse, error) {
 }
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
-func RunScribeADR(ctx context.Context, cfg *sightjack.Config, scanDir string, wave sightjack.Wave, architectResp *sightjack.ArchitectResponse, adrDir string, strictness string, out io.Writer, logger *sightjack.Logger) (*sightjack.ScribeResponse, error) {
+func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, logger domain.Logger) (*domain.ScribeResponse, error) {
+	ctx, span := platform.Tracer.Start(ctx, "sightjack.scribe")
+	defer span.End()
+
 	ClearScribeOutput(scanDir, wave)
 
 	adrNum, err := NextADRNumber(adrDir)
@@ -232,12 +237,15 @@ func RunScribeADR(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 
 	existingADRs, err := ReadExistingADRs(adrDir)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "sightjack.scribe.read_adrs"))
 		return nil, fmt.Errorf("read existing ADRs: %w", err)
 	}
+	span.SetAttributes(attribute.Int("scribe.adr.count", len(existingADRs)))
 
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, ScribeFileName(wave))
-	prompt, err := sightjack.RenderScribeADRPrompt(cfg.Lang, sightjack.ScribeADRPromptData{
+	prompt, err := platform.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),
@@ -268,6 +276,8 @@ func RunScribeADR(ctx context.Context, cfg *sightjack.Config, scanDir string, wa
 
 	logger.Info("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
 	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "sightjack.scribe.claude"))
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 

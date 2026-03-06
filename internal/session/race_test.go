@@ -1,13 +1,17 @@
 package session
 
+// white-box-reason: concurrency internals: tests race conditions on unexported shared state
+
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 // TestRace_OutboxStore_ConcurrentStageAndRead verifies that concurrent
@@ -15,10 +19,10 @@ import (
 func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 	dir := t.TempDir()
 	EnsureMailDirs(dir)
-	dbPath := filepath.Join(dir, sightjack.StateDir, ".run", "outbox.db")
+	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
 	os.MkdirAll(filepath.Dir(dbPath), 0o755)
-	archiveDir := sightjack.MailDir(dir, sightjack.ArchiveDir)
-	outboxDir := sightjack.MailDir(dir, sightjack.OutboxDir)
+	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
+	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
 	store, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -29,16 +33,17 @@ func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 	var wg sync.WaitGroup
 	const workers = 10
 
+	ctx := context.Background()
 	for i := range workers {
 		wg.Add(2)
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("race-%03d.md", id)
-			store.Stage(name, []byte("data"))
+			store.Stage(ctx, name, []byte("data"))
 		}(i)
 		go func() {
 			defer wg.Done()
-			store.Flush()
+			store.Flush(ctx)
 		}()
 	}
 	wg.Wait()
@@ -48,7 +53,7 @@ func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 // FeedbackCollector mutex protects concurrent field access.
 func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
 	ch := make(chan *DMail, 10)
-	fc := CollectFeedback(nil, ch, nil, sightjack.NewLogger(nil, false))
+	fc := CollectFeedback(nil, ch, nil, platform.NewLogger(nil, false))
 
 	var wg sync.WaitGroup
 	for i := range 20 {
@@ -75,7 +80,7 @@ func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
 // TestRace_Logger_ConcurrentWrite verifies that Logger's mutex protects
 // concurrent log writes.
 func TestRace_Logger_ConcurrentWrite(t *testing.T) {
-	logger := sightjack.NewLogger(nil, false)
+	logger := platform.NewLogger(nil, false)
 
 	var wg sync.WaitGroup
 	for i := range 20 {

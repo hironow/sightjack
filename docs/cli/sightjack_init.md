@@ -1,15 +1,14 @@
 ## sightjack init
 
-Create .siren/config.yaml interactively
+Create .siren/config.yaml
 
 ### Synopsis
 
 Initialize a new sightjack project by creating .siren/config.yaml.
 
-Interactively prompts for Linear team, project, language, and
-strictness level. Also creates .gitignore, installs d-mail skills,
-and sets up mail directories. Run 'sightjack doctor' after init
-to verify the environment.
+Use --team and --project flags for non-interactive mode, or omit
+flags for interactive prompts. Also creates .gitignore, installs
+d-mail skills, and sets up mail directories.
 
 ```
 sightjack init [path] [flags]
@@ -18,20 +17,27 @@ sightjack init [path] [flags]
 ### Examples
 
 ```
-  # Initialize in current directory
-  sightjack init
+  # Non-interactive with flags
+  sightjack init --team Engineering --project Hades
 
   # Initialize in a specific directory
-  sightjack init /path/to/project
+  sightjack init --team Engineering --project Hades /path/to/project
 
-  # After init, verify environment
-  sightjack init && sightjack doctor
+  # Defaults only (no prompts)
+  sightjack init /path/to/project
 ```
 
 ### Options
 
 ```
-  -h, --help   help for init
+  -h, --help                  help for init
+      --lang string           Language (ja/en) (default "ja")
+      --otel-backend string   OTel backend: jaeger, weave
+      --otel-entity string    Weave entity/team (required for weave)
+      --otel-project string   Weave project (required for weave)
+      --project string        Linear project name
+      --strictness string     Strictness level (fog/alert/lockdown) (default "fog")
+      --team string           Linear team name
 ```
 
 ### Options inherited from parent commands
@@ -39,7 +45,7 @@ sightjack init [path] [flags]
 ```
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
-  -l, --lang string     Language override (ja/en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```
 

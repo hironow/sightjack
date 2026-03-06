@@ -12,7 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -55,9 +56,10 @@ func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "sightjack",
 		Short: "SIREN-inspired issue architecture tool for Linear",
-		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse DefaultToScan() to preprocess args before Execute.",
+		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse NeedsDefaultScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			logger := sightjack.NewLogger(cmd.ErrOrStderr(), verbose)
+			applyOtelEnv(filepath.Dir(cfgPath))
+			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("sightjack", version)
 			shutdownMeter = initMeter("sightjack", version)
@@ -66,7 +68,7 @@ func NewRootCommand() *cobra.Command {
 			return nil
 		},
 		SilenceUsage:  true,
-		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output
+		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output [permanent]
 	}
 
 	finalizerOnce.Do(func() {
@@ -166,7 +168,7 @@ func resolveBaseDir(args []string) (string, error) {
 }
 
 // loadConfig loads the sightjack config, applying lang override if set.
-func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
+func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	resolved := resolveConfigPath(cmd, baseDir)
 	cfg, err := session.LoadConfig(resolved)
 	if err != nil {
@@ -181,13 +183,13 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*sightjack.Config, error) {
 	return cfg, nil
 }
 
-// loggerFrom extracts the *sightjack.Logger from the cobra command context.
+// loggerFrom extracts the domain.Logger from the cobra command context.
 // Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
-func loggerFrom(cmd *cobra.Command) *sightjack.Logger {
-	if l, ok := cmd.Context().Value(loggerKey).(*sightjack.Logger); ok {
+func loggerFrom(cmd *cobra.Command) domain.Logger {
+	if l, ok := cmd.Context().Value(loggerKey).(domain.Logger); ok {
 		return l
 	}
-	return sightjack.NewLogger(cmd.ErrOrStderr(), false)
+	return platform.NewLogger(cmd.ErrOrStderr(), false)
 }
 
 // resolveConfigPath returns the final config file path.
@@ -195,7 +197,7 @@ func loggerFrom(cmd *cobra.Command) *sightjack.Logger {
 // When explicitly set with a relative path, resolves against baseDir.
 func resolveConfigPath(cmd *cobra.Command, baseDir string) string {
 	if !cmd.Flags().Changed("config") {
-		return sightjack.ConfigPath(baseDir)
+		return domain.ConfigPath(baseDir)
 	}
 	if !filepath.IsAbs(cfgPath) {
 		return filepath.Join(baseDir, cfgPath)

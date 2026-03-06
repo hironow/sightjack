@@ -2,17 +2,37 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 	"io"
+	"time"
 
-	sightjack "github.com/hironow/sightjack"
-	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
-// RunScan validates the RunScanCommand, then delegates to session.RunScan.
-func RunScan(ctx context.Context, cmd sightjack.RunScanCommand, cfg *sightjack.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger *sightjack.Logger) (*sightjack.ScanResult, error) {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return nil, fmt.Errorf("command validation: %w", errs[0])
+// RunScan executes the scan, caches the result, and records session events.
+// The command is always-valid by construction — no validation needed.
+func RunScan(ctx context.Context, cmd domain.RunScanCommand, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger domain.Logger, scanner port.ScanRunner, factory port.RecorderFactory) (*domain.ScanResult, error) {
+	result, err := scanner.RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, logger)
+	if err != nil {
+		return nil, err
 	}
-	return session.RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, logger)
+
+	// In dry-run mode, no events to record
+	if dryRun || result == nil {
+		return result, nil
+	}
+
+	// Record scan state: cache result + session start/scan completed events
+	stateDir := factory.SessionEventsDir(baseDir, sessionID)
+	recorder, recErr := factory.NewSessionRecorder(stateDir, sessionID, logger)
+	if recErr != nil {
+		logger.Warn("session recorder: %v", recErr)
+		return result, nil
+	}
+
+	agg := domain.NewSessionAggregate()
+	emitter := NewSessionEventEmitter(agg, recorder, logger)
+	scanner.RecordScanState(baseDir, sessionID, result, cfg, emitter, time.Now(), logger)
+
+	return result, nil
 }

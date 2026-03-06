@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -36,7 +36,7 @@ for downstream commands (apply, discuss).`,
 				return fmt.Errorf("no input on stdin. Pipe wave plan: sightjack waves | sightjack select")
 			}
 
-			var plan sightjack.WavePlan
+			var plan domain.WavePlan
 			if err := json.Unmarshal(data, &plan); err != nil {
 				return fmt.Errorf("invalid WavePlan JSON: %w", err)
 			}
@@ -48,13 +48,13 @@ for downstream commands (apply, discuss).`,
 			// Open terminal for interactive input (stdin is consumed by pipe).
 			// cmd.InOrStdin() is already exhausted after io.ReadAll above,
 			// so we must open the controlling terminal directly.
-			tty, err := openTTY() // nosemgrep: devtty-hard-fail-needs-fallback
+			tty, err := openTTY() // nosemgrep: devtty-hard-fail-needs-fallback [permanent]
 			if err != nil {
 				return fmt.Errorf("cannot open terminal for interactive input (stdin consumed by pipe): %w", err)
 			}
 			defer tty.Close()
 			scanner := bufio.NewScanner(tty)
-			available := session.AvailableWaves(plan.Waves, map[string]bool{})
+			available := domain.AvailableWaves(plan.Waves, map[string]bool{})
 
 			if len(available) == 0 {
 				return fmt.Errorf("no available waves (all locked or completed)")
@@ -62,7 +62,7 @@ for downstream commands (apply, discuss).`,
 
 			selected, err := session.PromptWaveSelection(cmd.Context(), cmd.ErrOrStderr(), scanner, available)
 			if err != nil {
-				if err == session.ErrQuit || err == session.ErrGoBack {
+				if err == domain.ErrQuit || err == domain.ErrGoBack {
 					return nil
 				}
 				return fmt.Errorf("selection failed: %w", err)
@@ -80,18 +80,18 @@ for downstream commands (apply, discuss).`,
 
 			// Build remaining waves (all plan waves except the selected one)
 			// so downstream apply → nextgen can accurately check NeedsMoreWaves.
-			var remaining []sightjack.Wave
-			selectedKey := session.WaveKey(selected)
+			var remaining []domain.Wave
+			selectedKey := domain.WaveKey(selected)
 			for _, w := range plan.Waves {
-				if session.WaveKey(w) != selectedKey {
+				if domain.WaveKey(w) != selectedKey {
 					remaining = append(remaining, w)
 				}
 			}
 
 			// Output selected wave with remaining sibling context.
 			type selectOutput struct {
-				sightjack.Wave
-				RemainingWaves []sightjack.Wave `json:"remaining_waves,omitempty"`
+				domain.Wave
+				RemainingWaves []domain.Wave `json:"remaining_waves,omitempty"`
 			}
 			output := selectOutput{Wave: selected, RemainingWaves: remaining}
 			out, jsonErr := json.MarshalIndent(output, "", "  ")

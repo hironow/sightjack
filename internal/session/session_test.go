@@ -12,18 +12,19 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestIsWaveApplyComplete_NoErrors(t *testing.T) {
 	// given
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "auth-w1",
 		Applied: 5,
 		Errors:  []string{},
-		Ripples: []sightjack.Ripple{{ClusterName: "API", Description: "W2 unlocked"}},
+		Ripples: []domain.Ripple{{ClusterName: "API", Description: "W2 unlocked"}},
 	}
 
 	// when
@@ -37,11 +38,11 @@ func TestIsWaveApplyComplete_NoErrors(t *testing.T) {
 
 func TestIsWaveApplyComplete_WithErrors(t *testing.T) {
 	// given
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "auth-w1",
 		Applied: 3,
 		Errors:  []string{"failed to update ENG-101", "failed to update ENG-102"},
-		Ripples: []sightjack.Ripple{},
+		Ripples: []domain.Ripple{},
 	}
 
 	// when
@@ -55,7 +56,7 @@ func TestIsWaveApplyComplete_WithErrors(t *testing.T) {
 
 func TestIsWaveApplyComplete_NilErrors(t *testing.T) {
 	// given
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "auth-w1",
 		Applied: 5,
 		Errors:  nil,
@@ -73,27 +74,27 @@ func TestIsWaveApplyComplete_NilErrors(t *testing.T) {
 func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	// given: dry-run session should generate both classify and wave_generate prompts
 	baseDir := t.TempDir()
-	cfg := &sightjack.Config{
+	cfg := &domain.Config{
 		Lang: "en",
-		Claude: sightjack.ClaudeConfig{
+		Assistant: domain.AIAssistantConfig{
 			Command:    "claude",
 			TimeoutSec: 60,
 		},
-		Scan: sightjack.ScanConfig{
+		Scan: domain.ScanConfig{
 			MaxConcurrency: 1,
 			ChunkSize:      50,
 		},
-		Linear: sightjack.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    "ENG",
 			Project: "Test",
 		},
-		Scribe: sightjack.ScribeConfig{Enabled: true},
+		Scribe: domain.ScribeConfig{Enabled: true},
 	}
 	sessionID := "test-dry-run"
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, &port.NopSessionEventEmitter{}, platform.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -101,7 +102,7 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	}
 
 	// then: classify prompt was generated (Pass 1)
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	classifyPrompt := filepath.Join(scanDir, "classify_prompt.md")
 	if _, err := os.Stat(classifyPrompt); os.IsNotExist(err) {
 		t.Error("classify_prompt.md not generated")
@@ -129,27 +130,27 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	// given: dry-run with Scribe disabled
 	baseDir := t.TempDir()
-	cfg := &sightjack.Config{
+	cfg := &domain.Config{
 		Lang: "en",
-		Claude: sightjack.ClaudeConfig{
+		Assistant: domain.AIAssistantConfig{
 			Command:    "claude",
 			TimeoutSec: 60,
 		},
-		Scan: sightjack.ScanConfig{
+		Scan: domain.ScanConfig{
 			MaxConcurrency: 1,
 			ChunkSize:      50,
 		},
-		Linear: sightjack.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    "ENG",
 			Project: "Test",
 		},
-		Scribe: sightjack.ScribeConfig{Enabled: false},
+		Scribe: domain.ScribeConfig{Enabled: false},
 	}
 	sessionID := "test-dry-run-no-scribe"
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, &port.NopSessionEventEmitter{}, platform.NewLogger(io.Discard, false))
 
 	// then: no error
 	if err != nil {
@@ -157,7 +158,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	}
 
 	// then: scribe prompt should NOT be generated
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	scribePrompt := filepath.Join(scanDir, "scribe_sample_sample-w1_prompt.md")
 	if _, err := os.Stat(scribePrompt); !os.IsNotExist(err) {
 		t.Error("scribe prompt should not be generated when Scribe is disabled")
@@ -166,15 +167,15 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 
 func TestRunSession_NilInputReturnsError(t *testing.T) {
 	// given: non-dry-run session with nil input should return error early
-	cfg := &sightjack.Config{
-		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
-		Scan:   sightjack.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Linear: sightjack.LinearConfig{Team: "ENG", Project: "Test"},
+	cfg := &domain.Config{
+		Lang:      "en",
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		Scan:      domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 
 	// when
-	err := session.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(context.Background(), cfg, t.TempDir(), "test-nil-input", false, nil, io.Discard, &port.NopSessionEventEmitter{}, platform.NewLogger(io.Discard, false))
 
 	// then: should get an input-related error, not a panic or scan error
 	if err == nil {
@@ -186,7 +187,7 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 }
 
 func TestBuildCompletedWaveMap(t *testing.T) {
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "auth-w2", ClusterName: "Auth", Status: "available"},
 		{ID: "api-w1", ClusterName: "API", Status: "completed"},
@@ -208,9 +209,9 @@ func TestBuildCompletedWaveMap(t *testing.T) {
 }
 
 func TestBuildWaveStates(t *testing.T) {
-	waves := []sightjack.Wave{
-		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed", Prerequisites: nil, Actions: make([]sightjack.WaveAction, 3)},
-		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available", Prerequisites: []string{"auth-w1"}, Actions: make([]sightjack.WaveAction, 5)},
+	waves := []domain.Wave{
+		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed", Prerequisites: nil, Actions: make([]domain.WaveAction, 3)},
+		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available", Prerequisites: []string{"auth-w1"}, Actions: make([]domain.WaveAction, 5)},
 	}
 
 	states := domain.BuildWaveStates(waves)
@@ -232,10 +233,10 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 	// input "d\n" followed by topic, then "a\n" should eventually approve.
 
 	// given: piped input sequence: select wave 1, discuss, enter topic, then approve
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
-			Actions: []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
-			Delta:   sightjack.WaveDelta{Before: 0.25, After: 0.40}},
+			Actions: []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   domain.WaveDelta{Before: 0.25, After: 0.40}},
 	}
 	input := "1\nd\nShould we split?\na\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
@@ -256,7 +257,7 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalDiscuss {
+	if choice != domain.ApprovalDiscuss {
 		t.Fatalf("expected ApprovalDiscuss, got %d", choice)
 	}
 
@@ -274,7 +275,7 @@ func TestDiscussBranchReturnsToApproval(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalApprove {
+	if choice != domain.ApprovalApprove {
 		t.Errorf("expected ApprovalApprove after discuss, got %d", choice)
 	}
 }
@@ -283,10 +284,10 @@ func TestBuildCompletedWaveMap_Empty(t *testing.T) {
 	// given: nil and empty wave slices
 	tests := []struct {
 		name  string
-		waves []sightjack.Wave
+		waves []domain.Wave
 	}{
 		{"nil", nil},
-		{"empty", []sightjack.Wave{}},
+		{"empty", []domain.Wave{}},
 	}
 
 	for _, tt := range tests {
@@ -307,7 +308,7 @@ func TestBuildCompletedWaveMap_Empty(t *testing.T) {
 
 func TestBuildCompletedWaveMap_DuplicateIDsAcrossClusters(t *testing.T) {
 	// given: same wave ID "w1" in two different clusters, both completed
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "w1", ClusterName: "Auth", Status: "completed"},
 		{ID: "w1", ClusterName: "API", Status: "completed"},
 	}
@@ -331,10 +332,10 @@ func TestBuildWaveStates_Empty(t *testing.T) {
 	// given: nil and empty wave slices
 	tests := []struct {
 		name  string
-		waves []sightjack.Wave
+		waves []domain.Wave
 	}{
 		{"nil", nil},
-		{"empty", []sightjack.Wave{}},
+		{"empty", []domain.Wave{}},
 	}
 
 	for _, tt := range tests {
@@ -355,10 +356,10 @@ func TestBuildWaveStates_Empty(t *testing.T) {
 
 func TestDiscussBranchThenReject(t *testing.T) {
 	// given: piped input: select wave 1, discuss, enter topic, then reject
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
-			Actions: []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
-			Delta:   sightjack.WaveDelta{Before: 0.25, After: 0.40}},
+			Actions: []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   domain.WaveDelta{Before: 0.25, After: 0.40}},
 	}
 	input := "1\nd\nShould we split?\nr\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
@@ -376,7 +377,7 @@ func TestDiscussBranchThenReject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalDiscuss {
+	if choice != domain.ApprovalDiscuss {
 		t.Fatalf("expected ApprovalDiscuss, got %d", choice)
 	}
 
@@ -394,17 +395,17 @@ func TestDiscussBranchThenReject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalReject {
+	if choice != domain.ApprovalReject {
 		t.Errorf("expected ApprovalReject after discuss, got %d", choice)
 	}
 }
 
 func TestDiscussBranchQuitAtTopic(t *testing.T) {
 	// given: piped input: select wave 1, discuss, then quit at topic prompt
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
-			Actions: []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
-			Delta:   sightjack.WaveDelta{Before: 0.25, After: 0.40}},
+			Actions: []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   domain.WaveDelta{Before: 0.25, After: 0.40}},
 	}
 	input := "1\nd\nq\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
@@ -422,23 +423,23 @@ func TestDiscussBranchQuitAtTopic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalDiscuss {
+	if choice != domain.ApprovalDiscuss {
 		t.Fatalf("expected ApprovalDiscuss, got %d", choice)
 	}
 
 	// when: topic -> quit
 	_, err = session.PromptDiscussTopic(ctx, &output, scanner)
-	if err != session.ErrQuit {
+	if err != domain.ErrQuit {
 		t.Errorf("expected ErrQuit when quitting at topic, got %v", err)
 	}
 }
 
 func TestMultipleDiscussRounds(t *testing.T) {
 	// given: two discuss rounds then approve
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps",
-			Actions: []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
-			Delta:   sightjack.WaveDelta{Before: 0.25, After: 0.40}},
+			Actions: []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+			Delta:   domain.WaveDelta{Before: 0.25, After: 0.40}},
 	}
 	input := "1\nd\nFirst topic\nd\nSecond topic\na\n"
 	scanner := bufio.NewScanner(strings.NewReader(input))
@@ -456,7 +457,7 @@ func TestMultipleDiscussRounds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("round 1 approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalDiscuss {
+	if choice != domain.ApprovalDiscuss {
 		t.Fatalf("round 1: expected ApprovalDiscuss, got %d", choice)
 	}
 	topic, err := session.PromptDiscussTopic(ctx, &output, scanner)
@@ -472,7 +473,7 @@ func TestMultipleDiscussRounds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("round 2 approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalDiscuss {
+	if choice != domain.ApprovalDiscuss {
 		t.Fatalf("round 2: expected ApprovalDiscuss, got %d", choice)
 	}
 	topic, err = session.PromptDiscussTopic(ctx, &output, scanner)
@@ -488,31 +489,31 @@ func TestMultipleDiscussRounds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("final approval error: %v", err)
 	}
-	if choice != sightjack.ApprovalApprove {
+	if choice != domain.ApprovalApprove {
 		t.Errorf("expected ApprovalApprove after two discuss rounds, got %d", choice)
 	}
 }
 
 func TestApplyModifiedWave_PreservesIdentity(t *testing.T) {
 	// given: original wave with known identity
-	original := sightjack.Wave{
+	original := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Original Title",
-		Actions:     []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "original"}},
-		Delta:       sightjack.WaveDelta{Before: 0.25, After: 0.40},
+		Actions:     []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "original"}},
+		Delta:       domain.WaveDelta{Before: 0.25, After: 0.40},
 		Status:      "available",
 	}
 	// given: architect returns modified wave with CHANGED identity fields
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID:          "new-w1",
 		ClusterName: "Authentication",
 		Title:       "Better Title",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dependency", IssueID: "ENG-101", Description: "original"},
 			{Type: "add_dod", IssueID: "ENG-101", Description: "new action"},
 		},
-		Delta:  sightjack.WaveDelta{Before: 0.25, After: 0.50},
+		Delta:  domain.WaveDelta{Before: 0.25, After: 0.50},
 		Status: "modified",
 	}
 
@@ -544,19 +545,19 @@ func TestApplyModifiedWave_PreservesIdentity(t *testing.T) {
 
 func TestApplyModifiedWave_LocksOnUnmetPrerequisites(t *testing.T) {
 	// given: original available wave with no prerequisites
-	original := sightjack.Wave{
+	original := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Original",
 		Status:      "available",
 	}
 	// given: architect adds a prerequisite that hasn't been completed
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID:            "auth-w1",
 		ClusterName:   "Auth",
 		Title:         "Modified",
 		Prerequisites: []string{"API:api-w1"},
-		Actions:       []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
+		Actions:       []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
 	}
 	// given: api-w1 is NOT in the completed map
 	completed := map[string]bool{}
@@ -575,18 +576,18 @@ func TestApplyModifiedWave_LocksOnUnmetPrerequisites(t *testing.T) {
 
 func TestApplyModifiedWave_AvailableWhenPrereqsMet(t *testing.T) {
 	// given: architect adds a prerequisite that HAS been completed
-	original := sightjack.Wave{
+	original := domain.Wave{
 		ID:          "auth-w2",
 		ClusterName: "Auth",
 		Title:       "Original",
 		Status:      "available",
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID:            "auth-w2",
 		ClusterName:   "Auth",
 		Title:         "Modified",
 		Prerequisites: []string{"Auth:auth-w1"},
-		Actions:       []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
+		Actions:       []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
 	}
 	completed := map[string]bool{"Auth:auth-w1": true}
 
@@ -601,18 +602,18 @@ func TestApplyModifiedWave_AvailableWhenPrereqsMet(t *testing.T) {
 
 func TestApplyModifiedWave_NormalizesBarePrerequisites(t *testing.T) {
 	// given: architect returns bare ID "auth-w1" instead of composite "Auth:auth-w1"
-	original := sightjack.Wave{
+	original := domain.Wave{
 		ID:          "auth-w2",
 		ClusterName: "Auth",
 		Title:       "Original",
 		Status:      "available",
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID:            "auth-w2",
 		ClusterName:   "Auth",
 		Title:         "Modified",
 		Prerequisites: []string{"auth-w1"}, // bare ID, not composite
-		Actions:       []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
+		Actions:       []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
 	}
 	// given: "Auth:auth-w1" IS completed (composite key)
 	completed := map[string]bool{"Auth:auth-w1": true}
@@ -632,16 +633,16 @@ func TestApplyModifiedWave_NormalizesBarePrerequisites(t *testing.T) {
 
 func TestApplyModifiedWave_PropagatesLockToWaves(t *testing.T) {
 	// given: a waves slice and an architect-modified wave that becomes locked
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Wave 1", Status: "available"},
 		{ID: "auth-w2", ClusterName: "Auth", Title: "Wave 2", Status: "available"},
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		ID:            "auth-w1",
 		ClusterName:   "Auth",
 		Title:         "Modified",
 		Prerequisites: []string{"API:api-w1"}, // unmet
-		Actions:       []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
+		Actions:       []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
 	}
 	completed := map[string]bool{}
 
@@ -669,18 +670,18 @@ func TestApplyModifiedWave_PropagatesLockToWaves(t *testing.T) {
 
 func TestApplyModifiedWave_PreservesOriginalPrerequisitesWhenNil(t *testing.T) {
 	// given: original wave has prerequisites, modified wave omits them (nil from JSON)
-	original := sightjack.Wave{
+	original := domain.Wave{
 		ID:            "auth-w2",
 		ClusterName:   "Auth",
 		Title:         "Original",
 		Status:        "locked",
 		Prerequisites: []string{"Auth:auth-w1"},
-		Delta:         sightjack.WaveDelta{Before: 0.20, After: 0.40},
+		Delta:         domain.WaveDelta{Before: 0.20, After: 0.40},
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		Title:         "Modified Title",
 		Prerequisites: nil, // architect omitted the field
-		Actions:       []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
+		Actions:       []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-102", Description: "new"}},
 	}
 	completed := map[string]bool{} // auth-w1 NOT completed
 
@@ -699,17 +700,17 @@ func TestApplyModifiedWave_PreservesOriginalPrerequisitesWhenNil(t *testing.T) {
 
 func TestApplyModifiedWave_PreservesOriginalDeltaWhenZero(t *testing.T) {
 	// given: original wave has meaningful delta, modified wave omits it (zero value from JSON)
-	original := sightjack.Wave{
+	original := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Original",
 		Status:      "available",
-		Delta:       sightjack.WaveDelta{Before: 0.25, After: 0.50},
+		Delta:       domain.WaveDelta{Before: 0.25, After: 0.50},
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		Title:   "Modified Title",
-		Actions: []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
-		Delta:   sightjack.WaveDelta{}, // zero value — architect omitted the field
+		Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "new"}},
+		Delta:   domain.WaveDelta{}, // zero value — architect omitted the field
 	}
 	completed := map[string]bool{}
 
@@ -729,7 +730,7 @@ func TestMergeCompletedStatus_PreservesCompleted(t *testing.T) {
 		"API:api-w1":   true,
 	}
 	// given: new waves from re-scan (auth-w1 still exists, api-w2 is new)
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "available"},
 		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "locked"},
 		{ID: "api-w2", ClusterName: "API", Title: "New Wave", Status: "available"},
@@ -764,7 +765,7 @@ func TestMergeCompletedStatus_PreservesCompleted(t *testing.T) {
 func TestMergeCompletedStatus_EmptyOld(t *testing.T) {
 	// given: no old completed waves
 	oldCompleted := map[string]bool{}
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Status: "available"},
 	}
 
@@ -783,7 +784,7 @@ func TestMergeCompletedStatus_EmptyOld(t *testing.T) {
 func TestMergeCompletedStatus_EmptyNew(t *testing.T) {
 	// given: old waves completed but new scan returns nothing
 	oldCompleted := map[string]bool{"Auth:auth-w1": true}
-	var newWaves []sightjack.Wave
+	var newWaves []domain.Wave
 
 	// when
 	merged := domain.MergeCompletedStatus(oldCompleted, newWaves)
@@ -796,19 +797,19 @@ func TestMergeCompletedStatus_EmptyNew(t *testing.T) {
 
 func TestBuildWaveStates_IncludesFullFields(t *testing.T) {
 	// given
-	waves := []sightjack.Wave{
+	waves := []domain.Wave{
 		{
 			ID:            "auth-w1",
 			ClusterName:   "Auth",
 			Title:         "Deps",
 			Status:        "completed",
 			Prerequisites: []string{"Auth:auth-w0"},
-			Actions: []sightjack.WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "add_dependency", IssueID: "ENG-101", Description: "dep"},
 				{Type: "add_dod", IssueID: "ENG-102", Description: "dod"},
 			},
 			Description: "Order dependencies first",
-			Delta:       sightjack.WaveDelta{Before: 0.20, After: 0.40},
+			Delta:       domain.WaveDelta{Before: 0.20, After: 0.40},
 		},
 	}
 
@@ -830,7 +831,7 @@ func TestBuildWaveStates_IncludesFullFields(t *testing.T) {
 
 func TestRestoreWaves_ConvertsWaveStatesToWaves(t *testing.T) {
 	// given
-	states := []sightjack.WaveState{
+	states := []domain.WaveState{
 		{
 			ID:            "auth-w1",
 			ClusterName:   "Auth",
@@ -838,12 +839,12 @@ func TestRestoreWaves_ConvertsWaveStatesToWaves(t *testing.T) {
 			Status:        "completed",
 			Prerequisites: []string{"Auth:auth-w0"},
 			ActionCount:   2,
-			Actions: []sightjack.WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "add_dependency", IssueID: "ENG-101", Description: "dep"},
 				{Type: "add_dod", IssueID: "ENG-102", Description: "dod"},
 			},
 			Description: "Order dependencies first",
-			Delta:       sightjack.WaveDelta{Before: 0.20, After: 0.40},
+			Delta:       domain.WaveDelta{Before: 0.20, After: 0.40},
 		},
 		{
 			ID:          "auth-w2",
@@ -851,8 +852,8 @@ func TestRestoreWaves_ConvertsWaveStatesToWaves(t *testing.T) {
 			Title:       "DoD",
 			Status:      "available",
 			ActionCount: 1,
-			Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-103", Description: "dod2"}},
-			Delta:       sightjack.WaveDelta{Before: 0.40, After: 0.60},
+			Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-103", Description: "dod2"}},
+			Delta:       domain.WaveDelta{Before: 0.40, After: 0.60},
 		},
 	}
 
@@ -886,7 +887,7 @@ func TestRestoreWaves_ConvertsWaveStatesToWaves(t *testing.T) {
 
 func TestRestoreWaves_EmptyInput(t *testing.T) {
 	// given
-	var states []sightjack.WaveState
+	var states []domain.WaveState
 
 	// when
 	waves := domain.RestoreWaves(states)
@@ -903,24 +904,24 @@ func TestRestoreWaves_EmptyInput(t *testing.T) {
 func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	// given: dry-run should NOT write scan_result.json (no real scan happened)
 	baseDir := t.TempDir()
-	cfg := &sightjack.Config{
-		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
-		Scan:   sightjack.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Linear: sightjack.LinearConfig{Team: "ENG", Project: "Test"},
-		Scribe: sightjack.ScribeConfig{Enabled: true},
+	cfg := &domain.Config{
+		Lang:      "en",
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		Scan:      domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		Scribe:    domain.ScribeConfig{Enabled: true},
 	}
 	sessionID := "test-no-cache"
 	ctx := context.Background()
 
 	// when
-	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunSession(ctx, cfg, baseDir, sessionID, true, nil, io.Discard, &port.NopSessionEventEmitter{}, platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	scanDir := sightjack.ScanDir(baseDir, sessionID)
+	scanDir := domain.ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	if _, err := os.Stat(scanResultPath); !os.IsNotExist(err) {
 		t.Error("scan_result.json should not exist in dry-run mode")
@@ -978,19 +979,19 @@ func TestCalcNewlyUnlocked_CompletingWaveUnlocksNone(t *testing.T) {
 
 func TestApplyModifiedWave_PreservesOriginalActionsWhenNil(t *testing.T) {
 	// given: original wave has actions, modified wave omits them (nil from JSON)
-	originalActions := []sightjack.WaveAction{
+	originalActions := []domain.WaveAction{
 		{Type: "add_dod", IssueID: "ENG-101", Description: "Original action 1"},
 		{Type: "add_dependency", IssueID: "ENG-102", Description: "Original action 2"},
 	}
-	original := sightjack.Wave{
+	original := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Original",
 		Status:      "available",
 		Actions:     originalActions,
-		Delta:       sightjack.WaveDelta{Before: 0.20, After: 0.40},
+		Delta:       domain.WaveDelta{Before: 0.20, After: 0.40},
 	}
-	modified := sightjack.Wave{
+	modified := domain.Wave{
 		Title:   "Modified Title",
 		Actions: nil, // architect omitted the field
 	}
@@ -1013,12 +1014,12 @@ func TestResumeSession_RestoresWavesFromState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// Create scan result cache
-	scanDir := sightjack.ScanDir(baseDir, "old-session")
+	scanDir := domain.ScanDir(baseDir, "old-session")
 	os.MkdirAll(scanDir, 0755)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	scanResult := &sightjack.ScanResult{
-		Clusters: []sightjack.ClusterScanResult{
-			{Name: "Auth", Completeness: 0.50, Issues: []sightjack.IssueDetail{
+	scanResult := &domain.ScanResult{
+		Clusters: []domain.ClusterScanResult{
+			{Name: "Auth", Completeness: 0.50, Issues: []domain.IssueDetail{
 				{ID: "ENG-101", Identifier: "ENG-101", Title: "Login", Completeness: 0.50},
 			}},
 		},
@@ -1030,25 +1031,25 @@ func TestResumeSession_RestoresWavesFromState(t *testing.T) {
 	}
 
 	// Create state pointing to that scan result
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		Version:        "0.5",
 		SessionID:      "old-session",
 		Project:        "TestProject",
 		LastScanned:    time.Now(),
 		Completeness:   0.50,
 		ScanResultPath: scanResultPath,
-		Clusters: []sightjack.ClusterState{
+		Clusters: []domain.ClusterState{
 			{Name: "Auth", Completeness: 0.50, IssueCount: 1},
 		},
-		Waves: []sightjack.WaveState{
+		Waves: []domain.WaveState{
 			{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed",
 				ActionCount: 1,
-				Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d"}},
-				Delta:       sightjack.WaveDelta{Before: 0.25, After: 0.50}},
+				Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d"}},
+				Delta:       domain.WaveDelta{Before: 0.25, After: 0.50}},
 			{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "available",
 				ActionCount: 1,
-				Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d2"}},
-				Delta:       sightjack.WaveDelta{Before: 0.50, After: 0.75}},
+				Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "ENG-101", Description: "d2"}},
+				Delta:       domain.WaveDelta{Before: 0.50, After: 0.75}},
 		},
 		ADRCount: 2,
 	}
@@ -1078,19 +1079,19 @@ func TestResumeSession_RestoresWavesFromState(t *testing.T) {
 
 func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
-	cfg := &sightjack.Config{
-		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
-		Linear: sightjack.LinearConfig{Team: "ENG", Project: "Test"},
+	cfg := &domain.Config{
+		Lang:      "en",
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		Version:        "0.5",
 		SessionID:      "old-session",
 		ScanResultPath: "/some/path.json",
 	}
 
 	// when
-	err := session.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunResumeSession(context.Background(), cfg, t.TempDir(), state, nil, io.Discard, &port.NopSessionEventEmitter{}, platform.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1103,18 +1104,18 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 
 func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
-	cfg := &sightjack.Config{
-		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
-		Linear: sightjack.LinearConfig{Team: "ENG", Project: "Test"},
+	cfg := &domain.Config{
+		Lang:      "en",
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		Version:   "0.5",
 		SessionID: "old-session",
 	}
 
 	// when
-	err := session.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, session.NopRecorder{}, sightjack.NewLogger(io.Discard, false))
+	err := session.RunRescanSession(context.Background(), cfg, t.TempDir(), state, "test-rescan", nil, io.Discard, &port.NopSessionEventEmitter{}, platform.NewLogger(io.Discard, false))
 
 	// then
 	if err == nil {
@@ -1127,7 +1128,7 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 
 func TestResumeSession_ErrorOnMissingScanResultPath(t *testing.T) {
 	// given: state with empty scan result path
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		Version:        "0.5",
 		SessionID:      "old-session",
 		ScanResultPath: "",
@@ -1147,7 +1148,7 @@ func TestResumeSession_ErrorOnMissingScanResultPath(t *testing.T) {
 
 func TestResumeSession_ErrorOnMissingScanResultFile(t *testing.T) {
 	// given: state with non-existent scan result path
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		Version:        "0.5",
 		SessionID:      "old-session",
 		ScanResultPath: "/nonexistent/scan_result.json",
@@ -1171,8 +1172,8 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 	scanDir := filepath.Join(baseDir, ".siren", ".run", "old-session")
 	os.MkdirAll(scanDir, 0755)
 
-	scanResult := &sightjack.ScanResult{
-		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.50, Issues: []sightjack.IssueDetail{{ID: "E1", Identifier: "E1", Title: "t"}}}},
+	scanResult := &domain.ScanResult{
+		Clusters:     []domain.ClusterScanResult{{Name: "Auth", Completeness: 0.50, Issues: []domain.IssueDetail{{ID: "E1", Identifier: "E1", Title: "t"}}}},
 		TotalIssues:  1,
 		Completeness: 0.50,
 	}
@@ -1188,11 +1189,11 @@ func TestResumeSession_RecomputesADRCountFromFilesystem(t *testing.T) {
 		os.WriteFile(filepath.Join(adrDir, name), []byte("# ADR"), 0644)
 	}
 
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		Version:        "0.5",
 		SessionID:      "old-session",
 		ScanResultPath: scanResultPath,
-		Waves:          []sightjack.WaveState{{ID: "w1", ClusterName: "Auth", Status: "available"}},
+		Waves:          []domain.WaveState{{ID: "w1", ClusterName: "Auth", Status: "available"}},
 		ADRCount:       2, // stale: says 2 but filesystem has 3
 	}
 	// when
@@ -1215,9 +1216,9 @@ func TestCanResume_ValidState(t *testing.T) {
 	path := filepath.Join(scanDir, "scan_result.json")
 	os.WriteFile(path, []byte(`{}`), 0644)
 
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		ScanResultPath: path,
-		Waves:          []sightjack.WaveState{{ID: "w1", ClusterName: "auth", Status: "pending"}},
+		Waves:          []domain.WaveState{{ID: "w1", ClusterName: "auth", Status: "pending"}},
 	}
 
 	// when / then
@@ -1234,7 +1235,7 @@ func TestCanResume_EmptyWaves(t *testing.T) {
 	path := filepath.Join(scanDir, "scan_result.json")
 	os.WriteFile(path, []byte(`{}`), 0644)
 
-	state := &sightjack.SessionState{ScanResultPath: path, Waves: nil}
+	state := &domain.SessionState{ScanResultPath: path, Waves: nil}
 
 	// when / then
 	if session.CanResume(dir, state) {
@@ -1244,7 +1245,7 @@ func TestCanResume_EmptyWaves(t *testing.T) {
 
 func TestCanResume_EmptyPath(t *testing.T) {
 	// given: state with empty ScanResultPath (fallback to ScanDir)
-	state := &sightjack.SessionState{ScanResultPath: ""}
+	state := &domain.SessionState{ScanResultPath: ""}
 
 	// when / then
 	if session.CanResume("", state) {
@@ -1269,8 +1270,8 @@ func TestPartialApplyDelta(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// given
-			result := &sightjack.WaveApplyResult{Applied: tt.applied, TotalCount: tt.total}
-			delta := sightjack.WaveDelta{Before: tt.before, After: tt.after}
+			result := &domain.WaveApplyResult{Applied: tt.applied, TotalCount: tt.total}
+			delta := domain.WaveDelta{Before: tt.before, After: tt.after}
 
 			// when
 			got := domain.PartialApplyDelta(result, delta)
@@ -1287,19 +1288,19 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 	tests := []struct {
 		name     string
 		overall  float64
-		clusters []sightjack.ClusterScanResult
+		clusters []domain.ClusterScanResult
 		wantWarn bool
 	}{
-		{"consistent", 0.5, []sightjack.ClusterScanResult{
+		{"consistent", 0.5, []domain.ClusterScanResult{
 			{Name: "a", Completeness: 0.4},
 			{Name: "b", Completeness: 0.6},
 		}, false},
-		{"inconsistent", 0.9, []sightjack.ClusterScanResult{
+		{"inconsistent", 0.9, []domain.ClusterScanResult{
 			{Name: "a", Completeness: 0.4},
 			{Name: "b", Completeness: 0.6},
 		}, true},
 		{"empty clusters", 0.0, nil, false},
-		{"within tolerance", 0.54, []sightjack.ClusterScanResult{
+		{"within tolerance", 0.54, []domain.ClusterScanResult{
 			{Name: "a", Completeness: 0.5},
 		}, false},
 	}
@@ -1315,7 +1316,7 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 
 func TestCanResume_MissingFile(t *testing.T) {
 	// given: state with ScanResultPath pointing to deleted file
-	state := &sightjack.SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
+	state := &domain.SessionState{ScanResultPath: "/nonexistent/scan_result.json"}
 
 	// when / then
 	if session.CanResume("", state) {
@@ -1328,11 +1329,11 @@ func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
 	// After restore + EvaluateUnlocks, auth-w2 should become available
 	baseDir := t.TempDir()
 
-	scanDir := sightjack.ScanDir(baseDir, "resume-unlock")
+	scanDir := domain.ScanDir(baseDir, "resume-unlock")
 	os.MkdirAll(scanDir, 0755)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	scanResult := &sightjack.ScanResult{
-		Clusters:     []sightjack.ClusterScanResult{{Name: "Auth", Completeness: 0.40, Issues: []sightjack.IssueDetail{{ID: "E1", Identifier: "E1", Title: "t"}}}},
+	scanResult := &domain.ScanResult{
+		Clusters:     []domain.ClusterScanResult{{Name: "Auth", Completeness: 0.40, Issues: []domain.IssueDetail{{ID: "E1", Identifier: "E1", Title: "t"}}}},
 		TotalIssues:  1,
 		Completeness: 0.40,
 	}
@@ -1340,21 +1341,21 @@ func TestResumeSession_EvaluateUnlocksAfterRestore(t *testing.T) {
 		t.Fatalf("write scan result: %v", err)
 	}
 
-	state := &sightjack.SessionState{
-		Version:        sightjack.StateFormatVersion,
+	state := &domain.SessionState{
+		Version:        domain.StateFormatVersion,
 		SessionID:      "resume-unlock",
 		Project:        "Test",
 		ScanResultPath: scanResultPath,
 		Completeness:   0.40,
-		Clusters:       []sightjack.ClusterState{{Name: "Auth", Completeness: 0.40, IssueCount: 1}},
-		Waves: []sightjack.WaveState{
+		Clusters:       []domain.ClusterState{{Name: "Auth", Completeness: 0.40, IssueCount: 1}},
+		Waves: []domain.WaveState{
 			{ID: "auth-w1", ClusterName: "Auth", Title: "Deps", Status: "completed",
-				ActionCount: 1, Actions: []sightjack.WaveAction{{Type: "add_dod", IssueID: "E1", Description: "d"}},
-				Delta: sightjack.WaveDelta{Before: 0.20, After: 0.40}},
+				ActionCount: 1, Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "E1", Description: "d"}},
+				Delta: domain.WaveDelta{Before: 0.20, After: 0.40}},
 			{ID: "auth-w2", ClusterName: "Auth", Title: "DoD", Status: "locked",
 				Prerequisites: []string{"Auth:auth-w1"},
-				ActionCount:   1, Actions: []sightjack.WaveAction{{Type: "add_dod", IssueID: "E1", Description: "d2"}},
-				Delta: sightjack.WaveDelta{Before: 0.40, After: 0.65}},
+				ActionCount:   1, Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "E1", Description: "d2"}},
+				Delta: domain.WaveDelta{Before: 0.40, After: 0.65}},
 		},
 	}
 
@@ -1385,7 +1386,7 @@ func TestMergeCompletedStatus_AllCompleted(t *testing.T) {
 		"API:api-w1":   true,
 	}
 	// Rescan produces new waves — some match old keys, some are new
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "auth-w1", ClusterName: "Auth", Title: "Deps v2", Status: "available"},
 		{ID: "auth-w2", ClusterName: "Auth", Title: "DoD v2", Status: "locked"},
 		{ID: "auth-w3", ClusterName: "Auth", Title: "New", Status: "locked"},
@@ -1415,7 +1416,7 @@ func TestMergeCompletedStatus_AllCompleted(t *testing.T) {
 
 func TestResumeScanDir_DerivedFromScanResultPath(t *testing.T) {
 	// given: state with ScanResultPath set
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		SessionID:      "old-session",
 		ScanResultPath: "/project/.siren/.run/old-session/scan_result.json",
 	}
@@ -1432,7 +1433,7 @@ func TestResumeScanDir_DerivedFromScanResultPath(t *testing.T) {
 
 func TestResumeScanDir_EmptyScanResultPath_FallsBack(t *testing.T) {
 	// given: state with empty ScanResultPath (fallback to ScanDir)
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		SessionID:      "new-session",
 		ScanResultPath: "",
 	}
@@ -1441,7 +1442,7 @@ func TestResumeScanDir_EmptyScanResultPath_FallsBack(t *testing.T) {
 	got := session.ResumeScanDir(state, "/project")
 
 	// then: should fall back to ScanDir()
-	want := sightjack.ScanDir("/project", "new-session")
+	want := domain.ScanDir("/project", "new-session")
 	if got != want {
 		t.Errorf("ResumeScanDir: expected %q, got %q", want, got)
 	}
@@ -1449,7 +1450,7 @@ func TestResumeScanDir_EmptyScanResultPath_FallsBack(t *testing.T) {
 
 func TestResumeScanDir_CurrentPathFormat(t *testing.T) {
 	// given: state with ScanResultPath using current .siren/.run/ format
-	state := &sightjack.SessionState{
+	state := &domain.SessionState{
 		SessionID:      "current-session",
 		ScanResultPath: "/project/.siren/.run/current-session/scan_result.json",
 	}
@@ -1465,13 +1466,13 @@ func TestResumeScanDir_CurrentPathFormat(t *testing.T) {
 }
 
 func TestMergeOldWaves_CarriesForwardFailedClusters(t *testing.T) {
-	oldWaves := []sightjack.Wave{
+	oldWaves := []domain.Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth wave", Status: "completed"},
 		{ID: "2", ClusterName: "db", Title: "DB wave", Status: "pending"},
 		{ID: "3", ClusterName: "api", Title: "API wave", Status: "completed"},
 	}
 	// Only "auth" and "api" regenerated; "db" failed but is still in scan.
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth wave v2"},
 		{ID: "3", ClusterName: "api", Title: "API wave v2"},
 	}
@@ -1499,12 +1500,12 @@ func TestMergeOldWaves_CarriesForwardFailedClusters(t *testing.T) {
 }
 
 func TestMergeOldWaves_DropsRemovedClusters(t *testing.T) {
-	oldWaves := []sightjack.Wave{
+	oldWaves := []domain.Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth wave", Status: "completed"},
 		{ID: "2", ClusterName: "obsolete", Title: "Obsolete wave", Status: "completed"},
 	}
 	// "auth" regenerated; "obsolete" is gone from scan entirely.
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth wave v2"},
 	}
 	scannedClusters := map[string]bool{"auth": true}
@@ -1521,10 +1522,10 @@ func TestMergeOldWaves_DropsRemovedClusters(t *testing.T) {
 }
 
 func TestMergeOldWaves_AllClustersRegenerated(t *testing.T) {
-	oldWaves := []sightjack.Wave{
+	oldWaves := []domain.Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth old"},
 	}
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth new"},
 	}
 	scannedClusters := map[string]bool{"auth": true}
@@ -1541,11 +1542,11 @@ func TestMergeOldWaves_AllClustersRegenerated(t *testing.T) {
 }
 
 func TestMergeOldWaves_NoClustersRegenerated(t *testing.T) {
-	oldWaves := []sightjack.Wave{
+	oldWaves := []domain.Wave{
 		{ID: "1", ClusterName: "auth", Title: "Auth old", Status: "completed"},
 		{ID: "2", ClusterName: "db", Title: "DB old", Status: "pending"},
 	}
-	var newWaves []sightjack.Wave
+	var newWaves []domain.Wave
 	scannedClusters := map[string]bool{"auth": true, "db": true}
 	failedNames := map[string]bool{"auth": true, "db": true}
 
@@ -1561,11 +1562,11 @@ func TestMergeOldWaves_NoClustersRegenerated(t *testing.T) {
 
 func TestMergeOldWaves_DuplicateName_PartialFailure(t *testing.T) {
 	// Two "Auth" clusters existed; one regenerated, one failed.
-	oldWaves := []sightjack.Wave{
+	oldWaves := []domain.Wave{
 		{ID: "1", ClusterName: "Auth", Title: "Auth instance 1", Status: "completed"},
 		{ID: "2", ClusterName: "Auth", Title: "Auth instance 2", Status: "completed"},
 	}
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "10", ClusterName: "Auth", Title: "Auth new"},
 	}
 	scannedClusters := map[string]bool{"Auth": true}
@@ -1585,11 +1586,11 @@ func TestMergeOldWaves_DuplicateName_PartialFailure(t *testing.T) {
 
 func TestMergeOldWaves_DuplicateName_AllSucceeded(t *testing.T) {
 	// Two "Auth" clusters, both regenerated successfully.
-	oldWaves := []sightjack.Wave{
+	oldWaves := []domain.Wave{
 		{ID: "1", ClusterName: "Auth", Title: "Auth old 1"},
 		{ID: "2", ClusterName: "Auth", Title: "Auth old 2"},
 	}
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "10", ClusterName: "Auth", Title: "Auth new 1"},
 		{ID: "20", ClusterName: "Auth", Title: "Auth new 2"},
 	}
@@ -1615,11 +1616,11 @@ func TestMergeOldWaves_DuplicateName_DedupsWaveKey(t *testing.T) {
 	// Scenario: Two "Auth" instances. Instance 1 succeeds and regenerates
 	// wave ABC-123. Instance 2 fails. Old session also had wave ABC-123.
 	// Without dedup, Auth:ABC-123 appears twice.
-	oldWaves := []sightjack.Wave{
+	oldWaves := []domain.Wave{
 		{ID: "ABC-123", ClusterName: "Auth", Title: "Auth old", Status: "completed"},
 		{ID: "DEF-456", ClusterName: "Auth", Title: "Auth old 2", Status: "pending"},
 	}
-	newWaves := []sightjack.Wave{
+	newWaves := []domain.Wave{
 		{ID: "ABC-123", ClusterName: "Auth", Title: "Auth regenerated"},
 	}
 	scannedClusters := map[string]bool{"Auth": true}

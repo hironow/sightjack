@@ -2,6 +2,8 @@
 
 package session
 
+// white-box-reason: contract validation: tests unexported golden file enumeration
+
 import (
 	"os"
 	"path/filepath"

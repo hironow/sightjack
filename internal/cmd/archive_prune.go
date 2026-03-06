@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -37,6 +39,9 @@ Pass --execute to actually remove the files.`,
   sightjack archive-prune --days 7 --execute`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if execute && dryRun {
+				return fmt.Errorf("--execute and --dry-run are mutually exclusive")
+			}
 			baseDir, err := resolveBaseDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
@@ -49,7 +54,7 @@ Pass --execute to actually remove the files.`,
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
 
-			eventFiles, eventErr := session.ListExpiredEventFiles(baseDir, days)
+			eventFiles, eventErr := session.ListExpiredEventFiles(cmd.Context(), baseDir, days)
 			if eventErr != nil {
 				logger.Warn("Failed to list expired events: %v", eventErr)
 			}
@@ -77,7 +82,7 @@ Pass --execute to actually remove the files.`,
 						out.ArchiveDeleted = len(deleted)
 					}
 					if len(eventFiles) > 0 {
-						deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
+						deleted, delErr := session.PruneEventFiles(cmd.Context(), baseDir, eventFiles)
 						if delErr != nil {
 							return fmt.Errorf("event prune failed: %w", delErr)
 						}
@@ -124,6 +129,25 @@ Pass --execute to actually remove the files.`,
 				return nil
 			}
 
+			yes, _ := cmd.Flags().GetBool("yes")
+			totalFiles := len(files) + len(eventFiles)
+			if !yes {
+				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
+				scanner := bufio.NewScanner(cmd.InOrStdin())
+				if !scanner.Scan() {
+					if scanErr := scanner.Err(); scanErr != nil {
+						return fmt.Errorf("read confirmation: %w", scanErr)
+					}
+					fmt.Fprintln(errW, "Cancelled.")
+					return nil
+				}
+				answer := strings.TrimSpace(scanner.Text())
+				if answer != "y" && answer != "Y" {
+					fmt.Fprintln(errW, "Cancelled.")
+					return nil
+				}
+			}
+
 			if len(files) > 0 {
 				deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
 				if delErr != nil {
@@ -133,7 +157,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			if len(eventFiles) > 0 {
-				deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
+				deleted, delErr := session.PruneEventFiles(cmd.Context(), baseDir, eventFiles)
 				if delErr != nil {
 					return fmt.Errorf("event prune failed: %w", delErr)
 				}
@@ -141,7 +165,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			// Prune flushed outbox DB rows + incremental vacuum.
-			pruned, pruneErr := session.PruneFlushedOutbox(baseDir)
+			pruned, pruneErr := session.PruneFlushedOutbox(cmd.Context(), baseDir)
 			if pruneErr != nil {
 				logger.Warn("Failed to prune outbox DB: %v", pruneErr)
 			} else if pruned > 0 {
@@ -154,6 +178,7 @@ Pass --execute to actually remove the files.`,
 
 	cmd.Flags().BoolVarP(&execute, "execute", "x", false, "Execute archive pruning (default: dry-run)")
 	cmd.Flags().IntVarP(&days, "days", "d", 30, "Retention days for archive-prune")
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }

@@ -28,6 +28,7 @@ sightjack doctor [path] [flags]
 
 ```
   -h, --help   help for doctor
+  -j, --json   output as JSON
 ```
 
 ### Options inherited from parent commands
@@ -36,6 +37,7 @@ sightjack doctor [path] [flags]
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
+  -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```
 

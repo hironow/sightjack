@@ -1,0 +1,55 @@
+# What / Why / How Conformance
+
+This is the single source of truth for sightjack's purpose, design rationale, and implementation approach.
+Referenced from [README.md](../README.md) and [docs/README.md](README.md).
+
+| Aspect | Description |
+|--------|-------------|
+| **What** | Interactive AI session that analyzes Linear issues for completeness, dependencies, and architectural gaps |
+| **Why** | Bring issue completeness from ~30% to ~85% before autonomous execution begins |
+| **How** | Claude MCP tools scan issues → cluster analysis → wave generation → interactive approval → apply to Linear |
+| **Input** | Linear issues via Claude MCP tools, user approval via stdin |
+| **Output** | Updated Linear issues, D-Mail reports to downstream tools |
+| **Telemetry** | OTel spans: `sightjack.scan`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |
+| **External Systems** | Linear (via Claude MCP), Claude Code subprocess, OTel exporter (Jaeger/Weave) |
+
+## Layer Architecture
+
+```
+cmd              --> usecase, session, usecase/port, platform, domain  (composition root)
+usecase          --> usecase/port, domain                              (output port only)
+usecase/port     --> domain (+ stdlib)                                 (interface contracts)
+session          --> eventsource, usecase/port, platform, domain       (adapter impl)
+eventsource      --> domain                                            (event persistence adapter)
+platform         --> domain (+ stdlib)                                 (cross-cutting infra)
+domain           --> (nothing internal, stdlib only)                   (pure types/logic)
+```
+
+`eventsource` is the event persistence adapter based on the [AWS Event Sourcing pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/event-sourcing.html).
+Its responsibility is limited to append, load, and replay of domain events.
+Event store implementation MUST NOT exist outside `internal/eventsource`.
+`session` uses `eventsource` as a client but does not implement event persistence itself.
+
+Key constraints enforced by semgrep (ERROR severity):
+
+- `usecase --> session` PROHIBITED (must use output port interfaces)
+- `cmd --> eventsource` PROHIBITED (ADR S0008)
+- `domain` has no I/O, no `context.Context`
+
+Ref: `.semgrep/layers.yaml`, ADR 0013
+
+## Domain Primitives & Parse-Don't-Validate
+
+Domain command types use the Parse-Don't-Validate pattern:
+
+- Domain primitives (`RepoPath`, `SessionID`, `ClusterName`, `Topic`, `Lang`) validate in `New*()` constructors — invalid values are rejected at parse time
+- Command types use unexported fields with `New*Command()` constructors that accept only pre-validated primitives
+- Commands are always-valid by construction — no `Validate() []error` methods exist
+- Usecase layer receives always-valid commands with no validation boilerplate
+- Semgrep rule `domain-no-validate-method` prevents reintroduction of `Validate() []error`
+
+Ref: `.semgrep/layers.yaml`, ADR 0014
+
+## Cross-Tool Conformance
+
+All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // cmdFactoryFunc creates an *exec.Cmd — injectable for testing.
@@ -52,7 +52,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 	case "windows":
 		script := fmt.Sprintf(
 			`Add-Type -AssemblyName System.Windows.Forms; `+
-				`$n = New-Object System.Windows.Forms.NotifyIcon; `+
+				`$n = New-Object System.Windows.Forms.NotifyIcon; `+ // nosemgrep: lod-excessive-dot-chain [permanent]
 				`$n.Icon = [System.Drawing.SystemIcons]::Information; `+
 				`$n.BalloonTipTitle = '%s'; `+
 				`$n.BalloonTipText = '%s'; `+
@@ -63,7 +63,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		cmd := factory(ctx, "powershell", "-NoProfile", "-Command", script)
 		return cmd.Run()
 	default:
-		return sightjack.ErrUnsupportedOS
+		return port.ErrUnsupportedOS
 	}
 }
 

@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: session internals: tests unexported shellName/shellFlag platform detection
+
 import (
 	"runtime"
 	"testing"

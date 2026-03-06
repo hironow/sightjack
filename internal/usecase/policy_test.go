@@ -1,18 +1,20 @@
 package usecase
 
+// white-box-reason: policy internals: tests unexported PolicyEngine constructor and Dispatch
+
 import (
 	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
-	ev, err := sightjack.NewEvent(sightjack.EventSessionStarted, sightjack.SessionStartedPayload{
+	ev, err := domain.NewEvent(domain.EventSessionStarted, domain.SessionStartedPayload{
 		Project:         "test-project",
 		StrictnessLevel: "normal",
 	}, time.Now().UTC())
@@ -33,11 +35,11 @@ func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(sightjack.EventWaveApproved, func(ctx context.Context, ev sightjack.Event) error {
+	engine.Register(domain.EventWaveApproved, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := sightjack.NewEvent(sightjack.EventWaveApproved, sightjack.WaveIdentityPayload{
+	ev, err := domain.NewEvent(domain.EventWaveApproved, domain.WaveIdentityPayload{
 		WaveID:      "wave-1",
 		ClusterName: "cluster-a",
 	}, time.Now().UTC())
@@ -62,12 +64,12 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	engine := NewPolicyEngine(nil)
 	var count int
 	for range 3 {
-		engine.Register(sightjack.EventWaveCompleted, func(ctx context.Context, ev sightjack.Event) error {
+		engine.Register(domain.EventWaveCompleted, func(ctx context.Context, ev domain.Event) error {
 			count++
 			return nil
 		})
 	}
-	ev, err := sightjack.NewEvent(sightjack.EventWaveCompleted, sightjack.WaveCompletedPayload{
+	ev, err := domain.NewEvent(domain.EventWaveCompleted, domain.WaveCompletedPayload{
 		WaveID:      "wave-1",
 		ClusterName: "cluster-a",
 		Applied:     3,
@@ -89,13 +91,18 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	}
 }
 
-func TestPolicyEngine_HandlerError(t *testing.T) {
-	// given
+func TestPolicyEngine_HandlerError_BestEffort(t *testing.T) {
+	// given: two handlers — first fails, second succeeds
 	engine := NewPolicyEngine(nil)
-	engine.Register(sightjack.EventScanCompleted, func(ctx context.Context, ev sightjack.Event) error {
+	var secondFired bool
+	engine.Register(domain.EventScanCompleted, func(ctx context.Context, ev domain.Event) error {
 		return fmt.Errorf("handler failed")
 	})
-	ev, err := sightjack.NewEvent(sightjack.EventScanCompleted, sightjack.ScanCompletedPayload{
+	engine.Register(domain.EventScanCompleted, func(ctx context.Context, ev domain.Event) error {
+		secondFired = true
+		return nil
+	})
+	ev, err := domain.NewEvent(domain.EventScanCompleted, domain.ScanCompletedPayload{
 		Completeness: 0.5,
 		ShibitoCount: 10,
 	}, time.Now().UTC())
@@ -106,9 +113,12 @@ func TestPolicyEngine_HandlerError(t *testing.T) {
 	// when
 	dispatchErr := engine.Dispatch(context.Background(), ev)
 
-	// then: first handler error stops dispatch
-	if dispatchErr == nil {
-		t.Fatal("expected error from handler")
+	// then: best-effort — error swallowed, all handlers execute, nil returned
+	if dispatchErr != nil {
+		t.Fatalf("expected nil (best-effort), got: %v", dispatchErr)
+	}
+	if !secondFired {
+		t.Fatal("second handler should fire even after first handler error")
 	}
 }
 
@@ -116,11 +126,11 @@ func TestPolicyEngine_UnmatchedEventType(t *testing.T) {
 	// given: register for wave_approved only
 	engine := NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(sightjack.EventWaveApproved, func(ctx context.Context, ev sightjack.Event) error {
+	engine.Register(domain.EventWaveApproved, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := sightjack.NewEvent(sightjack.EventWaveRejected, sightjack.WaveIdentityPayload{
+	ev, err := domain.NewEvent(domain.EventWaveRejected, domain.WaveIdentityPayload{
 		WaveID:      "wave-1",
 		ClusterName: "cluster-a",
 	}, time.Now().UTC())

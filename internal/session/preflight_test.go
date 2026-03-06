@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: session internals: tests unexported PreflightCheck binary validation
+
 import (
 	"strings"
 	"testing"

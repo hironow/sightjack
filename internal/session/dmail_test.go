@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestDMailKind_Valid(t *testing.T) {
@@ -79,9 +81,9 @@ func TestMarshalDMail_SchemaVersion(t *testing.T) {
 }
 
 // testOutboxStore creates a SQLiteOutboxStore for testing and registers cleanup.
-func testOutboxStore(t *testing.T, dir string) sightjack.OutboxStore {
+func testOutboxStore(t *testing.T, dir string) port.OutboxStore {
 	t.Helper()
-	store, err := session.NewOutboxStoreForBase(dir)
+	store, err := session.NewOutboxStoreForDir(dir)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
@@ -94,21 +96,21 @@ func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "gate",
 		Title:       "Gate test",
-		Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
+		Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
 	}
 
 	// when
-	err := session.ComposeSpecification(store, wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(sightjack.MailDir(dir, "outbox"), "spec-gate-w1.md"))
+	data, _ := os.ReadFile(filepath.Join(domain.MailDir(dir, "outbox"), "spec-gate-w1.md"))
 	mail, _ := session.ParseDMail(data)
 	if mail.SchemaVersion != "1" {
 		t.Errorf("SchemaVersion: got %q, want %q", mail.SchemaVersion, "1")
@@ -120,22 +122,22 @@ func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "gate",
 		Title:       "Gate test",
-		Actions:     []sightjack.WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
+		Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
 	}
-	result := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 1}
+	result := &domain.WaveApplyResult{WaveID: "w1", Applied: 1}
 
 	// when
-	err := session.ComposeReport(store, wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(sightjack.MailDir(dir, "outbox"), "report-gate-w1.md"))
+	data, _ := os.ReadFile(filepath.Join(domain.MailDir(dir, "outbox"), "report-gate-w1.md"))
 	mail, _ := session.ParseDMail(data)
 	if mail.SchemaVersion != "1" {
 		t.Errorf("SchemaVersion: got %q, want %q", mail.SchemaVersion, "1")
@@ -317,7 +319,7 @@ func TestParseDMail_NoFrontmatter(t *testing.T) {
 }
 
 func TestMailDir(t *testing.T) {
-	got := sightjack.MailDir("/project", "inbox")
+	got := domain.MailDir("/project", "inbox")
 	want := filepath.Join("/project", ".siren", "inbox")
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
@@ -330,7 +332,7 @@ func TestEnsureMailDirs_CreatesAll(t *testing.T) {
 		t.Fatalf("EnsureMailDirs: %v", err)
 	}
 	for _, sub := range []string{"inbox", "outbox", "archive"} {
-		path := sightjack.MailDir(dir, sub)
+		path := domain.MailDir(dir, sub)
 		info, err := os.Stat(path)
 		if err != nil {
 			t.Errorf("%s not created: %v", sub, err)
@@ -365,18 +367,18 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 		SchemaVersion: "1",
 		Body:          "# DoD\n- item 1\n",
 	}
-	if err := session.ComposeDMail(store, mail); err != nil {
+	if err := session.ComposeDMail(context.Background(), store, mail); err != nil {
 		t.Fatalf("compose: %v", err)
 	}
 
 	// outbox file exists
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "spec-my-42.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-my-42.md")
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("outbox file missing: %v", err)
 	}
 
 	// archive file exists
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), "spec-my-42.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "spec-my-42.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -397,7 +399,7 @@ func TestComposeDMail_ValidationError(t *testing.T) {
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 	mail := &session.DMail{Name: "", Kind: session.DMailSpecification, Description: "bad"}
-	if err := session.ComposeDMail(store, mail); err == nil {
+	if err := session.ComposeDMail(context.Background(), store, mail); err == nil {
 		t.Error("expected validation error for empty name")
 	}
 }
@@ -417,9 +419,9 @@ func TestListDMail_Empty(t *testing.T) {
 func TestListDMail_FindsFiles(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), "a.md"), []byte("x"), 0644)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), "b.md"), []byte("y"), 0644)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), "not-md.txt"), []byte("z"), 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), "a.md"), []byte("x"), 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), "b.md"), []byte("y"), 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), "not-md.txt"), []byte("z"), 0644)
 	files, err := session.ListDMail(dir, "inbox")
 	if err != nil {
 		t.Fatalf("list: %v", err)
@@ -440,7 +442,7 @@ func TestReceiveDMail_MovesToArchive(t *testing.T) {
 		Body:        "# Feedback\n\nDrift in auth module.\n",
 	}
 	data, _ := session.MarshalDMail(mail)
-	inboxPath := filepath.Join(sightjack.MailDir(dir, "inbox"), mail.Filename())
+	inboxPath := filepath.Join(domain.MailDir(dir, "inbox"), mail.Filename())
 	os.WriteFile(inboxPath, data, 0644)
 
 	// receive
@@ -461,7 +463,7 @@ func TestReceiveDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// archive file exists
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), mail.Filename())
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), mail.Filename())
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -495,25 +497,25 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "auth",
 		Title:       "Add DoD to auth issues",
 		Description: "First wave for auth cluster",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket rate limiting"},
 			{Type: "add_dependency", IssueID: "MY-42", Description: "Depends on auth middleware"},
 			{Type: "add_dod", IssueID: "MY-43", Description: "Session management"},
 		},
 	}
 
-	err := session.ComposeSpecification(store, wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
 
 	// outbox file exists
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "spec-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-auth-w1.md")
 	data, readErr := os.ReadFile(outboxPath)
 	if readErr != nil {
 		t.Fatalf("outbox file missing: %v", readErr)
@@ -542,7 +544,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	}
 
 	// archive file also exists
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), "spec-auth-w1.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "spec-auth-w1.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -553,29 +555,29 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "auth",
 		Title:       "Add DoD to auth issues",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket"},
 		},
 	}
-	applyResult := &sightjack.WaveApplyResult{
+	applyResult := &domain.WaveApplyResult{
 		WaveID:  "w1",
 		Applied: 1,
-		Ripples: []sightjack.Ripple{
+		Ripples: []domain.Ripple{
 			{ClusterName: "api", Description: "Rate limiting affects API cluster"},
 		},
 	}
 
-	err := session.ComposeReport(store, wave, applyResult)
+	err := session.ComposeReport(context.Background(), store, wave, applyResult)
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
 
 	// outbox file exists and is parseable
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "report-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-auth-w1.md")
 	data, readErr := os.ReadFile(outboxPath)
 	if readErr != nil {
 		t.Fatalf("outbox file missing: %v", readErr)
@@ -596,7 +598,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 	}
 
 	// archive file also exists
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), "report-auth-w1.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "report-auth-w1.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -607,25 +609,25 @@ func TestComposeReport_NoRipples(t *testing.T) {
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w2",
 		ClusterName: "db",
 		Title:       "Database migrations",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-50", Description: "Schema migration"},
 		},
 	}
-	applyResult := &sightjack.WaveApplyResult{
+	applyResult := &domain.WaveApplyResult{
 		WaveID:  "w2",
 		Applied: 1,
 	}
 
-	err := session.ComposeReport(store, wave, applyResult)
+	err := session.ComposeReport(context.Background(), store, wave, applyResult)
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
 
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "report-db-w2.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-db-w2.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if mail.Body == "" {
@@ -646,12 +648,12 @@ func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 		Body:        "# Feedback\n",
 	}
 	data, _ := session.MarshalDMail(fb)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -679,7 +681,7 @@ func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 	}
 
 	// archive should have the file
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), fb.Filename())
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), fb.Filename())
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -697,12 +699,12 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 		Body:        "# Spec\n",
 	}
 	data, _ := session.MarshalDMail(spec)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), spec.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), spec.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -716,7 +718,7 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	}
 
 	// But the spec should be archived (received, just not sent to channel)
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), spec.Filename())
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), spec.Filename())
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -734,13 +736,13 @@ func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 		Body:        "# Dup\n",
 	}
 	data, _ := session.MarshalDMail(fb)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "archive"), fb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "archive"), fb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -767,7 +769,7 @@ func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -784,7 +786,7 @@ func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 		Body:        "# New\n",
 	}
 	data, _ := session.MarshalDMail(fb)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 
 	// Should receive via fsnotify
 	select {
@@ -805,7 +807,7 @@ func TestMonitorInbox_StopsOnCancel(t *testing.T) {
 	session.EnsureMailDirs(dir)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -835,17 +837,17 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 		Body:        "# Drain\n",
 	}
 	data, _ := session.MarshalDMail(fb)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(feedback) != 1 {
 		t.Errorf("expected 1 drained, got %d", len(feedback))
 	}
@@ -855,7 +857,7 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 }
 
 func TestDrainInboxFeedback_NilChannel(t *testing.T) {
-	feedback := session.DrainInboxFeedback(nil, sightjack.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(nil, platform.NewLogger(io.Discard, false))
 	if feedback != nil {
 		t.Errorf("expected nil for nil channel, got %d items", len(feedback))
 	}
@@ -874,21 +876,21 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 		Body:        "Initial body.",
 	}
 	data, _ := session.MarshalDMail(initialFb)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), initialFb.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), initialFb.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// Drain initial feedback
-	initial := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	initial := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// Start collector with initial feedback
-	collector := session.CollectFeedback(initial, ch, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// All() should return initial feedback
 	all := collector.All()
@@ -911,7 +913,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 		Body:        "Late body.",
 	}
 	lateData, _ := session.MarshalDMail(lateFb)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), lateFb.Filename()), lateData, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), lateFb.Filename()), lateData, 0644)
 
 	// Wait for fsnotify + background goroutine
 	time.Sleep(500 * time.Millisecond)
@@ -923,7 +925,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	}
 
 	// Verify late feedback was archived
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), lateFb.Filename())
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), lateFb.Filename())
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("late feedback not archived: %v", err)
 	}
@@ -935,7 +937,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 		{Name: "fb-001", Kind: session.DMailFeedback, Description: "Item 1"},
 		{Name: "fb-002", Kind: session.DMailFeedback, Description: "Item 2"},
 	}
-	collector := session.CollectFeedback(initial, nil, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when: call All() multiple times
 	first := collector.All()
@@ -952,7 +954,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 
 func TestFeedbackCollector_NilChannel(t *testing.T) {
 	// given: nil channel
-	collector := session.CollectFeedback(nil, nil, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// then: All() returns nil
 	if all := collector.All(); all != nil {
@@ -963,7 +965,7 @@ func TestFeedbackCollector_NilChannel(t *testing.T) {
 func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
 	// given: nil initial but channel that will receive items
 	ch := make(chan *session.DMail, 1)
-	collector := session.CollectFeedback(nil, ch, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when: send one item
 	ch <- &session.DMail{Name: "fb-late", Kind: session.DMailFeedback, Description: "Late only"}
@@ -1046,7 +1048,7 @@ func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 		{Name: "conv-001", Kind: session.DMailConvergence, Description: "Convergence signal"},
 		{Name: "fb-002", Kind: session.DMailFeedback, Description: "Naming convention"},
 	}
-	c := session.CollectFeedback(initial, nil, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	c := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when
 	feedbackOnly := c.FeedbackOnly()
@@ -1068,7 +1070,7 @@ func TestReceiveDMail_MalformedContent(t *testing.T) {
 	// given: a file in inbox that is not valid d-mail format
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	inboxPath := filepath.Join(sightjack.MailDir(dir, "inbox"), "bad.md")
+	inboxPath := filepath.Join(domain.MailDir(dir, "inbox"), "bad.md")
 	os.WriteFile(inboxPath, []byte("not a d-mail"), 0644)
 
 	// when
@@ -1101,7 +1103,7 @@ func TestReceiveDMail_PreservesAllFields(t *testing.T) {
 		Body:        "# Full\n\nAll fields present.\n",
 	}
 	data, _ := session.MarshalDMail(original)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), original.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), original.Filename()), data, 0644)
 
 	// when
 	received, err := session.ReceiveDMail(dir, original.Filename())
@@ -1144,20 +1146,20 @@ func TestMonitorInbox_MultipleFeedbackInitialDrain(t *testing.T) {
 			Description: name + " desc",
 		}
 		data, _ := session.MarshalDMail(fb)
-		os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
+		os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), fb.Filename()), data, 0644)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// when
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: all 3 drained
-	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(feedback) != 3 {
 		t.Errorf("expected 3 feedback, got %d", len(feedback))
 	}
@@ -1185,20 +1187,20 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 	}
 	for _, m := range mails {
 		data, _ := session.MarshalDMail(m)
-		os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), m.Filename()), data, 0644)
+		os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), m.Filename()), data, 0644)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// when
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: 3 items come through channel (2 feedback + 1 report; spec excluded)
-	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(feedback) != 3 {
 		t.Fatalf("expected 3 items (2 feedback + 1 report), got %d", len(feedback))
 	}
@@ -1224,7 +1226,7 @@ func TestDrainInboxFeedback_MultipleFeedback(t *testing.T) {
 	ch <- &session.DMail{Name: "fb-3", Kind: session.DMailFeedback, Description: "third", Severity: "high"}
 
 	// when
-	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// then
 	if len(feedback) != 3 {
@@ -1242,7 +1244,7 @@ func TestDrainInboxFeedback_ClosedChannel(t *testing.T) {
 	close(ch)
 
 	// when
-	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// then: should drain the buffered item
 	if len(feedback) != 1 {
@@ -1258,7 +1260,7 @@ func TestDrainInboxFeedback_EmptyChannel(t *testing.T) {
 	ch := make(chan *session.DMail, 5)
 
 	// when
-	feedback := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// then: returns nil (no feedback)
 	if feedback != nil {
@@ -1342,7 +1344,7 @@ func TestComposeDMail_NilMail(t *testing.T) {
 	store := testOutboxStore(t, dir)
 
 	// when
-	err := session.ComposeDMail(store, nil)
+	err := session.ComposeDMail(context.Background(), store, nil)
 
 	// then
 	if err == nil {
@@ -1355,29 +1357,29 @@ func TestComposeReport_WithErrors(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "api",
 		Title:       "API hardening",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-60", Description: "Rate limiting"},
 			{Type: "add_dependency", IssueID: "MY-61", Description: "Auth dependency"},
 		},
 	}
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "w1",
 		Applied: 1,
 		Errors:  []string{"Failed to update MY-61: permission denied"},
 	}
 
 	// when
-	err := session.ComposeReport(store, wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "report-api-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-api-w1.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "## Errors") {
@@ -1393,32 +1395,32 @@ func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w3",
 		ClusterName: "infra",
 		Title:       "Infra setup",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-70", Description: "Docker setup"},
 		},
 	}
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "w3",
 		Applied: 1,
 		Errors:  []string{"Partial failure on sub-issue creation"},
-		Ripples: []sightjack.Ripple{
+		Ripples: []domain.Ripple{
 			{ClusterName: "api", Description: "API now requires Docker"},
 			{ClusterName: "frontend", Description: "Frontend builds affected"},
 		},
 	}
 
 	// when
-	err := session.ComposeReport(store, wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "report-infra-w3.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-infra-w3.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "## Errors") {
@@ -1437,24 +1439,24 @@ func TestComposeSpecification_WaveWithDescription(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "db",
 		Title:       "Database Migrations",
 		Description: "Critical migration wave for schema changes.",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-80", Description: "Migration script"},
 		},
 	}
 
 	// when
-	err := session.ComposeSpecification(store, wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "spec-db-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-db-w1.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "Critical migration wave") {
@@ -1470,21 +1472,21 @@ func TestComposeSpecification_EmptyActions(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "misc",
 		Title:       "Empty wave",
-		Actions:     []sightjack.WaveAction{},
+		Actions:     []domain.WaveAction{},
 	}
 
 	// when
-	err := session.ComposeSpecification(store, wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then: should succeed (empty actions section)
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "spec-misc-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-misc-w1.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "## Actions") {
@@ -1497,11 +1499,11 @@ func TestComposeSpecification_IssueDedup(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "auth",
 		Title:       "Auth DoD",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-42", Description: "First DoD"},
 			{Type: "add_dependency", IssueID: "MY-42", Description: "Dependency"},
 			{Type: "add_dod", IssueID: "MY-43", Description: "Second DoD"},
@@ -1509,13 +1511,13 @@ func TestComposeSpecification_IssueDedup(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(store, wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then: issues list should be deduplicated
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "spec-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-auth-w1.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if len(mail.Issues) != 2 {
@@ -1528,26 +1530,26 @@ func TestComposeReport_IssuesSorted(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "sort",
 		Title:       "Sort test",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-99", Description: "Last"},
 			{Type: "add_dod", IssueID: "MY-10", Description: "First"},
 			{Type: "add_dod", IssueID: "MY-50", Description: "Middle"},
 		},
 	}
-	result := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 3}
+	result := &domain.WaveApplyResult{WaveID: "w1", Applied: 3}
 
 	// when
-	err := session.ComposeReport(store, wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then: issues are sorted
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "report-sort-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-sort-w1.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if len(mail.Issues) != 3 {
@@ -1562,8 +1564,8 @@ func TestComposeReport_IssuesSorted(t *testing.T) {
 
 func TestWaveIssueIDs_Dedup(t *testing.T) {
 	// given: actions with duplicate issue IDs
-	wave := sightjack.Wave{
-		Actions: []sightjack.WaveAction{
+	wave := domain.Wave{
+		Actions: []domain.WaveAction{
 			{IssueID: "MY-1"},
 			{IssueID: "MY-2"},
 			{IssueID: "MY-1"},
@@ -1583,7 +1585,7 @@ func TestWaveIssueIDs_Dedup(t *testing.T) {
 
 func TestWaveIssueIDs_Empty(t *testing.T) {
 	// given: wave with no actions
-	wave := sightjack.Wave{Actions: []sightjack.WaveAction{}}
+	wave := domain.Wave{Actions: []domain.WaveAction{}}
 
 	// when
 	ids := session.WaveIssueIDs(wave)
@@ -1596,8 +1598,8 @@ func TestWaveIssueIDs_Empty(t *testing.T) {
 
 func TestWaveIssueIDs_SkipsEmptyID(t *testing.T) {
 	// given: actions where some have empty issue IDs
-	wave := sightjack.Wave{
-		Actions: []sightjack.WaveAction{
+	wave := domain.Wave{
+		Actions: []domain.WaveAction{
 			{IssueID: "MY-1"},
 			{IssueID: ""},
 			{IssueID: "MY-2"},
@@ -1615,8 +1617,8 @@ func TestWaveIssueIDs_SkipsEmptyID(t *testing.T) {
 
 func TestWaveIssueIDs_Sorted(t *testing.T) {
 	// given: unsorted issue IDs
-	wave := sightjack.Wave{
-		Actions: []sightjack.WaveAction{
+	wave := domain.Wave{
+		Actions: []domain.WaveAction{
 			{IssueID: "MY-99"},
 			{IssueID: "MY-10"},
 			{IssueID: "MY-50"},
@@ -1634,10 +1636,10 @@ func TestWaveIssueIDs_Sorted(t *testing.T) {
 
 func TestSpecificationBody_Format(t *testing.T) {
 	// given
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		Title:       "Auth Wave",
 		Description: "Setting up authentication.",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-1", Description: "Add unit tests"},
 			{Type: "add_dependency", IssueID: "MY-2", Description: "Depends on auth"},
 		},
@@ -1666,9 +1668,9 @@ func TestSpecificationBody_Format(t *testing.T) {
 
 func TestSpecificationBody_NoDescription(t *testing.T) {
 	// given: wave without description
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		Title: "Minimal Wave",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-1", Description: "DoD item"},
 		},
 	}
@@ -1687,11 +1689,11 @@ func TestSpecificationBody_NoDescription(t *testing.T) {
 
 func TestReportBody_Format(t *testing.T) {
 	// given
-	wave := sightjack.Wave{Title: "Deploy Wave"}
-	result := &sightjack.WaveApplyResult{
+	wave := domain.Wave{Title: "Deploy Wave"}
+	result := &domain.WaveApplyResult{
 		Applied: 3,
 		Errors:  []string{"timeout on MY-5"},
-		Ripples: []sightjack.Ripple{
+		Ripples: []domain.Ripple{
 			{ClusterName: "api", Description: "API needs rebuild"},
 		},
 	}
@@ -1722,8 +1724,8 @@ func TestReportBody_Format(t *testing.T) {
 
 func TestReportBody_NoErrorsNoRipples(t *testing.T) {
 	// given: clean apply
-	wave := sightjack.Wave{Title: "Clean Wave"}
-	result := &sightjack.WaveApplyResult{Applied: 2}
+	wave := domain.Wave{Title: "Clean Wave"}
+	result := &domain.WaveApplyResult{Applied: 2}
 
 	// when
 	body := session.ReportBody(wave, result)
@@ -1768,7 +1770,7 @@ func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 	notifier := &testNotifier{onNotify: func(title, message string) {
 		notifyCalled.Store(true)
 	}}
-	collector := session.CollectFeedback(nil, ch, notifier, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, ch, notifier, platform.NewLogger(io.Discard, false))
 
 	// when: convergence arrives
 	ch <- &session.DMail{Name: "conv-late-001", Kind: session.DMailConvergence, Description: "Late convergence"}
@@ -1800,7 +1802,7 @@ func TestCollectFeedback_MixedFeedbackAndConvergence(t *testing.T) {
 		{Name: "fb-init", Kind: session.DMailFeedback, Description: "initial"},
 	}
 	ch := make(chan *session.DMail, 1)
-	collector := session.CollectFeedback(initial, ch, &sightjack.NopNotifier{}, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	ch <- &session.DMail{Name: "conv-mix-001", Kind: session.DMailConvergence, Description: "convergence"}
 	close(ch)
@@ -1837,7 +1839,7 @@ func TestCollectFeedback_HangingNotifierDoesNotBlockDrain(t *testing.T) {
 	hangingNotifier := &testNotifier{onNotify: func(title, message string) {
 		time.Sleep(10 * time.Second) // simulate hung notifier
 	}}
-	collector := session.CollectFeedback(nil, ch, hangingNotifier, sightjack.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(nil, ch, hangingNotifier, platform.NewLogger(io.Discard, false))
 
 	// when: send convergence (triggers hanging notify) then feedback
 	ch <- &session.DMail{Name: "conv-hang", Kind: session.DMailConvergence, Description: "convergence"}
@@ -1872,12 +1874,12 @@ func TestMonitorInbox_DeliversConvergence(t *testing.T) {
 		Description: "Convergence signal from phonewave",
 	}
 	data, _ := session.MarshalDMail(conv)
-	os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), conv.Filename()), data, 0644)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), conv.Filename()), data, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
@@ -1911,19 +1913,19 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 	}
 	for _, m := range mails {
 		data, _ := session.MarshalDMail(m)
-		os.WriteFile(filepath.Join(sightjack.MailDir(dir, "inbox"), m.Filename()), data, 0644)
+		os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), m.Filename()), data, 0644)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch, err := session.MonitorInbox(ctx, dir, sightjack.NewLogger(io.Discard, false))
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
 	// then: 2 d-mails delivered (feedback + convergence), spec excluded
-	drained := session.DrainInboxFeedback(ch, sightjack.NewLogger(io.Discard, false))
+	drained := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 	if len(drained) != 2 {
 		t.Fatalf("expected 2 (feedback + convergence), got %d", len(drained))
 	}
@@ -2080,25 +2082,25 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "auth",
 		Title:       "Auth hardening",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-42", Description: "Token bucket"},
 			{Type: "add_dependency", IssueID: "MY-43", Description: "Auth dep"},
 		},
 	}
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "w1",
 		Applied: 2,
-		Ripples: []sightjack.Ripple{
+		Ripples: []domain.Ripple{
 			{ClusterName: "api", Description: "Rate limiting affects API cluster"},
 		},
 	}
 
 	// when
-	err := session.ComposeFeedback(store, wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then: no error
 	if err != nil {
@@ -2106,7 +2108,7 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 	}
 
 	// and: outbox file exists and is parseable
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-auth-w1.md")
 	data, readErr := os.ReadFile(outboxPath)
 	if readErr != nil {
 		t.Fatalf("outbox file missing: %v", readErr)
@@ -2131,7 +2133,7 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 	}
 
 	// and: archive file also exists
-	archivePath := filepath.Join(sightjack.MailDir(dir, "archive"), "feedback-auth-w1.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "feedback-auth-w1.md")
 	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
 		t.Error("expected archive file to exist")
 	}
@@ -2142,32 +2144,32 @@ func TestComposeFeedback_BodyFormat(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w2",
 		ClusterName: "infra",
 		Title:       "Infra setup wave",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-70", Description: "Docker setup"},
 			{Type: "add_dod", IssueID: "MY-71", Description: "CI pipeline"},
 		},
 	}
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "w2",
 		Applied: 1,
 		Errors:  []string{"Failed to update MY-71: permission denied"},
-		Ripples: []sightjack.Ripple{
+		Ripples: []domain.Ripple{
 			{ClusterName: "api", Description: "API now requires Docker"},
 		},
 	}
 
 	// when
-	err := session.ComposeFeedback(store, wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
 		t.Fatalf("ComposeFeedback: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-infra-w2.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-infra-w2.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 
@@ -2197,27 +2199,27 @@ func TestComposeFeedback_NoErrorsNoRipples(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w3",
 		ClusterName: "db",
 		Title:       "Database migrations",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-50", Description: "Schema migration"},
 		},
 	}
-	result := &sightjack.WaveApplyResult{
+	result := &domain.WaveApplyResult{
 		WaveID:  "w3",
 		Applied: 1,
 	}
 
 	// when
-	err := session.ComposeFeedback(store, wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
 		t.Fatalf("ComposeFeedback: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-db-w3.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-db-w3.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 
@@ -2236,11 +2238,11 @@ func TestComposeFeedback_NoErrorsNoRipples(t *testing.T) {
 
 func TestFeedbackBody_Format(t *testing.T) {
 	// given
-	wave := sightjack.Wave{Title: "Feedback Wave"}
-	result := &sightjack.WaveApplyResult{
+	wave := domain.Wave{Title: "Feedback Wave"}
+	result := &domain.WaveApplyResult{
 		Applied: 3,
 		Errors:  []string{"timeout on MY-5"},
-		Ripples: []sightjack.Ripple{
+		Ripples: []domain.Ripple{
 			{ClusterName: "api", Description: "API needs rebuild"},
 		},
 	}
@@ -2271,8 +2273,8 @@ func TestFeedbackBody_Format(t *testing.T) {
 
 func TestFeedbackBody_NoErrorsNoRipples(t *testing.T) {
 	// given: clean apply
-	wave := sightjack.Wave{Title: "Clean Wave"}
-	result := &sightjack.WaveApplyResult{Applied: 2}
+	wave := domain.Wave{Title: "Clean Wave"}
+	result := &domain.WaveApplyResult{Applied: 2}
 
 	// when
 	body := session.FeedbackBody(wave, result)
@@ -2291,26 +2293,26 @@ func TestComposeFeedback_IssuesSorted(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "w1",
 		ClusterName: "sort",
 		Title:       "Sort test",
-		Actions: []sightjack.WaveAction{
+		Actions: []domain.WaveAction{
 			{Type: "add_dod", IssueID: "MY-99", Description: "Last"},
 			{Type: "add_dod", IssueID: "MY-10", Description: "First"},
 			{Type: "add_dod", IssueID: "MY-50", Description: "Middle"},
 		},
 	}
-	result := &sightjack.WaveApplyResult{WaveID: "w1", Applied: 3}
+	result := &domain.WaveApplyResult{WaveID: "w1", Applied: 3}
 
 	// when
-	err := session.ComposeFeedback(store, wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then: issues are sorted
 	if err != nil {
 		t.Fatalf("ComposeFeedback: %v", err)
 	}
-	outboxPath := filepath.Join(sightjack.MailDir(dir, "outbox"), "feedback-sort-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-sort-w1.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if len(mail.Issues) != 3 {

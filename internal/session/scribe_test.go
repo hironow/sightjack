@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -83,7 +84,7 @@ func TestNextADRNumber_IgnoresNonMatchingFiles(t *testing.T) {
 
 func TestScribeFileName(t *testing.T) {
 	// given
-	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
+	wave := domain.Wave{ID: "auth-w1", ClusterName: "Auth"}
 
 	// when
 	name := session.ScribeFileName(wave)
@@ -96,7 +97,7 @@ func TestScribeFileName(t *testing.T) {
 
 func TestScribeFileName_SpecialChars(t *testing.T) {
 	// given
-	wave := sightjack.Wave{ID: "w-1", ClusterName: "UI/Frontend"}
+	wave := domain.Wave{ID: "w-1", ClusterName: "UI/Frontend"}
 
 	// when
 	name := session.ScribeFileName(wave)
@@ -110,7 +111,7 @@ func TestScribeFileName_SpecialChars(t *testing.T) {
 func TestClearScribeOutput_RemovesExisting(t *testing.T) {
 	// given
 	scanDir := t.TempDir()
-	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
+	wave := domain.Wave{ID: "auth-w1", ClusterName: "Auth"}
 	outputFile := filepath.Join(scanDir, session.ScribeFileName(wave))
 	os.WriteFile(outputFile, []byte(`{"adr_id":"0001"}`), 0644)
 
@@ -126,7 +127,7 @@ func TestClearScribeOutput_RemovesExisting(t *testing.T) {
 func TestClearScribeOutput_NoOpIfMissing(t *testing.T) {
 	// given: no file exists
 	scanDir := t.TempDir()
-	wave := sightjack.Wave{ID: "auth-w1", ClusterName: "Auth"}
+	wave := domain.Wave{ID: "auth-w1", ClusterName: "Auth"}
 
 	// when: should not panic or error
 	session.ClearScribeOutput(scanDir, wave)
@@ -136,23 +137,23 @@ func TestRunScribeADRDryRun(t *testing.T) {
 	// given
 	scanDir := t.TempDir()
 	adrDir := filepath.Join(t.TempDir(), "adr")
-	cfg := &sightjack.Config{
-		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "claude", TimeoutSec: 60},
+	cfg := &domain.Config{
+		Lang:      "en",
+		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 	}
-	wave := sightjack.Wave{
+	wave := domain.Wave{
 		ID:          "auth-w1",
 		ClusterName: "Auth",
 		Title:       "Dependency Ordering",
-		Actions:     []sightjack.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
+		Actions:     []domain.WaveAction{{Type: "add_dependency", IssueID: "ENG-101", Description: "test"}},
 	}
-	architectResp := &sightjack.ArchitectResponse{
+	architectResp := &domain.ArchitectResponse{
 		Analysis:  "Splitting recommended.",
 		Reasoning: "Scale favors smaller batches.",
 	}
 
 	// when
-	err := session.RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog", sightjack.NewLogger(io.Discard, false))
+	err := session.RunScribeADRDryRun(cfg, scanDir, wave, architectResp, adrDir, "fog", platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -399,15 +400,15 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 	os.MkdirAll(adrDir, 0755)
 	os.WriteFile(filepath.Join(adrDir, "0001-auth.md"), []byte("# Auth ADR"), 0644)
 
-	cfg := &sightjack.Config{
-		Lang:   "en",
-		Claude: sightjack.ClaudeConfig{Command: "echo", TimeoutSec: 10},
+	cfg := &domain.Config{
+		Lang:      "en",
+		Assistant: domain.AIAssistantConfig{Command: "echo", TimeoutSec: 10},
 	}
-	wave := sightjack.Wave{ID: "w1", ClusterName: "Auth", Title: "Test"}
-	resp := &sightjack.ArchitectResponse{Analysis: "test", Reasoning: "test"}
+	wave := domain.Wave{ID: "w1", ClusterName: "Auth", Title: "Test"}
+	resp := &domain.ArchitectResponse{Analysis: "test", Reasoning: "test"}
 
 	// when
-	err := session.RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog", sightjack.NewLogger(io.Discard, false))
+	err := session.RunScribeADRDryRun(cfg, scanDir, wave, resp, adrDir, "fog", platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -425,10 +426,10 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 
 func TestNormalizeScribeResult_MatchingID(t *testing.T) {
 	// given: Claude returned matching adr_id
-	result := &sightjack.ScribeResponse{ADRID: "0003", Title: "test"}
+	result := &domain.ScribeResponse{ADRID: "0003", Title: "test"}
 
 	// when
-	session.NormalizeScribeResult(result, "0003", sightjack.NewLogger(io.Discard, false))
+	session.NormalizeScribeResult(result, "0003", platform.NewLogger(io.Discard, false))
 
 	// then: no change
 	if result.ADRID != "0003" {
@@ -438,10 +439,10 @@ func TestNormalizeScribeResult_MatchingID(t *testing.T) {
 
 func TestNormalizeScribeResult_MismatchID(t *testing.T) {
 	// given: Claude returned wrong adr_id
-	result := &sightjack.ScribeResponse{ADRID: "9999", Title: "test"}
+	result := &domain.ScribeResponse{ADRID: "9999", Title: "test"}
 
 	// when
-	session.NormalizeScribeResult(result, "0003", sightjack.NewLogger(io.Discard, false))
+	session.NormalizeScribeResult(result, "0003", platform.NewLogger(io.Discard, false))
 
 	// then: overwritten with authoritative ID
 	if result.ADRID != "0003" {
@@ -451,10 +452,10 @@ func TestNormalizeScribeResult_MismatchID(t *testing.T) {
 
 func TestNormalizeScribeResult_EmptyID(t *testing.T) {
 	// given: Claude returned empty adr_id
-	result := &sightjack.ScribeResponse{ADRID: "", Title: "test"}
+	result := &domain.ScribeResponse{ADRID: "", Title: "test"}
 
 	// when
-	session.NormalizeScribeResult(result, "0003", sightjack.NewLogger(io.Discard, false))
+	session.NormalizeScribeResult(result, "0003", platform.NewLogger(io.Discard, false))
 
 	// then: filled with authoritative ID
 	if result.ADRID != "0003" {
@@ -464,7 +465,7 @@ func TestNormalizeScribeResult_EmptyID(t *testing.T) {
 
 func TestRenderADRFromDiscuss_Basic(t *testing.T) {
 	// given
-	dr := sightjack.DiscussResult{
+	dr := domain.DiscussResult{
 		WaveID:    "auth-w1",
 		Analysis:  "JWT has trade-offs",
 		Reasoning: "Session-based auth is simpler",
@@ -496,7 +497,7 @@ func TestRenderADRFromDiscuss_Basic(t *testing.T) {
 
 func TestRenderADRFromDiscuss_UsesWaveIDWhenNoTitle(t *testing.T) {
 	// given
-	dr := sightjack.DiscussResult{
+	dr := domain.DiscussResult{
 		WaveID:   "auth-w1",
 		Analysis: "ok",
 		Decision: "proceed",
@@ -513,11 +514,11 @@ func TestRenderADRFromDiscuss_UsesWaveIDWhenNoTitle(t *testing.T) {
 
 func TestRenderADRFromDiscuss_WithModifications(t *testing.T) {
 	// given
-	dr := sightjack.DiscussResult{
+	dr := domain.DiscussResult{
 		WaveID:   "w1",
 		Analysis: "changed approach",
 		Decision: "use Redis",
-		Modifications: []sightjack.WaveModification{
+		Modifications: []domain.WaveModification{
 			{ActionIndex: 0, Change: "Added Redis dependency"},
 		},
 	}

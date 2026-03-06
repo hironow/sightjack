@@ -1,17 +1,15 @@
 package cmd
 
+// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+
 import (
 	"context"
-	"io"
-	"os/exec"
 	"testing"
 
+	"github.com/hironow/sightjack/internal/platform"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-
-	"github.com/hironow/sightjack"
-	"github.com/hironow/sightjack/internal/session"
 )
 
 // setupTestTracer installs an InMemoryExporter with a synchronous span processor
@@ -23,12 +21,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := sightjack.Tracer
-	sightjack.Tracer = tp.Tracer("sightjack-test")
+	oldTracer := platform.Tracer
+	platform.Tracer = tp.Tracer("sightjack-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		sightjack.Tracer = oldTracer
+		platform.Tracer = oldTracer
 	})
 	return exp
 }
@@ -48,7 +46,7 @@ func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 
 	// Use the OTel global tracer (set by setupTestTracer) to create a span
 	tr := otel.Tracer("sightjack-test")
-	_, span := tr.Start(context.Background(), "flushed-span")
+	_, span := tr.Start(context.Background(), "flushed-span") // nosemgrep: adr0003-otel-span-without-defer-end -- span.End() called immediately below in test [permanent]
 	span.End()
 
 	spans := exp.GetSpans()
@@ -57,111 +55,6 @@ func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 	}
 	if spans[0].Name != "flushed-span" {
 		t.Errorf("span name = %q, want %q", spans[0].Name, "flushed-span")
-	}
-}
-
-func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
-	exp := setupTestTracer(t)
-
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "hello")
-	})
-	t.Cleanup(cleanup)
-
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "echo", TimeoutSec: 10},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
-	}
-
-	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, sightjack.NewLogger(io.Discard, false))
-	if err != nil {
-		t.Fatalf("RunClaude failed: %v", err)
-	}
-
-	spans := exp.GetSpans()
-	var found bool
-	for _, s := range spans {
-		if s.Name == "claude.invoke" {
-			found = true
-
-			// Verify gen_ai.* semantic convention attributes (P1-3)
-			requiredAttrs := map[string]string{
-				"gen_ai.operation.name": "chat",
-				"gen_ai.system":         "anthropic",
-			}
-			for key, want := range requiredAttrs {
-				var attrFound bool
-				for _, attr := range s.Attributes {
-					if string(attr.Key) == key {
-						attrFound = true
-						if got := attr.Value.AsString(); got != want {
-							t.Errorf("attr %s = %q, want %q", key, got, want)
-						}
-					}
-				}
-				if !attrFound {
-					t.Errorf("missing gen_ai attribute %q on claude.invoke span", key)
-				}
-			}
-
-			// gen_ai.request.model should be present (value varies per config)
-			var modelFound bool
-			for _, attr := range s.Attributes {
-				if string(attr.Key) == "gen_ai.request.model" {
-					modelFound = true
-				}
-			}
-			if !modelFound {
-				t.Error("missing gen_ai.request.model attribute on claude.invoke span")
-			}
-
-			break
-		}
-	}
-	if !found {
-		names := make([]string, len(spans))
-		for i, s := range spans {
-			names[i] = s.Name
-		}
-		t.Errorf("expected 'claude.invoke' span, got: %v", names)
-	}
-}
-
-func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
-	exp := setupTestTracer(t)
-
-	callCount := 0
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		callCount++
-		if callCount == 1 {
-			return exec.CommandContext(ctx, "false") // exit 1
-		}
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	t.Cleanup(cleanup)
-
-	cfg := &sightjack.Config{
-		Claude: sightjack.ClaudeConfig{Command: "false", TimeoutSec: 30},
-		Retry:  sightjack.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
-	}
-
-	// Create a parent span so retry events have a recording span to attach to.
-	tr := otel.Tracer("sightjack-test")
-	ctx, parentSpan := tr.Start(context.Background(), "test-parent")
-	_, _ = session.RunClaude(ctx, cfg, "test", io.Discard, sightjack.NewLogger(io.Discard, false))
-	parentSpan.End()
-
-	spans := exp.GetSpans()
-	var retryFound bool
-	for _, s := range spans {
-		for _, ev := range s.Events {
-			if ev.Name == "claude.retry" {
-				retryFound = true
-			}
-		}
-	}
-	if !retryFound {
-		t.Error("expected 'claude.retry' event")
 	}
 }
 
@@ -175,15 +68,15 @@ func TestMultiExporter_BothReceive(t *testing.T) {
 	)
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := sightjack.Tracer
-	sightjack.Tracer = tp.Tracer("sightjack-test")
+	oldTracer := platform.Tracer
+	platform.Tracer = tp.Tracer("sightjack-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		sightjack.Tracer = oldTracer
+		platform.Tracer = oldTracer
 	})
 
-	_, span := sightjack.Tracer.Start(context.Background(), "multi-span")
+	_, span := platform.Tracer.Start(context.Background(), "multi-span") // nosemgrep: adr0003-otel-span-without-defer-end -- span.End() called immediately below in test [permanent]
 	span.End()
 
 	if len(exp1.GetSpans()) == 0 {
@@ -234,7 +127,7 @@ func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("expected sightjack.command=scan attribute on root span")
+		t.Error("expected domain.command=scan attribute on root span")
 	}
 }
 

@@ -1,16 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
-	sightjack "github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
-	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func newShowCmd() *cobra.Command {
@@ -41,7 +42,7 @@ replays events from .siren/events/ and displays the matrix navigator.`,
 			if stdinIsPipe() {
 				return runShowFromStdin(w)
 			}
-			return usecase.ShowFromState(w, baseDir, logger)
+			return showFromState(cmd.Context(), w, baseDir, logger)
 		},
 	}
 }
@@ -54,15 +55,50 @@ func stdinIsPipe() bool {
 	return fi.Mode()&os.ModeCharDevice == 0
 }
 
+// showFromState loads the latest session state and renders the matrix navigator.
+// This is the READ MODEL path for the show command — inlined from the deleted
+// usecase.ShowFromState to avoid usecase→session dependency.
+func showFromState(ctx context.Context, w io.Writer, baseDir string, logger domain.Logger) error {
+	state, _, err := session.LoadLatestState(ctx, baseDir)
+	if err != nil {
+		logger.Info("Run 'sightjack scan' first.")
+		return fmt.Errorf("no previous scan found: %w", err)
+	}
+
+	result := &domain.ScanResult{
+		Completeness: state.Completeness,
+	}
+	for _, c := range state.Clusters {
+		result.Clusters = append(result.Clusters, domain.ClusterScanResult{
+			Name:         c.Name,
+			Completeness: c.Completeness,
+			IssueCount:   c.IssueCount,
+		})
+		result.TotalIssues += c.IssueCount
+	}
+
+	waves := domain.RestoreWaves(state.Waves)
+	strictness := state.StrictnessLevel
+	if strictness == "" {
+		strictness = "fog"
+	}
+	adrCount := session.CountADRFiles(session.ADRDir(baseDir))
+	nav := session.RenderMatrixNavigator(result, state.Project, waves, adrCount, (*time.Time)(nil), strictness, state.ShibitoCount)
+	fmt.Fprintln(w)
+	fmt.Fprint(w, nav)
+	logger.Info("Last scanned: %s", state.LastScanned.Format("2006-01-02 15:04:05"))
+	return nil
+}
+
 func runShowFromStdin(w io.Writer) error {
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return fmt.Errorf("failed to read stdin: %w", err)
 	}
 
-	switch sightjack.DetectPipeType(data) {
-	case sightjack.PipeTypeScanResult:
-		var scanResult sightjack.ScanResult
+	switch domain.DetectPipeType(data) {
+	case domain.PipeTypeScanResult:
+		var scanResult domain.ScanResult
 		if err := json.Unmarshal(data, &scanResult); err != nil {
 			return fmt.Errorf("parse ScanResult: %w", err)
 		}
@@ -70,16 +106,16 @@ func runShowFromStdin(w io.Writer) error {
 		fmt.Fprintln(w)
 		fmt.Fprint(w, nav)
 
-	case sightjack.PipeTypeWavePlan:
-		var plan sightjack.WavePlan
+	case domain.PipeTypeWavePlan:
+		var plan domain.WavePlan
 		if err := json.Unmarshal(data, &plan); err != nil {
 			return fmt.Errorf("parse WavePlan: %w", err)
 		}
-		var result *sightjack.ScanResult
+		var result *domain.ScanResult
 		if plan.ScanResult != nil {
 			result = plan.ScanResult
 		} else {
-			result = &sightjack.ScanResult{}
+			result = &domain.ScanResult{}
 		}
 		nav := session.RenderMatrixNavigator(result, "", plan.Waves, 0, nil, "fog", 0)
 		fmt.Fprintln(w)

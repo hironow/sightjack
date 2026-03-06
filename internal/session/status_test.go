@@ -1,13 +1,14 @@
 package session_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack"
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -16,7 +17,7 @@ func TestStatus_EmptyState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(context.Background(), baseDir)
 
 	// then
 	if report.WavesTotal != 0 {
@@ -43,8 +44,8 @@ func TestStatus_WithMailDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	inboxDir := sightjack.MailDir(baseDir, sightjack.InboxDir)
-	archiveDir := sightjack.MailDir(baseDir, sightjack.ArchiveDir)
+	inboxDir := domain.MailDir(baseDir, domain.InboxDir)
+	archiveDir := domain.MailDir(baseDir, domain.ArchiveDir)
 
 	// Create 2 inbox files
 	for _, name := range []string{"spec-w1.md", "report-w2.md"} {
@@ -61,7 +62,7 @@ func TestStatus_WithMailDirs(t *testing.T) {
 	}
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(context.Background(), baseDir)
 
 	// then
 	if report.InboxCount != 2 {
@@ -76,56 +77,56 @@ func TestStatus_WithEvents(t *testing.T) {
 	// given — create event store with waves and scan events
 	baseDir := t.TempDir()
 	sessionID := "test-session-001"
-	store := session.NewEventStore(baseDir, sessionID)
+	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID), &domain.NopLogger{})
 
 	// Create a scan_completed event with LastScanned
 	scanTime := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
-	scanPayload := sightjack.ScanCompletedPayload{
+	scanPayload := domain.ScanCompletedPayload{
 		Completeness: 0.75,
 		ShibitoCount: 2,
 		LastScanned:  scanTime,
 	}
-	scanEvent, err := sightjack.NewEvent(sightjack.EventScanCompleted, scanPayload, scanTime)
+	scanEvent, err := domain.NewEvent(domain.EventScanCompleted, scanPayload, scanTime)
 	if err != nil {
 		t.Fatal(err)
 	}
 	scanEvent.SessionID = sessionID
 
 	// Create wave_applied event
-	appliedPayload := sightjack.WaveAppliedPayload{
+	appliedPayload := domain.WaveAppliedPayload{
 		WaveID:      "w1",
 		ClusterName: "cluster-a",
 		Applied:     3,
 		TotalCount:  3,
 	}
-	appliedEvent, err := sightjack.NewEvent(sightjack.EventWaveApplied, appliedPayload, scanTime.Add(time.Minute))
+	appliedEvent, err := domain.NewEvent(domain.EventWaveApplied, appliedPayload, scanTime.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 	appliedEvent.SessionID = sessionID
 
 	// Create wave_rejected event
-	rejectedPayload := sightjack.WaveIdentityPayload{
+	rejectedPayload := domain.WaveIdentityPayload{
 		WaveID:      "w2",
 		ClusterName: "cluster-b",
 	}
-	rejectedEvent, err := sightjack.NewEvent(sightjack.EventWaveRejected, rejectedPayload, scanTime.Add(2*time.Minute))
+	rejectedEvent, err := domain.NewEvent(domain.EventWaveRejected, rejectedPayload, scanTime.Add(2*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 	rejectedEvent.SessionID = sessionID
 
 	// Persist events — need to create event store directory first
-	eventsDir := filepath.Join(baseDir, sightjack.StateDir, "events", sessionID)
+	eventsDir := filepath.Join(baseDir, domain.StateDir, "events", sessionID)
 	if err := os.MkdirAll(eventsDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Append(scanEvent, appliedEvent, rejectedEvent); err != nil {
+	if _, err := store.Append(scanEvent, appliedEvent, rejectedEvent); err != nil {
 		t.Fatal(err)
 	}
 
 	// when
-	report := session.Status(baseDir)
+	report := session.Status(context.Background(), baseDir)
 
 	// then
 	if report.WavesTotal != 2 {
@@ -141,7 +142,7 @@ func TestStatus_WithEvents(t *testing.T) {
 
 func TestStatus_FormatText(t *testing.T) {
 	// given
-	report := session.StatusReport{
+	report := domain.StatusReport{
 		LastScanned:  time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
 		WavesTotal:   12,
 		SuccessRate:  0.8,
@@ -170,7 +171,7 @@ func TestStatus_FormatText(t *testing.T) {
 
 func TestStatus_FormatJSON(t *testing.T) {
 	// given
-	report := session.StatusReport{
+	report := domain.StatusReport{
 		LastScanned:  time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
 		WavesTotal:   12,
 		SuccessRate:  0.8,
@@ -196,7 +197,7 @@ func TestStatus_FormatJSON(t *testing.T) {
 
 func TestStatus_FormatText_NoEvents(t *testing.T) {
 	// given — zero-value report
-	report := session.StatusReport{}
+	report := domain.StatusReport{}
 
 	// when
 	text := report.FormatText()
