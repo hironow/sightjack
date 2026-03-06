@@ -112,7 +112,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			),
 		)
 		emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
-		if err := ComposeSpecification(store, selected); err != nil {
+		if err := ComposeSpecification(ctx, store, selected); err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
 			emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -140,7 +140,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				),
 			)
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
-			if err := ComposeSpecification(store, selected); err != nil {
+			if err := ComposeSpecification(ctx, store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -230,7 +230,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			domain.PropagateWaveUpdate(waves, selected)
 			sessionRejected[domain.WaveKey(selected)] = rejected
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
-			if err := ComposeSpecification(store, selected); err != nil {
+			if err := ComposeSpecification(ctx, store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -420,14 +420,14 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}
 
 	// Compose report d-mail for the completed wave
-	if err := ComposeReport(store, selected, applyResult); err != nil {
+	if err := ComposeReport(ctx, store, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
 		emitter.EmitSendReport(selected.ID, selected.ClusterName, time.Now().UTC())
 	}
 
 	// O2: sightjack → amadeus feedback D-Mail
-	if feedbackErr := ComposeFeedback(store, selected, applyResult); feedbackErr != nil {
+	if feedbackErr := ComposeFeedback(ctx, store, selected, applyResult); feedbackErr != nil {
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
 		emitter.EmitSendFeedback(selected.ID, selected.ClusterName, time.Now().UTC())

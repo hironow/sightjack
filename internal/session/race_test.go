@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,16 +31,17 @@ func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 	var wg sync.WaitGroup
 	const workers = 10
 
+	ctx := context.Background()
 	for i := range workers {
 		wg.Add(2)
 		go func(id int) {
 			defer wg.Done()
 			name := fmt.Sprintf("race-%03d.md", id)
-			store.Stage(name, []byte("data"))
+			store.Stage(ctx, name, []byte("data"))
 		}(i)
 		go func() {
 			defer wg.Done()
-			store.Flush()
+			store.Flush(ctx)
 		}()
 	}
 	wg.Wait()

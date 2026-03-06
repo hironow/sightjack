@@ -165,7 +165,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			// Prune flushed outbox DB rows + incremental vacuum.
-			pruned, pruneErr := session.PruneFlushedOutbox(baseDir)
+			pruned, pruneErr := session.PruneFlushedOutbox(cmd.Context(), baseDir)
 			if pruneErr != nil {
 				logger.Warn("Failed to prune outbox DB: %v", pruneErr)
 			} else if pruned > 0 {

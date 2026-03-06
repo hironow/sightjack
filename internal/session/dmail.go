@@ -125,7 +125,7 @@ func ParseDMail(data []byte) (*DMail, error) {
 
 // ComposeDMail stages a d-mail via the transactional outbox store, then
 // flushes it to archive/ and outbox/ using atomic file writes.
-func ComposeDMail(store port.OutboxStore, mail *DMail) error {
+func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *DMail) error {
 	if err := ValidateDMail(mail); err != nil {
 		return err
 	}
@@ -133,10 +133,10 @@ func ComposeDMail(store port.OutboxStore, mail *DMail) error {
 	if err != nil {
 		return err
 	}
-	if err := store.Stage(mail.Filename(), data); err != nil {
+	if err := store.Stage(ctx, mail.Filename(), data); err != nil {
 		return fmt.Errorf("dmail stage: %w", err)
 	}
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		return fmt.Errorf("dmail flush: %w", err)
 	}
@@ -583,7 +583,7 @@ func ReportBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 }
 
 // ComposeReport creates and sends a report d-mail for a completed wave.
-func ComposeReport(store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
+func ComposeReport(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
@@ -593,7 +593,7 @@ func ComposeReport(store port.OutboxStore, wave domain.Wave, result *domain.Wave
 		Issues:        WaveIssueIDs(wave),
 		Body:          ReportBody(wave, result),
 	}
-	return ComposeDMail(store, mail)
+	return ComposeDMail(ctx, store, mail)
 }
 
 // FeedbackBody formats wave apply results as Markdown body for a feedback d-mail.
@@ -621,7 +621,7 @@ func FeedbackBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 
 // ComposeFeedback stages a feedback D-Mail for amadeus consumption.
 // Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
-func ComposeFeedback(store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
+func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("feedback", key),
@@ -631,11 +631,11 @@ func ComposeFeedback(store port.OutboxStore, wave domain.Wave, result *domain.Wa
 		Issues:        WaveIssueIDs(wave),
 		Body:          FeedbackBody(wave, result),
 	}
-	return ComposeDMail(store, mail)
+	return ComposeDMail(ctx, store, mail)
 }
 
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
-func ComposeSpecification(store port.OutboxStore, wave domain.Wave) error {
+func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave domain.Wave) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),
@@ -645,5 +645,5 @@ func ComposeSpecification(store port.OutboxStore, wave domain.Wave) error {
 		Issues:        WaveIssueIDs(wave),
 		Body:          SpecificationBody(wave),
 	}
-	return ComposeDMail(store, mail)
+	return ComposeDMail(ctx, store, mail)
 }

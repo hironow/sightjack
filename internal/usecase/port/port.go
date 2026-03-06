@@ -84,11 +84,11 @@ type EventStore interface {
 type OutboxStore interface {
 	// Stage atomically records a D-Mail for delivery. Idempotent: re-staging
 	// the same name is a no-op.
-	Stage(name string, data []byte) error
+	Stage(ctx context.Context, name string, data []byte) error
 
 	// Flush writes all staged-but-unflushed D-Mails to archive/ and outbox/.
 	// Returns the number of items flushed.
-	Flush() (int, error)
+	Flush(ctx context.Context) (int, error)
 
 	// Close releases database resources.
 	Close() error
