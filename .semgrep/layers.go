@@ -248,7 +248,10 @@ func goodEmitterCall(e port.SessionEventEmitter) {}
 // --- Rule: gate-config-raw-field-access ---
 
 func badGateRawField(cfg struct {
-	Gate struct{ ReviewCmd string; AutoApprove bool }
+	Gate struct {
+		ReviewCmd   string
+		AutoApprove bool
+	}
 }) {
 	// ruleid: gate-config-raw-field-access
 	_ = cfg.Gate.ReviewCmd
@@ -256,7 +259,10 @@ func badGateRawField(cfg struct {
 	_ = cfg.Gate.AutoApprove
 }
 
-func goodGateIntentMethod(gate struct{ HasReviewCmd func() bool; IsAutoApprove func() bool }) {
+func goodGateIntentMethod(gate struct {
+	HasReviewCmd  func() bool
+	IsAutoApprove func() bool
+}) {
 	// ok: gate-config-raw-field-access
 	gate.HasReviewCmd()
 	// ok: gate-config-raw-field-access
@@ -265,7 +271,9 @@ func goodGateIntentMethod(gate struct{ HasReviewCmd func() bool; IsAutoApprove f
 
 // --- Rule: lod-excessive-dot-chain ---
 
-func badLodChain(a struct{ B struct{ C struct{ D func() } } }) {
+func badLodChain(a struct {
+	B struct{ C struct{ D func() } }
+}) {
 	// ruleid: lod-excessive-dot-chain
 	a.B.C.D()
 }

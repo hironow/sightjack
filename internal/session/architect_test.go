@@ -108,7 +108,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	// given
 	scanDir := t.TempDir()
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 	}
 	wave := domain.Wave{
@@ -193,7 +193,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	// given: wave with nil Actions — json.Marshal produces "null" not "[]"
 	scanDir := t.TempDir()
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 	}
 	wave := domain.Wave{

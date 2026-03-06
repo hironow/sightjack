@@ -65,4 +65,3 @@ func BuildReviewFixPrompt(branch string, comments string) string {
 Fix all review comments above. Commit and push your changes.
 Keep fixes focused — only address the review comments, do not refactor unrelated code.`, branch, comments)
 }
-

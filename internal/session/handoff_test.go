@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // Compile-time check: Handoff interface exists and has expected methods.

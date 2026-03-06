@@ -12,8 +12,8 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestDMailKind_Valid(t *testing.T) {
@@ -104,7 +104,7 @@ func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(context.Background(), store,wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then
 	if err != nil {
@@ -131,7 +131,7 @@ func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 	result := &domain.WaveApplyResult{WaveID: "w1", Applied: 1}
 
 	// when
-	err := session.ComposeReport(context.Background(), store,wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
@@ -367,7 +367,7 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 		SchemaVersion: "1",
 		Body:          "# DoD\n- item 1\n",
 	}
-	if err := session.ComposeDMail(context.Background(), store,mail); err != nil {
+	if err := session.ComposeDMail(context.Background(), store, mail); err != nil {
 		t.Fatalf("compose: %v", err)
 	}
 
@@ -399,7 +399,7 @@ func TestComposeDMail_ValidationError(t *testing.T) {
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 	mail := &session.DMail{Name: "", Kind: session.DMailSpecification, Description: "bad"}
-	if err := session.ComposeDMail(context.Background(), store,mail); err == nil {
+	if err := session.ComposeDMail(context.Background(), store, mail); err == nil {
 		t.Error("expected validation error for empty name")
 	}
 }
@@ -509,7 +509,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 		},
 	}
 
-	err := session.ComposeSpecification(context.Background(), store,wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
@@ -571,7 +571,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 		},
 	}
 
-	err := session.ComposeReport(context.Background(), store,wave, applyResult)
+	err := session.ComposeReport(context.Background(), store, wave, applyResult)
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
@@ -622,7 +622,7 @@ func TestComposeReport_NoRipples(t *testing.T) {
 		Applied: 1,
 	}
 
-	err := session.ComposeReport(context.Background(), store,wave, applyResult)
+	err := session.ComposeReport(context.Background(), store, wave, applyResult)
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
@@ -1344,7 +1344,7 @@ func TestComposeDMail_NilMail(t *testing.T) {
 	store := testOutboxStore(t, dir)
 
 	// when
-	err := session.ComposeDMail(context.Background(), store,nil)
+	err := session.ComposeDMail(context.Background(), store, nil)
 
 	// then
 	if err == nil {
@@ -1373,7 +1373,7 @@ func TestComposeReport_WithErrors(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeReport(context.Background(), store,wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
@@ -1414,7 +1414,7 @@ func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeReport(context.Background(), store,wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
@@ -1450,7 +1450,7 @@ func TestComposeSpecification_WaveWithDescription(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(context.Background(), store,wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then
 	if err != nil {
@@ -1480,7 +1480,7 @@ func TestComposeSpecification_EmptyActions(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(context.Background(), store,wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then: should succeed (empty actions section)
 	if err != nil {
@@ -1511,7 +1511,7 @@ func TestComposeSpecification_IssueDedup(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeSpecification(context.Background(), store,wave)
+	err := session.ComposeSpecification(context.Background(), store, wave)
 
 	// then: issues list should be deduplicated
 	if err != nil {
@@ -1543,7 +1543,7 @@ func TestComposeReport_IssuesSorted(t *testing.T) {
 	result := &domain.WaveApplyResult{WaveID: "w1", Applied: 3}
 
 	// when
-	err := session.ComposeReport(context.Background(), store,wave, result)
+	err := session.ComposeReport(context.Background(), store, wave, result)
 
 	// then: issues are sorted
 	if err != nil {
@@ -2100,7 +2100,7 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeFeedback(context.Background(), store,wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then: no error
 	if err != nil {
@@ -2163,7 +2163,7 @@ func TestComposeFeedback_BodyFormat(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeFeedback(context.Background(), store,wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
@@ -2213,7 +2213,7 @@ func TestComposeFeedback_NoErrorsNoRipples(t *testing.T) {
 	}
 
 	// when
-	err := session.ComposeFeedback(context.Background(), store,wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then
 	if err != nil {
@@ -2306,7 +2306,7 @@ func TestComposeFeedback_IssuesSorted(t *testing.T) {
 	result := &domain.WaveApplyResult{WaveID: "w1", Applied: 3}
 
 	// when
-	err := session.ComposeFeedback(context.Background(), store,wave, result)
+	err := session.ComposeFeedback(context.Background(), store, wave, result)
 
 	// then: issues are sorted
 	if err != nil {

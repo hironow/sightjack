@@ -1,4 +1,5 @@
 package usecase
+
 // white-box-reason: usecase internals: tests unexported scan adapter construction
 
 // Validation tests for RunScanCommand (empty RepoPath, invalid Lang)

@@ -1,4 +1,5 @@
 package platform
+
 // white-box-reason: platform internals: tests unexported OTel environment configuration generation
 
 import (

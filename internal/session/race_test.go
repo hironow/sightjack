@@ -1,4 +1,5 @@
 package session
+
 // white-box-reason: concurrency internals: tests race conditions on unexported shared state
 
 import (

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestAutoApprover_AlwaysApproves(t *testing.T) {

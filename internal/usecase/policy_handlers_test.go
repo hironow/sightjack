@@ -1,4 +1,5 @@
 package usecase
+
 // white-box-reason: policy internals: tests unexported handler registration and spy test doubles
 
 import (

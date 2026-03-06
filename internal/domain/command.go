@@ -14,10 +14,10 @@ func NewInitCommand(baseDir RepoPath, team, project, lang, strictness string) In
 }
 
 func (c InitCommand) BaseDir() RepoPath  { return c.baseDir }
-func (c InitCommand) Team() string        { return c.team }
-func (c InitCommand) Project() string     { return c.project }
-func (c InitCommand) Lang() string        { return c.lang }
-func (c InitCommand) Strictness() string  { return c.strictness }
+func (c InitCommand) Team() string       { return c.team }
+func (c InitCommand) Project() string    { return c.project }
+func (c InitCommand) Lang() string       { return c.lang }
+func (c InitCommand) Strictness() string { return c.strictness }
 
 // RunScanCommand represents the intent to run a sightjack scan.
 type RunScanCommand struct {
@@ -30,7 +30,7 @@ func NewRunScanCommand(repoPath RepoPath, dryRun bool) RunScanCommand {
 }
 
 func (c RunScanCommand) RepoPath() RepoPath { return c.repoPath }
-func (c RunScanCommand) DryRun() bool        { return c.dryRun }
+func (c RunScanCommand) DryRun() bool       { return c.dryRun }
 
 // RunSessionCommand represents the intent to start an interactive session.
 type RunSessionCommand struct {
@@ -43,7 +43,7 @@ func NewRunSessionCommand(repoPath RepoPath, dryRun bool) RunSessionCommand {
 }
 
 func (c RunSessionCommand) RepoPath() RepoPath { return c.repoPath }
-func (c RunSessionCommand) DryRun() bool        { return c.dryRun }
+func (c RunSessionCommand) DryRun() bool       { return c.dryRun }
 
 // ResumeSessionCommand represents the intent to resume an existing session.
 type ResumeSessionCommand struct {
@@ -55,8 +55,8 @@ func NewResumeSessionCommand(repoPath RepoPath, sessionID SessionID) ResumeSessi
 	return ResumeSessionCommand{repoPath: repoPath, sessionID: sessionID}
 }
 
-func (c ResumeSessionCommand) RepoPath() RepoPath    { return c.repoPath }
-func (c ResumeSessionCommand) SessionID() SessionID   { return c.sessionID }
+func (c ResumeSessionCommand) RepoPath() RepoPath   { return c.repoPath }
+func (c ResumeSessionCommand) SessionID() SessionID { return c.sessionID }
 
 // ApplyWaveCommand represents the intent to approve and apply a wave.
 type ApplyWaveCommand struct {
@@ -69,9 +69,9 @@ func NewApplyWaveCommand(repoPath RepoPath, sessionID SessionID, clusterName Clu
 	return ApplyWaveCommand{repoPath: repoPath, sessionID: sessionID, clusterName: clusterName}
 }
 
-func (c ApplyWaveCommand) RepoPath() RepoPath        { return c.repoPath }
-func (c ApplyWaveCommand) SessionID() SessionID       { return c.sessionID }
-func (c ApplyWaveCommand) ClusterName() ClusterName   { return c.clusterName }
+func (c ApplyWaveCommand) RepoPath() RepoPath       { return c.repoPath }
+func (c ApplyWaveCommand) SessionID() SessionID     { return c.sessionID }
+func (c ApplyWaveCommand) ClusterName() ClusterName { return c.clusterName }
 
 // DiscussWaveCommand represents the intent to discuss a specific wave topic.
 type DiscussWaveCommand struct {
@@ -85,7 +85,7 @@ func NewDiscussWaveCommand(repoPath RepoPath, sessionID SessionID, clusterName C
 	return DiscussWaveCommand{repoPath: repoPath, sessionID: sessionID, clusterName: clusterName, topic: topic}
 }
 
-func (c DiscussWaveCommand) RepoPath() RepoPath        { return c.repoPath }
-func (c DiscussWaveCommand) SessionID() SessionID       { return c.sessionID }
-func (c DiscussWaveCommand) ClusterName() ClusterName   { return c.clusterName }
-func (c DiscussWaveCommand) Topic() Topic               { return c.topic }
+func (c DiscussWaveCommand) RepoPath() RepoPath       { return c.repoPath }
+func (c DiscussWaveCommand) SessionID() SessionID     { return c.sessionID }
+func (c DiscussWaveCommand) ClusterName() ClusterName { return c.clusterName }
+func (c DiscussWaveCommand) Topic() Topic             { return c.topic }

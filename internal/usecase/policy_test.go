@@ -1,4 +1,5 @@
 package usecase
+
 // white-box-reason: policy internals: tests unexported PolicyEngine constructor and Dispatch
 
 import (

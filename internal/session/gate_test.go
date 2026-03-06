@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestFilterConvergence_Empty(t *testing.T) {

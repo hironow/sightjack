@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestNopNotifier_NoError(t *testing.T) {

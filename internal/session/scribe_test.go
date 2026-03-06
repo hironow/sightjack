@@ -138,7 +138,7 @@ func TestRunScribeADRDryRun(t *testing.T) {
 	scanDir := t.TempDir()
 	adrDir := filepath.Join(t.TempDir(), "adr")
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
 	}
 	wave := domain.Wave{
@@ -401,7 +401,7 @@ func TestRunScribeADRDryRun_IncludesExistingADRs(t *testing.T) {
 	os.WriteFile(filepath.Join(adrDir, "0001-auth.md"), []byte("# Auth ADR"), 0644)
 
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "echo", TimeoutSec: 10},
 	}
 	wave := domain.Wave{ID: "w1", ClusterName: "Auth", Title: "Test"}

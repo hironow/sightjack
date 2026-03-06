@@ -239,4 +239,3 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
 		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, emitter, out, logger)
 }
-

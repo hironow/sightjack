@@ -117,7 +117,7 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -142,7 +142,7 @@ func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -167,7 +167,7 @@ func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -204,8 +204,8 @@ func TestCheckLinearMCP_Success(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Tracker: domain.IssueTrackerConfig{Team: "Engineering"},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Tracker:   domain.IssueTrackerConfig{Team: "Engineering"},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 
@@ -227,8 +227,8 @@ func TestCheckLinearMCP_Failure(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Tracker: domain.IssueTrackerConfig{Team: "Engineering"},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Tracker:   domain.IssueTrackerConfig{Team: "Engineering"},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 	ctx := context.Background()
 

@@ -25,7 +25,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -54,7 +54,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", Model: "", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -134,7 +134,7 @@ func TestRunClaudeOnceNoRetry(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
 
 	// when
@@ -162,7 +162,7 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
+		Retry:     domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
 	}
 	output, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
@@ -189,7 +189,7 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
 	_, err := session.RunClaude(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	if err == nil {
@@ -211,7 +211,7 @@ func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", Model: "opus", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -246,7 +246,7 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
 	// when
@@ -279,7 +279,7 @@ func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "sleep", TimeoutSec: 30},
-		Retry:  domain.RetryConfig{MaxAttempts: 1},
+		Retry:     domain.RetryConfig{MaxAttempts: 1},
 	}
 
 	// when: cancel context after 100ms
@@ -313,7 +313,7 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
 	_, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	if err == nil {

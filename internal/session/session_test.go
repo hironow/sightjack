@@ -14,8 +14,8 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
-	"github.com/hironow/sightjack/internal/usecase/port"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func TestIsWaveApplyComplete_NoErrors(t *testing.T) {
@@ -168,10 +168,10 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 func TestRunSession_NilInputReturnsError(t *testing.T) {
 	// given: non-dry-run session with nil input should return error early
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Scan:   domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		Scan:      domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 
 	// when
@@ -905,11 +905,11 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	// given: dry-run should NOT write scan_result.json (no real scan happened)
 	baseDir := t.TempDir()
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Scan:   domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
-		Scribe: domain.ScribeConfig{Enabled: true},
+		Scan:      domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		Scribe:    domain.ScribeConfig{Enabled: true},
 	}
 	sessionID := "test-no-cache"
 	ctx := context.Background()
@@ -1080,9 +1080,9 @@ func TestResumeSession_RestoresWavesFromState(t *testing.T) {
 func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 	state := &domain.SessionState{
 		Version:        "0.5",
@@ -1105,9 +1105,9 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
 	cfg := &domain.Config{
-		Lang:   "en",
+		Lang:      "en",
 		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 	state := &domain.SessionState{
 		Version:   "0.5",

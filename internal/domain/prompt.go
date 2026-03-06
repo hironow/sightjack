@@ -152,4 +152,3 @@ func FormatDoDSection(tmpl DoDTemplate) string {
 	}
 	return b.String()
 }
-

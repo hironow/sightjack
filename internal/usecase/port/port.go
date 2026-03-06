@@ -132,17 +132,17 @@ type SessionEventEmitter interface {
 // NopSessionEventEmitter is a no-op emitter for tests and dry-run mode.
 type NopSessionEventEmitter struct{}
 
-func (*NopSessionEventEmitter) EmitStart(string, string, time.Time) error             { return nil }
+func (*NopSessionEventEmitter) EmitStart(string, string, time.Time) error { return nil }
 func (*NopSessionEventEmitter) EmitRecordScan(domain.ScanCompletedPayload, time.Time) error {
 	return nil
 }
-func (*NopSessionEventEmitter) EmitResume(string, time.Time) error  { return nil }
-func (*NopSessionEventEmitter) EmitRescan(string, time.Time) error  { return nil }
+func (*NopSessionEventEmitter) EmitResume(string, time.Time) error { return nil }
+func (*NopSessionEventEmitter) EmitRescan(string, time.Time) error { return nil }
 func (*NopSessionEventEmitter) EmitRecordWavesGenerated(domain.WavesGeneratedPayload, time.Time) error {
 	return nil
 }
-func (*NopSessionEventEmitter) EmitApproveWave(string, string, time.Time) error       { return nil }
-func (*NopSessionEventEmitter) EmitRejectWave(string, string, time.Time) error        { return nil }
+func (*NopSessionEventEmitter) EmitApproveWave(string, string, time.Time) error { return nil }
+func (*NopSessionEventEmitter) EmitRejectWave(string, string, time.Time) error  { return nil }
 func (*NopSessionEventEmitter) EmitModifyWave(domain.WaveModifiedPayload, time.Time) error {
 	return nil
 }
@@ -155,7 +155,7 @@ func (*NopSessionEventEmitter) EmitCompleteWave(domain.WaveCompletedPayload, tim
 func (*NopSessionEventEmitter) EmitUpdateCompleteness(string, float64, float64, time.Time) error {
 	return nil
 }
-func (*NopSessionEventEmitter) EmitUnlockWaves([]string, time.Time) error             { return nil }
+func (*NopSessionEventEmitter) EmitUnlockWaves([]string, time.Time) error { return nil }
 func (*NopSessionEventEmitter) EmitAddNextGenWaves(domain.NextGenWavesAddedPayload, time.Time) error {
 	return nil
 }
