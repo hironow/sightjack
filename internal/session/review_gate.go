@@ -55,8 +55,10 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 		logger.Info("Review gate: cycle %d/%d", cycle, maxReviewGateCycles)
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
+		reviewStart := time.Now()
 		result, err := RunReview(reviewCtx, cfg.Gate.ReviewCmdString(), dir)
 		reviewCancel()
+		span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
 		if err != nil {
 			span.RecordError(err)
 			span.SetAttributes(attribute.String("error.stage", "sightjack.review"))
