@@ -32,8 +32,10 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
 	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, selectPhaseResult, bool) {
 
+	gate := cfg.Gate
+
 	// Auto-select first available wave when --auto-approve is set.
-	if cfg.Gate.IsAutoApprove() {
+	if gate.IsAutoApprove() {
 		if w, ok := domain.AutoSelectWave(available); ok {
 			logger.Info("Auto-selecting wave: %s", w.Title)
 			return w, selectChosen, shibitoShown
@@ -103,8 +105,10 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
 	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
+	gate := cfg.Gate
+
 	// Auto-approve when --auto-approve is set.
-	if cfg.Gate.IsAutoApprove() {
+	if gate.IsAutoApprove() {
 		loopSpan.AddEvent("wave.auto_approved",
 			trace.WithAttributes(
 				attribute.String("wave.id", selected.ID),
@@ -379,6 +383,8 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	labeledReady map[string]bool,
 	fbCollector *FeedbackCollector, store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
 
+	gate := cfg.Gate
+
 	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, emitter, out, loopSpan, logger)
 	if !ok {
 		return
@@ -408,8 +414,8 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}, time.Now().UTC())
 
 	// Review gate: run review before composing report (outbox is read immediately by phonewave)
-	if cfg.Gate.HasReviewCmd() {
-		passed, reviewErr := RunReviewGate(ctx, cfg.Gate, cfg.Assistant, scanDir, logger)
+	if gate.HasReviewCmd() {
+		passed, reviewErr := RunReviewGate(ctx, gate, cfg.Assistant, scanDir, logger)
 		if reviewErr != nil {
 			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
 		}
