@@ -3,13 +3,13 @@ rules:
   # Layer dependency direction enforcement (CANONICAL — identical across all tools)
   #
   # 7-layer architecture:
-  #   internal/cmd         — cobra CLI (top layer)
-  #   internal/usecase     — orchestration (COMMAND, Aggregate, POLICY dispatch)
-  #   internal/session     — I/O orchestration (filesystem, network, subprocess)
-  #   internal/eventsource — event store infrastructure
-  #   internal/usecase/port — context-aware interface contracts + trivial defaults
-  #   internal/platform    — cross-cutting infrastructure (logger, telemetry, metrics)
-  #   internal/domain      — pure functions, types, interfaces (no I/O, no context)
+  #   internal/cmd              — cobra CLI (top layer)
+  #   internal/usecase          — orchestration (COMMAND, Aggregate, POLICY dispatch)
+  #   internal/usecase/port     — context-aware interface contracts + trivial defaults
+  #   internal/session          — I/O orchestration (filesystem, network, subprocess)
+  #   internal/eventsource      — event store infrastructure
+  #   internal/platform         — cross-cutting infrastructure (logger, telemetry, metrics)
+  #   internal/domain           — pure functions, types, interfaces (no I/O, no context)
   #
   # Allowed dependency directions (dependency inversion applied):
   #   cmd              → usecase, session, usecase/port, platform, domain (composition root)
@@ -192,13 +192,12 @@ rules:
         - "/internal/usecase/**"
 
   # --- Rule 8: session must not import usecase (ADR S0015) ---
-  # Note: session → usecase/port is ALLOWED (port contracts).
-  # The regex uses $ anchor to exclude usecase/port sub-package.
 
   - id: layer-session-no-import-usecase
     languages: [go]
     message: |
-      session 層から usecase 層への import は禁止です。
+      session 層から usecase 本体への import は禁止です。
+      session は usecase/port (Output Port) のみ import 可能です。
       session は eventsource, usecase/port, platform, domain を import できます。
       Ref: Shared ADR S0015 — aggregate-root-and-usecase-layer
     severity: ERROR
@@ -210,7 +209,7 @@ rules:
               import $_ALIAS "$PKG"
       - metavariable-regex:
           metavariable: $PKG
-          regex: ".*/internal/usecase$"
+          regex: ".*/internal/usecase(/(?!port).*)?$"
     paths:
       include:
         - "/internal/session/**"
@@ -347,20 +346,6 @@ rules:
       include:
         - "/internal/usecase/port/**"
 
-  # --- Rule 13b: No import of deprecated internal/port ---
-
-  - id: no-import-old-port
-    languages: [go]
-    severity: ERROR
-    pattern-regex: '".*internal/port"'
-    paths:
-      include:
-        - "/internal/**"
-      exclude:
-        - "*_test.go"
-    message: |
-      internal/port は廃止済みです。internal/usecase/port を使用してください。
-
   # --- Rule 14: No vendor vocabulary in domain ---
 
   - id: domain-no-vendor-vocabulary
@@ -443,7 +428,35 @@ rules:
       shell 経由のコマンド実行は禁止です。
       exec.Command で直接実行可能ファイルを指定してください。
 
-  # --- Rule 20: Session layer must not use aggregate types ---
+  # --- Rule 18: No ambiguous type names ---
+
+  - id: no-ambiguous-type-names
+    languages: [go]
+    severity: ERROR
+    pattern-regex: 'type\s+\w*(Manager|Service|Helper|Util|Impl|Base|Facade)\s+'
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。
+
+  # --- Rule 19: No import of deprecated internal/port ---
+
+  - id: no-import-old-port
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '"[^"]+/internal/port"'
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      internal/port は廃止済みです。internal/usecase/port を使用してください。
+
+  # --- Rule 20: Session layer must not reference aggregate types directly ---
 
   - id: session-no-aggregate-type
     languages: [go]
@@ -456,7 +469,7 @@ rules:
         - "*_test.go"
     message: |
       session 層で *domain.*Aggregate 型の直接使用は禁止です。
-      usecase/port の EventEmitter interface を経由してください。
+      usecase/port の EventEmitter / StateProvider interface を経由してください。
 
   # --- Rule 21: Session layer must not call aggregate methods ---
 
@@ -471,21 +484,7 @@ rules:
         - "*_test.go"
     message: |
       session 層から aggregate のメソッド直接呼び出しは禁止です。
-      usecase/port の EventEmitter interface を経由してください。
-
-  # --- Rule 18: No ambiguous type names ---
-
-  - id: no-ambiguous-type-names
-    languages: [go]
-    severity: ERROR
-    pattern-regex: 'type\s+\w*(Manager|Service|Helper|Util|Impl|Base|Facade)\s+'
-    paths:
-      include:
-        - "/internal/**"
-      exclude:
-        - "*_test.go"
-    message: |
-      曖昧な型命名は禁止です。具体的な責務を表す名前を使用してください。
+      usecase/port の EventEmitter / StateProvider interface を経由してください。
 
   # --- Rule 22: Domain must not use embed or text/template ---
 
