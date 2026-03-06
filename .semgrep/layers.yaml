@@ -580,3 +580,24 @@ rules:
       Tell-Don't-Ask 原則に従い、中間オブジェクトに委譲メソッドを追加してください。
       誤検知の場合は nosemgrep を付与してください。
       Ref: okite skill: law-of-demeter, tell-dont-ask
+
+  # --- Rule: GateConfig raw field access guard ---
+
+  - id: gate-config-raw-field-access
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '\.Gate\.(ReviewCmd|NotifyCmd|ApproveCmd|AutoApprove|ReviewBudget)\b'
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層で GateConfig の raw フィールドに直接アクセスしています。
+      intent メソッド経由でアクセスしてください:
+        .Gate.ReviewCmd     → .Gate.HasReviewCmd() / .Gate.ReviewCmdString()
+        .Gate.NotifyCmd     → .Gate.HasNotifyCmd() / .Gate.NotifyCmdString()
+        .Gate.ApproveCmd    → .Gate.HasApproveCmd() / .Gate.ApproveCmdString()
+        .Gate.AutoApprove   → .Gate.IsAutoApprove()
+        .Gate.ReviewBudget  → .Gate.EffectiveReviewBudget()
+      Ref: Tell-Don't-Ask principle
