@@ -29,8 +29,8 @@ func (a *SessionRunnerAdapter) RunRescanSession(ctx context.Context, cfg *domain
 	return RunRescanSession(ctx, cfg, baseDir, oldState, sessionID, input, out, emitter, logger)
 }
 
-func (a *SessionRunnerAdapter) BuildNotifier(cfg *domain.Config) port.Notifier {
-	return BuildNotifier(cfg)
+func (a *SessionRunnerAdapter) BuildNotifier(gate domain.GateConfig) port.Notifier {
+	return BuildNotifier(gate)
 }
 
 func (a *SessionRunnerAdapter) NewDispatchingRecorder(inner port.Recorder, dispatcher port.EventDispatcher, logger domain.Logger) port.Recorder {

@@ -113,21 +113,21 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 
 // BuildNotifier creates the appropriate Notifier based on config.
 // If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
-func BuildNotifier(cfg *domain.Config) port.Notifier {
-	if cfg.Gate.HasNotifyCmd() {
-		return NewCmdNotifier(cfg.Gate.NotifyCmdString())
+func BuildNotifier(gate domain.GateConfig) port.Notifier {
+	if gate.HasNotifyCmd() {
+		return NewCmdNotifier(gate.NotifyCmdString())
 	}
 	return &LocalNotifier{}
 }
 
 // BuildApprover creates the appropriate Approver based on config.
 // Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(cfg *domain.Config, input io.Reader, out io.Writer) port.Approver {
-	if cfg.Gate.IsAutoApprove() {
+func BuildApprover(gate domain.GateConfig, input io.Reader, out io.Writer) port.Approver {
+	if gate.IsAutoApprove() {
 		return &port.AutoApprover{}
 	}
-	if cfg.Gate.HasApproveCmd() {
-		return NewCmdApprover(cfg.Gate.ApproveCmdString())
+	if gate.HasApproveCmd() {
+		return NewCmdApprover(gate.ApproveCmdString())
 	}
 	return NewStdinApprover(input, out)
 }

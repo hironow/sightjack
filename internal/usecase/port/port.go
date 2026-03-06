@@ -174,7 +174,7 @@ type SessionRunner interface {
 	RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
 	RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
 	RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
-	BuildNotifier(cfg *domain.Config) Notifier
+	BuildNotifier(gate domain.GateConfig) Notifier
 	NewDispatchingRecorder(inner Recorder, dispatcher EventDispatcher, logger domain.Logger) Recorder
 }
 

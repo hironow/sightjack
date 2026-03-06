@@ -14,7 +14,7 @@ func wrapRecorder(recorder port.Recorder, logger domain.Logger, dryRun bool, cfg
 		return recorder
 	}
 	engine := NewPolicyEngine(logger)
-	notifier := runner.BuildNotifier(cfg)
+	notifier := runner.BuildNotifier(cfg.Gate)
 	if metrics == nil {
 		metrics = port.NopPolicyMetrics{}
 	}

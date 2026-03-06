@@ -47,8 +47,8 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 		initial := DrainInboxFeedback(inboxCh, logger)
 
 		// Convergence gate with re-drain: catches late-arriving convergence
-		notifier := BuildNotifier(cfg)
-		approver := BuildApprover(cfg, input, out)
+		notifier := BuildNotifier(cfg.Gate)
+		approver := BuildApprover(cfg.Gate, input, out)
 		allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 		if gateErr != nil {
 			return fmt.Errorf("convergence gate: %w", gateErr)
@@ -208,8 +208,8 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	initial := DrainInboxFeedback(inboxCh, logger)
 
 	// Convergence gate with re-drain: catches late-arriving convergence
-	notifier := BuildNotifier(cfg)
-	approver := BuildApprover(cfg, input, out)
+	notifier := BuildNotifier(cfg.Gate)
+	approver := BuildApprover(cfg.Gate, input, out)
 	allDmails, approved, gateErr := RunConvergenceGateWithRedrain(ctx, initial, inboxCh, notifier, approver, logger)
 	if gateErr != nil {
 		return fmt.Errorf("convergence gate: %w", gateErr)
