@@ -39,6 +39,35 @@ type GateConfig struct {
 	ReviewBudget int    `yaml:"review_budget"` // max review cycles (0 = default 3)
 }
 
+// IsAutoApprove reports whether the gate is configured to auto-approve.
+func (g GateConfig) IsAutoApprove() bool { return g.AutoApprove }
+
+// HasNotifyCmd reports whether a notification command is configured.
+func (g GateConfig) HasNotifyCmd() bool { return g.NotifyCmd != "" }
+
+// NotifyCmdString returns the notification command string.
+func (g GateConfig) NotifyCmdString() string { return g.NotifyCmd }
+
+// HasApproveCmd reports whether an approval command is configured.
+func (g GateConfig) HasApproveCmd() bool { return g.ApproveCmd != "" }
+
+// ApproveCmdString returns the approval command string.
+func (g GateConfig) ApproveCmdString() string { return g.ApproveCmd }
+
+// HasReviewCmd reports whether a review command is configured.
+func (g GateConfig) HasReviewCmd() bool { return strings.TrimSpace(g.ReviewCmd) != "" }
+
+// ReviewCmdString returns the review command string.
+func (g GateConfig) ReviewCmdString() string { return g.ReviewCmd }
+
+// EffectiveReviewBudget returns the review budget, defaulting to 3 if unset.
+func (g GateConfig) EffectiveReviewBudget() int {
+	if g.ReviewBudget <= 0 {
+		return 3
+	}
+	return g.ReviewBudget
+}
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
 	Tracker      IssueTrackerConfig     `yaml:"tracker"`

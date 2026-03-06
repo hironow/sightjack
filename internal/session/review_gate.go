@@ -20,7 +20,7 @@ const (
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
 func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger domain.Logger) (bool, error) {
-	if strings.TrimSpace(cfg.Gate.ReviewCmd) == "" {
+	if !cfg.Gate.HasReviewCmd() {
 		return true, nil
 	}
 
@@ -28,10 +28,7 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 		logger = &domain.NopLogger{}
 	}
 
-	budget := cfg.Gate.ReviewBudget
-	if budget <= 0 {
-		budget = maxReviewGateCycles
-	}
+	budget := cfg.Gate.EffectiveReviewBudget()
 
 	timeoutSec := cfg.Assistant.TimeoutSec
 	if timeoutSec <= 0 {
@@ -51,7 +48,7 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 		logger.Info("Review gate: cycle %d/%d", cycle, maxReviewGateCycles)
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		result, err := RunReview(reviewCtx, cfg.Gate.ReviewCmd, dir)
+		result, err := RunReview(reviewCtx, cfg.Gate.ReviewCmdString(), dir)
 		reviewCancel()
 		if err != nil {
 			return false, fmt.Errorf("review gate cycle %d: %w", cycle, err)
