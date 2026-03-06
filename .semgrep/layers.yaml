@@ -594,10 +594,13 @@ rules:
         - "*_test.go"
     message: |
       session 層で GateConfig の raw フィールドに直接アクセスしています。
-      intent メソッド経由でアクセスしてください:
+      禁止: .Gate.<RawField> — raw フィールド直接アクセス（ReviewCmd, NotifyCmd, ApproveCmd, AutoApprove, ReviewBudget）
+      許可: .Gate.<IntentMethod>() — intent メソッド経由
         .Gate.ReviewCmd     → .Gate.HasReviewCmd() / .Gate.ReviewCmdString()
         .Gate.NotifyCmd     → .Gate.HasNotifyCmd() / .Gate.NotifyCmdString()
         .Gate.ApproveCmd    → .Gate.HasApproveCmd() / .Gate.ApproveCmdString()
         .Gate.AutoApprove   → .Gate.IsAutoApprove()
         .Gate.ReviewBudget  → .Gate.EffectiveReviewBudget()
-      Ref: Tell-Don't-Ask principle
+      除外: *_test.go
+      意図的仕様差分: raw field 限定（intent method 呼び出しは許可。cfg.Gate.IsAutoApprove() は正当な Tell-Don't-Ask パターン）
+      Ref: Tell-Don't-Ask, Law of Demeter
