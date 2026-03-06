@@ -1,0 +1,13 @@
+# tool-vars.yaml — sightjack tool-specific values for layers.yaml
+#
+# semgrep does not support external variable includes.
+# This file documents the tool-specific values embedded in layers.yaml
+# so that the shared rule body can be verified via normalized hash.
+#
+# Ref: refs/opsx/semgrep-layer-contract.md
+
+module: github.com/hironow/sightjack
+state_dir: .siren
+session_aggregate_guard:
+  rule_id: gate-config-raw-field-access
+  pattern: '\.Gate\.(ReviewCmd|NotifyCmd|ApproveCmd|AutoApprove|ReviewBudget)\b'
