@@ -22,11 +22,11 @@ const (
 // Returns (true, nil) if review passes or is skipped (no ReviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger domain.Logger) (bool, error) {
+func RunReviewGate(ctx context.Context, gate domain.GateConfig, assistant domain.AIAssistantConfig, dir string, logger domain.Logger) (bool, error) {
 	ctx, span := platform.Tracer.Start(ctx, "sightjack.review")
 	defer span.End()
 
-	if !cfg.Gate.HasReviewCmd() {
+	if !gate.HasReviewCmd() {
 		return true, nil
 	}
 
@@ -34,9 +34,9 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 		logger = &domain.NopLogger{}
 	}
 
-	budget := cfg.Gate.EffectiveReviewBudget()
+	budget := gate.EffectiveReviewBudget()
 
-	timeoutSec := cfg.Assistant.TimeoutSec
+	timeoutSec := assistant.TimeoutSec
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
@@ -56,7 +56,7 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		reviewStart := time.Now()
-		result, err := RunReview(reviewCtx, cfg.Gate.ReviewCmdString(), dir)
+		result, err := RunReview(reviewCtx, gate.ReviewCmdString(), dir)
 		reviewCancel()
 		if platform.IsDetailDebug() {
 			span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
@@ -81,7 +81,7 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 		}
 
 		// Run Claude --continue to fix review comments
-		if err := runReviewFix(ctx, cfg, dir, lastComments, logger); err != nil {
+		if err := runReviewFix(ctx, assistant, dir, lastComments, logger); err != nil {
 			logger.Warn("Review fix failed: %v", err)
 			return false, nil
 		}
@@ -92,24 +92,24 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, cfg *domain.Config, dir, comments string, logger domain.Logger) error {
+func runReviewFix(ctx context.Context, assistant domain.AIAssistantConfig, dir, comments string, logger domain.Logger) error {
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)
 	}
 
-	claudeCmd := cfg.Assistant.Command
+	claudeCmd := assistant.Command
 	if claudeCmd == "" {
 		claudeCmd = "claude"
 	}
-	model := cfg.Assistant.Model
+	model := assistant.Model
 	if model == "" {
 		model = "opus"
 	}
 
 	prompt := BuildReviewFixPrompt(branch, comments)
 
-	fixTimeout := time.Duration(cfg.Assistant.TimeoutSec) * time.Second
+	fixTimeout := time.Duration(assistant.TimeoutSec) * time.Second
 	if fixTimeout <= 0 {
 		fixTimeout = 300 * time.Second
 	}

@@ -409,7 +409,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 
 	// Review gate: run review before composing report (outbox is read immediately by phonewave)
 	if cfg.Gate.HasReviewCmd() {
-		passed, reviewErr := RunReviewGate(ctx, cfg, scanDir, logger)
+		passed, reviewErr := RunReviewGate(ctx, cfg.Gate, cfg.Assistant, scanDir, logger)
 		if reviewErr != nil {
 			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
 		}
