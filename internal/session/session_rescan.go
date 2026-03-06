@@ -7,12 +7,18 @@ import (
 	"io"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // RunRescanSession performs a fresh scan then merges completed status from old state.
 func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
+	ctx, span := platform.Tracer.Start(ctx, "sightjack.rescan")
+	defer span.End()
+
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -62,6 +68,8 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	}
 	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, false, out, logger)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "sightjack.rescan.scan"))
 		return fmt.Errorf("re-scan: %w", err)
 	}
 	for _, w := range scanResult.ScanWarnings {
@@ -74,6 +82,8 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 
 	waves, rescanWarnings, failedNames, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "sightjack.rescan.wave_generate"))
 		return fmt.Errorf("wave generate: %w", err)
 	}
 	// rescanWarnings are already logged by RunParallel; just propagate.
@@ -102,6 +112,11 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	emitter.EmitRecordWavesGenerated(domain.WavesGeneratedPayload{
 		Waves: domain.BuildWaveStates(waves),
 	}, time.Now().UTC())
+
+	span.SetAttributes(
+		attribute.Int("rescan.cluster.count", len(scanResult.Clusters)),
+		attribute.Int("rescan.wave.count", len(waves)),
+	)
 
 	logger.OK("Re-scanned: %d clusters, %d waves (%d previously completed)",
 		len(scanResult.Clusters), len(waves), len(completed))

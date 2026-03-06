@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
 )
@@ -218,6 +220,9 @@ func ParseScribeResult(path string) (*domain.ScribeResponse, error) {
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
 func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, logger domain.Logger) (*domain.ScribeResponse, error) {
+	ctx, span := platform.Tracer.Start(ctx, "sightjack.scribe")
+	defer span.End()
+
 	ClearScribeOutput(scanDir, wave)
 
 	adrNum, err := NextADRNumber(adrDir)
@@ -232,8 +237,11 @@ func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 
 	existingADRs, err := ReadExistingADRs(adrDir)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "sightjack.scribe.read_adrs"))
 		return nil, fmt.Errorf("read existing ADRs: %w", err)
 	}
+	span.SetAttributes(attribute.Int("scribe.adr.count", len(existingADRs)))
 
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, ScribeFileName(wave))
@@ -268,6 +276,8 @@ func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 
 	logger.Info("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
 	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "sightjack.scribe.claude"))
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)
 	}
 

@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 const (
@@ -20,6 +23,9 @@ const (
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
 func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger domain.Logger) (bool, error) {
+	ctx, span := platform.Tracer.Start(ctx, "sightjack.review")
+	defer span.End()
+
 	if !cfg.Gate.HasReviewCmd() {
 		return true, nil
 	}
@@ -45,12 +51,15 @@ func RunReviewGate(ctx context.Context, cfg *domain.Config, dir string, logger d
 			return false, fmt.Errorf("review gate canceled: %w", ctx.Err())
 		}
 
+		span.SetAttributes(attribute.Int("review.cycle", cycle))
 		logger.Info("Review gate: cycle %d/%d", cycle, maxReviewGateCycles)
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		result, err := RunReview(reviewCtx, cfg.Gate.ReviewCmdString(), dir)
 		reviewCancel()
 		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "sightjack.review"))
 			return false, fmt.Errorf("review gate cycle %d: %w", cycle, err)
 		}
 
