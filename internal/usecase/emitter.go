@@ -32,7 +32,7 @@ func (e *sessionEventEmitter) record(evt domain.Event) {
 }
 
 func (e *sessionEventEmitter) EmitStart(project, strictness string, now time.Time) error {
-	evt, err := e.agg.Start(project, strictness, now) // nosemgrep: adr0003-otel-span-without-defer-end — not OTel; SessionAggregate.Start()
+	evt, err := e.agg.Start(project, strictness, now) // nosemgrep: adr0003-otel-span-without-defer-end — not OTel; SessionAggregate.Start() [permanent]
 	if err != nil {
 		return err
 	}

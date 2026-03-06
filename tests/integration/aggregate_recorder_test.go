@@ -23,7 +23,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	now := time.Now()
 
 	// when: aggregate generates events and recorder persists them
-	startEvt, err := agg.Start("my-project", "balanced", now) // nosemgrep: adr0003-otel-span-without-defer-end -- not an OTel span; domain aggregate method
+	startEvt, err := agg.Start("my-project", "balanced", now) // nosemgrep: adr0003-otel-span-without-defer-end -- not an OTel span; domain aggregate method [permanent]
 	if err != nil {
 		t.Fatalf("aggregate start: %v", err)
 	}

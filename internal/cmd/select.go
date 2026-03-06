@@ -48,7 +48,7 @@ for downstream commands (apply, discuss).`,
 			// Open terminal for interactive input (stdin is consumed by pipe).
 			// cmd.InOrStdin() is already exhausted after io.ReadAll above,
 			// so we must open the controlling terminal directly.
-			tty, err := openTTY() // nosemgrep: devtty-hard-fail-needs-fallback
+			tty, err := openTTY() // nosemgrep: devtty-hard-fail-needs-fallback [permanent]
 			if err != nil {
 				return fmt.Errorf("cannot open terminal for interactive input (stdin consumed by pipe): %w", err)
 			}

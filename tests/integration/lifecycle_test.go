@@ -108,7 +108,7 @@ func testEmitter(baseDir, sessionID string) port.SessionEventEmitter {
 func testConfig() *domain.Config {
 	return &domain.Config{
 		Lang:       "en",
-		Assistant:     domain.AIAssistantConfig{Command: "claude", TimeoutSec: 30},
+		Assistant:  domain.AIAssistantConfig{Command: "claude", TimeoutSec: 30},
 		Scan:       domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
 		Tracker:    domain.IssueTrackerConfig{Team: "ENG", Project: "TestProject"},
 		Scribe:     domain.ScribeConfig{Enabled: false},
@@ -166,7 +166,7 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 
 	if outputPath != "" {
 		filename := filepath.Base(outputPath)
-		d.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- explicit Unlock after scoped block; defer would extend hold past return
+		d.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- explicit Unlock after scoped block; defer would extend hold past return [permanent]
 		for _, r := range d.responses {
 			matched, _ := filepath.Match(r.pattern, filename)
 			if matched {

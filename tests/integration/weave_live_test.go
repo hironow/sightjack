@@ -65,7 +65,7 @@ func TestWeave_LiveTraceDelivery(t *testing.T) {
 	)
 
 	tracer := tp.Tracer("sightjack")
-	_, span := tracer.Start(ctx, "live-weave-verification") // nosemgrep: adr0003-otel-span-without-defer-end — test span, immediately ended
+	_, span := tracer.Start(ctx, "live-weave-verification") // nosemgrep: adr0003-otel-span-without-defer-end — test span, immediately ended [permanent]
 	span.SetAttributes(
 		attribute.String("test.tool", "sightjack"),
 		attribute.String("test.type", "live-verification"),

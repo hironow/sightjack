@@ -43,7 +43,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "echo", TimeoutSec: 10},
-		Retry:  domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
+		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
 	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
@@ -129,12 +129,12 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 
 	cfg := &domain.Config{
 		Assistant: domain.AIAssistantConfig{Command: "false", TimeoutSec: 30},
-		Retry:  domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
+		Retry:     domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
 
 	// Create a parent span so retry events have a recording span to attach to.
 	tr := otel.Tracer("sightjack-test")
-	ctx, parentSpan := tr.Start(context.Background(), "test-parent") // nosemgrep: adr0003-otel-span-without-defer-end -- parentSpan.End() called explicitly after RunClaude
+	ctx, parentSpan := tr.Start(context.Background(), "test-parent") // nosemgrep: adr0003-otel-span-without-defer-end -- parentSpan.End() called explicitly after RunClaude [permanent]
 	_, _ = session.RunClaude(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
 	parentSpan.End()
 

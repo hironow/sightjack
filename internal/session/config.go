@@ -37,7 +37,7 @@ func LoadConfig(path string) (*domain.Config, error) {
 	if cfg.Assistant.TimeoutSec < 1 {
 		cfg.Assistant.TimeoutSec = 300
 	}
-	if !cfg.Strictness.Default.Valid() { // nosemgrep: lod-excessive-dot-chain
+	if !cfg.Strictness.Default.Valid() { // nosemgrep: lod-excessive-dot-chain [permanent]
 		cfg.Strictness.Default = domain.StrictnessFog
 	}
 	for label, level := range cfg.Strictness.Overrides {

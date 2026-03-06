@@ -302,7 +302,7 @@ func DisplayArchitectResponse(w io.Writer, resp *domain.ArchitectResponse) {
 			fmt.Fprintf(w, "    %d. [%s] %s: %s\n", i+1, a.Type, a.IssueID, a.Description)
 		}
 		fmt.Fprintf(w, "\n  Expected: %.0f%% -> %.0f%%\n",
-			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100) // nosemgrep: lod-excessive-dot-chain
+			resp.ModifiedWave.Delta.Before*100, resp.ModifiedWave.Delta.After*100) // nosemgrep: lod-excessive-dot-chain [permanent]
 	}
 }
 

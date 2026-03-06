@@ -30,7 +30,7 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 		})
 	}
 
-	if err := emitter.EmitStart(cfg.Tracker.Project, string(cfg.Strictness.Default), scanTime); err != nil { // nosemgrep: adr0003-otel-span-without-defer-end — SessionEventEmitter.EmitStart, not tracer.Start
+	if err := emitter.EmitStart(cfg.Tracker.Project, string(cfg.Strictness.Default), scanTime); err != nil { // nosemgrep: adr0003-otel-span-without-defer-end — SessionEventEmitter.EmitStart, not tracer.Start [permanent]
 		logger.Warn("emit start: %v", err)
 		return scanResultPath
 	}
