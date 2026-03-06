@@ -27,13 +27,15 @@ func SessionEventsDir(baseDir, sessionID string) string {
 // eventsource is the event persistence adapter (AWS Event Sourcing pattern).
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
 func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
-	return eventsource.NewFileEventStore(stateDir, logger)
+	raw := eventsource.NewFileEventStore(stateDir, logger)
+	return NewSpanEventStore(raw)
 }
 
 // NewSessionRecorder creates a recorder for the given session.
 func NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
-	store := eventsource.NewFileEventStore(stateDir, logger)
-	return eventsource.NewSessionRecorder(store, sessionID)
+	raw := eventsource.NewFileEventStore(stateDir, logger)
+	wrapped := NewSpanEventStore(raw)
+	return eventsource.NewSessionRecorder(wrapped, sessionID)
 }
 
 // EventStorePath returns the filesystem path for a session's event store.
