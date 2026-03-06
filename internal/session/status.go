@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 
 // Status collects current operational status from the event store and filesystem.
 // baseDir is the repository root (e.g. the directory containing .siren/).
-func Status(baseDir string) domain.StatusReport {
+func Status(ctx context.Context, baseDir string) domain.StatusReport {
 	var report domain.StatusReport
 
 	// Count inbox files
@@ -19,7 +20,7 @@ func Status(baseDir string) domain.StatusReport {
 	report.ArchiveCount = countDirFiles(domain.MailDir(baseDir, domain.ArchiveDir))
 
 	// Load all events across sessions for wave stats
-	allEvents, err := LoadAllEvents(baseDir)
+	allEvents, err := LoadAllEvents(ctx, baseDir)
 	if err != nil || len(allEvents) == 0 {
 		return report
 	}

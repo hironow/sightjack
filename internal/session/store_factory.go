@@ -1,10 +1,14 @@
 package session
 
 import (
+	"context"
 	"path/filepath"
+
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
@@ -38,26 +42,67 @@ func EventStorePath(baseDir, sessionID string) string {
 }
 
 // LoadLatestState loads the most recent session state from event data.
-func LoadLatestState(baseDir string) (*domain.SessionState, string, error) {
-	return eventsource.LoadLatestState(stateDir(baseDir))
+func LoadLatestState(ctx context.Context, baseDir string) (*domain.SessionState, string, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_latest_state")
+	defer span.End()
+	_ = ctx
+	state, id, err := eventsource.LoadLatestState(stateDir(baseDir))
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.load_latest_state"))
+	}
+	return state, id, err
 }
 
 // LoadLatestResumableState loads the latest session state that matches the predicate.
-func LoadLatestResumableState(baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
-	return eventsource.LoadLatestResumableState(stateDir(baseDir), match)
+func LoadLatestResumableState(ctx context.Context, baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_latest_resumable_state")
+	defer span.End()
+	_ = ctx
+	state, id, err := eventsource.LoadLatestResumableState(stateDir(baseDir), match)
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.load_latest_resumable_state"))
+	}
+	return state, id, err
 }
 
 // LoadAllEvents aggregates events from all session stores.
-func LoadAllEvents(baseDir string) ([]domain.Event, error) {
-	return eventsource.LoadAllEventsAcrossSessions(stateDir(baseDir))
+func LoadAllEvents(ctx context.Context, baseDir string) ([]domain.Event, error) {
+	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_all_events")
+	defer span.End()
+	_ = ctx
+	events, err := eventsource.LoadAllEventsAcrossSessions(stateDir(baseDir))
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all_events"))
+	}
+	return events, err
 }
 
 // ListExpiredEventFiles returns event files older than the retention threshold.
-func ListExpiredEventFiles(baseDir string, days int) ([]string, error) {
-	return eventsource.ListExpiredEventFiles(stateDir(baseDir), days)
+func ListExpiredEventFiles(ctx context.Context, baseDir string, days int) ([]string, error) {
+	_, span := platform.Tracer.Start(ctx, "eventsource.list_expired")
+	defer span.End()
+	files, err := eventsource.ListExpiredEventFiles(stateDir(baseDir), days)
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.list_expired"))
+	}
+	span.SetAttributes(attribute.Int("event.count.out", len(files)))
+	return files, err
 }
 
 // PruneEventFiles deletes the specified event files.
-func PruneEventFiles(baseDir string, files []string) ([]string, error) {
-	return eventsource.PruneEventFiles(stateDir(baseDir), files)
+func PruneEventFiles(ctx context.Context, baseDir string, files []string) ([]string, error) {
+	_, span := platform.Tracer.Start(ctx, "eventsource.prune")
+	defer span.End()
+	span.SetAttributes(attribute.Int("event.count.in", len(files)))
+	deleted, err := eventsource.PruneEventFiles(stateDir(baseDir), files)
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "eventsource.prune"))
+	}
+	span.SetAttributes(attribute.Int("event.count.out", len(deleted)))
+	return deleted, err
 }

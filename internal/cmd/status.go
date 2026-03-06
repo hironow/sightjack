@@ -34,7 +34,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 
-			report := session.Status(baseDir)
+			report := session.Status(cmd.Context(), baseDir)
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {

@@ -258,7 +258,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	}
 
 	// 8. Success rate (informational, never fails)
-	allEvents, evErr := LoadAllEvents(baseDir)
+	allEvents, evErr := LoadAllEvents(ctx, baseDir)
 	if evErr != nil || len(allEvents) == 0 {
 		results = append(results, domain.CheckResult{
 			Name:    "success-rate",

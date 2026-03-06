@@ -193,7 +193,7 @@ type RecorderFactory interface {
 
 // StateLoader loads session state from the filesystem.
 type StateLoader interface {
-	LoadLatestState(baseDir string) (*domain.SessionState, string, error)
-	LoadLatestResumableState(baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error)
+	LoadLatestState(ctx context.Context, baseDir string) (*domain.SessionState, string, error)
+	LoadLatestResumableState(ctx context.Context, baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error)
 	CanResume(baseDir string, state *domain.SessionState) bool
 }

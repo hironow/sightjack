@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,7 +42,7 @@ replays events from .siren/events/ and displays the matrix navigator.`,
 			if stdinIsPipe() {
 				return runShowFromStdin(w)
 			}
-			return showFromState(w, baseDir, logger)
+			return showFromState(cmd.Context(), w, baseDir, logger)
 		},
 	}
 }
@@ -57,8 +58,8 @@ func stdinIsPipe() bool {
 // showFromState loads the latest session state and renders the matrix navigator.
 // This is the READ MODEL path for the show command — inlined from the deleted
 // usecase.ShowFromState to avoid usecase→session dependency.
-func showFromState(w io.Writer, baseDir string, logger domain.Logger) error {
-	state, _, err := session.LoadLatestState(baseDir)
+func showFromState(ctx context.Context, w io.Writer, baseDir string, logger domain.Logger) error {
+	state, _, err := session.LoadLatestState(ctx, baseDir)
 	if err != nil {
 		logger.Info("Run 'sightjack scan' first.")
 		return fmt.Errorf("no previous scan found: %w", err)

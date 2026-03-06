@@ -81,12 +81,12 @@ type StateLoaderAdapter struct{}
 // NewStateLoaderAdapter creates a new StateLoaderAdapter.
 func NewStateLoaderAdapter() *StateLoaderAdapter { return &StateLoaderAdapter{} }
 
-func (l *StateLoaderAdapter) LoadLatestState(baseDir string) (*domain.SessionState, string, error) {
-	return LoadLatestState(baseDir)
+func (l *StateLoaderAdapter) LoadLatestState(ctx context.Context, baseDir string) (*domain.SessionState, string, error) {
+	return LoadLatestState(ctx, baseDir)
 }
 
-func (l *StateLoaderAdapter) LoadLatestResumableState(baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
-	return LoadLatestResumableState(baseDir, match)
+func (l *StateLoaderAdapter) LoadLatestResumableState(ctx context.Context, baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
+	return LoadLatestResumableState(ctx, baseDir, match)
 }
 
 func (l *StateLoaderAdapter) CanResume(baseDir string, state *domain.SessionState) bool {

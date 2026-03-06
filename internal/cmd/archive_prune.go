@@ -54,7 +54,7 @@ Pass --execute to actually remove the files.`,
 				return fmt.Errorf("failed to list archive: %w", err)
 			}
 
-			eventFiles, eventErr := session.ListExpiredEventFiles(baseDir, days)
+			eventFiles, eventErr := session.ListExpiredEventFiles(cmd.Context(), baseDir, days)
 			if eventErr != nil {
 				logger.Warn("Failed to list expired events: %v", eventErr)
 			}
@@ -82,7 +82,7 @@ Pass --execute to actually remove the files.`,
 						out.ArchiveDeleted = len(deleted)
 					}
 					if len(eventFiles) > 0 {
-						deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
+						deleted, delErr := session.PruneEventFiles(cmd.Context(), baseDir, eventFiles)
 						if delErr != nil {
 							return fmt.Errorf("event prune failed: %w", delErr)
 						}
@@ -157,7 +157,7 @@ Pass --execute to actually remove the files.`,
 			}
 
 			if len(eventFiles) > 0 {
-				deleted, delErr := session.PruneEventFiles(baseDir, eventFiles)
+				deleted, delErr := session.PruneEventFiles(cmd.Context(), baseDir, eventFiles)
 				if delErr != nil {
 					return fmt.Errorf("event prune failed: %w", delErr)
 				}

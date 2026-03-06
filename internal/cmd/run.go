@@ -86,11 +86,11 @@ if event data is found in .siren/events/.`,
 			// state for rescan/new choices.
 			if !dryRun {
 				// Find best resumable session (may differ from the latest)
-				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(baseDir, func(s *domain.SessionState) bool {
+				resumableState, resumableSessionID, _ := session.LoadLatestResumableState(cmd.Context(), baseDir, func(s *domain.SessionState) bool {
 					return session.CanResume(baseDir, s)
 				})
 				// Find latest state for display and rescan (regardless of resumability)
-				displayState, _, stateErr := session.LoadLatestState(baseDir)
+				displayState, _, stateErr := session.LoadLatestState(cmd.Context(), baseDir)
 				if stateErr == nil {
 					// If a resumable session exists, prefer it for the prompt display
 					promptState := displayState

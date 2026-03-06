@@ -96,7 +96,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				cluster.Completeness = applyResult.NewCompleteness
 				allWaves = append([]domain.Wave{completedWave}, applyResult.RemainingWaves...)
 			} else {
-				state, _, stateErr := session.LoadLatestState(baseDir)
+				state, _, stateErr := session.LoadLatestState(cmd.Context(), baseDir)
 				if stateErr != nil {
 					return fmt.Errorf("cannot resolve wave context: no CompletedWave in ApplyResult and no event data.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first")
 				}
