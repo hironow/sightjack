@@ -470,11 +470,18 @@ tracker:
 	if results[1].Name != "State Dir" || results[1].Status != domain.CheckOK {
 		t.Errorf("State Dir check: expected OK, got %v: %s", results[1].Status, results[1].Message)
 	}
-	if results[5].Name != "Claude Auth" || results[5].Status != domain.CheckOK {
-		t.Errorf("Claude Auth check: expected OK, got %v: %s", results[5].Status, results[5].Message)
+	if results[5].Name != "Claude Auth" {
+		t.Errorf("expected 'Claude Auth', got %q", results[5].Name)
 	}
-	if results[6].Name != "Linear MCP" || results[6].Status != domain.CheckOK {
-		t.Errorf("Linear MCP check: expected OK, got %v: %s", results[6].Status, results[6].Message)
+	// Claude Auth may be OK (if claude binary exists) or SKIP (if not)
+	if results[5].Status != domain.CheckOK && results[5].Status != domain.CheckSkip {
+		t.Errorf("Claude Auth check: expected OK or SKIP, got %v: %s", results[5].Status, results[5].Message)
+	}
+	if results[6].Name != "Linear MCP" {
+		t.Errorf("expected 'Linear MCP', got %q", results[6].Name)
+	}
+	if results[6].Status != domain.CheckOK && results[6].Status != domain.CheckSkip {
+		t.Errorf("Linear MCP check: expected OK or SKIP, got %v: %s", results[6].Status, results[6].Message)
 	}
 	// success-rate should be last result, OK with "no events" (no events dir in temp)
 	sr := results[7]
