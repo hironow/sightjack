@@ -245,6 +245,36 @@ func badAggCall(p struct{ Aggregate interface{ RecordScan() } }) {
 // ok: session-no-aggregate-method-call
 func goodEmitterCall(e port.SessionEventEmitter) {}
 
+// --- Rule: gate-config-raw-field-access ---
+
+func badGateRawField(cfg struct {
+	Gate struct{ ReviewCmd string; AutoApprove bool }
+}) {
+	// ruleid: gate-config-raw-field-access
+	_ = cfg.Gate.ReviewCmd
+	// ruleid: gate-config-raw-field-access
+	_ = cfg.Gate.AutoApprove
+}
+
+func goodGateIntentMethod(gate struct{ HasReviewCmd func() bool; IsAutoApprove func() bool }) {
+	// ok: gate-config-raw-field-access
+	gate.HasReviewCmd()
+	// ok: gate-config-raw-field-access
+	gate.IsAutoApprove()
+}
+
+// --- Rule: lod-excessive-dot-chain ---
+
+func badLodChain(a struct{ B struct{ C struct{ D func() } } }) {
+	// ruleid: lod-excessive-dot-chain
+	a.B.C.D()
+}
+
+func goodLodChain(a struct{ B func() }) {
+	// ok: lod-excessive-dot-chain
+	a.B()
+}
+
 // suppress unused import warnings for test fixture
 var (
 	_ = fmt.Sprintf
