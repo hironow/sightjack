@@ -111,6 +111,7 @@ root-guard:
         ls *.go | grep -v '^doc\.go$' >&2; \
         exit 1; \
     fi
+    @bash scripts/check-root-layout.sh
 
 # Lint (fmt check + vet + markdown lint)
 lint: vet semgrep root-guard nosemgrep-audit lint-md
