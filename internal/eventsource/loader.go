@@ -18,7 +18,7 @@ var loaderLogger domain.Logger = &domain.NopLogger{}
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
 func LoadState(store *FileEventStore) (*domain.SessionState, error) {
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)
 	}
@@ -98,7 +98,7 @@ func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, error) {
 	var all []domain.Event
 	for _, c := range candidates {
 		store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
-		events, loadErr := store.LoadAll()
+		events, _, loadErr := store.LoadAll()
 		if loadErr != nil {
 			continue
 		}

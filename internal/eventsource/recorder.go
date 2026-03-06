@@ -11,8 +11,8 @@ import (
 // dependency. Kept unexported to avoid importing port from eventsource
 // (prohibited by semgrep Rule 5). FileEventStore satisfies this via duck typing.
 type eventStore interface {
-	Append(events ...domain.Event) error
-	LoadAll() ([]domain.Event, error)
+	Append(events ...domain.Event) (domain.AppendResult, error)
+	LoadAll() ([]domain.Event, domain.LoadResult, error)
 }
 
 // SessionRecorder wraps a FileEventStore with automatic SessionID assignment.
@@ -27,7 +27,7 @@ type SessionRecorder struct {
 // NewSessionRecorder creates a SessionRecorder for the given session.
 func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, error) {
 	// Load existing events to resume CausationID chain.
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
 	}
@@ -54,7 +54,7 @@ func (r *SessionRecorder) Record(ev domain.Event) error {
 	if r.prevID != "" {
 		ev.CausationID = r.prevID
 	}
-	if err := r.store.Append(ev); err != nil {
+	if _, err := r.store.Append(ev); err != nil {
 		return err
 	}
 	r.prevID = ev.ID

@@ -49,7 +49,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	}
 
 	// then: events are stored with SessionID, CorrelationID, and CausationID chain
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 	if err != nil {
 		t.Fatalf("load events: %v", err)
 	}
