@@ -416,33 +416,7 @@ just jaeger-down
 
 ## Development
 
-```bash
-just --list         # Show all available tasks
-just check          # Pre-commit: fmt + vet + test
-just install        # Build and install to /usr/local/bin
-just semgrep        # Run layer enforcement rules
-just jaeger         # Start Jaeger trace viewer
-```
-
-See `justfile` for the full task list.
-
-## Project Layout
-
-```
-cmd/sightjack/          CLI entry point
-internal/
-  cmd/                  Cobra commands (scan, run, waves, select, discuss, apply, etc.)
-  usecase/              Business logic (PolicyEngine + handlers)
-  session/              I/O orchestration (Claude, Linear, D-Mail, gates)
-  eventsource/          Event persistence (JSONL append-only)
-  domain/               Pure domain types (projection, wave scheduling)
-  platform/             Platform adapters (OTel, templates, logger)
-docs/                   Documentation, ADRs, CLI reference
-tests/                  Scenario (L1-L4) and Docker E2E tests
-.semgrep/               Layer enforcement rules
-```
-
-For detailed structure, see [docs/conformance.md](docs/conformance.md).
+All code lives in `internal/` (Go convention). See [docs/conformance.md](docs/conformance.md) for layer architecture and directory responsibilities. Run `just --list` for available tasks.
 
 ## What / Why / How
 
