@@ -3,6 +3,7 @@ package platform
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 )
 
@@ -32,7 +33,7 @@ func (sr *StreamReader) Next() (*StreamMessage, error) {
 	if sr.readErr != nil {
 		err := sr.readErr
 		sr.readErr = nil
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil, io.EOF
 		}
 		return nil, err
@@ -45,26 +46,26 @@ func (sr *StreamReader) Next() (*StreamMessage, error) {
 				msg, parseErr := ParseStreamMessage(trimmed)
 				if parseErr != nil {
 					if sr.logger != nil {
-						sr.logger.Warn("stream-json parse skip: %v", parseErr)
+						sr.logger.Warn("stream-json parse skip", "error", parseErr)
 					}
 					if err != nil {
-						if err == io.EOF {
+						if errors.Is(err, io.EOF) {
 							return nil, io.EOF
 						}
 						return nil, err
 					}
 					continue
 				}
-				if err != nil && err != io.EOF {
+				if err != nil && !errors.Is(err, io.EOF) {
 					sr.readErr = err
-				} else if err == io.EOF {
+				} else if errors.Is(err, io.EOF) {
 					sr.readErr = io.EOF
 				}
 				return msg, nil
 			}
 		}
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil, io.EOF
 			}
 			return nil, err
@@ -79,7 +80,7 @@ func (sr *StreamReader) CollectAll() (*StreamMessage, []*StreamMessage, error) {
 	var result *StreamMessage
 	for {
 		msg, err := sr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

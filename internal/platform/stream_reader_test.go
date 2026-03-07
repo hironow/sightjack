@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -72,7 +73,7 @@ func TestStreamReader_reads_all_message_types(t *testing.T) {
 	types := []string{}
 	for {
 		msg, err := reader.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -105,7 +106,7 @@ func TestStreamReader_skips_invalid_json_lines(t *testing.T) {
 	}
 
 	_, err = reader.Next()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Errorf("expected EOF, got %v", err)
 	}
 }
@@ -194,7 +195,7 @@ func TestStreamReader_propagates_read_errors(t *testing.T) {
 	}
 
 	_, err = sr.Next()
-	if err == nil || err == io.EOF {
+	if err == nil || errors.Is(err, io.EOF) {
 		t.Fatalf("expected underlying error, got %v", err)
 	}
 }
