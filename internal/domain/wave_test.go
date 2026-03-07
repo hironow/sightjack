@@ -638,3 +638,87 @@ func TestCompletedWavesForCluster(t *testing.T) {
 		t.Errorf("ID = %q, want %q", result[0].ID, "w1")
 	}
 }
+
+func TestToApplyResult_CreateActionPartialFailure(t *testing.T) {
+	t.Parallel()
+
+	// given: wave with mixed action types including create
+	wave := domain.Wave{
+		ID: "w1", ClusterName: "auth",
+		Actions: []domain.WaveAction{
+			{Type: "add_dod", IssueID: "ENG-1", Description: "Add DoD"},
+			{Type: "create", IssueID: "ENG-1", Description: "Create sub-issue"},
+			{Type: "add_label", IssueID: "ENG-2", Description: "Add label"},
+		},
+		Delta: domain.WaveDelta{Before: 0.3, After: 0.9},
+	}
+	// 2 of 3 actions succeeded; create (index 1) failed
+	internal := &domain.WaveApplyResult{
+		Applied:    1,
+		TotalCount: 3,
+		Errors:     []string{"Linear API error: duplicate issue", "timeout"},
+	}
+
+	// when
+	result := domain.ToApplyResult(wave, internal)
+
+	// then: first action succeeded
+	if !result.AppliedActions[0].Success {
+		t.Error("expected add_dod action to succeed")
+	}
+	// create action failed with specific error
+	if result.AppliedActions[1].Success {
+		t.Error("expected create action to fail")
+	}
+	if result.AppliedActions[1].Error != "Linear API error: duplicate issue" {
+		t.Errorf("create error = %q, want duplicate issue error", result.AppliedActions[1].Error)
+	}
+	if result.AppliedActions[1].Type != "create" {
+		t.Errorf("action type = %q, want create", result.AppliedActions[1].Type)
+	}
+
+	// wave is NOT complete (partial failure)
+	if domain.IsWaveApplyComplete(internal) {
+		t.Error("expected wave to be incomplete on partial failure")
+	}
+}
+
+func TestSelectiveApproval_CreateActionExcluded(t *testing.T) {
+	t.Parallel()
+
+	// given: wave with create and other actions
+	wave := domain.Wave{
+		ID: "w1", ClusterName: "auth",
+		Actions: []domain.WaveAction{
+			{Type: "add_dod", IssueID: "ENG-1"},
+			{Type: "create", IssueID: "ENG-1"},
+			{Type: "add_label", IssueID: "ENG-2"},
+		},
+		Delta: domain.WaveDelta{Before: 0.3, After: 0.9},
+	}
+
+	// when: simulate selective approval — only approve non-create actions
+	approved := []domain.WaveAction{wave.Actions[0], wave.Actions[2]}
+	rejected := []domain.WaveAction{wave.Actions[1]}
+	wave.Actions = approved
+
+	// Recompute delta proportionally (same as phases.go logic)
+	totalActions := len(approved) + len(rejected)
+	fraction := float64(len(approved)) / float64(totalActions)
+	wave.Delta.After = wave.Delta.Before + (wave.Delta.After-wave.Delta.Before)*fraction
+
+	// then: wave contains only approved actions (no create)
+	if len(wave.Actions) != 2 {
+		t.Fatalf("actions len = %d, want 2", len(wave.Actions))
+	}
+	for _, a := range wave.Actions {
+		if a.Type == "create" {
+			t.Error("create action should not be in approved list")
+		}
+	}
+
+	// delta recomputed: 0.3 + (0.9-0.3) * (2/3) = 0.7
+	if wave.Delta.After < 0.699 || wave.Delta.After > 0.701 {
+		t.Errorf("delta.After = %f, want ~0.7", wave.Delta.After)
+	}
+}

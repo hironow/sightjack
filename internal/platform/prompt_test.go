@@ -823,6 +823,67 @@ func TestRenderWaveApplyPrompt_WithoutDoDSection(t *testing.T) {
 	}
 }
 
+func TestRenderWaveApplyPrompt_CreateActionDocumented(t *testing.T) {
+	// given: wave apply prompt — template must document the create action type
+	data := domain.WaveApplyPromptData{
+		WaveID:          "auth-w2",
+		ClusterName:     "Auth",
+		Title:           "Sub-issue creation",
+		Actions:         `[{"type":"create","issue_id":"ENG-100","description":"Create sub-issue for auth refactor","detail":"title: Auth token validation; parent: ENG-100"}]`,
+		OutputPath:      "/tmp/apply_auth-w2.json",
+		StrictnessLevel: "alert",
+	}
+
+	for _, lang := range []string{"en", "ja"} {
+		t.Run(lang, func(t *testing.T) {
+			// when
+			result, err := platform.RenderWaveApplyPrompt(lang, data)
+
+			// then
+			if err != nil {
+				t.Fatalf("render error: %v", err)
+			}
+			// Verify template Application Steps section documents the create action
+			if !strings.Contains(result, "`create`") {
+				t.Errorf("lang=%s: expected '`create`' action type in apply template steps", lang)
+			}
+			if lang == "en" && !strings.Contains(result, "sub-issue") {
+				t.Errorf("lang=%s: expected 'sub-issue' in create action description", lang)
+			}
+			if lang == "ja" && !strings.Contains(result, "サブIssue") {
+				t.Errorf("lang=%s: expected 'サブIssue' in create action description", lang)
+			}
+		})
+	}
+}
+
+func TestRenderWaveGeneratePrompt_CreateActionDocumented(t *testing.T) {
+	// given: wave generate prompt — template must document the create action type
+	data := domain.WaveGeneratePromptData{
+		ClusterName:     "Auth",
+		Completeness:    "45",
+		Issues:          `[{"id":"ENG-100","completeness":0.3}]`,
+		Observations:    "Missing sub-tasks",
+		OutputPath:      "/tmp/wave_auth.json",
+		StrictnessLevel: "alert",
+	}
+
+	for _, lang := range []string{"en", "ja"} {
+		t.Run(lang, func(t *testing.T) {
+			// when
+			result, err := platform.RenderWaveGeneratePrompt(lang, data)
+
+			// then
+			if err != nil {
+				t.Fatalf("render error: %v", err)
+			}
+			if !strings.Contains(result, "`create`") {
+				t.Errorf("lang=%s: expected 'create' action type in generate template", lang)
+			}
+		})
+	}
+}
+
 func TestRenderReadyLabelPrompt(t *testing.T) {
 	// given
 	data := domain.ReadyLabelPromptData{
