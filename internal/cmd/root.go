@@ -17,12 +17,12 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-// version, commit, date are set by -ldflags at build time (GoReleaser).
+// Version, Commit, Date are set by -ldflags at build time (GoReleaser).
 // Defaults to "dev" for local development (go run / go build without flags).
 var (
-	version = "dev"
-	commit  = "dev"
-	date    = "dev"
+	Version = "dev"
+	Commit  = "dev"
+	Date    = "dev"
 )
 
 type loggerKeyType struct{}
@@ -61,8 +61,8 @@ func NewRootCommand() *cobra.Command {
 			applyOtelEnv(filepath.Dir(cfgPath))
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
-			shutdownTracer = initTracer("sightjack", version)
-			shutdownMeter = initMeter("sightjack", version)
+			shutdownTracer = initTracer("sightjack", Version)
+			shutdownMeter = initMeter("sightjack", Version)
 			spanCtx := startRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 			return nil
@@ -89,7 +89,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false, "Generate prompts without executing Claude")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 
-	rootCmd.Version = version
+	rootCmd.Version = Version
 
 	rootCmd.AddCommand(
 		newInitCmd(),

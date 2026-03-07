@@ -44,18 +44,18 @@ installing.`,
 
 			// Guard: version may be "dev" for local builds (non-semver).
 			// LessOrEqual calls semver.MustParse internally, which panics on invalid input.
-			if _, err := semver.NewVersion(version); err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", version, latest.Version())
+			if _, err := semver.NewVersion(Version); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", Version, latest.Version())
 				return nil
 			}
 
-			if latest.LessOrEqual(version) {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", version)
+			if latest.LessOrEqual(Version) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", Version)
 				return nil
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", version, latest.Version())
+				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", Version, latest.Version())
 				return nil
 			}
 
