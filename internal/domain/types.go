@@ -213,6 +213,20 @@ const (
 	ResumeChoiceRescan
 )
 
+// ParseSessionMode converts a --session-mode flag value to a ResumeChoice.
+func ParseSessionMode(s string) (ResumeChoice, error) {
+	switch s {
+	case "resume":
+		return ResumeChoiceResume, nil
+	case "new":
+		return ResumeChoiceNew, nil
+	case "rescan":
+		return ResumeChoiceRescan, nil
+	default:
+		return 0, fmt.Errorf("invalid session mode %q: must be resume, new, or rescan", s)
+	}
+}
+
 // StrictnessLevel controls DoD analysis depth (SIREN difficulty system).
 type StrictnessLevel string
 

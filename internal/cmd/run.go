@@ -97,38 +97,53 @@ if event data is found in .siren/events/.`,
 					if resumableState != nil {
 						promptState = resumableState
 					}
-					scanner := bufio.NewScanner(cmd.InOrStdin())
-					for {
-						choice, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, baseDir, promptState)
-						if promptErr == domain.ErrQuit {
-							return nil
+
+					// Determine session choice: --session-mode flag or interactive prompt
+					var choice domain.ResumeChoice
+					sessionMode, _ := cmd.Flags().GetString("session-mode")
+					if sessionMode != "" {
+						parsed, parseErr := domain.ParseSessionMode(sessionMode)
+						if parseErr != nil {
+							return parseErr
 						}
-						if promptErr != nil {
-							logger.Warn("Invalid input: %v", promptErr)
-							continue
+						choice = parsed
+					} else {
+						scanner := bufio.NewScanner(cmd.InOrStdin())
+						for {
+							prompted, promptErr := session.PromptResume(cmd.Context(), cmd.OutOrStdout(), scanner, baseDir, promptState)
+							if promptErr == domain.ErrQuit {
+								return nil
+							}
+							if promptErr != nil {
+								logger.Warn("Invalid input: %v", promptErr)
+								continue
+							}
+							choice = prompted
+							break
 						}
-						switch choice {
-						case domain.ResumeChoiceResume:
-							if resumableState == nil {
-								logger.Warn("No resumable session found — starting fresh session instead.")
-								goto freshSession
-							}
-							resumeRecorder, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, resumableSessionID), resumableSessionID, logger)
-							if recErr != nil {
-								return fmt.Errorf("resume recorder: %w", recErr)
-							}
-							resumeSID, _ := domain.NewSessionID(resumableSessionID)
-							return usecase.ResumeSession(cmd.Context(), domain.NewResumeSessionCommand(rp, resumeSID), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
-						case domain.ResumeChoiceRescan:
-							rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
-							rescanRecorder, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, rescanID), rescanID, logger)
-							if recErr != nil {
-								return fmt.Errorf("rescan recorder: %w", recErr)
-							}
-							return usecase.RescanSession(cmd.Context(), domain.NewRunSessionCommand(rp, dryRun), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
-						case domain.ResumeChoiceNew:
+					}
+
+					switch choice {
+					case domain.ResumeChoiceResume:
+						if resumableState == nil {
+							logger.Warn("No resumable session found — starting fresh session instead.")
 							goto freshSession
 						}
+						resumeRecorder, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, resumableSessionID), resumableSessionID, logger)
+						if recErr != nil {
+							return fmt.Errorf("resume recorder: %w", recErr)
+						}
+						resumeSID, _ := domain.NewSessionID(resumableSessionID)
+						return usecase.ResumeSession(cmd.Context(), domain.NewResumeSessionCommand(rp, resumeSID), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
+					case domain.ResumeChoiceRescan:
+						rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
+						rescanRecorder, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, rescanID), rescanID, logger)
+						if recErr != nil {
+							return fmt.Errorf("rescan recorder: %w", recErr)
+						}
+						return usecase.RescanSession(cmd.Context(), domain.NewRunSessionCommand(rp, dryRun), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
+					case domain.ResumeChoiceNew:
+						goto freshSession
 					}
 				}
 			}
@@ -153,6 +168,7 @@ if event data is found in .siren/events/.`,
 	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
 	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for convergence D-Mail")
 	cmd.Flags().String("review-cmd", "", "Review command (exit 0 = pass, non-zero = comments found)")
+	cmd.Flags().String("session-mode", "", "Session mode: resume, new, or rescan (skip interactive prompt)")
 
 	return cmd
 }
