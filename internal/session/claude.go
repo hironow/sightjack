@@ -1,7 +1,6 @@
 package session
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -84,6 +83,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	if len(o.allowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(o.allowedTools, ","))
 	}
+	args = append(args, "--output-format", "stream-json")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, cfg.Assistant.Command, args...)
 	cmd.Cancel = cancelFunc(cmd)
@@ -93,38 +93,70 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	if err != nil {
 		return "", fmt.Errorf("stdout pipe: %w", err)
 	}
-	cmd.Stderr = cmd.Stdout
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrBuf
 
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("claude start: %w", err)
 	}
 
 	var output strings.Builder
+	var responseModel, responseID string
+	streamErr := make(chan error, 1)
 	done := make(chan struct{})
 
 	go func() {
 		defer close(done)
-		reader := bufio.NewReader(stdout)
-		buf := make([]byte, 4096)
+		sr := platform.NewStreamReader(stdout)
+		if logger != nil {
+			sr.SetLogger(logger)
+		}
 		for {
-			n, readErr := reader.Read(buf)
-			if n > 0 {
-				chunk := buf[:n]
-				_, _ = w.Write(chunk)
-				output.Write(chunk)
+			msg, readErr := sr.Next()
+			if readErr == io.EOF {
+				return
 			}
 			if readErr != nil {
-				if readErr != io.EOF {
+				streamErr <- readErr
+				return
+			}
+			switch msg.Type {
+			case "assistant":
+				text, _ := msg.ExtractText()
+				if text != "" {
+					_, _ = w.Write([]byte(text))
+					output.WriteString(text)
+				}
+				tools, _ := msg.ExtractToolUse()
+				for _, t := range tools {
 					if logger != nil {
-						logger.Warn("stdout read: %v", readErr)
+						logger.Info("  tool: %s", t.Name)
 					}
 				}
-				break
+				if am, _ := msg.ParseAssistantMessage(); am != nil {
+					if am.Model != "" {
+						responseModel = am.Model
+					}
+					if am.ID != "" {
+						responseID = am.ID
+					}
+				}
+			case "result":
+				output.Reset()
+				output.WriteString(msg.Result)
+				span.SetAttributes(platform.GenAIResultAttrs(msg, responseModel, responseID)...)
 			}
 		}
 	}()
 
 	<-done
+
+	var readError error
+	select {
+	case sErr := <-streamErr:
+		readError = sErr
+	default:
+	}
 
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -133,6 +165,10 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 			)
 		}
 		return output.String(), fmt.Errorf("claude exit: %w", err)
+	}
+
+	if readError != nil {
+		return output.String(), fmt.Errorf("stream read: %w", readError)
 	}
 
 	return output.String(), nil
