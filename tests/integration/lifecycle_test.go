@@ -179,7 +179,13 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 		d.mu.Unlock()
 	}
 
-	return exec.CommandContext(ctx, "echo", "ok")
+	// Output valid stream-json NDJSON so RunClaudeOnce's StreamReader can parse it.
+	// The assistant message provides streaming text for the `w` writer,
+	// and the result message provides the final output string.
+	// Use a unique marker unlikely to appear in scan result JSON.
+	ndjson := `{"type":"assistant","session_id":"mock","message":{"content":[{"type":"text","text":"[mock-stream-xyzzy]"}]}}` + "\n" +
+		`{"type":"result","subtype":"success","session_id":"mock","result":"[mock-stream-xyzzy]","usage":{"input_tokens":10,"output_tokens":5}}`
+	return exec.CommandContext(ctx, "printf", "%s", ndjson)
 }
 
 // extractPromptFromArgs finds the value of the -p flag in Claude CLI args.
