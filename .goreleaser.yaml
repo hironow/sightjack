@@ -70,17 +70,10 @@ changelog:
       - "^ci:"
       - "^chore:"
 
-brews:
+homebrew_casks:
   - repository:
       owner: hironow
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
     homepage: "https://github.com/hironow/sightjack"
     description: "SIREN-inspired issue architecture tool for Linear"
-    license: "Apache-2.0"
-    install: |
-      bin.install "sightjack"
-      generate_completions_from_executable(bin/"sightjack", "completion")
-    test: |
-      system "#{bin}/sightjack", "version"
