@@ -57,7 +57,7 @@ func TestVersionCmd_JSONOutput(t *testing.T) {
 		t.Fatalf("invalid JSON output: %v\nraw: %s", jsonErr, stdout.String())
 	}
 
-	for _, key := range []string{"version", "commit", "date", "go"} {
+	for _, key := range []string{"version", "commit", "date", "go", "os", "arch"} {
 		if _, ok := info[key]; !ok {
 			t.Errorf("expected key %q in JSON output", key)
 		}

@@ -9,36 +9,31 @@ import (
 )
 
 func newVersionCmd() *cobra.Command {
-	var jsonOutput bool
-
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version, commit, and build information",
-		Long: `Print version, commit hash, build date, and Go version.
+		Long: `Print version, commit hash, build date, Go version, and OS/arch.
 
 By default outputs a human-readable single line. Use --json
 for structured output suitable for scripts and CI.`,
-		Example: `  # Print version info
-  sightjack version
-
-  # JSON output for scripts
-  sightjack version --json`,
 		Args: cobra.NoArgs,
+		Example: `  sightjack version
+  sightjack version -j`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			info := map[string]string{
 				"version": Version,
 				"commit":  Commit,
 				"date":    Date,
 				"go":      runtime.Version(),
+				"os":      runtime.GOOS,
+				"arch":    runtime.GOARCH,
 			}
 
-			if jsonOutput {
-				data, err := json.MarshalIndent(info, "", "  ")
-				if err != nil {
-					return fmt.Errorf("JSON marshal failed: %w", err)
-				}
-				fmt.Fprintln(cmd.OutOrStdout(), string(data))
-				return nil
+			jsonFlag, _ := cmd.Flags().GetBool("json")
+			if jsonFlag {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(info)
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "sightjack v%s (commit: %s, date: %s, go: %s)\n",
@@ -47,7 +42,7 @@ for structured output suitable for scripts and CI.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output version info as JSON")
+	cmd.Flags().BoolP("json", "j", false, "Output version info as JSON")
 
 	return cmd
 }
