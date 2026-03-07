@@ -19,10 +19,19 @@ func TestE2E_Gate_AutoApproveWithConvergence(t *testing.T) {
 	convergenceContent := fixtureBytes(t, "convergence_signal.md")
 	writeDMailToDir(t, dir, "inbox", "convergence-arch-review.md", convergenceContent)
 
-	// when: run with --auto-approve (gate auto-approves, session continues)
-	runFullSession(t, dir, withFlags("--auto-approve"))
+	// when: run with --auto-approve (fully non-interactive: gate, wave select, approval all auto)
+	cmd := exec.Command(sightjackBin(), "run", "--auto-approve", dir)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 
-	// then: convergence d-mail consumed and archived
+	// then: should succeed
+	if err != nil {
+		t.Fatalf("run --auto-approve failed: %v\nstderr: %s\nstdout: %s", err, stderr.String(), stdout.String())
+	}
+
+	// and: convergence d-mail consumed and archived
 	inboxPath := filepath.Join(dir, ".siren", "inbox", "convergence-arch-review.md")
 	archivePath := filepath.Join(dir, ".siren", "archive", "convergence-arch-review.md")
 	assertFileNotExists(t, inboxPath)
@@ -100,8 +109,17 @@ func TestE2E_Gate_NotifyCmdInvoked(t *testing.T) {
 	notifyFile := filepath.Join(dir, "notify_output.txt")
 	notifyCmd := "echo {title} {message} > '" + notifyFile + "'"
 
-	// when: run with --auto-approve + --notify-cmd
-	runFullSession(t, dir, withFlags("--auto-approve", "--notify-cmd", notifyCmd))
+	// when: run with --auto-approve + --notify-cmd (fully non-interactive)
+	cmd := exec.Command(sightjackBin(), "run", "--auto-approve", "--notify-cmd", notifyCmd, dir)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	// then: should succeed
+	if err != nil {
+		t.Fatalf("run --auto-approve --notify-cmd failed: %v\nstderr: %s\nstdout: %s", err, stderr.String(), stdout.String())
+	}
 
 	// then: notification file was created (poll for fire-and-forget goroutine)
 	deadline := time.Now().Add(5 * time.Second)
@@ -114,9 +132,9 @@ func TestE2E_Gate_NotifyCmdInvoked(t *testing.T) {
 	assertFileExists(t, notifyFile)
 
 	// and: notification content includes gate title and convergence name
-	data, err := os.ReadFile(notifyFile)
-	if err != nil {
-		t.Fatalf("read notify output: %v", err)
+	data, readErr := os.ReadFile(notifyFile)
+	if readErr != nil {
+		t.Fatalf("read notify output: %v", readErr)
 	}
 	content := string(data)
 	if !strings.Contains(content, "Sightjack Convergence") {
