@@ -1,6 +1,6 @@
 # Sightjack
 
-**An interactive session that sends AI agents to sightjack your Linear issues — seeing their blind spots, ordering their dependencies, and architecting them until every issue is ready for autonomous execution.**
+**An interactive planning tool that scans Linear issues, detects gaps in DoD and dependencies, and applies approved wave-by-wave architecture updates back to Linear.**
 
 Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to bring issue completeness from ~30% to ~85%.
 
