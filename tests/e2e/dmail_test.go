@@ -61,8 +61,8 @@ func TestE2E_DMail_ArchivePrunePreservesRecent(t *testing.T) {
 	for _, name := range recentFiles {
 		assertFileExists(t, filepath.Join(archiveDir, name))
 	}
-	if !strings.Contains(stderr.String(), "No expired files") {
-		t.Errorf("expected 'No expired files' message, got stderr: %s", stderr.String())
+	if !strings.Contains(stderr.String(), "No expired") {
+		t.Errorf("expected 'No expired' message, got stderr: %s", stderr.String())
 	}
 }
 
@@ -87,8 +87,8 @@ func TestE2E_DMail_ArchivePruneIgnoresNonMd(t *testing.T) {
 	mdPath := writeDMailToDir(t, dir, "archive", "report-old.md", mdContent)
 	os.Chtimes(mdPath, oldTime, oldTime)
 
-	// when: archive-prune with --execute
-	cmd := exec.Command(sightjackBin(), "archive-prune", "-d", "30", "-x", dir)
+	// when: archive-prune with --execute --yes (skip confirmation in CI)
+	cmd := exec.Command(sightjackBin(), "archive-prune", "-d", "30", "-x", "-y", dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -103,9 +103,9 @@ func TestE2E_DMail_ArchivePruneIgnoresNonMd(t *testing.T) {
 	// Non-.md files should remain
 	assertFileExists(t, filepath.Join(archiveDir, "state.json"))
 	assertFileExists(t, filepath.Join(archiveDir, "notes.txt"))
-	// stderr should mention only 1 file
-	if !strings.Contains(stderr.String(), "1 file(s)") {
-		t.Errorf("expected '1 file(s)' in stderr, got: %s", stderr.String())
+	// stderr should mention only 1 d-mail file
+	if !strings.Contains(stderr.String(), "1 d-mail file(s)") {
+		t.Errorf("expected '1 d-mail file(s)' in stderr, got: %s", stderr.String())
 	}
 }
 
@@ -131,8 +131,8 @@ func TestE2E_DMail_ArchivePruneRealDMails(t *testing.T) {
 	feedbackRecent := marshalDMail("feedback-recent", "feedback", "Recent feedback", "high", "Recent body.", []string{"AUTH-1"})
 	writeDMailToDir(t, dir, "archive", "feedback-recent.md", feedbackRecent)
 
-	// when: archive-prune with --execute, 30 day threshold
-	cmd := exec.Command(sightjackBin(), "archive-prune", "-d", "30", "-x", dir)
+	// when: archive-prune with --execute --yes, 30 day threshold
+	cmd := exec.Command(sightjackBin(), "archive-prune", "-d", "30", "-x", "-y", dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -145,11 +145,11 @@ func TestE2E_DMail_ArchivePruneRealDMails(t *testing.T) {
 	assertFileNotExists(t, specPath)
 	assertFileNotExists(t, reportPath)
 	assertFileExists(t, filepath.Join(archiveDir, "feedback-recent.md"))
-	if !strings.Contains(stderr.String(), "2 file(s) older than 30 days") {
-		t.Errorf("expected '2 file(s) older than 30 days', got stderr: %s", stderr.String())
+	if !strings.Contains(stderr.String(), "2 d-mail file(s) older than 30 days") {
+		t.Errorf("expected '2 d-mail file(s) older than 30 days', got stderr: %s", stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "Pruned 2 file(s)") {
-		t.Errorf("expected 'Pruned 2 file(s)', got stderr: %s", stderr.String())
+	if !strings.Contains(stderr.String(), "Pruned 2 d-mail file(s)") {
+		t.Errorf("expected 'Pruned 2 d-mail file(s)', got stderr: %s", stderr.String())
 	}
 }
 
