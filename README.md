@@ -275,6 +275,9 @@ sightjack run -c .siren/config.yaml
 # Auto-approve convergence gate (CI mode)
 sightjack run --auto-approve
 
+# Skip session prompt (rescan without interaction)
+sightjack run --session-mode rescan --auto-approve
+
 # Custom notification command
 sightjack run --notify-cmd 'echo {title}: {message}'
 
@@ -339,6 +342,7 @@ cat wave.json | sightjack apply | sightjack nextgen
 | `run` | `--approve-cmd` | | `""` | Approval command ({message} placeholder, exit 0 = approve) |
 | `run` | `--auto-approve` | | `false` | Skip approval gate for convergence D-Mail |
 | `run` | `--review-cmd` | | `""` | Review command (exit 0 = pass, non-zero = comments found) |
+| `run` | `--session-mode` | | `""` | Session mode: `resume`, `new`, or `rescan` (skip interactive prompt) |
 | `scan` | `--json` | `-j` | `false` | Output structured JSON |
 | `version` | `--json` | `-j` | `false` | Output version info as JSON |
 | `update` | `--check` | `-C` | `false` | Check for updates without installing |

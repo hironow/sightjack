@@ -17,8 +17,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-// Version, Commit, Date are set by -ldflags at build time (GoReleaser).
-// Defaults to "dev" for local development (go run / go build without flags).
+// Version, Commit, and Date are set at build time via -ldflags.
 var (
 	Version = "dev"
 	Commit  = "dev"

@@ -36,11 +36,12 @@ sightjack run [path] [flags]
 ### Options
 
 ```
-      --approve-cmd string   Approval command ({message} placeholder, exit 0 = approve)
-      --auto-approve         Skip approval gate for convergence D-Mail
-  -h, --help                 help for run
-      --notify-cmd string    Notification command ({title}, {message} placeholders)
-      --review-cmd string    Review command (exit 0 = pass, non-zero = comments found)
+      --approve-cmd string    Approval command ({message} placeholder, exit 0 = approve)
+      --auto-approve          Skip approval gate for convergence D-Mail
+  -h, --help                  help for run
+      --notify-cmd string     Notification command ({title}, {message} placeholders)
+      --review-cmd string     Review command (exit 0 = pass, non-zero = comments found)
+      --session-mode string   Session mode: resume, new, or rescan (skip interactive prompt)
 ```
 
 ### Options inherited from parent commands

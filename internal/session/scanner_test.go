@@ -2,6 +2,7 @@ package session_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -640,21 +641,35 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 		}
 
 		if callCount == 1 {
-			// Classify: stream chunks with delays, then write classify.json.
+			// Classify: stream assistant chunks with delays, then write classify.json.
 			classifyJSON := filepath.Join(scanDir, "classify.json")
-			script := fmt.Sprintf(
-				`printf "chunk1\n" && sleep 0.05 && printf "chunk2\n" && sleep 0.05 && printf '%s' > '%s' && printf "chunk3\n"`,
-				classifyResult, classifyJSON,
-			)
+			a1 := `{"type":"assistant","session_id":"fake","message":{"id":"m1","role":"assistant","content":[{"type":"text","text":"chunk1"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
+			a2 := `{"type":"assistant","session_id":"fake","message":{"id":"m2","role":"assistant","content":[{"type":"text","text":"chunk2"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
+			a3 := `{"type":"assistant","session_id":"fake","message":{"id":"m3","role":"assistant","content":[{"type":"text","text":"chunk3"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
+			crJSON, _ := json.Marshal(classifyResult)
+			rLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(crJSON))
+			sf := filepath.Join(t.TempDir(), "classify.sh")
+			body := fmt.Sprintf("#!/bin/sh\necho '%s'\nsleep 0.05\necho '%s'\nsleep 0.05\ncat > '%s' <<'EOF'\n%s\nEOF\necho '%s'\necho '%s'\n",
+				a1, a2, classifyJSON, classifyResult, a3, rLine)
+			if err := os.WriteFile(sf, []byte(body), 0755); err != nil {
+				t.Fatalf("write script: %v", err)
+			}
 			_ = prompt
-			return exec.CommandContext(ctx, "sh", "-c", script)
+			return exec.CommandContext(ctx, "sh", sf)
 		}
 		// Deep scan / wave: write result to the output path found in prompt.
 		if outPath := findJSONPath(prompt); outPath != "" {
-			script := fmt.Sprintf(`printf '%s' > '%s' && echo "done"`, deepScanResult, outPath)
-			return exec.CommandContext(ctx, "sh", "-c", script)
+			drJSON, _ := json.Marshal(deepScanResult)
+			drLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(drJSON))
+			sf := filepath.Join(t.TempDir(), fmt.Sprintf("deepscan_%d.sh", callCount))
+			body := fmt.Sprintf("#!/bin/sh\ncat > '%s' <<'EOF'\n%s\nEOF\necho '%s'\n", outPath, deepScanResult, drLine)
+			if err := os.WriteFile(sf, []byte(body), 0755); err != nil {
+				t.Fatalf("write deepscan script: %v", err)
+			}
+			return exec.CommandContext(ctx, "sh", sf)
 		}
-		return exec.CommandContext(ctx, "echo", "ok")
+		okLine := `{"type":"result","subtype":"success","session_id":"fake","result":"ok","is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
+		return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`echo '%s'`, okLine))
 	})
 	defer cleanup()
 
@@ -749,19 +764,35 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 			return ""
 		}
 		if callCount == 1 {
-			// Classify: emit two chunks separated by sleep to force separate Read calls on the pipe.
+			// Classify: emit two stream-json assistant chunks separated by sleep
+			// to force separate Read calls on the pipe (incremental streaming).
+			// Write NDJSON lines to a temp script file to avoid shell quoting issues.
 			classifyJSON := filepath.Join(scanDir, "classify.json")
-			script := fmt.Sprintf(
-				`printf "MARKER_A\n" && sleep 0.1 && printf "MARKER_B\n" && printf '%s' > '%s'`,
-				classifyResult, classifyJSON,
-			)
+			scriptFile := filepath.Join(t.TempDir(), "classify.sh")
+			assistantA := `{"type":"assistant","session_id":"fake","message":{"id":"m1","role":"assistant","content":[{"type":"text","text":"MARKER_A"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
+			assistantB := `{"type":"assistant","session_id":"fake","message":{"id":"m2","role":"assistant","content":[{"type":"text","text":"MARKER_B"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
+			resultJSON, _ := json.Marshal(classifyResult)
+			resultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(resultJSON))
+			scriptBody := fmt.Sprintf("#!/bin/sh\necho '%s'\nsleep 0.1\necho '%s'\necho '%s'\ncat > '%s' <<'CLASSIFY_EOF'\n%s\nCLASSIFY_EOF\n",
+				assistantA, assistantB, resultLine, classifyJSON, classifyResult)
+			if err := os.WriteFile(scriptFile, []byte(scriptBody), 0755); err != nil {
+				t.Fatalf("write script: %v", err)
+			}
 			_ = prompt
-			return exec.CommandContext(ctx, "sh", "-c", script)
+			return exec.CommandContext(ctx, "sh", scriptFile)
 		}
 		if outPath := findJSONPath(prompt); outPath != "" {
-			return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, deepScanResult, outPath))
+			deepResultJSON, _ := json.Marshal(deepScanResult)
+			deepResultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(deepResultJSON))
+			dsScript := fmt.Sprintf("#!/bin/sh\ncat > '%s' <<'DEEPSCAN_EOF'\n%s\nDEEPSCAN_EOF\necho '%s'\n", outPath, deepScanResult, deepResultLine)
+			dsFile := filepath.Join(t.TempDir(), fmt.Sprintf("deepscan_%d.sh", callCount))
+			if err := os.WriteFile(dsFile, []byte(dsScript), 0755); err != nil {
+				t.Fatalf("write deepscan script: %v", err)
+			}
+			return exec.CommandContext(ctx, "sh", dsFile)
 		}
-		return exec.CommandContext(ctx, "echo", "ok")
+		okResult := `{"type":"result","subtype":"success","session_id":"fake","result":"ok","is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
+		return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`echo '%s'`, okResult))
 	})
 	defer cleanup()
 

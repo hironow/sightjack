@@ -32,7 +32,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	session.RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
-	expected := []string{"--model", "opus", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
+	expected := []string{"--model", "opus", "--output-format", "stream-json", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
 	if len(capturedArgs) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
 	}
@@ -61,7 +61,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	session.RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
-	expected := []string{"--dangerously-skip-permissions", "--print", "-p", "test prompt"}
+	expected := []string{"--output-format", "stream-json", "--dangerously-skip-permissions", "--print", "-p", "test prompt"}
 	if len(capturedArgs) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
 	}
@@ -156,7 +156,9 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 		if callCount < 3 {
 			return exec.CommandContext(ctx, "false") // exits non-zero
 		}
-		return exec.CommandContext(ctx, "echo", "success")
+		// Emit stream-json result with "success" so StreamReader can parse it.
+		resultLine := `{"type":"result","subtype":"success","session_id":"fake","result":"success","is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
+		return exec.CommandContext(ctx, "sh", "-c", "echo '"+resultLine+"'")
 	})
 	defer cleanup()
 
