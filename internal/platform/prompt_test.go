@@ -853,6 +853,10 @@ func TestRenderWaveApplyPrompt_CreateActionDocumented(t *testing.T) {
 			if lang == "ja" && !strings.Contains(result, "サブIssue") {
 				t.Errorf("lang=%s: expected 'サブIssue' in create action description", lang)
 			}
+			// Verify MCP tool name matches implementation allowlist
+			if !strings.Contains(result, "mcp__linear__create_issue") {
+				t.Errorf("lang=%s: expected 'mcp__linear__create_issue' in create action step", lang)
+			}
 		})
 	}
 }
