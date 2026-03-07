@@ -1,4 +1,4 @@
-# 0009. Event Validation and Concurrency Control
+# 0004. Event Validation and Concurrency Control
 
 **Date:** 2026-02-24
 **Status:** Accepted

@@ -1,4 +1,4 @@
-# 0007. fake-Claude E2E Testing
+# 0002. fake-Claude E2E Testing
 
 **Date:** 2026-02-23
 **Status:** Accepted

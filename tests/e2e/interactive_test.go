@@ -47,12 +47,20 @@ func TestE2E_Run_DryRun(t *testing.T) {
 	if readErr != nil {
 		t.Fatalf("failed to read run dir %s: %v", runDir, readErr)
 	}
-	if len(sessions) == 0 {
+
+	// Find the first directory entry (skip files like outbox.db)
+	var sessionDir string
+	for _, s := range sessions {
+		if s.IsDir() {
+			sessionDir = filepath.Join(runDir, s.Name())
+			break
+		}
+	}
+	if sessionDir == "" {
 		t.Fatal("expected session directory in .siren/.run/, got none")
 	}
 
 	// Check for classify prompt inside the session directory
-	sessionDir := filepath.Join(runDir, sessions[0].Name())
 	entries, dirErr := os.ReadDir(sessionDir)
 	if dirErr != nil {
 		t.Fatalf("read session dir %s: %v", sessionDir, dirErr)

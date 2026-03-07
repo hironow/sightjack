@@ -21,9 +21,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/hironow/sightjack/internal/cmd.version={{.Version}}
-      - -X github.com/hironow/sightjack/internal/cmd.commit={{.ShortCommit}}
-      - -X github.com/hironow/sightjack/internal/cmd.date={{.Date}}
+      - -X github.com/hironow/sightjack/internal/cmd.Version={{.Version}}
+      - -X github.com/hironow/sightjack/internal/cmd.Commit={{.ShortCommit}}
+      - -X github.com/hironow/sightjack/internal/cmd.Date={{.Date}}
 
 archives:
   - formats:

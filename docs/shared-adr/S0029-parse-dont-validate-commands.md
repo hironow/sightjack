@@ -1,4 +1,4 @@
-# 0014. Parse-Don't-Validate Commands
+# S0029. Parse-Don't-Validate Commands
 
 **Date:** 2026-03-06
 **Status:** Accepted

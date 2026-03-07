@@ -1,4 +1,4 @@
-# 0010. Root Package File Consolidation
+# 0005. Root Package File Consolidation
 
 **Date:** 2026-02-24
 **Status:** Accepted

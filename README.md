@@ -1,8 +1,8 @@
 # Sightjack
 
-**An interactive session that sends AI agents to sightjack your Linear issues — seeing their blind spots, ordering their dependencies, and architecting them until every issue is ready for autonomous execution.**
+**An interactive planning tool that scans Linear issues, detects gaps in DoD and dependencies, and applies approved wave-by-wave architecture updates back to Linear.**
 
-Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to bring issue completeness from ~30% to ~85%.
+Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to incrementally improve issue completeness.
 
 ```bash
 sightjack run
@@ -104,7 +104,7 @@ When a `convergence` D-Mail is detected at session startup, the **convergence ga
 2. **Approve** — blocking prompt (stdin y/N, external command, or auto-approve)
 3. **Re-drain** — checks for late-arriving convergence and loops if found
 
-The gate runs before the interactive wave loop in all session modes (`run`, `resume`, `rescan`). Gate behavior is configurable via `gate:` config section or `--notify-cmd` / `--approve-cmd` / `--auto-approve` CLI flags.
+The gate runs before the interactive wave loop in the `run` command (which supports resuming or rescanning from previous sessions). Gate behavior is configurable via `gate:` config section or `--notify-cmd` / `--approve-cmd` / `--auto-approve` CLI flags.
 
 SKILL.md files in `.siren/skills/` declare produces/consumes routing for phonewave discovery using Agent Skills spec format with `dmail-schema-version: "1"`.
 
@@ -175,6 +175,21 @@ Linear (via MCP Server)
 | Architect | Design discussion during wave approval | Character dialogue |
 | Scribe | ADR generation from design decisions | Archive collection |
 | (Handoff) | Ready-issue labeling for downstream tools | Next expedition |
+
+## Scope
+
+**What Sightjack does:**
+- Scan Linear issues and detect missing DoD, hidden dependencies, and technical debt revival
+- Generate wave-by-wave execution plans with prerequisite chains
+- Guide interactive approval and apply approved changes to Linear via MCP
+- Generate ADRs from design discussions (Scribe agent)
+- Send specification/report D-Mails to downstream tools
+
+**What Sightjack does NOT do:**
+- Implement code changes (paintress handles implementation)
+- Verify post-merge integrity (amadeus handles verification)
+- Deliver D-Mails (phonewave handles routing)
+- Modify source code or git repositories directly
 
 ## Setup
 
@@ -323,6 +338,7 @@ cat wave.json | sightjack apply | sightjack nextgen
 | `run` | `--notify-cmd` | | `""` | Notification command ({title}, {message} placeholders) |
 | `run` | `--approve-cmd` | | `""` | Approval command ({message} placeholder, exit 0 = approve) |
 | `run` | `--auto-approve` | | `false` | Skip approval gate for convergence D-Mail |
+| `run` | `--review-cmd` | | `""` | Review command (exit 0 = pass, non-zero = comments found) |
 | `scan` | `--json` | `-j` | `false` | Output structured JSON |
 | `version` | `--json` | `-j` | `false` | Output version info as JSON |
 | `update` | `--check` | `-C` | `false` | Check for updates without installing |
@@ -400,111 +416,7 @@ just jaeger-down
 
 ## Development
 
-```bash
-# Task runner (just)
-just build          # Build binary with version info (ldflags)
-just install        # Build and install to /usr/local/bin
-just test           # Run all tests
-just test-v         # Verbose test output
-just test-race      # Tests with race detector
-just cover          # Coverage report
-just cover-html     # Open coverage in browser
-just fmt            # Format code (gofmt)
-just vet            # Run go vet
-just semgrep        # Run semgrep rules (ERROR severity only)
-just lint           # fmt check + vet + markdown lint
-just lint-md        # Lint markdown files only
-just check          # fmt + vet + test (pre-commit check)
-just docgen         # Generate CLI Markdown docs (docs/cli/)
-just clean          # Clean build artifacts
-just prek-install   # Install prek hooks (pre-commit + pre-push)
-just prek-run       # Run all prek hooks on all files
-just jaeger         # Start Jaeger trace viewer (docker)
-just jaeger-down    # Stop Jaeger
-```
-
-## File Structure
-
-```
-+-- cmd/sightjack/
-|   +-- main.go                 CLI entry point (signal handling, NeedsDefaultScan)
-+-- internal/cmd/               Cobra CLI commands
-|   +-- root.go                 Root command, persistent flags, OTel hooks
-|   +-- scan.go                 scan subcommand (classify + deep-scan)
-|   +-- waves.go                waves subcommand (wave generation)
-|   +-- select.go               select subcommand (interactive wave picker via tty)
-|   +-- discuss.go              discuss subcommand (Architect agent via tty)
-|   +-- apply.go                apply subcommand (wave apply to Linear)
-|   +-- adr.go                  adr subcommand (ADR generation)
-|   +-- nextgen.go              nextgen subcommand (follow-up wave generation)
-|   +-- show.go                 show subcommand (human-readable display)
-|   +-- run.go                  run subcommand (interactive session loop)
-|   +-- init.go                 init subcommand (config scaffolding)
-|   +-- doctor.go               doctor subcommand (environment check)
-|   +-- status.go               status subcommand (machine-readable state)
-|   +-- archive_prune.go        archive-prune subcommand
-|   +-- clean.go                clean subcommand
-|   +-- version.go              version subcommand
-|   +-- update.go               update subcommand (self-update)
-|   +-- default_scan.go         NeedsDefaultScan + ReorderArgs
-|   +-- telemetry.go            initTracer (OTLP HTTP exporter)
-+-- internal/usecase/           Use case layer (PolicyEngine + handlers)
-|   +-- policy.go               PolicyEngine type
-|   +-- policy_handlers.go      Event-driven policy handlers
-|   +-- scan.go                 Scan use case orchestration
-|   +-- session.go              Session use case orchestration
-|   +-- show.go                 Show use case orchestration
-+-- internal/session/           I/O orchestration layer
-|   +-- scanner.go              Scanner Agent (classify + deep-scan)
-|   +-- architect.go            Architect Agent (discussion)
-|   +-- scribe.go               Scribe Agent (ADR generation)
-|   +-- session.go              Session lifecycle (run, resume)
-|   +-- wave.go                 Wave model + unlock evaluation
-|   +-- wave_generator.go       Wave generation + nextgen
-|   +-- handoff.go              Handoff to downstream tools
-|   +-- navigator.go            Matrix Navigator rendering
-|   +-- cli.go                  Interactive prompts (selection, approval)
-|   +-- claude.go               Claude Code subprocess runner
-|   +-- config.go               Config loader (.siren/config.yaml)
-|   +-- dmail.go                D-Mail file I/O (inbox/outbox/archive)
-|   +-- outbox_store.go         SQLiteOutboxStore (transactional outbox)
-|   +-- gate.go                 Convergence gate
-|   +-- approve.go              Approver (Stdin, Cmd, Auto)
-|   +-- notify.go               Notifier (Local, Cmd, Nop)
-|   +-- review.go               Review subprocess
-|   +-- review_gate.go          ReviewGate (exit code detection)
-|   +-- recorder.go             Event recorder
-|   +-- state_io.go             State persistence I/O
-|   +-- status.go               Status query
-|   +-- store_factory.go        Factory for cmd→eventsource access
-|   +-- archive.go              Archive pruning
-|   +-- skills.go               SKILL.md management
-|   +-- doctor.go               Health check logic
-|   +-- json_normalize.go       JSON UTF-8 normalization
-|   +-- preflight.go            Pre-flight checks
-|   +-- shell_quote.go          Cross-platform shell quoting
-|   +-- shell_{unix,windows}.go Platform-specific shell
-|   +-- signal_{unix,windows}.go Platform-specific signal handling
-+-- internal/domain/            Pure domain functions
-|   +-- projection.go           Event projection
-|   +-- scan.go                 Scan utilities
-|   +-- wave.go                 Wave scheduling
-+-- internal/eventsource/       Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
-|   +-- store_file.go           FileEventStore (JSONL append-only)
-|   +-- lifecycle.go            Event file expiry + pruning
-|   +-- loader.go               Event loader
-|   +-- recorder.go             Event recorder
-|   +-- path.go                 EventsDir path helper
-+-- internal/tools/docgen/      CLI doc generator
-+-- doc.go                      Package declaration (root-zero: all code in internal/)
-+-- tests/scenario/             Scenario tests (L1-L4, //go:build scenario)
-+-- tests/e2e/                  Docker E2E tests (//go:build e2e)
-+-- .semgrep/                   Semgrep rules (layer enforcement)
-+-- docs/cli/                   Auto-generated CLI reference
-+-- docker/                     Jaeger v2 for trace viewing
-+-- templates/                  AI prompt templates ({en,ja})
-    +-- skills/                 D-Mail SKILL.md templates
-```
+All code lives in `internal/` (Go convention). See [docs/conformance.md](docs/conformance.md) for layer architecture and directory responsibilities. Run `just --list` for available tasks.
 
 ## What / Why / How
 

@@ -159,7 +159,8 @@ func assertFileNotExists(t *testing.T, path string) {
 	}
 }
 
-// assertEventsExist verifies that .siren/events/ has at least one .jsonl file.
+// assertEventsExist verifies that .siren/events/ has at least one .jsonl file
+// (possibly inside session subdirectories).
 func assertEventsExist(t *testing.T, baseDir string) {
 	t.Helper()
 	eventsDir := filepath.Join(baseDir, ".siren", "events")
@@ -171,6 +172,18 @@ func assertEventsExist(t *testing.T, baseDir string) {
 	for _, e := range entries {
 		if !e.IsDir() && filepath.Ext(e.Name()) == ".jsonl" {
 			return
+		}
+		// Check inside session subdirectories
+		if e.IsDir() {
+			subEntries, subErr := os.ReadDir(filepath.Join(eventsDir, e.Name()))
+			if subErr != nil {
+				continue
+			}
+			for _, se := range subEntries {
+				if !se.IsDir() && filepath.Ext(se.Name()) == ".jsonl" {
+					return
+				}
+			}
 		}
 	}
 	t.Errorf("expected at least one .jsonl file in %s", eventsDir)
@@ -188,6 +201,19 @@ func assertNoEvents(t *testing.T, baseDir string) {
 		if !e.IsDir() && filepath.Ext(e.Name()) == ".jsonl" {
 			t.Errorf("expected no .jsonl files in %s, found %s", eventsDir, e.Name())
 			return
+		}
+		// Check inside session subdirectories
+		if e.IsDir() {
+			subEntries, subErr := os.ReadDir(filepath.Join(eventsDir, e.Name()))
+			if subErr != nil {
+				continue
+			}
+			for _, se := range subEntries {
+				if !se.IsDir() && filepath.Ext(se.Name()) == ".jsonl" {
+					t.Errorf("expected no .jsonl files in %s/%s, found %s", eventsDir, e.Name(), se.Name())
+					return
+				}
+			}
 		}
 	}
 }
@@ -260,22 +286,13 @@ func runFullSession(t *testing.T, dir string, opts ...sessionOption) {
 		t.Fatalf("send 'a': %v", expErr)
 	}
 
-	// Wait for apply + report + nextgen → back to wave selection
-	if _, expErr := c.ExpectString("Select wave"); expErr != nil {
-		// If 2nd Select wave times out, close TTY gracefully
-		c.Tty().Close()
-		if _, eofErr := c.ExpectEOF(); eofErr != nil {
-			t.Logf("ExpectEOF: %v", eofErr)
+	// Wait for apply + report + nextgen → either back to wave selection or session end.
+	// When nextgen returns empty waves, the session ends without a 2nd "Select wave".
+	if _, expErr := c.ExpectString("Select wave"); expErr == nil {
+		// Got 2nd Select wave — quit gracefully
+		if _, sendErr := c.SendLine("q"); sendErr != nil {
+			t.Logf("send 'q': %v", sendErr)
 		}
-		if waitErr := cmd.Wait(); waitErr != nil {
-			if isTTYError(waitErr) {
-				t.Skipf("run requires controlling terminal: %v", waitErr)
-			}
-		}
-		t.Fatalf("expected 2nd 'Select wave' (post-nextgen): %v", expErr)
-	}
-	if _, expErr := c.SendLine("q"); expErr != nil {
-		t.Fatalf("send 'q': %v", expErr)
 	}
 
 	c.Tty().Close()

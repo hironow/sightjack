@@ -1,4 +1,4 @@
-# 0008. Event Sourcing State Management
+# 0003. Event Sourcing State Management
 
 **Date:** 2026-02-24
 **Status:** Accepted

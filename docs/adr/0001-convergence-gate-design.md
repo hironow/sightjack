@@ -1,4 +1,4 @@
-# 0006. Convergence Gate Design
+# 0001. Convergence Gate Design
 
 **Date:** 2026-02-23
 **Status:** Accepted

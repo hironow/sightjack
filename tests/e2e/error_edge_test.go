@@ -220,8 +220,8 @@ func TestE2E_State_ArchivePrune_WithData(t *testing.T) {
 		t.Fatalf("chtimes: %v", err)
 	}
 
-	// when: archive-prune with --days 0 --execute (prune everything)
-	cmd := exec.Command(sightjackBin(), "archive-prune", "--days", "0", "--execute", dir)
+	// when: archive-prune with --days 0 --execute --yes (prune everything, skip confirmation)
+	cmd := exec.Command(sightjackBin(), "archive-prune", "--days", "0", "--execute", "--yes", dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

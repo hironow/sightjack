@@ -133,8 +133,8 @@ func TestCobraRouting_Version(t *testing.T) {
 	if err != nil {
 		t.Fatalf("--version failed: %v", err)
 	}
-	if !strings.Contains(stdout.String(), version) {
-		t.Errorf("expected version %q in output, got: %s", version, stdout.String())
+	if !strings.Contains(stdout.String(), Version) {
+		t.Errorf("expected version %q in output, got: %s", Version, stdout.String())
 	}
 }
 

@@ -1,4 +1,4 @@
-# 0012. Root Package I/O Cleanup
+# 0007. Root Package I/O Cleanup
 
 **Date:** 2026-02-25
 **Status:** Accepted

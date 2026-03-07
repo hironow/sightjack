@@ -26,9 +26,9 @@ for structured output suitable for scripts and CI.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			info := map[string]string{
-				"version": version,
-				"commit":  commit,
-				"date":    date,
+				"version": Version,
+				"commit":  Commit,
+				"date":    Date,
 				"go":      runtime.Version(),
 			}
 
@@ -42,7 +42,7 @@ for structured output suitable for scripts and CI.`,
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "sightjack v%s (commit: %s, date: %s, go: %s)\n",
-				version, commit, date, runtime.Version())
+				Version, Commit, Date, runtime.Version())
 			return nil
 		},
 	}

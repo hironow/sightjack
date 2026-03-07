@@ -1,4 +1,4 @@
-# 0011. ES Layer-First Refactoring
+# 0006. ES Layer-First Refactoring
 
 **Date:** 2026-02-25
 **Status:** Accepted
