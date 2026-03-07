@@ -9,9 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	expect "github.com/Netflix/go-expect"
 )
 
 // sightjackBin returns the path to the sightjack binary.
@@ -134,61 +131,17 @@ func TestE2E_ArchivePrune_Empty(t *testing.T) {
 	}
 }
 
-func TestE2E_Init_Interactive(t *testing.T) {
+func TestE2E_Init_WithFlags(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	c, err := expect.NewConsole(expect.WithDefaultTimeout(5 * time.Second))
+
+	// when: init with flags (non-interactive, no prompts)
+	out, err := runCmd(t, "init", "--team", "TestTeam", "--project", "TestProject", dir)
+
+	// then
 	if err != nil {
-		t.Fatalf("create console: %v", err)
+		t.Fatalf("init failed: %v\noutput: %s", err, out)
 	}
-	defer c.Close()
-
-	cmd := exec.Command(sightjackBin(), "init", dir)
-	cmd.Stdin = c.Tty()
-	cmd.Stdout = c.Tty()
-	cmd.Stderr = c.Tty()
-
-	// when
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("start init: %v", err)
-	}
-
-	// Send interactive input matching exact prompt strings from init.go
-	if _, expErr := c.ExpectString("Linear team name:"); expErr != nil {
-		t.Fatalf("expected 'Linear team name:' prompt: %v", expErr)
-	}
-	if _, expErr := c.SendLine("TestTeam"); expErr != nil {
-		t.Fatalf("failed to send team name: %v", expErr)
-	}
-	if _, expErr := c.ExpectString("Linear project name:"); expErr != nil {
-		t.Fatalf("expected 'Linear project name:' prompt: %v", expErr)
-	}
-	if _, expErr := c.SendLine("TestProject"); expErr != nil {
-		t.Fatalf("failed to send project name: %v", expErr)
-	}
-	if _, expErr := c.ExpectString("Language"); expErr != nil {
-		t.Fatalf("expected 'Language' prompt: %v", expErr)
-	}
-	if _, expErr := c.SendLine(""); expErr != nil {
-		t.Fatalf("failed to send language default: %v", expErr)
-	}
-	if _, expErr := c.ExpectString("Strictness"); expErr != nil {
-		t.Fatalf("expected 'Strictness' prompt: %v", expErr)
-	}
-	if _, expErr := c.SendLine(""); expErr != nil {
-		t.Fatalf("failed to send strictness default: %v", expErr)
-	}
-
-	c.Tty().Close()
-	if _, eofErr := c.ExpectEOF(); eofErr != nil {
-		t.Logf("ExpectEOF: %v", eofErr)
-	}
-
-	if waitErr := cmd.Wait(); waitErr != nil {
-		t.Fatalf("init exited with error: %v", waitErr)
-	}
-
-	// then: config file should exist
 	cfgFile := filepath.Join(dir, ".siren", "config.yaml")
 	if _, statErr := os.Stat(cfgFile); os.IsNotExist(statErr) {
 		t.Errorf("config file not created: %s", cfgFile)
