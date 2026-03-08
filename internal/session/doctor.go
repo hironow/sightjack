@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -81,14 +82,14 @@ func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger domain.Logg
 				Name:    "Claude Auth",
 				Status:  domain.CheckFail,
 				Message: "not logged in",
-				Hint:    `run "claude login" then "/login" inside the session`,
+				Hint:    `run "claude login" then "/login" inside the session (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 			}
 		}
 		return domain.CheckResult{
 			Name:    "Claude Auth",
 			Status:  domain.CheckFail,
 			Message: hint,
-			Hint:    `check Claude CLI with "claude --version"; if auth issue, run "claude login"`,
+			Hint:    `check Claude CLI with "claude --version"; if auth issue, run "claude login" (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 		}
 	}
 
@@ -193,6 +194,86 @@ func CheckSkills(baseDir string) domain.CheckResult {
 	}
 }
 
+// CheckEventStore validates the event store directory structure and JSONL integrity.
+// Events are stored under .siren/events/{session-id}/YYYY-MM-DD.jsonl.
+// Returns CheckSkip if the events directory does not exist yet.
+func CheckEventStore(baseDir string) domain.CheckResult {
+	eventsDir := filepath.Join(baseDir, domain.StateDir, "events")
+	sessionEntries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		return domain.CheckResult{
+			Name:    "Event Store",
+			Status:  domain.CheckSkip,
+			Message: "events/ not found",
+		}
+	}
+
+	var sessions, totalEvents int
+	for _, sessionEntry := range sessionEntries {
+		if !sessionEntry.IsDir() {
+			continue
+		}
+		sessionPath := filepath.Join(eventsDir, sessionEntry.Name())
+		files, readErr := os.ReadDir(sessionPath)
+		if readErr != nil {
+			return domain.CheckResult{
+				Name:    "Event Store",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("read error: %v", readErr),
+				Hint:    "check file permissions on .siren/events/",
+			}
+		}
+		hasJSONL := false
+		for _, f := range files {
+			if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
+				continue
+			}
+			data, fErr := os.ReadFile(filepath.Join(sessionPath, f.Name()))
+			if fErr != nil {
+				return domain.CheckResult{
+					Name:    "Event Store",
+					Status:  domain.CheckFail,
+					Message: fmt.Sprintf("read error: %v", fErr),
+					Hint:    "check file permissions on .siren/events/",
+				}
+			}
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				if !json.Valid([]byte(line)) {
+					return domain.CheckResult{
+						Name:    "Event Store",
+						Status:  domain.CheckFail,
+						Message: fmt.Sprintf("corrupt JSON in %s/%s", sessionEntry.Name(), f.Name()),
+						Hint:    "check event files for corruption in .siren/events/",
+					}
+				}
+				totalEvents++
+			}
+			hasJSONL = true
+		}
+		if hasJSONL {
+			sessions++
+		}
+	}
+
+	if sessions == 0 {
+		return domain.CheckResult{
+			Name:    "Event Store",
+			Status:  domain.CheckOK,
+			Message: "no event files yet",
+		}
+	}
+
+	return domain.CheckResult{
+		Name:    "Event Store",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%d session(s), %d event(s) OK", sessions, totalEvents),
+	}
+}
+
 // RunDoctor executes all health checks and returns the results.
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
@@ -229,6 +310,9 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 
 	// 5. Skills check
 	results = append(results, CheckSkills(baseDir))
+
+	// 5.5. Event store check
+	results = append(results, CheckEventStore(baseDir))
 
 	// 6. Claude Auth check (skip if claude binary unavailable)
 	skipClaude := claudeResult.Status != domain.CheckOK
