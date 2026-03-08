@@ -92,6 +92,9 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 	if cfg.Strictness.Overrides != nil {
 		t.Errorf("Strictness.Overrides: expected nil, got %v", cfg.Strictness.Overrides)
 	}
+	if cfg.Strictness.Estimated != nil {
+		t.Errorf("Strictness.Estimated: expected nil, got %v", cfg.Strictness.Estimated)
+	}
 
 	// then: Retry defaults
 	if cfg.Retry.MaxAttempts != 3 {
@@ -298,7 +301,7 @@ func TestResolveStrictness_NoMatchingLabels(t *testing.T) {
 	}
 }
 
-func TestResolveStrictness_OverrideCanLowerStrictness(t *testing.T) {
+func TestResolveStrictness_OverrideCannotLowerBelowDefault(t *testing.T) {
 	cfg := domain.StrictnessConfig{
 		Default:   domain.StrictnessLockdown,
 		Overrides: map[string]domain.StrictnessLevel{"Docs": domain.StrictnessFog},
@@ -306,8 +309,8 @@ func TestResolveStrictness_OverrideCanLowerStrictness(t *testing.T) {
 
 	result := domain.ResolveStrictness(cfg, []string{"Docs"})
 
-	if result != domain.StrictnessFog {
-		t.Errorf("expected fog override to win over lockdown default, got %s", result)
+	if result != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown (max never lowers), got %s", result)
 	}
 }
 
@@ -322,8 +325,8 @@ func TestResolveStrictness_MultipleMatchesPickStrictest(t *testing.T) {
 
 	result := domain.ResolveStrictness(cfg, []string{"Docs", "Security"})
 
-	if result != domain.StrictnessAlert {
-		t.Errorf("expected alert (strictest matched override), got %s", result)
+	if result != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown (default is strictest via max), got %s", result)
 	}
 }
 
@@ -382,5 +385,54 @@ func TestDefaultConfig_WaitTimeout(t *testing.T) {
 	// then
 	if cfg.Gate.WaitTimeout != 30*time.Minute {
 		t.Errorf("Gate.WaitTimeout: expected 30m, got %v", cfg.Gate.WaitTimeout)
+	}
+}
+
+func TestResolveStrictness_EstimatedTakesEffect(t *testing.T) {
+	// given
+	cfg := domain.StrictnessConfig{
+		Default:   domain.StrictnessFog,
+		Estimated: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert},
+	}
+
+	// when
+	got := domain.ResolveStrictness(cfg, []string{"auth-module"})
+
+	// then
+	if got != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", got)
+	}
+}
+
+func TestResolveStrictness_OverrideTrumpsEstimated(t *testing.T) {
+	// given
+	cfg := domain.StrictnessConfig{
+		Default:   domain.StrictnessFog,
+		Overrides: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessLockdown},
+		Estimated: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert},
+	}
+
+	// when
+	got := domain.ResolveStrictness(cfg, []string{"auth-module"})
+
+	// then
+	if got != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", got)
+	}
+}
+
+func TestResolveStrictness_MaxOfDefaultAndEstimated(t *testing.T) {
+	// given
+	cfg := domain.StrictnessConfig{
+		Default:   domain.StrictnessAlert,
+		Estimated: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessFog},
+	}
+
+	// when
+	got := domain.ResolveStrictness(cfg, []string{"auth-module"})
+
+	// then
+	if got != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", got)
 	}
 }
