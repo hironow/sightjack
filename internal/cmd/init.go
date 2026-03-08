@@ -72,7 +72,7 @@ d-mail skills, and sets up mail directories.`,
 			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, w)
 		},
 	}
-	cmd.Flags().String("team", "", "Linear team name")
+	cmd.Flags().String("team", "", "Linear team key (e.g. MY)")
 	cmd.Flags().String("project", "", "Linear project name")
 	cmd.Flags().String("lang", "ja", "Language (ja/en)")
 	cmd.Flags().String("strictness", "fog", "Strictness level (fog/alert/lockdown)")
