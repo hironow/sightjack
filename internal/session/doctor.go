@@ -187,6 +187,26 @@ func CheckSkills(baseDir string) domain.CheckResult {
 		}
 	}
 
+	// Check for deprecated "kind: feedback" (split into design-feedback / implementation-feedback)
+	for _, name := range skillNames {
+		path := filepath.Join(skillsDir, name, "SKILL.md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "kind: feedback") &&
+			!strings.Contains(content, "kind: design-feedback") &&
+			!strings.Contains(content, "kind: implementation-feedback") {
+			return domain.CheckResult{
+				Name:    "Skills",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
+				Hint:    `run "sightjack init --force" to regenerate skills with updated kind (feedback → design-feedback)`,
+			}
+		}
+	}
+
 	return domain.CheckResult{
 		Name:    "Skills",
 		Status:  domain.CheckOK,

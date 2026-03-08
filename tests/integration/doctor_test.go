@@ -352,6 +352,52 @@ func TestCheckSkills_MissingSchemaVersion(t *testing.T) {
 	}
 }
 
+func TestCheckSkills_DeprecatedFeedbackKind(t *testing.T) {
+	// given — SKILL.md with deprecated "kind: feedback" (pre-split)
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".siren", "skills", "dmail-readable")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"),
+		[]byte("---\nname: dmail-readable\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: feedback\n---\n"), 0644)
+	// Also create sendable so it doesn't fail on missing
+	sendDir := filepath.Join(dir, ".siren", "skills", "dmail-sendable")
+	os.MkdirAll(sendDir, 0755)
+	os.WriteFile(filepath.Join(sendDir, "SKILL.md"),
+		[]byte("---\nname: dmail-sendable\nmetadata:\n  dmail-schema-version: \"1\"\nproduces:\n    - kind: specification\n---\n"), 0644)
+
+	// when
+	result := session.CheckSkills(dir)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected CheckFail for deprecated kind, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "init --force") {
+		t.Errorf("hint should suggest init --force, got %q", result.Hint)
+	}
+}
+
+func TestCheckSkills_UpdatedFeedbackKind(t *testing.T) {
+	// given — SKILL.md with updated "kind: design-feedback" (post-split)
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".siren", "skills", "dmail-readable")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"),
+		[]byte("---\nname: dmail-readable\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: design-feedback\n---\n"), 0644)
+	sendDir := filepath.Join(dir, ".siren", "skills", "dmail-sendable")
+	os.MkdirAll(sendDir, 0755)
+	os.WriteFile(filepath.Join(sendDir, "SKILL.md"),
+		[]byte("---\nname: dmail-sendable\nmetadata:\n  dmail-schema-version: \"1\"\nproduces:\n    - kind: specification\n---\n"), 0644)
+
+	// when
+	result := session.CheckSkills(dir)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected CheckOK for updated kind, got %v: %s", result.Status, result.Message)
+	}
+}
+
 func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// given: nonexistent config path → config check fails, cfg=nil
 	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
