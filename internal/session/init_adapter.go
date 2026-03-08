@@ -33,7 +33,7 @@ func (a *InitAdapter) InitProject(baseDir, team, project, lang, strictness strin
 	_ = WriteGitIgnore(baseDir)
 
 	var warnings []string
-	if err := InstallSkills(baseDir, platform.SkillsFS); err != nil {
+	if err := InstallSkills(baseDir, platform.SkillsFS, nil); err != nil {
 		warnings = append(warnings, fmt.Sprintf("failed to install skills: %v", err))
 	}
 	if err := EnsureMailDirs(baseDir); err != nil {

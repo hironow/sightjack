@@ -2,8 +2,10 @@ package platform_test
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/platform"
@@ -146,4 +148,98 @@ func TestLogger_Writer(t *testing.T) {
 	if logger.Writer() != &buf {
 		t.Error("Writer() should return the configured writer")
 	}
+}
+
+func TestLogger_NoColorWhenNotTerminal(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.Info("no terminal")
+	if strings.Contains(buf.String(), "\033[") {
+		t.Errorf("expected no ANSI codes for non-terminal writer, got %q", buf.String())
+	}
+}
+
+func TestLogger_ColorWhenEnabled(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.SetNoColor(false)
+	logger.Info("colored")
+	if !strings.Contains(buf.String(), "\033[") {
+		t.Errorf("expected ANSI codes when color enabled, got %q", buf.String())
+	}
+}
+
+func TestLogger_SetNoColor(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.SetNoColor(false)
+	logger.Info("on")
+	colored := buf.String()
+
+	buf.Reset()
+	logger.SetNoColor(true)
+	logger.Info("off")
+	plain := buf.String()
+
+	if !strings.Contains(colored, "\033[") {
+		t.Errorf("expected color when on, got %q", colored)
+	}
+	if strings.Contains(plain, "\033[") {
+		t.Errorf("expected no color when off, got %q", plain)
+	}
+}
+
+func TestLogger_NoColorEnvVar(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.Info("env test")
+	if strings.Contains(buf.String(), "\033[") {
+		t.Errorf("NO_COLOR=1 should disable color, got %q", buf.String())
+	}
+}
+
+func TestLogger_ExtraWriterPlainText(t *testing.T) {
+	var primary bytes.Buffer
+	logger := platform.NewLogger(&primary, false)
+	logger.SetNoColor(false)
+
+	var extra bytes.Buffer
+	logger.SetExtraWriter(&extra)
+
+	logger.Info("dual")
+
+	if !strings.Contains(primary.String(), "\033[") {
+		t.Errorf("primary should have ANSI codes, got %q", primary.String())
+	}
+	if strings.Contains(extra.String(), "\033[") {
+		t.Errorf("extra writer should be plain text, got %q", extra.String())
+	}
+}
+
+func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
+	logger := platform.NewLogger(io.Discard, false)
+
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			var buf bytes.Buffer
+			logger.SetExtraWriter(&buf)
+		}()
+		go func(n int) {
+			defer wg.Done()
+			logger.Info("race test info %d", n)
+			logger.Warn("race test warn %d", n)
+		}(i)
+		go func() {
+			defer wg.Done()
+			logger.SetExtraWriter(nil)
+		}()
+	}
+	wg.Wait()
+
+	// Clean up
+	logger.SetExtraWriter(nil)
 }

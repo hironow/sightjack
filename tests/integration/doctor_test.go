@@ -305,7 +305,7 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 func TestCheckSkills_OK(t *testing.T) {
 	// given: valid SKILL.md files installed
 	baseDir := t.TempDir()
-	if err := session.InstallSkills(baseDir, platform.SkillsFS); err != nil {
+	if err := session.InstallSkills(baseDir, platform.SkillsFS, &domain.NopLogger{}); err != nil {
 		t.Fatalf("InstallSkills: %v", err)
 	}
 

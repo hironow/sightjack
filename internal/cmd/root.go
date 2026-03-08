@@ -58,6 +58,10 @@ func NewRootCommand() *cobra.Command {
 		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse NeedsDefaultScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			applyOtelEnv(filepath.Dir(cfgPath))
+			noColor, _ := cmd.Flags().GetBool("no-color")
+			if noColor {
+				os.Setenv("NO_COLOR", "1")
+			}
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("sightjack", Version)
@@ -85,6 +89,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", ".siren/config.yaml", "Config file path")
 	rootCmd.PersistentFlags().StringVarP(&lang, "lang", "l", "", "Language override (ja/en)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose logging")
+	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (respects NO_COLOR env)")
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false, "Generate prompts without executing Claude")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 

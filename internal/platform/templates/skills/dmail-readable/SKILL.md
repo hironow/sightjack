@@ -8,6 +8,7 @@ metadata:
   consumes:
     - kind: feedback
     - kind: convergence
+    - kind: report
 ---
 
 Sightjack D-Mail readable skill.
