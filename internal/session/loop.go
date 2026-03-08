@@ -30,7 +30,7 @@ func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessio
 	)
 	defer loopSpan.End()
 
-	// --- Interactive Loop ---
+	// --- Interactive Loop with D-Mail Waiting Cycle ---
 	shibitoShown := false
 	// sessionRejected tracks user-rejected actions per wave (keyed by WaveKey).
 	// Scoped per-wave intentionally: rejected actions are only fed back to the
@@ -38,47 +38,96 @@ func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessio
 	// across the entire cluster.
 	sessionRejected := make(map[string][]domain.WaveAction)
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
-outerLoop:
+
+	// waitingCycle wraps the interactive loop: after all waves are processed,
+	// enter a D-Mail waiting phase. When D-Mails arrive, classify and resume.
+waitingCycle:
 	for {
+		userQuit := false
+	outerLoop:
+		for {
+			waves = domain.EvaluateUnlocks(waves, completed)
+			available := domain.AvailableWaves(waves, completed)
+			if len(available) == 0 {
+				logger.OK("All waves completed or no available waves.")
+				break
+			}
+
+			var selected domain.Wave
+			var result selectPhaseResult
+			selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, out, loopSpan, logger)
+			switch result {
+			case selectQuit:
+				userQuit = true
+				break outerLoop
+			case selectRetry:
+				continue
+			}
+
+			resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
+
+			selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, out, loopSpan, logger)
+			if approvalResult != approvalApproved {
+				continue
+			}
+
+			applyPhase(ctx, cfg, scanDir, scanResultPath, adrDir,
+				selected, resolvedStrictness,
+				&waves, completed, scanResult, sessionRejected,
+				labeledReady, fbCollector, store, emitter, out, loopSpan, logger)
+		}
+
+		// Consistency check after each outerLoop iteration
+		if domain.CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
+			logger.Warn("Completeness mismatch detected. Recalculating...")
+			scanResult.CalculateCompleteness()
+		}
+
+		// Save scan result cache
+		if err := WriteScanResult(scanResultPath, scanResult); err != nil {
+			logger.Warn("Failed to update cached scan result: %v", err)
+		}
+
+		// Exit waiting cycle if user quit via 'q'
+		if userQuit {
+			break waitingCycle
+		}
+
+		// Negative WaitTimeout disables waiting mode
+		if cfg.Gate.WaitTimeout < 0 {
+			break waitingCycle
+		}
+
+		// Snapshot before entering waiting phase
+		fbCollector.Snapshot()
+
+		// Wait for D-Mail arrival
+		arrived, waitErr := waitForDMail(ctx, fbCollector, cfg.Gate.WaitTimeout, logger)
+		if waitErr != nil {
+			return waitErr
+		}
+		if !arrived {
+			break waitingCycle
+		}
+
+		// Classify new D-Mails since snapshot
+		newMails := fbCollector.NewSinceSnapshot()
+		hasSpec := false
+		for _, m := range newMails {
+			if m.Kind == DMailSpecification {
+				hasSpec = true
+				break
+			}
+		}
+
+		if hasSpec {
+			logger.Info("New specification received. Rescanning not yet supported in waiting mode.")
+		} else {
+			logger.Info("New feedback received. Resuming interactive loop...")
+		}
+
+		// Re-evaluate waves with new feedback context before resuming
 		waves = domain.EvaluateUnlocks(waves, completed)
-		available := domain.AvailableWaves(waves, completed)
-		if len(available) == 0 {
-			logger.OK("All waves completed or no available waves.")
-			break
-		}
-
-		var selected domain.Wave
-		var result selectPhaseResult
-		selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, out, loopSpan, logger)
-		switch result {
-		case selectQuit:
-			break outerLoop
-		case selectRetry:
-			continue
-		}
-
-		resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
-
-		selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, out, loopSpan, logger)
-		if approvalResult != approvalApproved {
-			continue
-		}
-
-		applyPhase(ctx, cfg, scanDir, scanResultPath, adrDir,
-			selected, resolvedStrictness,
-			&waves, completed, scanResult, sessionRejected,
-			labeledReady, fbCollector, store, emitter, out, loopSpan, logger)
-	}
-
-	// Final consistency check
-	if domain.CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
-		logger.Warn("Completeness mismatch detected. Recalculating...")
-		scanResult.CalculateCompleteness()
-	}
-
-	// Save scan result cache
-	if err := WriteScanResult(scanResultPath, scanResult); err != nil {
-		logger.Warn("Failed to update cached scan result: %v", err)
 	}
 
 	logger.OK("Session events saved to %s", filepath.Join(baseDir, domain.StateDir, "events"))

@@ -31,7 +31,7 @@ func scribeADRResponse() string {
 
 func autoApproveConfig() *domain.Config {
 	cfg := testConfig()
-	cfg.Gate = domain.GateConfig{AutoApprove: true}
+	cfg.Gate = domain.GateConfig{AutoApprove: true, WaitTimeout: -1}
 	cfg.Scribe = domain.ScribeConfig{Enabled: true, AutoDiscussRounds: 1}
 	return cfg
 }
