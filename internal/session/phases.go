@@ -116,6 +116,30 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			),
 		)
 		emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
+
+		// Auto-discuss: Devil's Advocate debate → ADR generation
+		if cfg.Scribe.Enabled && cfg.Scribe.AutoDiscussRounds > 0 {
+			discussResult, discussErr := RunAutoDiscuss(ctx, cfg, scanDir, selected, nil, adrDir, resolvedStrictness, out, logger)
+			if discussErr != nil {
+				logger.Warn("Auto-discuss failed (non-fatal): %v", discussErr)
+			} else if discussResult != nil {
+				archResp := discussResult.ToArchitectResponse()
+				if len(discussResult.OpenIssues) > 0 {
+					logger.Info("Auto-discuss: %d open issues identified", len(discussResult.OpenIssues))
+				}
+				scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, archResp, adrDir, resolvedStrictness, out, logger)
+				if scribeErr != nil {
+					logger.Warn("Auto-discuss ADR generation failed (non-fatal): %v", scribeErr)
+				} else {
+					logger.OK("Auto-discuss: ADR generated — %s-%s", scribeResp.ADRID, scribeResp.Title)
+					*adrCount++
+					emitter.EmitGenerateADR(domain.ADRGeneratedPayload{
+						ADRID: scribeResp.ADRID, Title: scribeResp.Title,
+					}, time.Now().UTC())
+				}
+			}
+		}
+
 		if err := ComposeSpecification(ctx, store, selected); err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
