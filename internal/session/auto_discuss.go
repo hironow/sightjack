@@ -77,11 +77,11 @@ func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 	var priorContent string
 
 	// Round 0: Architect explains (always)
-	// Round 1..N: alternating Devil's Advocate (odd) and Architect (even)
-	// Total calls = rounds*2 + 1 (round 0 + N devil's advocate + N architect responses)
-	// Simplified: 0=architect, then for each round: devil's advocate, architect response
-	// Final round is always devil's advocate and includes open_issues summary
-	for r := 0; r <= rounds*2; r++ {
+	// Round 1..2N-1: alternating Devil's Advocate (odd) and Architect (even)
+	// Total calls = 2N (N architect + N devil's advocate)
+	// Final round (r=2N-1) is always devil's advocate and includes open_issues summary
+	totalCalls := rounds * 2
+	for r := 0; r < totalCalls; r++ {
 		speaker := speakerForRound(r)
 		roundCtx, roundSpan := platform.Tracer.Start(ctx, "scribe.auto_discuss.round",
 			trace.WithAttributes(
@@ -97,7 +97,7 @@ func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 			content, roundErr = runAutoDiscussArchitect(roundCtx, cfg, scanDir, wave,
 				string(actionsJSON), priorContent, feedbackSection, strictness, r, out, logger)
 		} else {
-			isFinal := r == rounds*2
+			isFinal := r == totalCalls-1
 			daRoundIndex := (r + 1) / 2
 			content, roundErr = runAutoDiscussDevilsAdvocate(roundCtx, cfg, scanDir, wave,
 				string(actionsJSON), priorContent, existingADRs, claudeMD,
