@@ -56,6 +56,169 @@ func TestLabelsConfigDefaults(t *testing.T) {
 	}
 }
 
+func TestDefaultConfig_AllFields(t *testing.T) {
+	// given/when
+	cfg := domain.DefaultConfig()
+
+	// then: Scan defaults
+	if cfg.Scan.ChunkSize != 20 {
+		t.Errorf("Scan.ChunkSize: expected 20, got %d", cfg.Scan.ChunkSize)
+	}
+	if cfg.Scan.MaxConcurrency != 3 {
+		t.Errorf("Scan.MaxConcurrency: expected 3, got %d", cfg.Scan.MaxConcurrency)
+	}
+
+	// then: Assistant defaults (zero values before LoadConfig clamping)
+	if cfg.Assistant.Command != "" {
+		t.Errorf("Assistant.Command: expected empty (set by LoadConfig), got %q", cfg.Assistant.Command)
+	}
+	if cfg.Assistant.Model != "" {
+		t.Errorf("Assistant.Model: expected empty (set by LoadConfig), got %q", cfg.Assistant.Model)
+	}
+	if cfg.Assistant.TimeoutSec != 0 {
+		t.Errorf("Assistant.TimeoutSec: expected 0 (set by LoadConfig), got %d", cfg.Assistant.TimeoutSec)
+	}
+
+	// then: Scribe defaults
+	if !cfg.Scribe.Enabled {
+		t.Error("Scribe.Enabled: expected true")
+	}
+
+	// then: Strictness defaults
+	if cfg.Strictness.Default != domain.StrictnessFog {
+		t.Errorf("Strictness.Default: expected fog, got %s", cfg.Strictness.Default)
+	}
+	if cfg.Strictness.Overrides != nil {
+		t.Errorf("Strictness.Overrides: expected nil, got %v", cfg.Strictness.Overrides)
+	}
+
+	// then: Retry defaults
+	if cfg.Retry.MaxAttempts != 3 {
+		t.Errorf("Retry.MaxAttempts: expected 3, got %d", cfg.Retry.MaxAttempts)
+	}
+	if cfg.Retry.BaseDelaySec != 2 {
+		t.Errorf("Retry.BaseDelaySec: expected 2, got %d", cfg.Retry.BaseDelaySec)
+	}
+
+	// then: Labels defaults
+	if !cfg.Labels.Enabled {
+		t.Error("Labels.Enabled: expected true")
+	}
+	if cfg.Labels.Prefix != "sightjack" {
+		t.Errorf("Labels.Prefix: expected 'sightjack', got %q", cfg.Labels.Prefix)
+	}
+	if cfg.Labels.ReadyLabel != "sightjack:ready" {
+		t.Errorf("Labels.ReadyLabel: expected 'sightjack:ready', got %q", cfg.Labels.ReadyLabel)
+	}
+
+	// then: Gate defaults (all zero values)
+	if cfg.Gate.AutoApprove {
+		t.Error("Gate.AutoApprove: expected false")
+	}
+	if cfg.Gate.NotifyCmd != "" {
+		t.Errorf("Gate.NotifyCmd: expected empty, got %q", cfg.Gate.NotifyCmd)
+	}
+	if cfg.Gate.ApproveCmd != "" {
+		t.Errorf("Gate.ApproveCmd: expected empty, got %q", cfg.Gate.ApproveCmd)
+	}
+	if cfg.Gate.ReviewCmd != "" {
+		t.Errorf("Gate.ReviewCmd: expected empty, got %q", cfg.Gate.ReviewCmd)
+	}
+	if cfg.Gate.ReviewBudget != 0 {
+		t.Errorf("Gate.ReviewBudget: expected 0, got %d", cfg.Gate.ReviewBudget)
+	}
+
+	// then: Tracker defaults (all zero values)
+	if cfg.Tracker.Team != "" {
+		t.Errorf("Tracker.Team: expected empty, got %q", cfg.Tracker.Team)
+	}
+	if cfg.Tracker.Project != "" {
+		t.Errorf("Tracker.Project: expected empty, got %q", cfg.Tracker.Project)
+	}
+	if cfg.Tracker.Cycle != "" {
+		t.Errorf("Tracker.Cycle: expected empty, got %q", cfg.Tracker.Cycle)
+	}
+
+	// then: DoDTemplates defaults
+	if cfg.DoDTemplates != nil {
+		t.Errorf("DoDTemplates: expected nil, got %v", cfg.DoDTemplates)
+	}
+
+	// then: Lang default
+	if cfg.Lang != "ja" {
+		t.Errorf("Lang: expected 'ja', got %q", cfg.Lang)
+	}
+}
+
+func TestGateConfig_EffectiveReviewBudget(t *testing.T) {
+	tests := []struct {
+		name   string
+		budget int
+		want   int
+	}{
+		{"zero defaults to 3", 0, 3},
+		{"negative defaults to 3", -1, 3},
+		{"explicit value preserved", 5, 5},
+		{"one preserved", 1, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := domain.GateConfig{ReviewBudget: tt.budget}
+			if got := g.EffectiveReviewBudget(); got != tt.want {
+				t.Errorf("EffectiveReviewBudget() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGateConfig_HasMethods(t *testing.T) {
+	// given
+	empty := domain.GateConfig{}
+	full := domain.GateConfig{
+		NotifyCmd:   "echo notify",
+		ApproveCmd:  "echo approve",
+		AutoApprove: true,
+		ReviewCmd:   "echo review",
+	}
+
+	// then: empty gate
+	if empty.IsAutoApprove() {
+		t.Error("empty: IsAutoApprove should be false")
+	}
+	if empty.HasNotifyCmd() {
+		t.Error("empty: HasNotifyCmd should be false")
+	}
+	if empty.HasApproveCmd() {
+		t.Error("empty: HasApproveCmd should be false")
+	}
+	if empty.HasReviewCmd() {
+		t.Error("empty: HasReviewCmd should be false")
+	}
+
+	// then: full gate
+	if !full.IsAutoApprove() {
+		t.Error("full: IsAutoApprove should be true")
+	}
+	if !full.HasNotifyCmd() {
+		t.Error("full: HasNotifyCmd should be true")
+	}
+	if full.NotifyCmdString() != "echo notify" {
+		t.Errorf("full: NotifyCmdString = %q", full.NotifyCmdString())
+	}
+	if !full.HasApproveCmd() {
+		t.Error("full: HasApproveCmd should be true")
+	}
+	if full.ApproveCmdString() != "echo approve" {
+		t.Errorf("full: ApproveCmdString = %q", full.ApproveCmdString())
+	}
+	if !full.HasReviewCmd() {
+		t.Error("full: HasReviewCmd should be true")
+	}
+	if full.ReviewCmdString() != "echo review" {
+		t.Errorf("full: ReviewCmdString = %q", full.ReviewCmdString())
+	}
+}
+
 func TestResolveStrictness_DefaultWhenNoOverrides(t *testing.T) {
 	cfg := domain.StrictnessConfig{Default: domain.StrictnessFog}
 

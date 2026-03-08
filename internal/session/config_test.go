@@ -477,6 +477,132 @@ strictness:
 	}
 }
 
+func TestUpdateConfig_SetTrackerTeam(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "OLD"
+  project: "Test"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "tracker.team", "NEW")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Tracker.Team != "NEW" {
+		t.Errorf("expected team 'NEW', got %q", cfg.Tracker.Team)
+	}
+	// unchanged fields preserved
+	if cfg.Tracker.Project != "Test" {
+		t.Errorf("expected project 'Test', got %q", cfg.Tracker.Project)
+	}
+	if cfg.Lang != "ja" {
+		t.Errorf("expected lang 'ja', got %q", cfg.Lang)
+	}
+}
+
+func TestUpdateConfig_SetLang(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "lang", "en")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Lang != "en" {
+		t.Errorf("expected lang 'en', got %q", cfg.Lang)
+	}
+}
+
+func TestUpdateConfig_SetStrictnessDefault(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+strictness:
+  default: fog
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "strictness.default", "alert")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Strictness.Default != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", cfg.Strictness.Default)
+	}
+}
+
+func TestUpdateConfig_InvalidKey_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "nonexistent.key", "value")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid key")
+	}
+}
+
+func TestUpdateConfig_InvalidLang_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`lang: "ja"`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "lang", "fr")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid lang value")
+	}
+}
+
+func TestUpdateConfig_InvalidStrictness_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`strictness: {default: fog}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "strictness.default", "banana")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid strictness value")
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")

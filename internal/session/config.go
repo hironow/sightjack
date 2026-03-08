@@ -3,11 +3,99 @@ package session
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/hironow/sightjack/internal/domain"
 )
+
+// UpdateConfig reads a config file, updates a single key, validates, and writes back.
+// Supported keys: tracker.team, tracker.project, tracker.cycle, lang, strictness.default,
+// scan.chunk_size, scan.max_concurrency, assistant.model, assistant.timeout_sec,
+// gate.auto_approve, labels.enabled, labels.prefix, labels.ready_label.
+func UpdateConfig(path string, key string, value string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read config: %w", err)
+	}
+
+	cfg := domain.DefaultConfig()
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parse config: %w", err)
+	}
+
+	if err := setConfigField(&cfg, key, value); err != nil {
+		return err
+	}
+
+	out, err := yaml.Marshal(&cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	return os.WriteFile(path, out, 0644)
+}
+
+func setConfigField(cfg *domain.Config, key string, value string) error {
+	switch key {
+	case "tracker.team":
+		cfg.Tracker.Team = value
+	case "tracker.project":
+		cfg.Tracker.Project = value
+	case "tracker.cycle":
+		cfg.Tracker.Cycle = value
+	case "lang":
+		if !domain.ValidLang(value) {
+			return fmt.Errorf("invalid lang %q: must be ja or en", value)
+		}
+		cfg.Lang = value
+	case "strictness.default":
+		level := domain.StrictnessLevel(value)
+		if !level.Valid() {
+			return fmt.Errorf("invalid strictness %q: must be fog, alert, or lockdown", value)
+		}
+		cfg.Strictness.Default = level
+	case "scan.chunk_size":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return fmt.Errorf("invalid chunk_size %q: must be positive integer", value)
+		}
+		cfg.Scan.ChunkSize = n
+	case "scan.max_concurrency":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return fmt.Errorf("invalid max_concurrency %q: must be positive integer", value)
+		}
+		cfg.Scan.MaxConcurrency = n
+	case "assistant.model":
+		cfg.Assistant.Model = value
+	case "assistant.timeout_sec":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return fmt.Errorf("invalid timeout_sec %q: must be positive integer", value)
+		}
+		cfg.Assistant.TimeoutSec = n
+	case "gate.auto_approve":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid auto_approve %q: must be true or false", value)
+		}
+		cfg.Gate.AutoApprove = b
+	case "labels.enabled":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid labels.enabled %q: must be true or false", value)
+		}
+		cfg.Labels.Enabled = b
+	case "labels.prefix":
+		cfg.Labels.Prefix = value
+	case "labels.ready_label":
+		cfg.Labels.ReadyLabel = value
+	default:
+		return fmt.Errorf("unknown config key %q", key)
+	}
+	return nil
+}
 
 // LoadConfig reads a YAML config file and returns a Config with defaults
 // applied for any fields not specified in the file.
