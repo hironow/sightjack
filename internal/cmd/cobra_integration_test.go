@@ -413,6 +413,73 @@ func TestRunCmd_AutoApproveFlagChanged(t *testing.T) {
 	}
 }
 
+func TestStrictnessFlag_RunAndScan(t *testing.T) {
+	rootCmd := NewRootCommand()
+
+	// Verify run command has --strictness flag
+	var runCmd, scanCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		switch sub.Name() {
+		case "run":
+			runCmd = sub
+		case "scan":
+			scanCmd = sub
+		}
+	}
+	if runCmd == nil {
+		t.Fatal("run command not found")
+	}
+	if scanCmd == nil {
+		t.Fatal("scan command not found")
+	}
+
+	// run: --strictness flag exists with -s shorthand
+	runFlag := runCmd.Flags().Lookup("strictness")
+	if runFlag == nil {
+		t.Fatal("run: --strictness flag not found")
+	}
+	if runFlag.Shorthand != "s" {
+		t.Errorf("run: expected shorthand 's', got %q", runFlag.Shorthand)
+	}
+
+	// scan: --strictness flag exists with -s shorthand
+	scanFlag := scanCmd.Flags().Lookup("strictness")
+	if scanFlag == nil {
+		t.Fatal("scan: --strictness flag not found")
+	}
+	if scanFlag.Shorthand != "s" {
+		t.Errorf("scan: expected shorthand 's', got %q", scanFlag.Shorthand)
+	}
+}
+
+func TestStrictnessFlag_InvalidValueReturnsError(t *testing.T) {
+	// given: a directory with valid config
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, ".siren")
+	os.MkdirAll(sirenDir, 0755)
+	os.WriteFile(filepath.Join(sirenDir, "config.yaml"), []byte(`
+tracker:
+  team: "MY"
+  project: "Test"
+`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"scan", "--strictness", "banana", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for invalid strictness value")
+	}
+	if !strings.Contains(err.Error(), "invalid strictness") {
+		t.Errorf("expected 'invalid strictness' in error, got: %v", err)
+	}
+}
+
 func TestCobraRouting_ConfigShow(t *testing.T) {
 	// given: a directory with valid config
 	dir := t.TempDir()

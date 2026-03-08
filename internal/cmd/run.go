@@ -71,6 +71,15 @@ if event data is found in .siren/events/.`,
 			if cmd.Flags().Changed("review-cmd") {
 				cfg.Gate.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
 			}
+			if cmd.Flags().Changed("strictness") {
+				s, _ := cmd.Flags().GetString("strictness")
+				level := domain.StrictnessLevel(s)
+				if !level.Valid() {
+					return fmt.Errorf("invalid strictness %q: must be fog, alert, or lockdown", s)
+				}
+				cfg.Strictness.Default = level
+				logger.Info("Strictness override: %s", s)
+			}
 
 			// Parse base directory into domain primitive (used by all command constructions below)
 			rp, rpErr := domain.NewRepoPath(baseDir)
@@ -172,6 +181,7 @@ if event data is found in .siren/events/.`,
 	cmd.Flags().Bool("auto-approve", false, "Skip all interactive prompts (resume session + convergence gate)")
 	cmd.Flags().String("review-cmd", "", "Review command (exit 0 = pass, non-zero = comments found)")
 	cmd.Flags().String("session-mode", "", "Session mode: resume, new, or rescan (skip interactive prompt)")
+	cmd.Flags().StringP("strictness", "s", "", "Override default strictness level (fog, alert, lockdown)")
 
 	return cmd
 }
