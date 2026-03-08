@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 // CheckConfig validates that the config file exists and can be loaded.
@@ -215,12 +215,13 @@ func CheckSkills(baseDir string) domain.CheckResult {
 }
 
 // CheckEventStore validates the event store directory structure and JSONL integrity.
-// Events are stored under .siren/events/{session-id}/YYYY-MM-DD.jsonl.
+// Delegates to eventsource.ValidateStore for the actual file-level checks.
 // Returns CheckSkip if the events directory does not exist yet.
 func CheckEventStore(baseDir string) domain.CheckResult {
-	eventsDir := filepath.Join(baseDir, domain.StateDir, "events")
-	sessionEntries, err := os.ReadDir(eventsDir)
-	if err != nil {
+	stateDir := filepath.Join(baseDir, domain.StateDir)
+	health := eventsource.ValidateStore(stateDir)
+
+	if health.NotFound {
 		return domain.CheckResult{
 			Name:    "Event Store",
 			Status:  domain.CheckSkip,
@@ -228,58 +229,16 @@ func CheckEventStore(baseDir string) domain.CheckResult {
 		}
 	}
 
-	var sessions, totalEvents int
-	for _, sessionEntry := range sessionEntries {
-		if !sessionEntry.IsDir() {
-			continue
-		}
-		sessionPath := filepath.Join(eventsDir, sessionEntry.Name())
-		files, readErr := os.ReadDir(sessionPath)
-		if readErr != nil {
-			return domain.CheckResult{
-				Name:    "Event Store",
-				Status:  domain.CheckFail,
-				Message: fmt.Sprintf("read error: %v", readErr),
-				Hint:    "check file permissions on .siren/events/",
-			}
-		}
-		hasJSONL := false
-		for _, f := range files {
-			if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
-				continue
-			}
-			data, fErr := os.ReadFile(filepath.Join(sessionPath, f.Name()))
-			if fErr != nil {
-				return domain.CheckResult{
-					Name:    "Event Store",
-					Status:  domain.CheckFail,
-					Message: fmt.Sprintf("read error: %v", fErr),
-					Hint:    "check file permissions on .siren/events/",
-				}
-			}
-			for _, line := range strings.Split(string(data), "\n") {
-				line = strings.TrimSpace(line)
-				if line == "" {
-					continue
-				}
-				if !json.Valid([]byte(line)) {
-					return domain.CheckResult{
-						Name:    "Event Store",
-						Status:  domain.CheckFail,
-						Message: fmt.Sprintf("corrupt JSON in %s/%s", sessionEntry.Name(), f.Name()),
-						Hint:    "check event files for corruption in .siren/events/",
-					}
-				}
-				totalEvents++
-			}
-			hasJSONL = true
-		}
-		if hasJSONL {
-			sessions++
+	if health.Err != nil {
+		return domain.CheckResult{
+			Name:    "Event Store",
+			Status:  domain.CheckFail,
+			Message: health.Err.Error(),
+			Hint:    health.ErrHint,
 		}
 	}
 
-	if sessions == 0 {
+	if health.Sessions == 0 {
 		return domain.CheckResult{
 			Name:    "Event Store",
 			Status:  domain.CheckOK,
@@ -290,7 +249,7 @@ func CheckEventStore(baseDir string) domain.CheckResult {
 	return domain.CheckResult{
 		Name:    "Event Store",
 		Status:  domain.CheckOK,
-		Message: fmt.Sprintf("%d session(s), %d event(s) OK", sessions, totalEvents),
+		Message: fmt.Sprintf("%d session(s), %d event(s) OK", health.Sessions, health.Events),
 	}
 }
 

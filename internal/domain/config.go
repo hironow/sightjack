@@ -50,6 +50,9 @@ type GateConfig struct {
 // IsAutoApprove reports whether the gate is configured to auto-approve.
 func (g GateConfig) IsAutoApprove() bool { return g.AutoApprove }
 
+// SetAutoApprove sets the auto-approve flag on the gate config.
+func (g *GateConfig) SetAutoApprove(v bool) { g.AutoApprove = v }
+
 // HasNotifyCmd reports whether a notification command is configured.
 func (g GateConfig) HasNotifyCmd() bool { return g.NotifyCmd != "" }
 

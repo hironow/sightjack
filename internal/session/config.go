@@ -80,7 +80,7 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 		if err != nil {
 			return fmt.Errorf("invalid auto_approve %q: must be true or false", value)
 		}
-		cfg.Gate.AutoApprove = b
+		cfg.Gate.SetAutoApprove(b)
 	case "labels.enabled":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
