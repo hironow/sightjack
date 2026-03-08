@@ -98,7 +98,7 @@ if event data is found in .siren/events/.`,
 						promptState = resumableState
 					}
 
-					// Determine session choice: --session-mode flag or interactive prompt
+					// Determine session choice: --session-mode flag, --auto-approve, or interactive prompt
 					var choice domain.ResumeChoice
 					sessionMode, _ := cmd.Flags().GetString("session-mode")
 					if sessionMode != "" {
@@ -107,6 +107,9 @@ if event data is found in .siren/events/.`,
 							return parseErr
 						}
 						choice = parsed
+					} else if cfg.Gate.AutoApprove {
+						choice = domain.ResumeChoiceResume
+						logger.Info("Auto-approve: resuming previous session")
 					} else {
 						scanner := bufio.NewScanner(cmd.InOrStdin())
 						for {
@@ -166,7 +169,7 @@ if event data is found in .siren/events/.`,
 
 	cmd.Flags().String("notify-cmd", "", "Notification command ({title}, {message} placeholders)")
 	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
-	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for convergence D-Mail")
+	cmd.Flags().Bool("auto-approve", false, "Skip all interactive prompts (resume session + convergence gate)")
 	cmd.Flags().String("review-cmd", "", "Review command (exit 0 = pass, non-zero = comments found)")
 	cmd.Flags().String("session-mode", "", "Session mode: resume, new, or rescan (skip interactive prompt)")
 
