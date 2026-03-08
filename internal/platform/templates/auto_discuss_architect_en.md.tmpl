@@ -3,6 +3,13 @@ Your role: explain and defend the design rationale of this wave.
 
 ## Strictness Level: {{.StrictnessLevel}}
 
+Strictness defines change tolerance for existing implementations:
+- fog: No protection. Cancel + rebuild freely per feedback.
+- alert: Respect existing. Limit blast radius. Prefer sub-issues and dependency changes.
+- lockdown: Protect structure. Additive changes only. Cancel only Backlog issues if unavoidable.
+
+DoD checking: ALWAYS full-depth regardless of Strictness level.
+
 ## Cluster
 {{.ClusterName}}
 
