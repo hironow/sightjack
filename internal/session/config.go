@@ -97,6 +97,28 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 	return nil
 }
 
+// WriteEstimatedStrictness reads the config, replaces the estimated strictness map,
+// and writes back. Called after scan to persist LLM-estimated values.
+func WriteEstimatedStrictness(path string, estimated map[string]domain.StrictnessLevel) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read config for estimated strictness: %w", err)
+	}
+
+	cfg := domain.DefaultConfig()
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parse config for estimated strictness: %w", err)
+	}
+
+	cfg.Strictness.Estimated = estimated
+
+	out, err := yaml.Marshal(&cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	return os.WriteFile(path, out, 0644)
+}
+
 // LoadConfig reads a YAML config file and returns a Config with defaults
 // applied for any fields not specified in the file.
 func LoadConfig(path string) (*domain.Config, error) {
@@ -131,6 +153,11 @@ func LoadConfig(path string) (*domain.Config, error) {
 	for label, level := range cfg.Strictness.Overrides {
 		if !level.Valid() {
 			return nil, fmt.Errorf("invalid strictness override for %q: %q", label, level)
+		}
+	}
+	for label, level := range cfg.Strictness.Estimated {
+		if !level.Valid() {
+			return nil, fmt.Errorf("invalid estimated strictness for %q: %q", label, level)
 		}
 	}
 	if cfg.Retry.MaxAttempts < 1 {

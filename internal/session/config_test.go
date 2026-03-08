@@ -603,6 +603,102 @@ func TestUpdateConfig_InvalidStrictness_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestWriteEstimatedStrictness(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+
+	initial := `
+tracker:
+  team: test
+  project: test
+strictness:
+  default: fog
+  overrides:
+    security: lockdown
+`
+	os.WriteFile(cfgPath, []byte(initial), 0644)
+
+	estimated := map[string]domain.StrictnessLevel{
+		"auth-module":     domain.StrictnessAlert,
+		"payment-billing": domain.StrictnessLockdown,
+	}
+
+	err := session.WriteEstimatedStrictness(cfgPath, estimated)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Strictness.Estimated["auth-module"] != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", cfg.Strictness.Estimated["auth-module"])
+	}
+	if cfg.Strictness.Estimated["payment-billing"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["payment-billing"])
+	}
+	// Verify overrides preserved
+	if cfg.Strictness.Overrides["security"] != domain.StrictnessLockdown {
+		t.Errorf("overrides should be preserved, got %s", cfg.Strictness.Overrides["security"])
+	}
+}
+
+func TestWriteEstimatedStrictness_OverwritesPrevious(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+
+	initial := `
+tracker:
+  team: test
+  project: test
+strictness:
+  default: fog
+  estimated:
+    old-cluster: alert
+`
+	os.WriteFile(cfgPath, []byte(initial), 0644)
+
+	newEstimated := map[string]domain.StrictnessLevel{
+		"new-cluster": domain.StrictnessLockdown,
+	}
+
+	err := session.WriteEstimatedStrictness(cfgPath, newEstimated)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.Strictness.Estimated["old-cluster"]; ok {
+		t.Error("old-cluster should be overwritten")
+	}
+	if cfg.Strictness.Estimated["new-cluster"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["new-cluster"])
+	}
+}
+
+func TestLoadConfig_EstimatedStrictnessInvalid_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(`
+tracker:
+  team: test
+  project: test
+strictness:
+  default: fog
+  estimated:
+    bad-cluster: nightmare
+`), 0644)
+
+	_, err := session.LoadConfig(path)
+	if err == nil {
+		t.Fatal("expected error for invalid estimated strictness value")
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
