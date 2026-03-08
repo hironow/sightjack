@@ -2396,3 +2396,50 @@ func TestDMail_ActionPriorityOmitEmpty(t *testing.T) {
 		t.Error("expected priority field to be omitted when zero")
 	}
 }
+
+func TestFeedbackCollector_Snapshot(t *testing.T) {
+	// given: collector with channel
+	ch := make(chan *session.DMail, 5)
+	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+
+	// send two d-mails before snapshot
+	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-001"}
+	ch <- &session.DMail{Kind: session.DMailReport, Name: "rpt-001"}
+	time.Sleep(100 * time.Millisecond)
+
+	// when: take snapshot
+	fc.Snapshot()
+
+	// and: send one more after snapshot
+	ch <- &session.DMail{Kind: session.DMailSpecification, Name: "spec-001"}
+	time.Sleep(100 * time.Millisecond)
+
+	// then: NewSinceSnapshot returns only the post-snapshot item
+	newMails := fc.NewSinceSnapshot()
+	if len(newMails) != 1 {
+		t.Fatalf("got %d new mails, want 1", len(newMails))
+	}
+	if newMails[0].Name != "spec-001" {
+		t.Errorf("got name %q, want spec-001", newMails[0].Name)
+	}
+}
+
+func TestFeedbackCollector_NewSinceSnapshot_noNew(t *testing.T) {
+	// given: collector with channel
+	ch := make(chan *session.DMail, 5)
+	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+
+	// send one d-mail and snapshot after it
+	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-001"}
+	time.Sleep(100 * time.Millisecond)
+
+	fc.Snapshot()
+
+	// when: no new d-mails after snapshot
+	newMails := fc.NewSinceSnapshot()
+
+	// then
+	if len(newMails) != 0 {
+		t.Fatalf("got %d new mails, want 0", len(newMails))
+	}
+}
