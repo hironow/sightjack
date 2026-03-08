@@ -102,6 +102,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *domain.Config, scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves []domain.Wave, completed map[string]bool,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
+	feedback []*DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
 	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
@@ -119,7 +120,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 
 		// Auto-discuss: Devil's Advocate debate → ADR generation
 		if cfg.Scribe.Enabled && cfg.Scribe.AutoDiscussRounds > 0 {
-			discussResult, discussErr := RunAutoDiscuss(ctx, cfg, scanDir, selected, nil, adrDir, resolvedStrictness, out, logger)
+			discussResult, discussErr := RunAutoDiscuss(ctx, cfg, scanDir, selected, feedback, adrDir, resolvedStrictness, out, logger)
 			if discussErr != nil {
 				logger.Warn("Auto-discuss failed (non-fatal): %v", discussErr)
 			} else if discussResult != nil {
