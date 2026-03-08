@@ -591,7 +591,7 @@ func TestSQLiteOutboxStore_PruneFlushed(t *testing.T) {
 	// Stage 3 items
 	for i := 0; i < 3; i++ {
 		name := fmt.Sprintf("test-%d.dmail", i)
-		if err := store.Stage(ctx, name, []byte(`{"kind":"feedback"}`)); err != nil {
+		if err := store.Stage(ctx, name, []byte(`{"kind":"design-feedback"}`)); err != nil {
 			t.Fatalf("stage %s: %v", name, err)
 		}
 	}
@@ -640,7 +640,7 @@ func TestSQLiteOutboxStore_PruneFlushed_KeepsUnflushed(t *testing.T) {
 	// Stage 2 items, flush them
 	for i := 0; i < 2; i++ {
 		name := fmt.Sprintf("flushed-%d.dmail", i)
-		if err := store.Stage(ctx, name, []byte(`{"kind":"feedback"}`)); err != nil {
+		if err := store.Stage(ctx, name, []byte(`{"kind":"design-feedback"}`)); err != nil {
 			t.Fatalf("stage %s: %v", name, err)
 		}
 	}
