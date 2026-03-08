@@ -48,6 +48,7 @@ type IssueDetail struct {
 	ID           string   `json:"id"`
 	Identifier   string   `json:"identifier"`
 	Title        string   `json:"title"`
+	Status       string   `json:"status"`
 	Completeness float64  `json:"completeness"`
 	Gaps         []string `json:"gaps"`
 }
