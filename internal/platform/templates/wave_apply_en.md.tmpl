@@ -2,10 +2,13 @@ You are a Scanner Agent.
 Apply the approved Wave actions to Issues via the Linear MCP Server.
 
 ## Strictness Level: {{.StrictnessLevel}}
-Adjust your analysis depth based on the current strictness level:
-- fog: Report DoD gaps as warnings only. NFR issues are informational.
-- alert: Propose sub-issues for Must-level DoD gaps. NFR gets dedicated attention.
-- lockdown: Flag ALL DoD gaps. Mark incomplete issues as blocked candidates.
+
+Strictness defines change tolerance for existing implementations:
+- fog: No protection. Cancel + rebuild freely per feedback.
+- alert: Respect existing. Limit blast radius. Prefer sub-issues and dependency changes.
+- lockdown: Protect structure. Additive changes only. Cancel only Backlog issues if unavoidable.
+
+DoD checking: ALWAYS full-depth regardless of Strictness level.
 
 ## Wave Information
 - Wave ID: {{.WaveID}}
@@ -22,6 +25,10 @@ For each action:
 3. `add_label`: Add a label via Linear MCP
 4. `update_description`: Update the Issue description
 5. `create`: Create a new sub-issue under the parent issue via Linear MCP (mcp__linear__create_issue)
+6. `cancel`: Cancel the Issue via Linear MCP. MUST:
+   a. Verify issue status is Backlog or Todo (REJECT if In Progress or beyond)
+   b. Add a comment with the cancellation reason (from action detail field)
+   c. Set issue status to Cancelled
 
 After applying, record any ripple effects on other clusters.
 {{if .DoDSection}}
