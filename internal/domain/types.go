@@ -30,8 +30,10 @@ type ClusterScanResult struct {
 	Completeness float64       `json:"completeness"`
 	Issues       []IssueDetail `json:"issues"`
 	Observations []string      `json:"observations"`
-	Labels       []string      `json:"labels,omitempty"`
-	IssueCount   int           `json:"-"` // computed; used when Issues is nil (e.g. show command)
+	Labels              []string      `json:"labels,omitempty"`
+	EstimatedStrictness string        `json:"estimated_strictness,omitempty"`
+	StrictnessReasoning string        `json:"strictness_reasoning,omitempty"`
+	IssueCount          int           `json:"-"` // computed; used when Issues is nil (e.g. show command)
 }
 
 // NumIssues returns the number of issues. It prefers len(Issues) when

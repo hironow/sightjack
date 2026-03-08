@@ -45,3 +45,18 @@ func TestIssueDetail_HasStatus(t *testing.T) {
 		t.Errorf("expected in_progress, got %s", issue.Status)
 	}
 }
+
+func TestClusterScanResult_EstimatedStrictness(t *testing.T) {
+	c := domain.ClusterScanResult{
+		Name:                "Auth Module",
+		Key:                 "auth-module",
+		EstimatedStrictness: "alert",
+		StrictnessReasoning: "Done 60%, In Progress 15%. Core auth has tight coupling.",
+	}
+	if c.EstimatedStrictness != "alert" {
+		t.Errorf("expected alert, got %s", c.EstimatedStrictness)
+	}
+	if c.StrictnessReasoning == "" {
+		t.Error("expected non-empty reasoning")
+	}
+}
