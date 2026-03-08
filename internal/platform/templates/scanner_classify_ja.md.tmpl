@@ -3,10 +3,13 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 論理的なクラスタ（機能グループ）に分類してください。
 
 ## Strictness Level: {{.StrictnessLevel}}
-現在の厳格度レベルに応じて分析の深さを調整してください:
-- fog: DoD不足をWarningとして表示のみ。NFRは参考情報。
-- alert: Must級DoD欠落にはサブIssue提案。NFRにも専用の注意を。
-- lockdown: 全DoD不足をフラグ。未完了IssueをBlocked候補としてマーク。
+
+Strictnessは既存実装に対する変更許容度を定義します:
+- fog: 既存実装の保護なし。自由に再構成可能。
+- alert: 既存実装を尊重。変更の影響範囲を制限。
+- lockdown: 既存構造を保護。追加的な変更のみ許可。
+
+DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 ## フィルター条件
 - チーム: {{.TeamFilter}}
@@ -31,7 +34,7 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 ```json
 {
   "clusters": [
-    { "name": "クラスタ名", "issue_ids": ["issue-id-1", "issue-id-2"], "labels": ["label1", "label2"] }
+    { "name": "クラスタ名", "key": "cluster-name", "issue_ids": ["issue-id-1", "issue-id-2"], "labels": ["label1", "label2"] }
   ],
   "total_issues": 数値,
   "shibito_warnings": [
@@ -39,6 +42,8 @@ Linear MCP Server を使って指定プロジェクトの Issue を取得し、
   ]
 }
 ```
+
+各クラスタには "name"（表示名、任意の言語可）と "key"（小文字英語のスラグ、ハイフン区切り、スキャン間で安定）の両方が必要です。
 
 {{if .LabelsEnabled}}
 分類完了後、Linear MCPを使用して各分析済みIssueに "{{.LabelPrefix}}:analyzed" ラベルを付与してください。
