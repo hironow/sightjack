@@ -141,6 +141,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			}
 		}
 
+		domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 		if err := ComposeSpecification(ctx, store, selected); err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
@@ -169,6 +170,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				),
 			)
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
+			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 			if err := ComposeSpecification(ctx, store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
@@ -259,6 +261,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			domain.PropagateWaveUpdate(waves, selected)
 			sessionRejected[domain.WaveKey(selected)] = rejected
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
+			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 			if err := ComposeSpecification(ctx, store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
@@ -451,6 +454,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}
 
 	// Compose report d-mail for the completed wave
+	domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
 	if err := ComposeReport(ctx, store, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
@@ -458,6 +462,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}
 
 	// O2: sightjack → amadeus feedback D-Mail
+	domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
 	if feedbackErr := ComposeFeedback(ctx, store, selected, applyResult); feedbackErr != nil {
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
