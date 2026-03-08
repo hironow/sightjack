@@ -84,7 +84,8 @@ type Config struct {
 
 // ScribeConfig holds Scribe Agent settings.
 type ScribeConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled           bool `yaml:"enabled"`
+	AutoDiscussRounds int  `yaml:"auto_discuss_rounds"`
 }
 
 // IssueTrackerConfig holds issue tracker integration settings.
@@ -158,7 +159,8 @@ func DefaultConfig() Config {
 		},
 		Assistant: AIAssistantConfig{},
 		Scribe: ScribeConfig{
-			Enabled: true,
+			Enabled:           true,
+			AutoDiscussRounds: 2,
 		},
 		Strictness: StrictnessConfig{
 			Default: StrictnessFog,
