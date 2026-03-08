@@ -91,6 +91,32 @@ type NextGenPromptData struct {
 	StrictnessLevel string
 }
 
+// AutoDiscussArchitectPromptData holds template data for the auto-discuss architect prompt.
+type AutoDiscussArchitectPromptData struct {
+	ClusterName     string
+	WaveTitle       string
+	WaveActions     string
+	PriorContent    string // prior Devil's Advocate remarks (empty for round 0)
+	FeedbackSection string // design-feedback D-Mails
+	OutputPath      string
+	StrictnessLevel string
+}
+
+// AutoDiscussDevilsAdvocatePromptData holds template data for the Devil's Advocate prompt.
+type AutoDiscussDevilsAdvocatePromptData struct {
+	ClusterName     string
+	WaveTitle       string
+	WaveActions     string
+	PriorContent    string // prior Architect remarks
+	ExistingADRs    []ExistingADR
+	CLAUDEMDContent string // CLAUDE.md content (may be empty)
+	OutputPath      string
+	StrictnessLevel string
+	RoundIndex      int
+	TotalRounds     int
+	IsFinalRound    bool
+}
+
 // MatchDoDTemplate finds a DoD template matching the cluster name.
 // Matching uses case-insensitive prefix match. When multiple keys match,
 // the longest matching prefix wins. Equal-length ties are broken by
