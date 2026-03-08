@@ -313,6 +313,7 @@ loop:
 	}
 	logger.Info("Received %d d-mail(s):", len(feedback))
 	for _, fb := range feedback {
+		domain.LogBanner(logger, domain.BannerRecv, string(fb.Kind), fb.Name, fb.Description)
 		prefix := "[D-Mail]"
 		if fb.Kind == DMailConvergence {
 			prefix = "[D-Mail] [CONVERGENCE]"
@@ -398,6 +399,7 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 	if ch != nil {
 		go func() {
 			for mail := range ch {
+				domain.LogBanner(logger, domain.BannerRecv, string(mail.Kind), mail.Name, mail.Description)
 				c.addMail(mail)
 
 				if mail.Kind == DMailConvergence {
