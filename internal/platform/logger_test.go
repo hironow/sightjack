@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
 )
 
@@ -242,4 +243,81 @@ func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
 
 	// Clean up
 	logger.SetExtraWriter(nil)
+}
+
+func TestBanner_Send_Format(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	l.Banner(domain.BannerSend, "specification", "spec-auth-w1-001", "Add DoD for login")
+	out := buf.String()
+	if !strings.Contains(out, "D-MAIL SEND") {
+		t.Errorf("expected D-MAIL SEND, got: %s", out)
+	}
+	if !strings.Contains(out, "specification") {
+		t.Errorf("expected kind, got: %s", out)
+	}
+	if !strings.Contains(out, "spec-auth-w1-001") {
+		t.Errorf("expected name, got: %s", out)
+	}
+	if !strings.Contains(out, "Add DoD for login") {
+		t.Errorf("expected description, got: %s", out)
+	}
+	if !strings.Contains(out, ">>>") {
+		t.Errorf("expected >>> fallback, got: %s", out)
+	}
+}
+
+func TestBanner_Recv_Format(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	l.Banner(domain.BannerRecv, "design-feedback", "design-feedback-003", "Token rotation drift")
+	out := buf.String()
+	if !strings.Contains(out, "D-MAIL RECV") {
+		t.Errorf("expected D-MAIL RECV, got: %s", out)
+	}
+	if !strings.Contains(out, "<<<") {
+		t.Errorf("expected <<< fallback, got: %s", out)
+	}
+}
+
+func TestBanner_NoColor(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	l.Banner(domain.BannerSend, "specification", "spec-001", "desc")
+	out := buf.String()
+	if strings.Contains(out, "\033[") {
+		t.Errorf("no ANSI codes in no-color mode, got: %s", out)
+	}
+}
+
+func TestBanner_LongDescription_Truncated(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	longDesc := "This is a very long description that exceeds fifty characters easily"
+	l.Banner(domain.BannerSend, "specification", "spec-001", longDesc)
+	out := buf.String()
+	if !strings.Contains(out, "...") {
+		t.Errorf("expected truncation, got: %s", out)
+	}
+	if strings.Contains(out, "easily") {
+		t.Errorf("should be truncated before 'easily', got: %s", out)
+	}
+}
+
+func TestBanner_ExtraWriter_PlainText(t *testing.T) {
+	var buf, extra bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(false)
+	l.SetExtraWriter(&extra)
+	l.Banner(domain.BannerSend, "specification", "spec-001", "desc")
+	if strings.Contains(extra.String(), "\033[") {
+		t.Errorf("extra writer should not have ANSI, got: %s", extra.String())
+	}
+	if !strings.Contains(extra.String(), ">>>") {
+		t.Errorf("extra writer should use plain fallback, got: %s", extra.String())
+	}
 }
