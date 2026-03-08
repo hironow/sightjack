@@ -381,6 +381,8 @@ type FeedbackCollector struct {
 	items            []*DMail
 	convergenceNames []string
 	notifier         port.Notifier
+	notify           chan struct{} // signals new D-Mail arrival (buffered, size 1)
+	snapshotIdx      int          // index up to which items have been seen
 }
 
 // CollectFeedback creates a FeedbackCollector seeded with initial feedback
@@ -391,7 +393,10 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
 	}
-	c := &FeedbackCollector{notifier: notifier}
+	c := &FeedbackCollector{
+		notifier: notifier,
+		notify:   make(chan struct{}, 1),
+	}
 	if len(initial) > 0 {
 		c.items = make([]*DMail, len(initial))
 		copy(c.items, initial)
@@ -401,6 +406,10 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 			for mail := range ch {
 				domain.LogBanner(logger, domain.BannerRecv, string(mail.Kind), mail.Name, mail.Description)
 				c.addMail(mail)
+				select {
+				case c.notify <- struct{}{}:
+				default: // non-blocking, don't block if already signaled
+				}
 
 				if mail.Kind == DMailConvergence {
 					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
@@ -434,6 +443,30 @@ func (c *FeedbackCollector) addMail(mail *DMail) {
 	if mail.Kind == DMailConvergence {
 		c.convergenceNames = append(c.convergenceNames, mail.Name)
 	}
+}
+
+// NotifyCh returns a channel that receives a signal when new D-Mails arrive.
+// Used by the waiting phase to wake up when inbox content changes.
+func (c *FeedbackCollector) NotifyCh() <-chan struct{} { return c.notify }
+
+// Snapshot marks the current position in the collected items.
+// Call before entering the waiting phase.
+func (c *FeedbackCollector) Snapshot() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.snapshotIdx = len(c.items)
+}
+
+// NewSinceSnapshot returns D-Mails received since the last Snapshot call.
+func (c *FeedbackCollector) NewSinceSnapshot() []*DMail {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.snapshotIdx >= len(c.items) {
+		return nil
+	}
+	result := make([]*DMail, len(c.items)-c.snapshotIdx)
+	copy(result, c.items[c.snapshotIdx:])
+	return result
 }
 
 // ConvergenceNames returns a copy of convergence d-mail names received
