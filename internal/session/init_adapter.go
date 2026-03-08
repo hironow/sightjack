@@ -10,14 +10,16 @@ import (
 )
 
 // InitAdapter implements port.InitRunner by orchestrating project initialization I/O.
-type InitAdapter struct{}
+type InitAdapter struct {
+	Force bool // When true, overwrite existing config.yaml
+}
 
 // InitProject creates .siren/config.yaml and supporting files.
 // Returns warnings for non-fatal errors (skill install, mail dirs).
 func (a *InitAdapter) InitProject(baseDir, team, project, lang, strictness string) ([]string, error) {
 	cfgPath := domain.ConfigPath(baseDir)
-	if _, err := os.Stat(cfgPath); err == nil {
-		return nil, fmt.Errorf(".siren/config.yaml already exists in %s", baseDir)
+	if _, err := os.Stat(cfgPath); err == nil && !a.Force {
+		return nil, fmt.Errorf(".siren/config.yaml already exists in %s\nUse --force to overwrite", baseDir)
 	}
 
 	sirenDir := filepath.Join(baseDir, domain.StateDir)

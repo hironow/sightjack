@@ -99,6 +99,57 @@ func TestInitCmd_AlreadyExists(t *testing.T) {
 	}
 }
 
+func TestInitCmd_AlreadyExists_SuggestsForce(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
+	os.WriteFile(domain.ConfigPath(dir), []byte("existing"), 0644)
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error when config already exists")
+	}
+	if !strings.Contains(err.Error(), "--force") {
+		t.Errorf("expected '--force' hint in error, got: %v", err)
+	}
+}
+
+func TestInitCmd_Force_OverwritesExisting(t *testing.T) {
+	// given: existing config with old content
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
+	os.WriteFile(domain.ConfigPath(dir), []byte("old content"), 0644)
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--force", "--team", "NewTeam", "--project", "NewProject", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init --force failed: %v", err)
+	}
+	data, _ := os.ReadFile(domain.ConfigPath(dir))
+	content := string(data)
+	if !strings.Contains(content, "NewTeam") {
+		t.Errorf("expected 'NewTeam' in overwritten config, got:\n%s", content)
+	}
+}
+
 func TestInitCmd_CreatesGitIgnore(t *testing.T) {
 	// given
 	dir := t.TempDir()
