@@ -238,7 +238,7 @@ func ParseSessionMode(s string) (ResumeChoice, error) {
 	}
 }
 
-// StrictnessLevel controls DoD analysis depth (SIREN difficulty system).
+// StrictnessLevel controls change tolerance for existing implementations.
 type StrictnessLevel string
 
 const (
