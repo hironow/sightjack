@@ -2,6 +2,7 @@ package domain
 
 import (
 	"strings"
+	"time"
 )
 
 // StrictnessConfig holds DoD strictness level settings.
@@ -30,13 +31,17 @@ type LabelsConfig struct {
 	ReadyLabel string `yaml:"ready_label"`
 }
 
+// DefaultWaitTimeout is the default D-Mail waiting phase timeout.
+const DefaultWaitTimeout = 30 * time.Minute
+
 // GateConfig holds convergence gate notification and approval settings.
 type GateConfig struct {
-	NotifyCmd    string `yaml:"notify_cmd"`
-	ApproveCmd   string `yaml:"approve_cmd"`
-	AutoApprove  bool   `yaml:"auto_approve"`
-	ReviewCmd    string `yaml:"review_cmd"`
-	ReviewBudget int    `yaml:"review_budget"` // max review cycles (0 = default 3)
+	NotifyCmd    string        `yaml:"notify_cmd"`
+	ApproveCmd   string        `yaml:"approve_cmd"`
+	AutoApprove  bool          `yaml:"auto_approve"`
+	ReviewCmd    string        `yaml:"review_cmd"`
+	ReviewBudget int           `yaml:"review_budget"`  // max review cycles (0 = default 3)
+	WaitTimeout  time.Duration `yaml:"wait_timeout"`   // D-Mail waiting phase timeout (0 = no timeout, <0 = disable waiting)
 }
 
 // IsAutoApprove reports whether the gate is configured to auto-approve.
@@ -173,6 +178,9 @@ func DefaultConfig() Config {
 			Enabled:    true,
 			Prefix:     "sightjack",
 			ReadyLabel: "sightjack:ready",
+		},
+		Gate: GateConfig{
+			WaitTimeout: DefaultWaitTimeout,
 		},
 		Lang: "ja",
 	}

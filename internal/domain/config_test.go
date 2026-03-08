@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 )
@@ -126,6 +127,9 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 	}
 	if cfg.Gate.ReviewBudget != 0 {
 		t.Errorf("Gate.ReviewBudget: expected 0, got %d", cfg.Gate.ReviewBudget)
+	}
+	if cfg.Gate.WaitTimeout != 30*time.Minute {
+		t.Errorf("Gate.WaitTimeout: expected 30m, got %v", cfg.Gate.WaitTimeout)
 	}
 
 	// then: Tracker defaults (all zero values)
@@ -362,5 +366,21 @@ func TestValidLang_RejectsInvalid(t *testing.T) {
 		if domain.ValidLang(lang) {
 			t.Errorf("expected ValidLang(%q) = false", lang)
 		}
+	}
+}
+
+func TestDefaultWaitTimeout(t *testing.T) {
+	if domain.DefaultWaitTimeout != 30*time.Minute {
+		t.Errorf("got %v, want 30m", domain.DefaultWaitTimeout)
+	}
+}
+
+func TestDefaultConfig_WaitTimeout(t *testing.T) {
+	// given/when
+	cfg := domain.DefaultConfig()
+
+	// then
+	if cfg.Gate.WaitTimeout != 30*time.Minute {
+		t.Errorf("Gate.WaitTimeout: expected 30m, got %v", cfg.Gate.WaitTimeout)
 	}
 }
