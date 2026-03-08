@@ -12,7 +12,8 @@
 ## CLI Reference
 
 - [sightjack](cli/sightjack.md) — Root command
-- [sightjack init](cli/sightjack_init.md) — Initialize a project
+- [sightjack init](cli/sightjack_init.md) — Initialize a project (`--force` to overwrite)
+- sightjack config show / config set — Show or set configuration values
 - [sightjack scan](cli/sightjack_scan.md) — Classify and deep-scan Linear issues
 - [sightjack run](cli/sightjack_run.md) — Run the full interactive session
 - [sightjack waves](cli/sightjack_waves.md) — Generate execution waves
