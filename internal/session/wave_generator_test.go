@@ -240,7 +240,7 @@ func TestBuildNextGenPrompt_WithFeedback(t *testing.T) {
 		Issues:       []domain.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
 	feedback := []*session.DMail{
-		{Name: "fb-arch-001", Kind: session.DMailFeedback, Description: "Architecture drift in auth module", Severity: "high", Body: "Token rotation not aligned with JWT spec."},
+		{Name: "fb-arch-001", Kind: session.DMailDesignFeedback, Description: "Architecture drift in auth module", Severity: "high", Body: "Token rotation not aligned with JWT spec."},
 	}
 
 	// when

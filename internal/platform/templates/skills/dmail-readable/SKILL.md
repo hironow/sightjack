@@ -6,7 +6,7 @@ compatibility: Requires phonewave daemon or direct filesystem access.
 metadata:
   dmail-schema-version: "1"
   consumes:
-    - kind: feedback
+    - kind: design-feedback
     - kind: convergence
     - kind: report
 ---

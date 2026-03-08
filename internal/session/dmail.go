@@ -37,11 +37,12 @@ type DMail struct {
 type DMailKind string
 
 const (
-	DMailSpecification DMailKind = "specification"
-	DMailReport        DMailKind = "report"
-	DMailFeedback      DMailKind = "feedback"
-	DMailConvergence   DMailKind = "convergence"
-	DMailCIResult      DMailKind = "ci-result"
+	DMailSpecification  DMailKind = "specification"
+	DMailReport         DMailKind = "report"
+	DMailDesignFeedback DMailKind = "design-feedback"
+	DMailImplFeedback   DMailKind = "implementation-feedback"
+	DMailConvergence    DMailKind = "convergence"
+	DMailCIResult       DMailKind = "ci-result"
 )
 
 // validActions is the set of valid action values per D-Mail schema v1.
@@ -161,10 +162,10 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: dmail-schema-version is required")
 	}
 	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence, DMailCIResult:
+	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult:
 		// valid
 	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence, ci-result)", mail.Kind)
+		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result)", mail.Kind)
 	}
 	if mail.Action != "" && !validActions[mail.Action] {
 		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", mail.Action)
@@ -210,7 +211,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != DMailFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
+	if mail.Kind != DMailDesignFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
 		return nil
 	}
 	return mail
@@ -454,7 +455,7 @@ func (c *FeedbackCollector) FeedbackOnly() []*DMail {
 	defer c.mu.Unlock()
 	var result []*DMail
 	for _, m := range c.items {
-		if m.Kind == DMailFeedback {
+		if m.Kind == DMailDesignFeedback {
 			result = append(result, m)
 		}
 	}
@@ -619,14 +620,15 @@ func FeedbackBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 	return b.String()
 }
 
-// ComposeFeedback stages a feedback D-Mail for amadeus consumption.
+// ComposeFeedback stages a report D-Mail for amadeus consumption.
 // Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
+// Uses DMailReport kind because sightjack's sendable contract only produces specification and report.
 func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("feedback", key),
-		Kind:          DMailFeedback,
-		Description:   fmt.Sprintf("Wave %s feedback for amadeus", key),
+		Kind:          DMailReport,
+		Description:   fmt.Sprintf("Wave %s report for amadeus", key),
 		SchemaVersion: "1",
 		Issues:        WaveIssueIDs(wave),
 		Body:          FeedbackBody(wave, result),

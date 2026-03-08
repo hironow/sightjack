@@ -25,7 +25,7 @@ func TestFilterConvergence_Empty(t *testing.T) {
 func TestFilterConvergence_MixedKinds(t *testing.T) {
 	// given: mixed d-mails
 	dmails := []*session.DMail{
-		{Name: "fb-1", Kind: session.DMailFeedback, Description: "feedback"},
+		{Name: "fb-1", Kind: session.DMailDesignFeedback, Description: "feedback"},
 		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence 1"},
 		{Name: "spec-1", Kind: session.DMailSpecification, Description: "spec"},
 		{Name: "conv-2", Kind: session.DMailConvergence, Description: "convergence 2"},
@@ -49,7 +49,7 @@ func TestFilterConvergence_MixedKinds(t *testing.T) {
 func TestConvergenceGate_NoConvergence(t *testing.T) {
 	// given: no convergence d-mails
 	dmails := []*session.DMail{
-		{Name: "fb-1", Kind: session.DMailFeedback, Description: "feedback only"},
+		{Name: "fb-1", Kind: session.DMailDesignFeedback, Description: "feedback only"},
 	}
 	notifier := &port.NopNotifier{}
 	approver := &port.AutoApprover{}

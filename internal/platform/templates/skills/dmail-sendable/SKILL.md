@@ -8,7 +8,6 @@ metadata:
   produces:
     - kind: specification
     - kind: report
-    - kind: feedback
 ---
 
 Sightjack D-Mail sendable skill.
