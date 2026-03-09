@@ -387,10 +387,9 @@ scan:
   chunk_size: 20         # Issues per scan chunk
   max_concurrency: 3     # Parallel scan workers
 
-assistant:
-  command: "claude"      # Claude CLI command
-  model: "opus"          # Model override (default: "opus")
-  timeout_sec: 300       # Per-invocation timeout
+claude_cmd: "claude"     # Claude CLI command
+model: "opus"            # Model override (default: "opus")
+timeout_sec: 1980        # Per-invocation timeout (33 min)
 
 scribe:
   enabled: true          # ADR generation via Scribe agent

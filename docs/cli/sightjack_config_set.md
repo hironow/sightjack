@@ -14,8 +14,9 @@ Supported keys:
   strictness.default    Default strictness level (fog, alert, lockdown)
   scan.chunk_size       Issues per scan chunk
   scan.max_concurrency  Max concurrent scan workers
-  assistant.model       Claude model name
-  assistant.timeout_sec Claude timeout in seconds
+  claude_cmd            Claude CLI command name
+  model                 Claude model name
+  timeout_sec           Claude timeout in seconds
   gate.auto_approve     Auto-approve convergence gate (true/false)
   labels.enabled        Enable Linear label assignment (true/false)
   labels.prefix         Linear label prefix
