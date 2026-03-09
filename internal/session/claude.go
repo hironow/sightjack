@@ -19,7 +19,7 @@ import (
 var newCmd = defaultNewCmd
 
 func defaultNewCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
-	return exec.CommandContext(ctx, name, args...)
+	return platform.NewShellCmd(ctx, name, args...)
 }
 
 // OverrideNewCmd replaces the command constructor for testing and returns a

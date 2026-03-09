@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 // CheckConfig validates that the config file exists and can be loaded.
@@ -34,7 +34,7 @@ func CheckConfig(configPath string) domain.CheckResult {
 // CheckTool verifies that a CLI tool is installed and executable.
 // It runs `<tool> --version` to confirm functionality.
 func CheckTool(ctx context.Context, name string) domain.CheckResult {
-	path, err := exec.LookPath(name)
+	path, err := platform.LookPathShell(name)
 	if err != nil {
 		return domain.CheckResult{
 			Name:    name,
@@ -44,7 +44,7 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 		}
 	}
 
-	out, err := exec.CommandContext(ctx, path, "--version").Output()
+	out, err := platform.NewShellCmd(ctx, name, "--version").Output()
 	if err != nil {
 		return domain.CheckResult{
 			Name:    name,
