@@ -1,28 +1,23 @@
-## sightjack clean
+## sightjack config
 
-Remove state directory (.siren/)
+View or update sightjack configuration
 
 ### Synopsis
 
-Delete the .siren/ directory to reset to a clean state. Use 'sightjack init' to reinitialize.
-
-```
-sightjack clean [path] [flags]
-```
+View or update the .siren/config.yaml configuration file.
 
 ### Examples
 
 ```
-  sightjack clean
-  sightjack clean /path/to/project
-  sightjack clean --yes
+  sightjack config show
+  sightjack config set tracker.team MY
+  sightjack config set lang en
 ```
 
 ### Options
 
 ```
-  -h, --help   help for clean
-      --yes    Skip confirmation prompt
+  -h, --help   help for config
 ```
 
 ### Options inherited from parent commands
@@ -39,4 +34,6 @@ sightjack clean [path] [flags]
 ### SEE ALSO
 
 * [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+* [sightjack config set](sightjack_config_set.md)	 - Update a configuration value
+* [sightjack config show](sightjack_config_show.md)	 - Display effective configuration
 

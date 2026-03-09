@@ -23,6 +23,9 @@ sightjack init [path] [flags]
   # Initialize in a specific directory
   sightjack init --team Engineering --project Hades /path/to/project
 
+  # Re-initialize (overwrite config, keep state)
+  sightjack init --force --team Engineering --project Hades
+
   # Defaults only (no prompts)
   sightjack init /path/to/project
 ```
@@ -30,6 +33,7 @@ sightjack init [path] [flags]
 ### Options
 
 ```
+      --force                 Overwrite existing config (preserves state directories)
   -h, --help                  help for init
       --lang string           Language (ja/en) (default "ja")
       --otel-backend string   OTel backend: jaeger, weave
@@ -37,7 +41,7 @@ sightjack init [path] [flags]
       --otel-project string   Weave project (required for weave)
       --project string        Linear project name
       --strictness string     Strictness level (fog/alert/lockdown) (default "fog")
-      --team string           Linear team name
+      --team string           Linear team key (e.g. MY)
 ```
 
 ### Options inherited from parent commands
@@ -45,6 +49,7 @@ sightjack init [path] [flags]
 ```
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
+      --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```

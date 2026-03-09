@@ -17,6 +17,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
   -n, --dry-run         Generate prompts without executing Claude
   -h, --help            help for sightjack
   -l, --lang string     Language override (ja/en)
+      --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```
@@ -27,6 +28,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
 * [sightjack apply](sightjack_apply.md)	 - Apply a wave to Linear from stdin Wave JSON
 * [sightjack archive-prune](sightjack_archive-prune.md)	 - Prune expired d-mails and event files
 * [sightjack clean](sightjack_clean.md)	 - Remove state directory (.siren/)
+* [sightjack config](sightjack_config.md)	 - View or update sightjack configuration
 * [sightjack discuss](sightjack_discuss.md)	 - Architect discussion from stdin Wave JSON
 * [sightjack doctor](sightjack_doctor.md)	 - Check environment and tool availability
 * [sightjack init](sightjack_init.md)	 - Create .siren/config.yaml
