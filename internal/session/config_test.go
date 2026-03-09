@@ -44,8 +44,8 @@ tracker:
 	if cfg.ClaudeCmd != "claude" {
 		t.Errorf("expected default command 'claude', got %s", cfg.ClaudeCmd)
 	}
-	if cfg.TimeoutSec != 300 {
-		t.Errorf("expected default timeout 300, got %d", cfg.TimeoutSec)
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected default timeout 1980, got %d", cfg.TimeoutSec)
 	}
 	if cfg.Lang != "ja" {
 		t.Errorf("expected default lang 'ja', got %s", cfg.Lang)
@@ -145,8 +145,8 @@ timeout_sec: 0
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.TimeoutSec)
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected timeout clamped to default 1980, got %d", cfg.TimeoutSec)
 	}
 }
 
@@ -165,8 +165,8 @@ timeout_sec: -10
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.TimeoutSec)
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected timeout clamped to default 1980, got %d", cfg.TimeoutSec)
 	}
 }
 
@@ -1116,8 +1116,8 @@ func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
 	if loaded.Scribe.AutoDiscussRounds != 2 {
 		t.Errorf("Scribe.AutoDiscussRounds: expected 2, got %d", loaded.Scribe.AutoDiscussRounds)
 	}
-	if loaded.TimeoutSec != 300 {
-		t.Errorf("Assistant.TimeoutSec: expected 300, got %d", loaded.TimeoutSec)
+	if loaded.TimeoutSec != 1980 {
+		t.Errorf("Assistant.TimeoutSec: expected 1980, got %d", loaded.TimeoutSec)
 	}
 
 	// verify ComputedConfig is zero-value (nil map) after round-trip of defaults

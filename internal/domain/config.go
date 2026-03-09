@@ -197,7 +197,7 @@ func DefaultConfig() Config {
 		},
 		ClaudeCmd:  "claude",
 		Model:      "opus",
-		TimeoutSec: 300,
+		TimeoutSec: 1980,
 		Scribe: ScribeConfig{
 			Enabled:           true,
 			AutoDiscussRounds: 2,

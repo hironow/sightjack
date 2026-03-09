@@ -79,8 +79,8 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 	if cfg.Model != "opus" {
 		t.Errorf("Model: expected 'opus', got %q", cfg.Model)
 	}
-	if cfg.TimeoutSec != 300 {
-		t.Errorf("TimeoutSec: expected 300, got %d", cfg.TimeoutSec)
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("TimeoutSec: expected 1980, got %d", cfg.TimeoutSec)
 	}
 
 	// then: Scribe defaults

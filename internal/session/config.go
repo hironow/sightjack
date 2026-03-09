@@ -197,7 +197,7 @@ func LoadConfig(path string) (*domain.Config, error) {
 		cfg.Model = "opus"
 	}
 	if cfg.TimeoutSec < 1 {
-		cfg.TimeoutSec = 300
+		cfg.TimeoutSec = 1980
 	}
 	if !cfg.Strictness.Default.Valid() { // nosemgrep: lod-excessive-dot-chain [permanent]
 		cfg.Strictness.Default = domain.StrictnessFog
