@@ -100,6 +100,16 @@ func TestCheckClaudeInference_Error(t *testing.T) {
 	}
 }
 
+func TestCheckClaudeInference_FalsePositive(t *testing.T) {
+	// given: output contains "2" as substring but is not exactly "2"
+	result := checkClaudeInference("12", nil)
+
+	// then: must fail — "12" is not the correct answer
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL for false positive '12', got %v: %s", result.Status, result.Message)
+	}
+}
+
 func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	// given
 	result := checkClaudeInference("I cannot compute that", nil)

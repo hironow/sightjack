@@ -71,7 +71,10 @@ func writeConfigWithDefaults(cfgPath, team, project, lang, strictness string) er
 		var existingMap map[string]any
 		if yamlErr := yaml.Unmarshal(existing, &existingMap); yamlErr == nil {
 			var defaultMap map[string]any
-			defaultData, _ := yaml.Marshal(cfg)
+			defaultData, marshalErr := yaml.Marshal(cfg)
+			if marshalErr != nil {
+				return marshalErr
+			}
 			if err := yaml.Unmarshal(defaultData, &defaultMap); err != nil {
 				return err
 			}
@@ -81,8 +84,15 @@ func writeConfigWithDefaults(cfgPath, team, project, lang, strictness string) er
 
 			// CLI flags override everything: re-apply on top
 			cliOverrides := make(map[string]any)
+			trackerOverrides := make(map[string]any)
 			if team != "" {
-				cliOverrides["tracker"] = map[string]any{"team": team, "project": project}
+				trackerOverrides["team"] = team
+			}
+			if project != "" {
+				trackerOverrides["project"] = project
+			}
+			if len(trackerOverrides) > 0 {
+				cliOverrides["tracker"] = trackerOverrides
 			}
 			if lang != "" {
 				cliOverrides["lang"] = lang

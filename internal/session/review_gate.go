@@ -108,7 +108,7 @@ func runReviewFix(ctx context.Context, cfg *domain.Config, dir, comments string,
 	fixCtx, fixCancel := context.WithTimeout(ctx, fixTimeout)
 	defer fixCancel()
 
-	cmd := exec.CommandContext(fixCtx, claudeCmd,
+	cmd := newCmd(fixCtx, claudeCmd,
 		"--model", model,
 		"--continue",
 		"--dangerously-skip-permissions",

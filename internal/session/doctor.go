@@ -126,7 +126,7 @@ func checkClaudeInference(output string, err error) domain.CheckResult {
 			Hint:    "check API key, quota, and model access",
 		}
 	}
-	if !strings.Contains(output, "2") {
+	if strings.TrimSpace(output) != "2" {
 		return domain.CheckResult{
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
