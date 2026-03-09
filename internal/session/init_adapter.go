@@ -7,6 +7,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"gopkg.in/yaml.v3"
 )
 
 // InitAdapter implements port.InitRunner by orchestrating project initialization I/O.
@@ -27,8 +28,7 @@ func (a *InitAdapter) InitProject(baseDir, team, project, lang, strictness strin
 		return nil, fmt.Errorf("create .siren dir: %w", err)
 	}
 
-	content := platform.RenderInitConfig(team, project, lang, strictness)
-	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
+	if err := writeConfigWithDefaults(cfgPath, team, project, lang, strictness); err != nil {
 		return nil, fmt.Errorf("write config: %w", err)
 	}
 
@@ -43,4 +43,90 @@ func (a *InitAdapter) InitProject(baseDir, team, project, lang, strictness strin
 	}
 
 	return warnings, nil
+}
+
+// writeConfigWithDefaults writes config.yaml with all defaults populated.
+// If an existing config.yaml exists, user values are preserved (merged over defaults).
+// CLI-provided values (team, project, lang, strictness) always win.
+func writeConfigWithDefaults(cfgPath, team, project, lang, strictness string) error {
+	cfg := domain.DefaultConfig()
+
+	// Apply CLI flags
+	if team != "" {
+		cfg.Tracker.Team = team
+	}
+	if project != "" {
+		cfg.Tracker.Project = project
+	}
+	if lang != "" {
+		cfg.Lang = lang
+	}
+	if strictness != "" {
+		cfg.Strictness.Default = domain.StrictnessLevel(strictness)
+	}
+
+	// Merge existing config if present and valid YAML
+	existing, readErr := os.ReadFile(cfgPath)
+	if readErr == nil && len(existing) > 0 {
+		var existingMap map[string]any
+		if yamlErr := yaml.Unmarshal(existing, &existingMap); yamlErr == nil {
+			var defaultMap map[string]any
+			defaultData, _ := yaml.Marshal(cfg)
+			if err := yaml.Unmarshal(defaultData, &defaultMap); err != nil {
+				return err
+			}
+
+			// existing values override defaults
+			deepMerge(defaultMap, existingMap)
+
+			// CLI flags override everything: re-apply on top
+			cliOverrides := make(map[string]any)
+			if team != "" {
+				cliOverrides["tracker"] = map[string]any{"team": team, "project": project}
+			}
+			if lang != "" {
+				cliOverrides["lang"] = lang
+			}
+			if strictness != "" {
+				cliOverrides["strictness"] = map[string]any{"default": strictness}
+			}
+			deepMerge(defaultMap, cliOverrides)
+
+			merged, err := yaml.Marshal(defaultMap)
+			if err != nil {
+				return err
+			}
+			// Round-trip through struct for validation
+			var mergedCfg domain.Config
+			if err := yaml.Unmarshal(merged, &mergedCfg); err != nil {
+				return err
+			}
+			cfg = mergedCfg
+		}
+		// If YAML is invalid, fall through to write fresh defaults
+	}
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(cfgPath, data, 0644)
+}
+
+// deepMerge merges src into dst recursively. src values override dst values.
+func deepMerge(dst, src map[string]any) {
+	for k, sv := range src {
+		dv, exists := dst[k]
+		if !exists {
+			dst[k] = sv
+			continue
+		}
+		srcMap, srcOK := sv.(map[string]any)
+		dstMap, dstOK := dv.(map[string]any)
+		if srcOK && dstOK {
+			deepMerge(dstMap, srcMap)
+		} else {
+			dst[k] = sv
+		}
+	}
 }
