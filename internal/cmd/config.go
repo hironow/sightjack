@@ -64,9 +64,9 @@ Supported keys:
   strictness.default        Default strictness level (fog, alert, lockdown)
   scan.chunk_size           Issues per scan chunk
   scan.max_concurrency      Max concurrent scan workers
-  assistant.command         Claude CLI command name
-  assistant.model           Claude model name
-  assistant.timeout_sec     Claude timeout in seconds
+  claude_cmd                Claude CLI command name (alias: assistant.command)
+  model                     Claude model name (alias: assistant.model)
+  timeout_sec               Claude timeout in seconds (alias: assistant.timeout_sec)
   scribe.enabled            Enable Scribe Agent (true/false)
   scribe.auto_discuss_rounds  Auto-discuss rounds (non-negative integer)
   retry.max_attempts        Max retry attempts (positive integer)

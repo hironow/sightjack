@@ -33,7 +33,7 @@ func TestRunReviewGate_SkippedWhenNoCmd(t *testing.T) {
 	// given
 	ctx := context.Background()
 	gate := domain.GateConfig{} // ReviewCmd empty
-	assistant := domain.AIAssistantConfig{}
+	assistant := &domain.Config{}
 
 	// when
 	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
@@ -51,7 +51,7 @@ func TestRunReviewGate_PassingReview(t *testing.T) {
 	// given
 	ctx := context.Background()
 	gate := domain.GateConfig{ReviewCmd: "echo 'all good'"}
-	assistant := domain.AIAssistantConfig{Command: "true", TimeoutSec: 30}
+	assistant := &domain.Config{ClaudeCmd: "true", TimeoutSec: 30}
 
 	// when
 	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
@@ -69,7 +69,7 @@ func TestRunReviewGate_FailingReviewExhaustedCycles(t *testing.T) {
 	// given — review always fails (exit 1), claude fix is "true" (noop, does nothing)
 	ctx := context.Background()
 	gate := domain.GateConfig{ReviewCmd: "echo 'found issues' && exit 1"}
-	assistant := domain.AIAssistantConfig{Command: "true", TimeoutSec: 30}
+	assistant := &domain.Config{ClaudeCmd: "true", TimeoutSec: 30}
 	dir := t.TempDir()
 	initGitRepo(t, dir)
 
@@ -89,7 +89,7 @@ func TestRunReviewGate_BudgetExceeded(t *testing.T) {
 	// given — budget=1, review always fails
 	ctx := context.Background()
 	gate := domain.GateConfig{ReviewCmd: "echo 'error' && exit 1", ReviewBudget: 1}
-	assistant := domain.AIAssistantConfig{Command: "true", TimeoutSec: 30}
+	assistant := &domain.Config{ClaudeCmd: "true", TimeoutSec: 30}
 	dir := t.TempDir()
 	initGitRepo(t, dir)
 
@@ -109,7 +109,7 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 	// given — budget=0 means use default (3)
 	ctx := context.Background()
 	gate := domain.GateConfig{ReviewCmd: "echo ok"}
-	assistant := domain.AIAssistantConfig{TimeoutSec: 30}
+	assistant := &domain.Config{TimeoutSec: 30}
 
 	// when
 	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
@@ -147,7 +147,7 @@ exit 0
 `), 0755)
 
 	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2}
-	assistant := domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
+	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
 	ctx := context.Background()
 
 	// when — review fails, fix is called with review comments in prompt
@@ -189,7 +189,7 @@ exit 0
 	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 0\n"), 0755)
 
 	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 3}
-	assistant := domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
+	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
 	ctx := context.Background()
 
 	// when — review fail → fix (fake claude) → review pass
@@ -216,7 +216,7 @@ func TestRunReviewGate_FixFailure_ReturnsFalse(t *testing.T) {
 	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 1\n"), 0755)
 
 	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2}
-	assistant := domain.AIAssistantConfig{Command: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
+	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
 	ctx := context.Background()
 
 	// when — fix fails

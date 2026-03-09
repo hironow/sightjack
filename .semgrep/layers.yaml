@@ -354,7 +354,7 @@ rules:
     pattern-regex: '(LinearConfig|ClaudeConfig|Wandb|Jaeger)'
     message: |
       domain 層に vendor 固有の語彙が含まれています。
-      汎用的な名前を使用してください（例: IssueTrackerConfig, AIAssistantConfig）。
+      汎用的な名前を使用してください（例: IssueTrackerConfig）。
     paths:
       include:
         - "/internal/domain/**"
@@ -639,3 +639,20 @@ rules:
         - /internal/cmd/
       exclude:
         - '*_test.go'
+
+  # --- Rule: No hardcoded "claude" literal in exec arguments ---
+
+  - id: config-no-hardcoded-claude-literal
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: exec.Command("claude", ...)
+      - pattern: exec.CommandContext($CTX, "claude", ...)
+      - pattern: append($BINS, "claude")
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      Do not hardcode "claude" as exec argument. Use config.ClaudeCmd.

@@ -72,15 +72,15 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 		t.Errorf("Scan.MaxConcurrency: expected 3, got %d", cfg.Scan.MaxConcurrency)
 	}
 
-	// then: Assistant defaults (zero values before LoadConfig clamping)
-	if cfg.Assistant.Command != "" {
-		t.Errorf("Assistant.Command: expected empty (set by LoadConfig), got %q", cfg.Assistant.Command)
+	// then: Claude assistant defaults (set in DefaultConfig)
+	if cfg.ClaudeCmd != "claude" {
+		t.Errorf("ClaudeCmd: expected 'claude', got %q", cfg.ClaudeCmd)
 	}
-	if cfg.Assistant.Model != "" {
-		t.Errorf("Assistant.Model: expected empty (set by LoadConfig), got %q", cfg.Assistant.Model)
+	if cfg.Model != "opus" {
+		t.Errorf("Model: expected 'opus', got %q", cfg.Model)
 	}
-	if cfg.Assistant.TimeoutSec != 0 {
-		t.Errorf("Assistant.TimeoutSec: expected 0 (set by LoadConfig), got %d", cfg.Assistant.TimeoutSec)
+	if cfg.TimeoutSec != 300 {
+		t.Errorf("TimeoutSec: expected 300, got %d", cfg.TimeoutSec)
 	}
 
 	// then: Scribe defaults

@@ -149,13 +149,8 @@ func (w *Workspace) overrideSightjackClaudeCommand(t *testing.T) {
 		t.Fatalf("parse sightjack config: %v", err)
 	}
 
-	// Ensure claude section exists with command = "claude"
-	claudeSection, ok := cfg["claude"].(map[string]any)
-	if !ok {
-		claudeSection = make(map[string]any)
-	}
-	claudeSection["command"] = "claude"
-	cfg["claude"] = claudeSection
+	// Ensure claude_cmd is set to "claude" (the fake-claude binary in PATH)
+	cfg["claude_cmd"] = "claude"
 
 	out, err := yaml.Marshal(cfg)
 	if err != nil {

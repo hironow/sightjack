@@ -676,7 +676,7 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 	cfg := domain.DefaultConfig()
 	cfg.Tracker.Team = "TEST"
 	cfg.Tracker.Project = "test-project"
-	cfg.Assistant.TimeoutSec = 30
+	cfg.TimeoutSec = 30
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
 	cfg.Labels.Enabled = false // avoid RunClaudeOnce label path complexity
@@ -799,7 +799,7 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 	cfg := domain.DefaultConfig()
 	cfg.Tracker.Team = "T"
 	cfg.Tracker.Project = "p"
-	cfg.Assistant.TimeoutSec = 30
+	cfg.TimeoutSec = 30
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
 	cfg.Labels.Enabled = false
@@ -917,7 +917,7 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 		{Name: "API", Completeness: 0.30, Issues: []domain.IssueDetail{{ID: "T-3"}}},
 	}
 	cfg := domain.DefaultConfig()
-	cfg.Assistant.TimeoutSec = 10
+	cfg.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
 	logger := platform.NewLogger(io.Discard, false)
@@ -958,7 +958,7 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 		{Name: "B", Completeness: 0.1, Issues: []domain.IssueDetail{{ID: "T-2"}}},
 	}
 	cfg := domain.DefaultConfig()
-	cfg.Assistant.TimeoutSec = 10
+	cfg.TimeoutSec = 10
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
 	logger := platform.NewLogger(io.Discard, false)

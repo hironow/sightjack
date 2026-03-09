@@ -42,8 +42,8 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	cfg := &domain.Config{
-		Assistant: domain.AIAssistantConfig{Command: "echo", TimeoutSec: 10},
-		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
+		ClaudeCmd: "echo", TimeoutSec: 10,
+		Retry: domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
 	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
@@ -128,8 +128,8 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	cfg := &domain.Config{
-		Assistant: domain.AIAssistantConfig{Command: "false", TimeoutSec: 30},
-		Retry:     domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
+		ClaudeCmd: "false", TimeoutSec: 30,
+		Retry: domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
 
 	// Create a parent span so retry events have a recording span to attach to.

@@ -54,9 +54,9 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", cfg.Assistant.Model),
-				attribute.Int("claude.timeout_sec", cfg.Assistant.TimeoutSec),
-			}, platform.GenAISpanAttrs(cfg.Assistant.Model)...)...,
+				attribute.String("claude.model", cfg.Model),
+				attribute.Int("claude.timeout_sec", cfg.TimeoutSec),
+			}, platform.GenAISpanAttrs(cfg.Model)...)...,
 		),
 	)
 	defer span.End()
@@ -65,7 +65,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	// RunClaude wraps the entire retry loop in a single timeout, so individual
 	// attempts inherit the remaining budget without resetting it.
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		timeout := time.Duration(cfg.Assistant.TimeoutSec) * time.Second
+		timeout := time.Duration(cfg.TimeoutSec) * time.Second
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
@@ -77,15 +77,15 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	}
 
 	var args []string
-	if cfg.Assistant.Model != "" {
-		args = append(args, "--model", cfg.Assistant.Model)
+	if cfg.Model != "" {
+		args = append(args, "--model", cfg.Model)
 	}
 	if len(o.allowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(o.allowedTools, ","))
 	}
 	args = append(args, "--output-format", "stream-json")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
-	cmd := newCmd(ctx, cfg.Assistant.Command, args...)
+	cmd := newCmd(ctx, cfg.ClaudeCmd, args...)
 	cmd.Cancel = cancelFunc(cmd)
 	cmd.WaitDelay = 3 * time.Second
 
@@ -169,7 +169,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			span.AddEvent("claude.timeout",
-				trace.WithAttributes(attribute.Int("claude.timeout_sec", cfg.Assistant.TimeoutSec)),
+				trace.WithAttributes(attribute.Int("claude.timeout_sec", cfg.TimeoutSec)),
 			)
 		}
 		return output.String(), fmt.Errorf("claude exit: %w", err)
@@ -196,7 +196,7 @@ func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writ
 
 	// Wrap the entire retry loop in a single timeout so total wall time
 	// is bounded by TimeoutSec regardless of MaxAttempts.
-	timeout := time.Duration(cfg.Assistant.TimeoutSec) * time.Second
+	timeout := time.Duration(cfg.TimeoutSec) * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 

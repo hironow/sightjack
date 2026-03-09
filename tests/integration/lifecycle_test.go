@@ -107,8 +107,8 @@ func testEmitter(baseDir, sessionID string) port.SessionEventEmitter {
 // Labels and Scribe disabled to avoid extra Claude calls.
 func testConfig() *domain.Config {
 	return &domain.Config{
-		Lang:       "en",
-		Assistant:  domain.AIAssistantConfig{Command: "claude", TimeoutSec: 30},
+		Lang:      "en",
+		ClaudeCmd: "claude", TimeoutSec: 30,
 		Scan:       domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
 		Tracker:    domain.IssueTrackerConfig{Team: "ENG", Project: "TestProject"},
 		Scribe:     domain.ScribeConfig{Enabled: false},

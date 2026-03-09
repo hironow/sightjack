@@ -102,7 +102,9 @@ func (g *GateConfig) SetWaitTimeout(d time.Duration) { g.WaitTimeout = d }
 type Config struct {
 	Tracker      IssueTrackerConfig     `yaml:"tracker"`
 	Scan         ScanConfig             `yaml:"scan"`
-	Assistant    AIAssistantConfig      `yaml:"assistant"`
+	ClaudeCmd    string                 `yaml:"claude_cmd,omitempty"`
+	Model        string                 `yaml:"model,omitempty"`
+	TimeoutSec   int                    `yaml:"timeout_sec,omitempty"`
 	Scribe       ScribeConfig           `yaml:"scribe"`
 	Strictness   StrictnessConfig       `yaml:"strictness"`
 	Retry        RetryConfig            `yaml:"retry"`
@@ -130,13 +132,6 @@ type IssueTrackerConfig struct {
 type ScanConfig struct {
 	ChunkSize      int `yaml:"chunk_size"`
 	MaxConcurrency int `yaml:"max_concurrency"`
-}
-
-// AIAssistantConfig holds AI assistant invocation settings.
-type AIAssistantConfig struct {
-	Command    string `yaml:"command"`
-	Model      string `yaml:"model"`
-	TimeoutSec int    `yaml:"timeout_sec"`
 }
 
 // strictnessRank returns a numeric rank for ordering: higher = stricter.
@@ -200,7 +195,9 @@ func DefaultConfig() Config {
 			ChunkSize:      20,
 			MaxConcurrency: 3,
 		},
-		Assistant: AIAssistantConfig{},
+		ClaudeCmd:  "claude",
+		Model:      "opus",
+		TimeoutSec: 300,
 		Scribe: ScribeConfig{
 			Enabled:           true,
 			AutoDiscussRounds: 2,
@@ -251,8 +248,8 @@ func ValidateConfig(cfg Config) []string {
 	if cfg.Scan.MaxConcurrency < 1 {
 		errs = append(errs, fmt.Sprintf("scan.max_concurrency must be positive (got %d)", cfg.Scan.MaxConcurrency))
 	}
-	if cfg.Assistant.TimeoutSec < 0 {
-		errs = append(errs, fmt.Sprintf("assistant.timeout_sec must be non-negative (got %d)", cfg.Assistant.TimeoutSec))
+	if cfg.TimeoutSec < 0 {
+		errs = append(errs, fmt.Sprintf("timeout_sec must be non-negative (got %d)", cfg.TimeoutSec))
 	}
 	if cfg.Retry.MaxAttempts < 1 {
 		errs = append(errs, fmt.Sprintf("retry.max_attempts must be positive (got %d)", cfg.Retry.MaxAttempts))

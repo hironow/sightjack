@@ -8,7 +8,7 @@
 //   - Produces no stdout output (avoids leaking into pipe JSON).
 //
 // Install as /usr/local/bin/claude inside the E2E Docker container so that
-// cfg.Assistant.Command = "claude" resolves to this binary.
+// cfg.ClaudeCmd = "claude" resolves to this binary.
 package main
 
 import (

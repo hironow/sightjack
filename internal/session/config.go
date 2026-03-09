@@ -73,14 +73,14 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid max_concurrency %q: must be positive integer", value)
 		}
 		cfg.Scan.MaxConcurrency = n
-	case "assistant.model":
-		cfg.Assistant.Model = value
-	case "assistant.timeout_sec":
+	case "model", "assistant.model":
+		cfg.Model = value
+	case "timeout_sec", "assistant.timeout_sec":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 1 {
 			return fmt.Errorf("invalid timeout_sec %q: must be positive integer", value)
 		}
-		cfg.Assistant.TimeoutSec = n
+		cfg.TimeoutSec = n
 	case "gate.auto_approve":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
@@ -97,8 +97,8 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 		cfg.Labels.Prefix = value
 	case "labels.ready_label":
 		cfg.Labels.ReadyLabel = value
-	case "assistant.command":
-		cfg.Assistant.Command = value
+	case "claude_cmd", "assistant.command":
+		cfg.ClaudeCmd = value
 	case "scribe.enabled":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
@@ -190,14 +190,14 @@ func LoadConfig(path string) (*domain.Config, error) {
 	if cfg.Scan.MaxConcurrency < 1 {
 		cfg.Scan.MaxConcurrency = 3
 	}
-	if cfg.Assistant.Command == "" {
-		cfg.Assistant.Command = "claude"
+	if cfg.ClaudeCmd == "" {
+		cfg.ClaudeCmd = "claude"
 	}
-	if cfg.Assistant.Model == "" {
-		cfg.Assistant.Model = "opus"
+	if cfg.Model == "" {
+		cfg.Model = "opus"
 	}
-	if cfg.Assistant.TimeoutSec < 1 {
-		cfg.Assistant.TimeoutSec = 300
+	if cfg.TimeoutSec < 1 {
+		cfg.TimeoutSec = 300
 	}
 	if !cfg.Strictness.Default.Valid() { // nosemgrep: lod-excessive-dot-chain [permanent]
 		cfg.Strictness.Default = domain.StrictnessFog

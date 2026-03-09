@@ -217,7 +217,7 @@ func TestRenderInitConfig_DefaultsApplied(t *testing.T) {
 	if cfg.Scan.ChunkSize != 20 {
 		t.Errorf("expected default ChunkSize 20, got %d", cfg.Scan.ChunkSize)
 	}
-	if cfg.Assistant.Command != "claude" {
-		t.Errorf("expected default command 'claude', got %s", cfg.Assistant.Command)
+	if cfg.ClaudeCmd != "claude" {
+		t.Errorf("expected default command 'claude', got %s", cfg.ClaudeCmd)
 	}
 }

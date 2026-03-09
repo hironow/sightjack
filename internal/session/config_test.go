@@ -41,11 +41,11 @@ tracker:
 	if cfg.Scan.MaxConcurrency != 3 {
 		t.Errorf("expected default max_concurrency 3, got %d", cfg.Scan.MaxConcurrency)
 	}
-	if cfg.Assistant.Command != "claude" {
-		t.Errorf("expected default command 'claude', got %s", cfg.Assistant.Command)
+	if cfg.ClaudeCmd != "claude" {
+		t.Errorf("expected default command 'claude', got %s", cfg.ClaudeCmd)
 	}
-	if cfg.Assistant.TimeoutSec != 300 {
-		t.Errorf("expected default timeout 300, got %d", cfg.Assistant.TimeoutSec)
+	if cfg.TimeoutSec != 300 {
+		t.Errorf("expected default timeout 300, got %d", cfg.TimeoutSec)
 	}
 	if cfg.Lang != "ja" {
 		t.Errorf("expected default lang 'ja', got %s", cfg.Lang)
@@ -63,10 +63,9 @@ tracker:
 scan:
   chunk_size: 50
   max_concurrency: 5
-assistant:
-  command: "cc-p"
-  model: "sonnet"
-  timeout_sec: 600
+claude_cmd: "cc-p"
+model: "sonnet"
+timeout_sec: 600
 lang: "en"
 `), 0644)
 	if err != nil {
@@ -81,8 +80,8 @@ lang: "en"
 	if cfg.Scan.ChunkSize != 50 {
 		t.Errorf("expected 50, got %d", cfg.Scan.ChunkSize)
 	}
-	if cfg.Assistant.Model != "sonnet" {
-		t.Errorf("expected sonnet, got %s", cfg.Assistant.Model)
+	if cfg.Model != "sonnet" {
+		t.Errorf("expected sonnet, got %s", cfg.Model)
 	}
 	if cfg.Lang != "en" {
 		t.Errorf("expected en, got %s", cfg.Lang)
@@ -135,8 +134,7 @@ func TestLoadConfig_ZeroTimeout_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-assistant:
-  timeout_sec: 0
+timeout_sec: 0
 `), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -147,8 +145,8 @@ assistant:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Assistant.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Assistant.TimeoutSec)
+	if cfg.TimeoutSec != 300 {
+		t.Errorf("expected timeout clamped to default 300, got %d", cfg.TimeoutSec)
 	}
 }
 
@@ -156,8 +154,7 @@ func TestLoadConfig_NegativeTimeout_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-assistant:
-  timeout_sec: -10
+timeout_sec: -10
 `), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -168,8 +165,8 @@ assistant:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Assistant.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Assistant.TimeoutSec)
+	if cfg.TimeoutSec != 300 {
+		t.Errorf("expected timeout clamped to default 300, got %d", cfg.TimeoutSec)
 	}
 }
 
@@ -737,8 +734,8 @@ lang: "ja"
 		t.Fatalf("UpdateConfig: %v", err)
 	}
 	cfg, _ := session.LoadConfig(cfgPath)
-	if cfg.Assistant.Command != "cc-p" {
-		t.Errorf("expected 'cc-p', got %q", cfg.Assistant.Command)
+	if cfg.ClaudeCmd != "cc-p" {
+		t.Errorf("expected 'cc-p', got %q", cfg.ClaudeCmd)
 	}
 }
 
@@ -1003,9 +1000,8 @@ strictness:
 scan:
   chunk_size: 30
   max_concurrency: 4
-assistant:
-  model: sonnet
-  timeout_sec: 600
+model: sonnet
+timeout_sec: 600
 `), 0644)
 
 	estimated := map[string]domain.StrictnessLevel{
@@ -1056,11 +1052,11 @@ assistant:
 	if loaded.Scan.MaxConcurrency != 4 {
 		t.Errorf("Scan.MaxConcurrency: expected 4, got %d", loaded.Scan.MaxConcurrency)
 	}
-	if loaded.Assistant.Model != "sonnet" {
-		t.Errorf("Assistant.Model: expected 'sonnet', got %q", loaded.Assistant.Model)
+	if loaded.Model != "sonnet" {
+		t.Errorf("Assistant.Model: expected 'sonnet', got %q", loaded.Model)
 	}
-	if loaded.Assistant.TimeoutSec != 600 {
-		t.Errorf("Assistant.TimeoutSec: expected 600, got %d", loaded.Assistant.TimeoutSec)
+	if loaded.TimeoutSec != 600 {
+		t.Errorf("Assistant.TimeoutSec: expected 600, got %d", loaded.TimeoutSec)
 	}
 }
 
@@ -1120,8 +1116,8 @@ func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
 	if loaded.Scribe.AutoDiscussRounds != 2 {
 		t.Errorf("Scribe.AutoDiscussRounds: expected 2, got %d", loaded.Scribe.AutoDiscussRounds)
 	}
-	if loaded.Assistant.TimeoutSec != 300 {
-		t.Errorf("Assistant.TimeoutSec: expected 300, got %d", loaded.Assistant.TimeoutSec)
+	if loaded.TimeoutSec != 300 {
+		t.Errorf("Assistant.TimeoutSec: expected 300, got %d", loaded.TimeoutSec)
 	}
 
 	// verify ComputedConfig is zero-value (nil map) after round-trip of defaults

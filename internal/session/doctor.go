@@ -279,8 +279,8 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 
 	// 3. claude binary check
 	claudeName := "claude"
-	if cfg != nil && cfg.Assistant.Command != "" {
-		claudeName = cfg.Assistant.Command
+	if cfg != nil && cfg.ClaudeCmd != "" {
+		claudeName = cfg.ClaudeCmd
 	}
 	claudeResult := CheckTool(ctx, claudeName)
 	results = append(results, claudeResult)
