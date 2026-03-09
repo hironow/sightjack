@@ -3,10 +3,10 @@ package session
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
@@ -44,7 +44,7 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 		}
 	}
 
-	out, err := platform.NewShellCmd(ctx, name, "--version").Output()
+	out, err := newCmd(ctx, name, "--version").Output()
 	if err != nil {
 		return domain.CheckResult{
 			Name:    name,
@@ -62,37 +62,18 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 	}
 }
 
-// CheckClaudeAuth verifies that Claude Code is authenticated by sending a
-// simple prompt that does not require any MCP server.
-// Returns CheckSkip if cfg is nil (config loading failed).
-func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger domain.Logger) domain.CheckResult {
-	if cfg == nil {
-		return domain.CheckResult{
-			Name:    "Claude Auth",
-			Status:  domain.CheckSkip,
-			Message: "skipped (config not available)",
-		}
-	}
-
-	output, err := RunClaudeOnce(ctx, cfg, "Reply with only the word OK.", io.Discard, logger, WithAllowedTools("Write"))
-	if err != nil {
-		hint := fmt.Sprintf("claude execution failed: %v", err)
-		if strings.Contains(output, "Not logged in") {
-			return domain.CheckResult{
-				Name:    "Claude Auth",
-				Status:  domain.CheckFail,
-				Message: "not logged in",
-				Hint:    `run "claude login" then "/login" inside the session (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
-			}
-		}
+// checkClaudeAuth determines if the Claude CLI is authenticated by
+// interpreting the result of running `claude mcp list`. A successful
+// command execution (no error) indicates the CLI is authenticated.
+func checkClaudeAuth(mcpOutput string, mcpErr error) domain.CheckResult {
+	if mcpErr != nil {
 		return domain.CheckResult{
 			Name:    "Claude Auth",
 			Status:  domain.CheckFail,
-			Message: hint,
-			Hint:    `check Claude CLI with "claude --version"; if auth issue, run "claude login" (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
+			Message: "not authenticated: " + mcpErr.Error(),
+			Hint:    `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 		}
 	}
-
 	return domain.CheckResult{
 		Name:    "Claude Auth",
 		Status:  domain.CheckOK,
@@ -100,34 +81,38 @@ func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger domain.Logg
 	}
 }
 
-// CheckLinearMCP verifies Linear MCP connectivity by sending a prompt that
-// references the configured Linear team.
-// Returns CheckSkip if cfg is nil (config loading failed).
-func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger domain.Logger) domain.CheckResult {
-	if cfg == nil {
-		return domain.CheckResult{
-			Name:    "Linear MCP",
-			Status:  domain.CheckSkip,
-			Message: "skipped (config not available)",
-		}
-	}
-
-	prompt := fmt.Sprintf("Reply with only the word OK. If you have access to the Linear MCP server for team %q, reply OK.", cfg.Tracker.Team)
-	_, err := RunClaudeOnce(ctx, cfg, prompt, io.Discard, logger, WithAllowedTools(LinearMCPAllowedTools...))
-	if err != nil {
+// checkLinearMCP parses `claude mcp list` output for Linear MCP connection.
+// Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
+// Requires "✓" to avoid false positives from "disconnected" or "not connected".
+func checkLinearMCP(mcpOutput string, mcpErr error) domain.CheckResult {
+	if mcpErr != nil {
 		return domain.CheckResult{
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("claude execution failed: %v", err),
-			Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
-				"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
+			Message: fmt.Sprintf("claude mcp list failed: %v", mcpErr),
+			Hint:    `ensure Claude CLI is authenticated with "claude login"`,
+		}
+	}
+
+	output := strings.ToLower(mcpOutput)
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "linear") &&
+			strings.Contains(line, "✓") &&
+			strings.Contains(line, "connected") {
+			return domain.CheckResult{
+				Name:    "Linear MCP",
+				Status:  domain.CheckOK,
+				Message: "Linear MCP connected",
+			}
 		}
 	}
 
 	return domain.CheckResult{
 		Name:    "Linear MCP",
-		Status:  domain.CheckOK,
-		Message: fmt.Sprintf("claude responded (team: %s)", cfg.Tracker.Team),
+		Status:  domain.CheckFail,
+		Message: "Linear MCP not found or not connected",
+		Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
+			"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
 	}
 }
 
@@ -294,31 +279,48 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	// 5.5. Event store check
 	results = append(results, CheckEventStore(baseDir))
 
-	// 6. Claude Auth check (skip if claude binary unavailable)
-	skipClaude := claudeResult.Status != domain.CheckOK
-	if skipClaude {
+	// 6-7. Claude Auth + Linear MCP (run `claude mcp list` once, share output)
+	if cfgResult.Status != domain.CheckOK {
+		results = append(results, domain.CheckResult{
+			Name:    "Claude Auth",
+			Status:  domain.CheckSkip,
+			Message: "skipped (config not loaded)",
+		})
+		results = append(results, domain.CheckResult{
+			Name:    "Linear MCP",
+			Status:  domain.CheckSkip,
+			Message: "skipped (config not loaded)",
+		})
+	} else if claudeResult.Status != domain.CheckOK {
 		results = append(results, domain.CheckResult{
 			Name:    "Claude Auth",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
-	} else {
-		authResult := CheckClaudeAuth(ctx, cfg, logger)
-		results = append(results, authResult)
-		if authResult.Status != domain.CheckOK {
-			skipClaude = true
-		}
-	}
-
-	// 7. Linear MCP connectivity (skip if claude binary or auth unavailable)
-	if skipClaude {
 		results = append(results, domain.CheckResult{
 			Name:    "Linear MCP",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
 	} else {
-		results = append(results, CheckLinearMCP(ctx, cfg, logger))
+		mcpCtx, mcpCancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := newCmd(mcpCtx, claudeName, "mcp", "list")
+		out, mcpErr := cmd.Output()
+		mcpCancel()
+		mcpOutput := string(out)
+
+		authResult := checkClaudeAuth(mcpOutput, mcpErr)
+		results = append(results, authResult)
+
+		if authResult.Status != domain.CheckOK {
+			results = append(results, domain.CheckResult{
+				Name:    "Linear MCP",
+				Status:  domain.CheckSkip,
+				Message: "skipped (claude not authenticated)",
+			})
+		} else {
+			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+		}
 	}
 
 	// 8. Success rate (informational, never fails)

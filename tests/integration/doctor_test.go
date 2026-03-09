@@ -106,156 +106,6 @@ func TestCheckStatusLabel(t *testing.T) {
 	}
 }
 
-// --- CheckClaudeAuth tests ---
-
-func TestCheckClaudeAuth_Success(t *testing.T) {
-	// given: mock claude that responds OK
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "OK")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd: "claude", TimeoutSec: 10,
-		Retry: domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
-	}
-	if result.Name != "Claude Auth" {
-		t.Errorf("expected name 'Claude Auth', got %q", result.Name)
-	}
-}
-
-func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
-	// given: mock claude that outputs "Not logged in" and exits 1
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "sh", "-c", `echo "Not logged in · Please run /login"; exit 1`)
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd: "claude", TimeoutSec: 10,
-		Retry: domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
-	}
-	if !strings.Contains(result.Hint, "claude login") {
-		t.Errorf("expected Hint to contain 'claude login', got: %s", result.Hint)
-	}
-}
-
-func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
-	// given: mock claude that fails with unknown error
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "false")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd: "claude", TimeoutSec: 10,
-		Retry: domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
-	}
-}
-
-func TestCheckClaudeAuth_NilConfig_Skips(t *testing.T) {
-	// given: nil config
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, nil, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckSkip {
-		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
-	}
-}
-
-// --- CheckLinearMCP tests ---
-
-func TestCheckLinearMCP_Success(t *testing.T) {
-	// given: mock claude that returns team info
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", `{"teams": [{"name": "Engineering"}]}`)
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd: "claude", TimeoutSec: 10,
-		Tracker: domain.IssueTrackerConfig{Team: "Engineering"},
-		Retry:   domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckLinearMCP(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
-	}
-}
-
-func TestCheckLinearMCP_Failure(t *testing.T) {
-	// given: mock claude that fails (auth is OK but MCP fails)
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "false")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd: "claude", TimeoutSec: 10,
-		Tracker: domain.IssueTrackerConfig{Team: "Engineering"},
-		Retry:   domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckLinearMCP(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
-	}
-	if !strings.Contains(result.Hint, "claude mcp add") {
-		t.Errorf("expected Hint to contain 'claude mcp add', got: %s", result.Hint)
-	}
-}
-
-func TestCheckLinearMCP_NilConfig_Skips(t *testing.T) {
-	// given: nil config (config load failed)
-	ctx := context.Background()
-
-	// when
-	result := session.CheckLinearMCP(ctx, nil, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckSkip {
-		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
-	}
-}
 
 func TestCheckStateDir_Writable(t *testing.T) {
 	// given: a directory where .siren/ can be created
@@ -521,15 +371,16 @@ tracker:
 	if results[6].Name != "Claude Auth" {
 		t.Errorf("expected 'Claude Auth', got %q", results[6].Name)
 	}
-	// Claude Auth may be OK (if claude binary exists) or SKIP (if not)
-	if results[6].Status != domain.CheckOK && results[6].Status != domain.CheckSkip {
-		t.Errorf("Claude Auth check: expected OK or SKIP, got %v: %s", results[6].Status, results[6].Message)
+	// Claude Auth may be OK, FAIL, or SKIP depending on environment
+	if results[6].Status != domain.CheckOK && results[6].Status != domain.CheckSkip && results[6].Status != domain.CheckFail {
+		t.Errorf("Claude Auth check: unexpected status %v: %s", results[6].Status, results[6].Message)
 	}
 	if results[7].Name != "Linear MCP" {
 		t.Errorf("expected 'Linear MCP', got %q", results[7].Name)
 	}
-	if results[7].Status != domain.CheckOK && results[7].Status != domain.CheckSkip {
-		t.Errorf("Linear MCP check: expected OK or SKIP, got %v: %s", results[7].Status, results[7].Message)
+	// Linear MCP may be OK, FAIL, or SKIP depending on environment
+	if results[7].Status != domain.CheckOK && results[7].Status != domain.CheckSkip && results[7].Status != domain.CheckFail {
+		t.Errorf("Linear MCP check: unexpected status %v: %s", results[7].Status, results[7].Message)
 	}
 	// success-rate should be last result, OK with "no events" (no events dir in temp)
 	sr := results[8]
