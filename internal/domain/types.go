@@ -25,11 +25,11 @@ type ClusterClassification struct {
 // ClusterScanResult is the output of Pass 2 (per-cluster deep scan).
 // Written by Claude Code to cluster_{name}.json.
 type ClusterScanResult struct {
-	Name         string        `json:"name"`
-	Key          string        `json:"key"`
-	Completeness float64       `json:"completeness"`
-	Issues       []IssueDetail `json:"issues"`
-	Observations []string      `json:"observations"`
+	Name                string        `json:"name"`
+	Key                 string        `json:"key"`
+	Completeness        float64       `json:"completeness"`
+	Issues              []IssueDetail `json:"issues"`
+	Observations        []string      `json:"observations"`
 	Labels              []string      `json:"labels,omitempty"`
 	EstimatedStrictness string        `json:"estimated_strictness,omitempty"`
 	StrictnessReasoning string        `json:"strictness_reasoning,omitempty"`

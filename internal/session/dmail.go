@@ -382,7 +382,7 @@ type FeedbackCollector struct {
 	convergenceNames []string
 	notifier         port.Notifier
 	notify           chan struct{} // signals new D-Mail arrival (buffered, size 1)
-	snapshotIdx      int          // index up to which items have been seen
+	snapshotIdx      int           // index up to which items have been seen
 }
 
 // CollectFeedback creates a FeedbackCollector seeded with initial feedback
