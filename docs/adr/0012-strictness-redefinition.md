@@ -31,16 +31,19 @@ The key insight: DoD analysis should ALWAYS be thorough regardless of how much e
 ## Consequences
 
 ### Positive
+
 - Clear separation between analysis depth and change tolerance
 - Scan-time estimation prevents stale strictness values
 - Cancel action enables clean feedback-driven course corrections
 - 3-layer max ensures strictness never accidentally decreases
 
 ### Negative
+
 - Breaking change: overrides can no longer lower strictness below default
 - Scan-time estimation adds LLM cost to every deep scan
 - Estimated values in config may surprise users unfamiliar with auto-generation
 
 ### Neutral
+
 - All prompt templates updated to reflect new definition
 - Issue status now tracked in scan results (enables future status-based policies)

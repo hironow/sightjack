@@ -39,15 +39,18 @@ Key design choices:
 ## Consequences
 
 ### Positive
+
 - Auto-approve mode now generates ADRs, preventing invisible architectural debt
 - Positive feedback loop: more ADRs improve Devil's Advocate arguments, improving ADR quality
 - Bounded by fixed round count and ScribeADR's "ADR not needed" escape hatch
 - No changes to existing `RunScribeADR()` or `ComposeSpecification()`
 
 ### Negative
+
 - Additional Claude API calls per wave in auto-approve mode (2N+1 calls for N rounds)
 - Devil's Advocate quality depends on existing ADR corpus; initial runs with few ADRs produce weaker challenges
 
 ### Neutral
+
 - Design-feedback D-Mails are threaded into the debate as additional context for the Architect agent
 - OTEL spans added for observability (`scribe.auto_discuss`, `scribe.auto_discuss.round`)

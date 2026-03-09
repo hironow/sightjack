@@ -188,6 +188,7 @@ Linear (via MCP Server)
 ## Scope
 
 **What Sightjack does:**
+
 - Scan Linear issues and detect missing DoD, hidden dependencies, and technical debt revival
 - Generate wave-by-wave execution plans with prerequisite chains
 - Guide interactive approval and apply approved changes to Linear via MCP
@@ -195,6 +196,7 @@ Linear (via MCP Server)
 - Send specification/report D-Mails to downstream tools
 
 **What Sightjack does NOT do:**
+
 - Implement code changes (paintress handles implementation)
 - Verify post-merge integrity (amadeus handles verification)
 - Deliver D-Mails (phonewave handles routing)

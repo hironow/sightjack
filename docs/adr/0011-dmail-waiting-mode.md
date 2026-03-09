@@ -26,15 +26,18 @@ Key design choices:
 ## Consequences
 
 ### Positive
+
 - Transforms sightjack from one-shot to persistent session without daemon infrastructure
 - Leverages existing fsnotify watcher (zero additional OS resources)
 - All three entry points (RunSession, RunResumeSession, RunRescanSession) gain waiting mode automatically
 - Configurable timeout provides flexibility for different workflows
 
 ### Negative
+
 - Specification D-Mail rescan is not yet implemented (logged but not acted upon)
 - Waiting mode adds complexity to the interactive loop control flow (two nested loops with labels)
 
 ### Neutral
+
 - Integration tests disable waiting mode via `WaitTimeout: -1` to avoid blocking
 - The `--wait-timeout` flag follows existing Cobra flag override pattern
