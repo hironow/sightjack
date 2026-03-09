@@ -8,6 +8,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// isUpToDate returns true if current version is >= latest version.
+// Non-semver versions (e.g. "dev") are always considered out of date.
+func isUpToDate(current, latest string) bool {
+	cv, err := semver.NewVersion(current)
+	if err != nil {
+		return false
+	}
+	lv, err := semver.NewVersion(latest)
+	if err != nil {
+		return false
+	}
+	return !cv.LessThan(lv)
+}
+
 func newUpdateCmd() *cobra.Command {
 	var checkOnly bool
 
@@ -42,14 +56,7 @@ installing.`,
 				return nil
 			}
 
-			// Guard: version may be "dev" for local builds (non-semver).
-			// LessOrEqual calls semver.MustParse internally, which panics on invalid input.
-			if _, err := semver.NewVersion(Version); err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", Version, latest.Version())
-				return nil
-			}
-
-			if latest.LessOrEqual(Version) {
+			if isUpToDate(Version, latest.Version()) {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", Version)
 				return nil
 			}
