@@ -119,7 +119,8 @@ func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger domain.Logge
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("claude execution failed: %v", err),
-			Hint:    `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`,
+			Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
+				"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
 		}
 	}
 
