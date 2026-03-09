@@ -443,10 +443,19 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 
 	// Review gate: run review before composing report (outbox is read immediately by phonewave)
 	if gate.HasReviewCmd() {
+		_, reviewSpan := platform.Tracer.Start(ctx, "wave.review", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+			trace.WithAttributes(
+				attribute.String("wave.id", selected.ID),
+				attribute.String("wave.cluster_name", selected.ClusterName),
+			),
+		)
 		passed, reviewErr := RunReviewGate(ctx, gate, cfg.Assistant, scanDir, logger)
 		if reviewErr != nil {
+			reviewSpan.SetAttributes(attribute.String("review.error", reviewErr.Error()))
 			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
 		}
+		reviewSpan.SetAttributes(attribute.Bool("review.passed", passed))
+		reviewSpan.End()
 		if !passed {
 			logger.Warn("Review gate: not passed — skipping ComposeReport for wave %s", domain.WaveKey(selected))
 			return
