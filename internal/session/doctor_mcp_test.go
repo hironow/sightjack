@@ -1,3 +1,4 @@
+// white-box-reason: tests unexported checkClaudeAuth and checkLinearMCP pure functions
 package session
 
 import (
