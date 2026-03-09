@@ -52,4 +52,5 @@ sightjack config set <key> <value> [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack config](sightjack_config.md)  - View or update sightjack configuration
+* [sightjack config](sightjack_config.md)	 - View or update sightjack configuration
+
