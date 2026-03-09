@@ -603,3 +603,39 @@ rules:
       除外: *_test.go
       意図的仕様差分: raw field 限定（intent method 呼び出しは許可。cfg.Gate.IsAutoApprove() は正当な Tell-Don't-Ask パターン）
       Ref: Tell-Don't-Ask, Law of Demeter
+
+  # --- Rule: No computed field assignment in setConfigField ---
+
+  - id: config-no-computed-field-in-set
+    severity: ERROR
+    message: >-
+      Do not assign to ComputedConfig fields in setConfigField.
+      Computed fields are read-only; use WriteEstimatedStrictness() for system writes.
+    languages: [go]
+    patterns:
+      - pattern: cfg.Computed.$FIELD = $VALUE
+      - pattern-inside: |
+          func setConfigField(...) error {
+            ...
+          }
+    paths:
+      include:
+        - /internal/session/config.go
+
+  # --- Rule: No direct computed field write from cmd layer ---
+
+  - id: config-no-direct-computed-write
+    severity: ERROR
+    message: >-
+      Do not write to ComputedConfig fields from cmd layer.
+      Use session.WriteEstimatedStrictness() for system-level writes only.
+    languages: [go]
+    patterns:
+      - pattern-either:
+          - pattern: $CFG.Computed.EstimatedStrictness = $VALUE
+          - pattern: $CFG.Computed.EstimatedStrictness[$KEY] = $VALUE
+    paths:
+      include:
+        - /internal/cmd/
+      exclude:
+        - '*_test.go'
