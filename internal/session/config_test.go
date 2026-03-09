@@ -3,6 +3,7 @@ package session_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -961,6 +962,24 @@ scan:
 	}
 	if cfg.Scan.MaxConcurrency != 3 {
 		t.Errorf("expected max_concurrency clamped to default 3, got %d", cfg.Scan.MaxConcurrency)
+	}
+}
+
+func TestSetConfigField_RejectsComputedKey(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "strictness.estimated", "fog")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for computed key strictness.estimated")
+	}
+	if !strings.Contains(err.Error(), "computed") {
+		t.Errorf("expected error to contain 'computed', got %q", err.Error())
 	}
 }
 

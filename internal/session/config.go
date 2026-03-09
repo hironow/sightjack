@@ -141,6 +141,8 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid gate.wait_timeout %q: must be duration (e.g. 30m, 1h)", value)
 		}
 		cfg.Gate.SetWaitTimeout(d)
+	case "strictness.estimated":
+		return fmt.Errorf("key %q is computed (read-only): cannot be set manually", key)
 	default:
 		return fmt.Errorf("unknown config key %q", key)
 	}
