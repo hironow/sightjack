@@ -30,6 +30,16 @@ func OverrideNewCmd(fn func(ctx context.Context, name string, args ...string) *e
 	return func() { newCmd = old }
 }
 
+var lookPath = platform.LookPathShell
+
+// OverrideLookPath replaces the path lookup function for testing and returns a
+// cleanup function.
+func OverrideLookPath(fn func(cmd string) (string, error)) func() {
+	old := lookPath
+	lookPath = fn
+	return func() { lookPath = old }
+}
+
 // RunOption configures optional behavior for RunClaudeOnce / RunClaude.
 type RunOption func(*runOpts)
 

@@ -97,13 +97,7 @@ func runReviewFix(ctx context.Context, cfg *domain.Config, dir, comments string,
 	}
 
 	claudeCmd := cfg.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = "claude"
-	}
 	model := cfg.Model
-	if model == "" {
-		model = "opus"
-	}
 
 	prompt := BuildReviewFixPrompt(branch, comments)
 
