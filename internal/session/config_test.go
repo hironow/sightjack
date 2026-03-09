@@ -648,11 +648,11 @@ strictness:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Strictness.Estimated["auth-module"] != domain.StrictnessAlert {
-		t.Errorf("expected alert, got %s", cfg.Strictness.Estimated["auth-module"])
+	if cfg.Computed.EstimatedStrictness["auth-module"] != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", cfg.Computed.EstimatedStrictness["auth-module"])
 	}
-	if cfg.Strictness.Estimated["payment-billing"] != domain.StrictnessLockdown {
-		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["payment-billing"])
+	if cfg.Computed.EstimatedStrictness["payment-billing"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Computed.EstimatedStrictness["payment-billing"])
 	}
 	// Verify overrides preserved
 	if cfg.Strictness.Overrides["security"] != domain.StrictnessLockdown {
@@ -670,7 +670,8 @@ tracker:
   project: test
 strictness:
   default: fog
-  estimated:
+computed:
+  estimated_strictness:
     old-cluster: alert
 `
 	os.WriteFile(cfgPath, []byte(initial), 0644)
@@ -688,11 +689,11 @@ strictness:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := cfg.Strictness.Estimated["old-cluster"]; ok {
+	if _, ok := cfg.Computed.EstimatedStrictness["old-cluster"]; ok {
 		t.Error("old-cluster should be overwritten")
 	}
-	if cfg.Strictness.Estimated["new-cluster"] != domain.StrictnessLockdown {
-		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["new-cluster"])
+	if cfg.Computed.EstimatedStrictness["new-cluster"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Computed.EstimatedStrictness["new-cluster"])
 	}
 }
 
@@ -705,7 +706,8 @@ tracker:
   project: test
 strictness:
   default: fog
-  estimated:
+computed:
+  estimated_strictness:
     bad-cluster: nightmare
 `), 0644)
 

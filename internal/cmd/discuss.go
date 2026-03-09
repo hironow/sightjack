@@ -81,7 +81,7 @@ suitable for piping into 'adr' for ADR generation.`,
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
 
-			strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+			strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 
 			logger := loggerFrom(cmd)
 

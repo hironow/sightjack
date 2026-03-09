@@ -141,7 +141,7 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid gate.wait_timeout %q: must be duration (e.g. 30m, 1h)", value)
 		}
 		cfg.Gate.SetWaitTimeout(d)
-	case "strictness.estimated":
+	case "strictness.estimated", "computed.estimated_strictness":
 		return fmt.Errorf("key %q is computed (read-only): cannot be set manually", key)
 	default:
 		return fmt.Errorf("unknown config key %q", key)
@@ -162,7 +162,7 @@ func WriteEstimatedStrictness(path string, estimated map[string]domain.Strictnes
 		return fmt.Errorf("parse config for estimated strictness: %w", err)
 	}
 
-	cfg.Strictness.Estimated = estimated
+	cfg.Computed.EstimatedStrictness = estimated
 
 	out, err := yaml.Marshal(&cfg)
 	if err != nil {
@@ -207,7 +207,7 @@ func LoadConfig(path string) (*domain.Config, error) {
 			return nil, fmt.Errorf("invalid strictness override for %q: %q", label, level)
 		}
 	}
-	for label, level := range cfg.Strictness.Estimated {
+	for label, level := range cfg.Computed.EstimatedStrictness {
 		if !level.Valid() {
 			return nil, fmt.Errorf("invalid estimated strictness for %q: %q", label, level)
 		}

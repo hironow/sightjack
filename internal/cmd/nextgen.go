@@ -142,7 +142,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			adrDir := session.ADRDir(baseDir)
 			existingADRs, _ := session.ReadExistingADRs(adrDir)
 			completedWaves := domain.CompletedWavesForCluster(allWaves, cluster.Name)
-			strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
+			strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
 
 			if dryRun {
 				if err := session.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger); err != nil {

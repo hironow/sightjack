@@ -1,8 +1,11 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/hironow/sightjack/internal/domain"
 )
@@ -92,8 +95,8 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 	if cfg.Strictness.Overrides != nil {
 		t.Errorf("Strictness.Overrides: expected nil, got %v", cfg.Strictness.Overrides)
 	}
-	if cfg.Strictness.Estimated != nil {
-		t.Errorf("Strictness.Estimated: expected nil, got %v", cfg.Strictness.Estimated)
+	if cfg.Computed.EstimatedStrictness != nil {
+		t.Errorf("Computed.EstimatedStrictness: expected nil, got %v", cfg.Computed.EstimatedStrictness)
 	}
 
 	// then: Retry defaults
@@ -229,7 +232,7 @@ func TestGateConfig_HasMethods(t *testing.T) {
 func TestResolveStrictness_DefaultWhenNoOverrides(t *testing.T) {
 	cfg := domain.StrictnessConfig{Default: domain.StrictnessFog}
 
-	result := domain.ResolveStrictness(cfg, []string{"feature", "bug"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"feature", "bug"})
 
 	if result != domain.StrictnessFog {
 		t.Errorf("expected fog, got %s", result)
@@ -242,7 +245,7 @@ func TestResolveStrictness_SingleLabelMatch(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, []string{"feature", "security"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"feature", "security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown, got %s", result)
@@ -258,7 +261,7 @@ func TestResolveStrictness_StrictestWins(t *testing.T) {
 		},
 	}
 
-	result := domain.ResolveStrictness(cfg, []string{"enhancement", "security"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"enhancement", "security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (strictest), got %s", result)
@@ -268,7 +271,7 @@ func TestResolveStrictness_StrictestWins(t *testing.T) {
 func TestResolveStrictness_NilOverrides(t *testing.T) {
 	cfg := domain.StrictnessConfig{Default: domain.StrictnessAlert}
 
-	result := domain.ResolveStrictness(cfg, []string{"anything"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"anything"})
 
 	if result != domain.StrictnessAlert {
 		t.Errorf("expected alert default, got %s", result)
@@ -281,7 +284,7 @@ func TestResolveStrictness_EmptyLabels(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil)
+	result := domain.ResolveStrictness(cfg, nil, nil)
 
 	if result != domain.StrictnessFog {
 		t.Errorf("expected fog default, got %s", result)
@@ -294,7 +297,7 @@ func TestResolveStrictness_NoMatchingLabels(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, []string{"feature", "backend"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"feature", "backend"})
 
 	if result != domain.StrictnessFog {
 		t.Errorf("expected fog default, got %s", result)
@@ -307,7 +310,7 @@ func TestResolveStrictness_OverrideCannotLowerBelowDefault(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"Docs": domain.StrictnessFog},
 	}
 
-	result := domain.ResolveStrictness(cfg, []string{"Docs"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"Docs"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (max never lowers), got %s", result)
@@ -323,7 +326,7 @@ func TestResolveStrictness_MultipleMatchesPickStrictest(t *testing.T) {
 		},
 	}
 
-	result := domain.ResolveStrictness(cfg, []string{"Docs", "Security"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"Docs", "Security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (default is strictest via max), got %s", result)
@@ -336,7 +339,7 @@ func TestResolveStrictness_ClusterNameAsLabel(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"Security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, []string{"Security"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"Security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown for Security cluster, got %s", result)
@@ -349,7 +352,7 @@ func TestResolveStrictness_CaseInsensitiveMatch(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, []string{"Security"})
+	result := domain.ResolveStrictness(cfg, nil, []string{"Security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (case-insensitive match), got %s", result)
@@ -391,12 +394,12 @@ func TestDefaultConfig_WaitTimeout(t *testing.T) {
 func TestResolveStrictness_EstimatedTakesEffect(t *testing.T) {
 	// given
 	cfg := domain.StrictnessConfig{
-		Default:   domain.StrictnessFog,
-		Estimated: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert},
+		Default: domain.StrictnessFog,
 	}
+	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert}
 
 	// when
-	got := domain.ResolveStrictness(cfg, []string{"auth-module"})
+	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then
 	if got != domain.StrictnessAlert {
@@ -409,11 +412,11 @@ func TestResolveStrictness_OverrideTrumpsEstimated(t *testing.T) {
 	cfg := domain.StrictnessConfig{
 		Default:   domain.StrictnessFog,
 		Overrides: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessLockdown},
-		Estimated: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert},
 	}
+	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert}
 
 	// when
-	got := domain.ResolveStrictness(cfg, []string{"auth-module"})
+	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then
 	if got != domain.StrictnessLockdown {
@@ -479,15 +482,63 @@ func TestValidateConfig_InvalidStrictnessOverride(t *testing.T) {
 func TestResolveStrictness_MaxOfDefaultAndEstimated(t *testing.T) {
 	// given
 	cfg := domain.StrictnessConfig{
-		Default:   domain.StrictnessAlert,
-		Estimated: map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessFog},
+		Default: domain.StrictnessAlert,
 	}
+	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessFog}
 
 	// when
-	got := domain.ResolveStrictness(cfg, []string{"auth-module"})
+	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then
 	if got != domain.StrictnessAlert {
 		t.Errorf("expected alert, got %s", got)
+	}
+}
+
+func TestConfig_ComputedConfig_EmptyByDefault(t *testing.T) {
+	// given/when
+	cfg := domain.DefaultConfig()
+
+	// then
+	if cfg.Computed.EstimatedStrictness != nil {
+		t.Errorf("expected nil EstimatedStrictness, got %v", cfg.Computed.EstimatedStrictness)
+	}
+}
+
+func TestConfig_YAMLRoundTrip_WithComputed(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+	cfg.Computed.EstimatedStrictness = map[string]domain.StrictnessLevel{
+		"auth-module":     domain.StrictnessAlert,
+		"payment-billing": domain.StrictnessLockdown,
+	}
+
+	// when: marshal
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	// then: YAML contains computed section, not nested under user/strictness
+	yamlStr := string(data)
+	if !strings.Contains(yamlStr, "computed:") {
+		t.Errorf("expected 'computed:' section in YAML, got:\n%s", yamlStr)
+	}
+	if strings.Contains(yamlStr, "user:") {
+		t.Errorf("YAML should not contain 'user:' wrapper, got:\n%s", yamlStr)
+	}
+
+	// when: unmarshal back
+	var restored domain.Config
+	if err := yaml.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then: estimated strictness preserved
+	if restored.Computed.EstimatedStrictness["auth-module"] != domain.StrictnessAlert {
+		t.Errorf("auth-module: expected alert, got %s", restored.Computed.EstimatedStrictness["auth-module"])
+	}
+	if restored.Computed.EstimatedStrictness["payment-billing"] != domain.StrictnessLockdown {
+		t.Errorf("payment-billing: expected lockdown, got %s", restored.Computed.EstimatedStrictness["payment-billing"])
 	}
 }

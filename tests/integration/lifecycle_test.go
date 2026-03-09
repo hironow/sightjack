@@ -1393,7 +1393,7 @@ func TestResultCache_ApplyResult(t *testing.T) {
 	}
 
 	wave := waves[0]
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 	internal, err := session.RunWaveApply(context.Background(), cfg, scanDir, wave, strictness, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveApply failed: %v", err)
@@ -1456,7 +1456,7 @@ func TestResultCache_DiscussResult(t *testing.T) {
 	}
 
 	wave := waves[0]
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 	resp, err := session.RunArchitectDiscuss(context.Background(), cfg, scanDir, wave, "review coupling", strictness, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunArchitectDiscuss failed: %v", err)
@@ -1528,7 +1528,7 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 
 	existingADRs, _ := session.ReadExistingADRs(session.ADRDir(baseDir))
 	completedWaves := domain.CompletedWavesForCluster(waves, cluster.Name)
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
 
 	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, platform.NewLogger(io.Discard, false))
 	if err != nil {

@@ -172,7 +172,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
 				OutputPath:      chunkFile,
-				StrictnessLevel: string(domain.ResolveStrictness(cfg.Strictness, append([]string{cc.Name}, cc.Labels...))),
+				StrictnessLevel: string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, append([]string{cc.Name}, cc.Labels...))),
 			})
 			if renderErr != nil {
 				return domain.ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)
@@ -300,7 +300,7 @@ func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir str
 		Observations:    strings.Join(cluster.Observations, "\n"),
 		DoDSection:      domain.ResolveDoDSection(cfg.DoDTemplates, cluster.Name),
 		OutputPath:      waveFile,
-		StrictnessLevel: string(domain.ResolveStrictness(cfg.Strictness, append([]string{cluster.Name}, cluster.Labels...))),
+		StrictnessLevel: string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, append([]string{cluster.Name}, cluster.Labels...))),
 	})
 	if err != nil {
 		return domain.WaveGenerateResult{}, fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)

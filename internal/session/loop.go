@@ -61,7 +61,7 @@ waitingCycle:
 				continue
 			}
 
-			resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
+			resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
 			waveKey := domain.WaveKey(selected)
 			waveCtx, waveSpan := platform.Tracer.Start(ctx, fmt.Sprintf("wave[%s]", waveKey), // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch in loop [permanent]
