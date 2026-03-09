@@ -71,6 +71,18 @@ if event data is found in .siren/events/.`,
 			if cmd.Flags().Changed("review-cmd") {
 				cfg.Gate.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
 			}
+			if cmd.Flags().Changed("strictness") {
+				s, _ := cmd.Flags().GetString("strictness")
+				level := domain.StrictnessLevel(s)
+				if !level.Valid() {
+					return fmt.Errorf("invalid strictness %q: must be fog, alert, or lockdown", s)
+				}
+				cfg.Strictness.Default = level
+				logger.Info("Strictness override: %s", s)
+			}
+			if cmd.Flags().Changed("wait-timeout") {
+				cfg.Gate.WaitTimeout, _ = cmd.Flags().GetDuration("wait-timeout")
+			}
 
 			// Parse base directory into domain primitive (used by all command constructions below)
 			rp, rpErr := domain.NewRepoPath(baseDir)
@@ -98,7 +110,7 @@ if event data is found in .siren/events/.`,
 						promptState = resumableState
 					}
 
-					// Determine session choice: --session-mode flag or interactive prompt
+					// Determine session choice: --session-mode flag, --auto-approve, or interactive prompt
 					var choice domain.ResumeChoice
 					sessionMode, _ := cmd.Flags().GetString("session-mode")
 					if sessionMode != "" {
@@ -107,6 +119,9 @@ if event data is found in .siren/events/.`,
 							return parseErr
 						}
 						choice = parsed
+					} else if cfg.Gate.AutoApprove {
+						choice = domain.ResumeChoiceResume
+						logger.Info("Auto-approve: resuming previous session")
 					} else {
 						scanner := bufio.NewScanner(cmd.InOrStdin())
 						for {
@@ -166,9 +181,11 @@ if event data is found in .siren/events/.`,
 
 	cmd.Flags().String("notify-cmd", "", "Notification command ({title}, {message} placeholders)")
 	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
-	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for convergence D-Mail")
+	cmd.Flags().Bool("auto-approve", false, "Skip all interactive prompts (resume session + convergence gate)")
 	cmd.Flags().String("review-cmd", "", "Review command (exit 0 = pass, non-zero = comments found)")
 	cmd.Flags().String("session-mode", "", "Session mode: resume, new, or rescan (skip interactive prompt)")
+	cmd.Flags().StringP("strictness", "s", "", "Override default strictness level (fog, alert, lockdown)")
+	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting)")
 
 	return cmd
 }

@@ -249,7 +249,10 @@ func runFullSession(t *testing.T, dir string, opts ...sessionOption) {
 	}
 	defer c.Close()
 
-	args := append([]string{"run"}, so.flags...)
+	// Disable D-Mail waiting mode to prevent session from blocking after
+	// nextgen returns empty waves. Without this, the default 30m wait-timeout
+	// causes the session to enter inbox polling instead of exiting.
+	args := append([]string{"run", "--wait-timeout=-1s"}, so.flags...)
 	args = append(args, dir)
 	cmd := exec.Command(sightjackBin(), args...)
 	cmd.Stdin = c.Tty()
@@ -262,6 +265,18 @@ func runFullSession(t *testing.T, dir string, opts ...sessionOption) {
 	if startErr := cmd.Start(); startErr != nil {
 		t.Fatalf("start run: %v", startErr)
 	}
+
+	// Safety net: kill process if it doesn't exit within 2 minutes.
+	// This prevents the entire e2e suite from timing out at 600s.
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Minute):
+			cmd.Process.Kill()
+		}
+	}()
+	defer close(done)
 
 	// scan → wave selection
 	if _, expErr := c.ExpectString("Select wave"); expErr != nil {

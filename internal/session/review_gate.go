@@ -58,9 +58,7 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, assistant domain
 		reviewStart := time.Now()
 		result, err := RunReview(reviewCtx, gate.ReviewCmdString(), dir)
 		reviewCancel()
-		if platform.IsDetailDebug() {
-			span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
-		}
+		span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
 		if err != nil {
 			span.RecordError(err)
 			span.SetAttributes(attribute.String("error.stage", "sightjack.review"))

@@ -29,6 +29,9 @@ d-mail skills, and sets up mail directories.`,
   # Initialize in a specific directory
   sightjack init --team Engineering --project Hades /path/to/project
 
+  # Re-initialize (overwrite config, keep state)
+  sightjack init --force --team Engineering --project Hades
+
   # Defaults only (no prompts)
   sightjack init /path/to/project`,
 		Args: cobra.MaximumNArgs(1),
@@ -54,8 +57,9 @@ d-mail skills, and sets up mail directories.`,
 			if rpErr != nil {
 				return rpErr
 			}
+			force, _ := cmd.Flags().GetBool("force")
 			initCmd := domain.NewInitCommand(rp, team, project, lang, strictness)
-			warnings, initErr := usecase.RunInit(initCmd, &session.InitAdapter{})
+			warnings, initErr := usecase.RunInit(initCmd, &session.InitAdapter{Force: force})
 			if initErr != nil {
 				return initErr
 			}
@@ -72,7 +76,8 @@ d-mail skills, and sets up mail directories.`,
 			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, w)
 		},
 	}
-	cmd.Flags().String("team", "", "Linear team name")
+	cmd.Flags().Bool("force", false, "Overwrite existing config (preserves state directories)")
+	cmd.Flags().String("team", "", "Linear team key (e.g. MY)")
 	cmd.Flags().String("project", "", "Linear project name")
 	cmd.Flags().String("lang", "ja", "Language (ja/en)")
 	cmd.Flags().String("strictness", "fog", "Strictness level (fog/alert/lockdown)")

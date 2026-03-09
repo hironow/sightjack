@@ -30,7 +30,7 @@ const (
 func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	scanResult *domain.ScanResult, cfg *domain.Config, available []domain.Wave, waves []domain.Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
-	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, selectPhaseResult, bool) {
+	out io.Writer, sessionSpan trace.Span, logger domain.Logger) (domain.Wave, selectPhaseResult, bool) {
 
 	gate := cfg.Gate
 
@@ -57,7 +57,7 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	// Prompt wave selection
 	selected, err := PromptWaveSelection(ctx, out, scanner, available)
 	if err == domain.ErrQuit {
-		loopSpan.AddEvent("session.paused")
+		sessionSpan.AddEvent("session.paused")
 		logger.Info("Session paused. State saved.")
 		return domain.Wave{}, selectQuit, shibitoShown
 	}
@@ -102,20 +102,46 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *domain.Config, scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves []domain.Wave, completed map[string]bool,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
+	feedback []*DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
-	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
+	out io.Writer, waveSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	gate := cfg.Gate
 
 	// Auto-approve when --auto-approve is set.
 	if gate.IsAutoApprove() {
-		loopSpan.AddEvent("wave.auto_approved",
+		waveSpan.AddEvent("wave.auto_approved",
 			trace.WithAttributes(
 				attribute.String("wave.id", selected.ID),
 				attribute.String("wave.cluster_name", selected.ClusterName),
 			),
 		)
 		emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
+
+		// Auto-discuss: Devil's Advocate debate → ADR generation
+		if cfg.Scribe.Enabled && cfg.Scribe.AutoDiscussRounds > 0 {
+			discussResult, discussErr := RunAutoDiscuss(ctx, cfg, scanDir, selected, feedback, adrDir, resolvedStrictness, out, logger)
+			if discussErr != nil {
+				logger.Warn("Auto-discuss failed (non-fatal): %v", discussErr)
+			} else if discussResult != nil {
+				archResp := discussResult.ToArchitectResponse()
+				if len(discussResult.OpenIssues) > 0 {
+					logger.Info("Auto-discuss: %d open issues identified", len(discussResult.OpenIssues))
+				}
+				scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, archResp, adrDir, resolvedStrictness, out, logger)
+				if scribeErr != nil {
+					logger.Warn("Auto-discuss ADR generation failed (non-fatal): %v", scribeErr)
+				} else {
+					logger.OK("Auto-discuss: ADR generated — %s-%s", scribeResp.ADRID, scribeResp.Title)
+					*adrCount++
+					emitter.EmitGenerateADR(domain.ADRGeneratedPayload{
+						ADRID: scribeResp.ADRID, Title: scribeResp.Title,
+					}, time.Now().UTC())
+				}
+			}
+		}
+
+		domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 		if err := ComposeSpecification(ctx, store, selected); err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
@@ -137,13 +163,14 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		switch choice {
 		case domain.ApprovalApprove:
 			delete(sessionRejected, domain.WaveKey(selected))
-			loopSpan.AddEvent("wave.approved",
+			waveSpan.AddEvent("wave.approved",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
 					attribute.String("wave.cluster_name", selected.ClusterName),
 				),
 			)
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
+			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 			if err := ComposeSpecification(ctx, store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
@@ -152,7 +179,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			return selected, approvalApproved
 		case domain.ApprovalReject:
 			delete(sessionRejected, domain.WaveKey(selected))
-			loopSpan.AddEvent("wave.rejected",
+			waveSpan.AddEvent("wave.rejected",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
 					attribute.String("wave.cluster_name", selected.ClusterName),
@@ -234,6 +261,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			domain.PropagateWaveUpdate(waves, selected)
 			sessionRejected[domain.WaveKey(selected)] = rejected
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
+			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 			if err := ComposeSpecification(ctx, store, selected); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
@@ -251,7 +279,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
-	emitter port.SessionEventEmitter, out io.Writer, loopSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
+	emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
 
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
 	if err != nil {
@@ -269,7 +297,7 @@ func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	platform.RecordWave(ctx, "applied")
 
 	if !domain.IsWaveApplyComplete(applyResult) {
-		loopSpan.AddEvent("wave.partial_failure",
+		waveSpan.AddEvent("wave.partial_failure",
 			trace.WithAttributes(
 				attribute.String("wave.id", selected.ID),
 				attribute.String("wave.cluster_name", selected.ClusterName),
@@ -290,7 +318,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	scanDir, adrDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
-	fbCollector *FeedbackCollector, emitter port.SessionEventEmitter, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, emitter port.SessionEventEmitter, waveSpan trace.Span, logger domain.Logger) {
 
 	var clusterForNextgen domain.ClusterScanResult
 	for _, c := range scanResult.Clusters {
@@ -304,7 +332,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 		return
 	}
 	if !NeedsMoreWaves(clusterForNextgen, *waves) {
-		loopSpan.AddEvent("nextgen.skipped",
+		waveSpan.AddEvent("nextgen.skipped",
 			trace.WithAttributes(
 				attribute.String("wave.cluster_name", selected.ClusterName),
 			),
@@ -381,16 +409,16 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) {
 
 	gate := cfg.Gate
 
-	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, emitter, out, loopSpan, logger)
+	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, emitter, out, waveSpan, logger)
 	if !ok {
 		return
 	}
 
-	loopSpan.AddEvent("wave.completed",
+	waveSpan.AddEvent("wave.completed",
 		trace.WithAttributes(
 			attribute.String("wave.id", selected.ID),
 			attribute.String("wave.cluster_name", selected.ClusterName),
@@ -415,10 +443,19 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 
 	// Review gate: run review before composing report (outbox is read immediately by phonewave)
 	if gate.HasReviewCmd() {
+		_, reviewSpan := platform.Tracer.Start(ctx, "wave.review", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+			trace.WithAttributes(
+				attribute.String("wave.id", selected.ID),
+				attribute.String("wave.cluster_name", selected.ClusterName),
+			),
+		)
 		passed, reviewErr := RunReviewGate(ctx, gate, cfg.Assistant, scanDir, logger)
 		if reviewErr != nil {
+			reviewSpan.SetAttributes(attribute.String("review.error", reviewErr.Error()))
 			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
 		}
+		reviewSpan.SetAttributes(attribute.Bool("review.passed", passed))
+		reviewSpan.End()
 		if !passed {
 			logger.Warn("Review gate: not passed — skipping ComposeReport for wave %s", domain.WaveKey(selected))
 			return
@@ -426,6 +463,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}
 
 	// Compose report d-mail for the completed wave
+	domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
 	if err := ComposeReport(ctx, store, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
@@ -433,6 +471,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}
 
 	// O2: sightjack → amadeus feedback D-Mail
+	domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
 	if feedbackErr := ComposeFeedback(ctx, store, selected, applyResult); feedbackErr != nil {
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
@@ -486,7 +525,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 	generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, selected, resolvedStrictness,
-		waves, completed, scanResult, sessionRejected, fbCollector, emitter, loopSpan, logger)
+		waves, completed, scanResult, sessionRejected, fbCollector, emitter, waveSpan, logger)
 
 	applyReadyLabelsIfEnabled(ctx, cfg, waves, completed, labeledReady, emitter, out, logger)
 

@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,7 +82,7 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	err := session.InstallSkills(baseDir, platform.SkillsFS)
+	err := session.InstallSkills(baseDir, platform.SkillsFS, &domain.NopLogger{})
 
 	// then: no error
 	if err != nil {
@@ -122,21 +123,24 @@ func TestInstallSkills_CreatesFiles(t *testing.T) {
 		t.Errorf("dmail-readable missing dmail-schema-version, got:\n%s", readable)
 	}
 
-	// then: readable contains convergence kind
+	// then: readable contains convergence and report kinds
 	if !strings.Contains(string(readable), "convergence") {
 		t.Errorf("dmail-readable missing convergence kind, got:\n%s", readable)
+	}
+	if !strings.Contains(string(readable), "kind: report") {
+		t.Errorf("dmail-readable missing report kind, got:\n%s", readable)
 	}
 }
 
 func TestInstallSkills_Idempotent(t *testing.T) {
 	// given: install once
 	baseDir := t.TempDir()
-	if err := session.InstallSkills(baseDir, platform.SkillsFS); err != nil {
+	if err := session.InstallSkills(baseDir, platform.SkillsFS, &domain.NopLogger{}); err != nil {
 		t.Fatalf("first install: %v", err)
 	}
 
 	// when: install again
-	err := session.InstallSkills(baseDir, platform.SkillsFS)
+	err := session.InstallSkills(baseDir, platform.SkillsFS, &domain.NopLogger{})
 
 	// then: no error, files still correct
 	if err != nil {
@@ -145,6 +149,54 @@ func TestInstallSkills_Idempotent(t *testing.T) {
 	sendable, _ := os.ReadFile(filepath.Join(baseDir, ".siren", "skills", "dmail-sendable", "SKILL.md"))
 	if !strings.Contains(string(sendable), "name: dmail-sendable") {
 		t.Errorf("content corrupted after second install")
+	}
+}
+
+func TestInstallSkills_LogsWhenSkillUpdated(t *testing.T) {
+	// given: install once
+	baseDir := t.TempDir()
+	if err := session.InstallSkills(baseDir, platform.SkillsFS, &domain.NopLogger{}); err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+
+	// given: overwrite with outdated content
+	skillPath := filepath.Join(baseDir, ".siren", "skills", "dmail-sendable", "SKILL.md")
+	os.WriteFile(skillPath, []byte("outdated"), 0644)
+
+	// when: install again captures log
+	var buf bytes.Buffer
+	logCapture := platform.NewLogger(&buf, false)
+	err := session.InstallSkills(baseDir, platform.SkillsFS, logCapture)
+
+	// then: no error and log mentions updated skill
+	if err != nil {
+		t.Fatalf("second install: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "dmail-sendable") {
+		t.Errorf("expected log to mention dmail-sendable, got: %q", output)
+	}
+}
+
+func TestInstallSkills_NoLogWhenSkillUnchanged(t *testing.T) {
+	// given: install once
+	baseDir := t.TempDir()
+	if err := session.InstallSkills(baseDir, platform.SkillsFS, &domain.NopLogger{}); err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+
+	// when: install again with no changes
+	var buf bytes.Buffer
+	logCapture := platform.NewLogger(&buf, false)
+	err := session.InstallSkills(baseDir, platform.SkillsFS, logCapture)
+
+	// then: no SKILL.md update log
+	if err != nil {
+		t.Fatalf("second install: %v", err)
+	}
+	output := buf.String()
+	if strings.Contains(output, "SKILL.md") {
+		t.Errorf("should not log when skills are unchanged, got: %q", output)
 	}
 }
 

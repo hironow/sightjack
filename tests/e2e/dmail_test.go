@@ -128,7 +128,7 @@ func TestE2E_DMail_ArchivePruneRealDMails(t *testing.T) {
 	os.Chtimes(reportPath, oldTime45, oldTime45)
 
 	// Recent d-mail (should be preserved)
-	feedbackRecent := marshalDMail("feedback-recent", "feedback", "Recent feedback", "high", "Recent body.", []string{"AUTH-1"})
+	feedbackRecent := marshalDMail("feedback-recent", "design-feedback", "Recent feedback", "high", "Recent body.", []string{"AUTH-1"})
 	writeDMailToDir(t, dir, "archive", "feedback-recent.md", feedbackRecent)
 
 	// when: archive-prune with --execute --yes, 30 day threshold
@@ -246,8 +246,8 @@ func TestE2E_DMail_FeedbackConsumed(t *testing.T) {
 
 	// Verify archived feedback is parseable and has correct kind
 	dm := parseDMailFile(t, archivePath)
-	if dm.Kind != "feedback" {
-		t.Errorf("expected kind=feedback, got %q", dm.Kind)
+	if dm.Kind != "design-feedback" {
+		t.Errorf("expected kind=design-feedback, got %q", dm.Kind)
 	}
 }
 
@@ -257,7 +257,7 @@ func TestE2E_DMail_DedupSkipsDuplicate(t *testing.T) {
 	ensureMailDirs(t, dir)
 
 	// Create feedback d-mail with known content
-	content := marshalDMail("feedback-dup-001", "feedback", "Duplicate feedback", "high", "Original body.", []string{"AUTH-1"})
+	content := marshalDMail("feedback-dup-001", "design-feedback", "Duplicate feedback", "high", "Original body.", []string{"AUTH-1"})
 	originalContent := make([]byte, len(content))
 	copy(originalContent, content)
 
@@ -294,7 +294,7 @@ func TestE2E_DMail_FsnotifyAndInjection(t *testing.T) {
 
 	// Prepare feedback d-mail content to write mid-session
 	lateContent := marshalDMail(
-		"feedback-late-001", "feedback",
+		"feedback-late-001", "design-feedback",
 		"Late architecture feedback", "high",
 		"Session-time feedback body.", []string{"AUTH-1"},
 	)

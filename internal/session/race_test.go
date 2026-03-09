@@ -1,6 +1,4 @@
-package session
-
-// white-box-reason: concurrency internals: tests race conditions on unexported shared state
+package session_test
 
 import (
 	"context"
@@ -12,19 +10,20 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 // TestRace_OutboxStore_ConcurrentStageAndRead verifies that concurrent
 // Stage and query operations do not trigger the race detector.
 func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 	dir := t.TempDir()
-	EnsureMailDirs(dir)
+	session.EnsureMailDirs(dir)
 	dbPath := filepath.Join(dir, domain.StateDir, ".run", "outbox.db")
 	os.MkdirAll(filepath.Dir(dbPath), 0o755)
 	archiveDir := domain.MailDir(dir, domain.ArchiveDir)
 	outboxDir := domain.MailDir(dir, domain.OutboxDir)
 
-	store, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create store: %v", err)
 	}
@@ -52,8 +51,8 @@ func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 // TestRace_FeedbackCollector_ConcurrentAccess verifies that the
 // FeedbackCollector mutex protects concurrent field access.
 func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
-	ch := make(chan *DMail, 10)
-	fc := CollectFeedback(nil, ch, nil, platform.NewLogger(nil, false))
+	ch := make(chan *session.DMail, 10)
+	fc := session.CollectFeedback(nil, ch, nil, platform.NewLogger(nil, false))
 
 	var wg sync.WaitGroup
 	for i := range 20 {
@@ -70,7 +69,7 @@ func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
 
 	// Send items concurrently
 	for i := range 5 {
-		dm := &DMail{Name: fmt.Sprintf("dm-%d", i), Kind: "report"}
+		dm := &session.DMail{Name: fmt.Sprintf("dm-%d", i), Kind: "report"}
 		ch <- dm
 	}
 	close(ch)

@@ -1,17 +1,17 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"testing"
+
+	"github.com/hironow/sightjack/internal/cmd"
 )
 
 func TestNeedsDefaultScan_NoArgs(t *testing.T) {
 	// given
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{})
 
 	// then
 	if !got {
@@ -21,10 +21,10 @@ func TestNeedsDefaultScan_NoArgs(t *testing.T) {
 
 func TestNeedsDefaultScan_NilArgs(t *testing.T) {
 	// given
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, nil)
+	got := cmd.NeedsDefaultScan(rootCmd, nil)
 
 	// then
 	if !got {
@@ -34,10 +34,10 @@ func TestNeedsDefaultScan_NilArgs(t *testing.T) {
 
 func TestNeedsDefaultScan_PathOnly(t *testing.T) {
 	// given: just a path — no subcommand found → needs default
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"."})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"."})
 
 	// then
 	if !got {
@@ -47,10 +47,10 @@ func TestNeedsDefaultScan_PathOnly(t *testing.T) {
 
 func TestNeedsDefaultScan_ScanLocalFlagOnly(t *testing.T) {
 	// given: only flags, no subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"--json"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"--json"})
 
 	// then
 	if !got {
@@ -60,10 +60,10 @@ func TestNeedsDefaultScan_ScanLocalFlagOnly(t *testing.T) {
 
 func TestNeedsDefaultScan_ScanLocalFlagWithPath(t *testing.T) {
 	// given: --json flag (scan-local) with path
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"--json", "."})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"--json", "."})
 
 	// then
 	if !got {
@@ -73,10 +73,10 @@ func TestNeedsDefaultScan_ScanLocalFlagWithPath(t *testing.T) {
 
 func TestNeedsDefaultScan_ExplicitSubcommand(t *testing.T) {
 	// given: explicit subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"version", "--json"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"version", "--json"})
 
 	// then
 	if got {
@@ -86,10 +86,10 @@ func TestNeedsDefaultScan_ExplicitSubcommand(t *testing.T) {
 
 func TestNeedsDefaultScan_ExplicitScan(t *testing.T) {
 	// given: explicit scan subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"scan", "."})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"scan", "."})
 
 	// then
 	if got {
@@ -99,10 +99,10 @@ func TestNeedsDefaultScan_ExplicitScan(t *testing.T) {
 
 func TestNeedsDefaultScan_VersionFlag(t *testing.T) {
 	// given: --version flag
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"--version"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"--version"})
 
 	// then
 	if got {
@@ -112,10 +112,10 @@ func TestNeedsDefaultScan_VersionFlag(t *testing.T) {
 
 func TestNeedsDefaultScan_HelpFlag(t *testing.T) {
 	// given: --help flag
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"--help"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"--help"})
 
 	// then
 	if got {
@@ -125,10 +125,10 @@ func TestNeedsDefaultScan_HelpFlag(t *testing.T) {
 
 func TestNeedsDefaultScan_HelpSubcommand(t *testing.T) {
 	// given: help subcommand (cobra-injected)
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"help"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"help"})
 
 	// then
 	if got {
@@ -138,10 +138,10 @@ func TestNeedsDefaultScan_HelpSubcommand(t *testing.T) {
 
 func TestNeedsDefaultScan_CompletionSubcommand(t *testing.T) {
 	// given: completion subcommand (cobra-injected)
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"completion", "bash"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"completion", "bash"})
 
 	// then
 	if got {
@@ -151,10 +151,10 @@ func TestNeedsDefaultScan_CompletionSubcommand(t *testing.T) {
 
 func TestNeedsDefaultScan_PersistentFlagBeforeSubcommand(t *testing.T) {
 	// given: --verbose before doctor subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"--verbose", "doctor", "."})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"--verbose", "doctor", "."})
 
 	// then
 	if got {
@@ -164,10 +164,10 @@ func TestNeedsDefaultScan_PersistentFlagBeforeSubcommand(t *testing.T) {
 
 func TestNeedsDefaultScan_ValueFlagBeforeSubcommand(t *testing.T) {
 	// given: --config takes a value, waves is the subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"--config", "custom.yaml", "waves"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"--config", "custom.yaml", "waves"})
 
 	// then
 	if got {
@@ -177,10 +177,10 @@ func TestNeedsDefaultScan_ValueFlagBeforeSubcommand(t *testing.T) {
 
 func TestNeedsDefaultScan_ValueFlagBeforePath(t *testing.T) {
 	// given: --lang ja /path — /path is not a subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"--lang", "ja", "/some/path"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"--lang", "ja", "/some/path"})
 
 	// then
 	if !got {
@@ -190,10 +190,10 @@ func TestNeedsDefaultScan_ValueFlagBeforePath(t *testing.T) {
 
 func TestNeedsDefaultScan_MultipleUnknownPositionals(t *testing.T) {
 	// given: multiple unknown positional args with no subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := NeedsDefaultScan(rootCmd, []string{"path1", "path2"})
+	got := cmd.NeedsDefaultScan(rootCmd, []string{"path1", "path2"})
 
 	// then
 	if !got {
@@ -203,10 +203,10 @@ func TestNeedsDefaultScan_MultipleUnknownPositionals(t *testing.T) {
 
 func TestReorderArgs_SubcommandAtFront(t *testing.T) {
 	// given: subcommand already at front
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"version", "--json"})
+	got := cmd.ReorderArgs(rootCmd, []string{"version", "--json"})
 
 	// then
 	if len(got) != 2 || got[0] != "version" || got[1] != "--json" {
@@ -216,10 +216,10 @@ func TestReorderArgs_SubcommandAtFront(t *testing.T) {
 
 func TestReorderArgs_FlagBeforeSubcommand(t *testing.T) {
 	// given: --verbose before doctor
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"--verbose", "doctor", "."})
+	got := cmd.ReorderArgs(rootCmd, []string{"--verbose", "doctor", "."})
 
 	// then
 	if len(got) != 3 || got[0] != "doctor" {
@@ -229,10 +229,10 @@ func TestReorderArgs_FlagBeforeSubcommand(t *testing.T) {
 
 func TestReorderArgs_ValueFlagBeforeSubcommand(t *testing.T) {
 	// given: --config custom.yaml waves
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"--config", "custom.yaml", "waves"})
+	got := cmd.ReorderArgs(rootCmd, []string{"--config", "custom.yaml", "waves"})
 
 	// then
 	if len(got) != 3 || got[0] != "waves" {
@@ -242,10 +242,10 @@ func TestReorderArgs_ValueFlagBeforeSubcommand(t *testing.T) {
 
 func TestReorderArgs_ShortValueFlagBeforeSubcommand(t *testing.T) {
 	// given: -c custom.yaml doctor
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"-c", "custom.yaml", "doctor"})
+	got := cmd.ReorderArgs(rootCmd, []string{"-c", "custom.yaml", "doctor"})
 
 	// then
 	if len(got) != 3 || got[0] != "doctor" {
@@ -255,10 +255,10 @@ func TestReorderArgs_ShortValueFlagBeforeSubcommand(t *testing.T) {
 
 func TestReorderArgs_ValueFlagEqualsForm(t *testing.T) {
 	// given: --config=custom.yaml waves
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"--config=custom.yaml", "waves"})
+	got := cmd.ReorderArgs(rootCmd, []string{"--config=custom.yaml", "waves"})
 
 	// then
 	if len(got) != 2 || got[0] != "waves" {
@@ -268,10 +268,10 @@ func TestReorderArgs_ValueFlagEqualsForm(t *testing.T) {
 
 func TestReorderArgs_ScanLocalFlagBeforeScan(t *testing.T) {
 	// given: --json scan — scan-local flag before subcommand
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"--json", "scan"})
+	got := cmd.ReorderArgs(rootCmd, []string{"--json", "scan"})
 
 	// then
 	if len(got) != 2 || got[0] != "scan" || got[1] != "--json" {
@@ -281,10 +281,10 @@ func TestReorderArgs_ScanLocalFlagBeforeScan(t *testing.T) {
 
 func TestReorderArgs_UnknownFlagBeforeSubcommand(t *testing.T) {
 	// given: --days 7 archive-prune
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"--days", "7", "archive-prune"})
+	got := cmd.ReorderArgs(rootCmd, []string{"--days", "7", "archive-prune"})
 
 	// then
 	if len(got) != 3 || got[0] != "archive-prune" {
@@ -294,10 +294,10 @@ func TestReorderArgs_UnknownFlagBeforeSubcommand(t *testing.T) {
 
 func TestReorderArgs_NoSubcommand(t *testing.T) {
 	// given: no subcommand present
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"--json", "."})
+	got := cmd.ReorderArgs(rootCmd, []string{"--json", "."})
 
 	// then: should return unchanged
 	if len(got) != 2 || got[0] != "--json" || got[1] != "." {
@@ -307,10 +307,10 @@ func TestReorderArgs_NoSubcommand(t *testing.T) {
 
 func TestReorderArgs_Empty(t *testing.T) {
 	// given
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{})
+	got := cmd.ReorderArgs(rootCmd, []string{})
 
 	// then
 	if len(got) != 0 {
@@ -320,10 +320,10 @@ func TestReorderArgs_Empty(t *testing.T) {
 
 func TestReorderArgs_HelpSubcommandWithTopic(t *testing.T) {
 	// given: help scan
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"help", "scan"})
+	got := cmd.ReorderArgs(rootCmd, []string{"help", "scan"})
 
 	// then: help at front, no reordering needed
 	if len(got) != 2 || got[0] != "help" || got[1] != "scan" {
@@ -333,10 +333,10 @@ func TestReorderArgs_HelpSubcommandWithTopic(t *testing.T) {
 
 func TestReorderArgs_BoolFlagExplicitValueBeforeSubcommand(t *testing.T) {
 	// given: --dry-run false waves
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 
 	// when
-	got := ReorderArgs(rootCmd, []string{"--dry-run", "false", "waves"})
+	got := cmd.ReorderArgs(rootCmd, []string{"--dry-run", "false", "waves"})
 
 	// then: "waves" reordered to front
 	if len(got) != 3 || got[0] != "waves" {

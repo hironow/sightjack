@@ -111,15 +111,15 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 		if logger != nil {
 			sr.SetLogger(logger)
 		}
-		for {
-			msg, readErr := sr.Next()
-			if readErr == io.EOF {
-				return
-			}
-			if readErr != nil {
-				streamErr <- readErr
-				return
-			}
+		emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
+		result, messages, readErr := emitter.CollectAll()
+		if readErr != nil {
+			streamErr <- readErr
+			return
+		}
+
+		// Extract text and tool info from messages
+		for _, msg := range messages {
 			switch msg.Type {
 			case "assistant":
 				text, _ := msg.ExtractText()
@@ -146,6 +146,14 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 				output.WriteString(msg.Result)
 				span.SetAttributes(platform.GenAIResultAttrs(msg, responseModel, responseID)...)
 			}
+		}
+
+		// Attach raw events and session ID to the invoke span
+		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
+			span.SetAttributes(attribute.StringSlice("stream.raw_events", rawEvents))
+		}
+		if result != nil && result.SessionID != "" {
+			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
 		}
 	}()
 

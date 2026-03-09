@@ -37,11 +37,12 @@ type DMail struct {
 type DMailKind string
 
 const (
-	DMailSpecification DMailKind = "specification"
-	DMailReport        DMailKind = "report"
-	DMailFeedback      DMailKind = "feedback"
-	DMailConvergence   DMailKind = "convergence"
-	DMailCIResult      DMailKind = "ci-result"
+	DMailSpecification  DMailKind = "specification"
+	DMailReport         DMailKind = "report"
+	DMailDesignFeedback DMailKind = "design-feedback"
+	DMailImplFeedback   DMailKind = "implementation-feedback"
+	DMailConvergence    DMailKind = "convergence"
+	DMailCIResult       DMailKind = "ci-result"
 )
 
 // validActions is the set of valid action values per D-Mail schema v1.
@@ -161,10 +162,10 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: dmail-schema-version is required")
 	}
 	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailFeedback, DMailConvergence, DMailCIResult:
+	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult:
 		// valid
 	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, feedback, convergence, ci-result)", mail.Kind)
+		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result)", mail.Kind)
 	}
 	if mail.Action != "" && !validActions[mail.Action] {
 		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", mail.Action)
@@ -210,7 +211,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != DMailFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
+	if mail.Kind != DMailDesignFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
 		return nil
 	}
 	return mail
@@ -312,6 +313,7 @@ loop:
 	}
 	logger.Info("Received %d d-mail(s):", len(feedback))
 	for _, fb := range feedback {
+		domain.LogBanner(logger, domain.BannerRecv, string(fb.Kind), fb.Name, fb.Description)
 		prefix := "[D-Mail]"
 		if fb.Kind == DMailConvergence {
 			prefix = "[D-Mail] [CONVERGENCE]"
@@ -379,6 +381,8 @@ type FeedbackCollector struct {
 	items            []*DMail
 	convergenceNames []string
 	notifier         port.Notifier
+	notify           chan struct{} // signals new D-Mail arrival (buffered, size 1)
+	snapshotIdx      int           // index up to which items have been seen
 }
 
 // CollectFeedback creates a FeedbackCollector seeded with initial feedback
@@ -389,7 +393,10 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
 	}
-	c := &FeedbackCollector{notifier: notifier}
+	c := &FeedbackCollector{
+		notifier: notifier,
+		notify:   make(chan struct{}, 1),
+	}
 	if len(initial) > 0 {
 		c.items = make([]*DMail, len(initial))
 		copy(c.items, initial)
@@ -397,7 +404,12 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 	if ch != nil {
 		go func() {
 			for mail := range ch {
+				domain.LogBanner(logger, domain.BannerRecv, string(mail.Kind), mail.Name, mail.Description)
 				c.addMail(mail)
+				select {
+				case c.notify <- struct{}{}:
+				default: // non-blocking, don't block if already signaled
+				}
 
 				if mail.Kind == DMailConvergence {
 					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
@@ -433,6 +445,30 @@ func (c *FeedbackCollector) addMail(mail *DMail) {
 	}
 }
 
+// NotifyCh returns a channel that receives a signal when new D-Mails arrive.
+// Used by the waiting phase to wake up when inbox content changes.
+func (c *FeedbackCollector) NotifyCh() <-chan struct{} { return c.notify }
+
+// Snapshot marks the current position in the collected items.
+// Call before entering the waiting phase.
+func (c *FeedbackCollector) Snapshot() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.snapshotIdx = len(c.items)
+}
+
+// NewSinceSnapshot returns D-Mails received since the last Snapshot call.
+func (c *FeedbackCollector) NewSinceSnapshot() []*DMail {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.snapshotIdx >= len(c.items) {
+		return nil
+	}
+	result := make([]*DMail, len(c.items)-c.snapshotIdx)
+	copy(result, c.items[c.snapshotIdx:])
+	return result
+}
+
 // ConvergenceNames returns a copy of convergence d-mail names received
 // mid-session. Used for journaling/state persistence.
 func (c *FeedbackCollector) ConvergenceNames() []string {
@@ -454,7 +490,7 @@ func (c *FeedbackCollector) FeedbackOnly() []*DMail {
 	defer c.mu.Unlock()
 	var result []*DMail
 	for _, m := range c.items {
-		if m.Kind == DMailFeedback {
+		if m.Kind == DMailDesignFeedback {
 			result = append(result, m)
 		}
 	}
@@ -619,14 +655,15 @@ func FeedbackBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 	return b.String()
 }
 
-// ComposeFeedback stages a feedback D-Mail for amadeus consumption.
+// ComposeFeedback stages a report D-Mail for amadeus consumption.
 // Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
+// Uses DMailReport kind because sightjack's sendable contract only produces specification and report.
 func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("feedback", key),
-		Kind:          DMailFeedback,
-		Description:   fmt.Sprintf("Wave %s feedback for amadeus", key),
+		Kind:          DMailReport,
+		Description:   fmt.Sprintf("Wave %s report for amadeus", key),
 		SchemaVersion: "1",
 		Issues:        WaveIssueIDs(wave),
 		Body:          FeedbackBody(wave, result),

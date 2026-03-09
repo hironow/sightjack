@@ -7,7 +7,7 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 |--------|-------------|
 | **What** | Interactive AI session that analyzes Linear issues for completeness, dependencies, and architectural gaps |
 | **Why** | Bring issue completeness from ~30% to ~85% before autonomous execution begins |
-| **How** | Claude MCP tools scan issues → cluster analysis → wave generation → interactive approval → apply to Linear |
+| **How** | Claude MCP tools scan issues → cluster analysis (with estimated strictness) → wave generation → interactive approval (with cancel action) → apply to Linear |
 | **Input** | Linear issues via Claude MCP tools, user approval via stdin |
 | **Output** | Updated Linear issues, D-Mail reports to downstream tools |
 | **Telemetry** | OTel spans: `sightjack.scan`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |

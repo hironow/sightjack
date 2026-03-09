@@ -115,6 +115,7 @@ func testConfig() *domain.Config {
 		Strictness: domain.StrictnessConfig{Default: domain.StrictnessFog},
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 		Labels:     domain.LabelsConfig{Enabled: false},
+		Gate:       domain.GateConfig{WaitTimeout: -1}, // disable D-Mail waiting in tests
 	}
 }
 
@@ -972,7 +973,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	}
 	feedbackMail := &session.DMail{
 		Name:        "fb-arch-001",
-		Kind:        session.DMailFeedback,
+		Kind:        session.DMailDesignFeedback,
 		Description: "Token rotation drift detected",
 		Severity:    "high",
 		Body:        "JWT rotation interval misaligned with refresh window.",
@@ -1026,7 +1027,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse archived feedback: %v", err)
 	}
-	if archivedFeedback.Kind != session.DMailFeedback {
+	if archivedFeedback.Kind != session.DMailDesignFeedback {
 		t.Errorf("expected feedback kind, got %q", archivedFeedback.Kind)
 	}
 	if archivedFeedback.Severity != "high" {
@@ -1155,7 +1156,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	}
 	feedbackMail := &session.DMail{
 		Name:        "fb-perf-001",
-		Kind:        session.DMailFeedback,
+		Kind:        session.DMailDesignFeedback,
 		Description: "Auth latency spike in token validation",
 		Severity:    "high",
 		Body:        "p99 latency exceeds 500ms under load.",

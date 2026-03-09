@@ -143,6 +143,25 @@ func ReadExistingADRs(adrDir string) ([]domain.ExistingADR, error) {
 	return adrs, nil
 }
 
+// ReadCLAUDEMD searches for CLAUDE.md starting from scanDir and walking up to 3 levels.
+// Returns empty string if not found.
+func ReadCLAUDEMD(scanDir string) string {
+	dir := scanDir
+	for range 3 {
+		candidate := filepath.Join(dir, "CLAUDE.md")
+		data, err := os.ReadFile(candidate)
+		if err == nil {
+			return string(data)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return ""
+}
+
 // ScribeFileName returns the output filename for a scribe run.
 func ScribeFileName(wave domain.Wave) string {
 	return fmt.Sprintf("scribe_%s_%s.json", domain.SanitizeName(wave.ClusterName), domain.SanitizeName(wave.ID))

@@ -477,6 +477,228 @@ strictness:
 	}
 }
 
+func TestUpdateConfig_SetTrackerTeam(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "OLD"
+  project: "Test"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "tracker.team", "NEW")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Tracker.Team != "NEW" {
+		t.Errorf("expected team 'NEW', got %q", cfg.Tracker.Team)
+	}
+	// unchanged fields preserved
+	if cfg.Tracker.Project != "Test" {
+		t.Errorf("expected project 'Test', got %q", cfg.Tracker.Project)
+	}
+	if cfg.Lang != "ja" {
+		t.Errorf("expected lang 'ja', got %q", cfg.Lang)
+	}
+}
+
+func TestUpdateConfig_SetLang(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "lang", "en")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Lang != "en" {
+		t.Errorf("expected lang 'en', got %q", cfg.Lang)
+	}
+}
+
+func TestUpdateConfig_SetStrictnessDefault(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+strictness:
+  default: fog
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "strictness.default", "alert")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Strictness.Default != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", cfg.Strictness.Default)
+	}
+}
+
+func TestUpdateConfig_InvalidKey_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "nonexistent.key", "value")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid key")
+	}
+}
+
+func TestUpdateConfig_InvalidLang_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`lang: "ja"`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "lang", "fr")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid lang value")
+	}
+}
+
+func TestUpdateConfig_InvalidStrictness_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`strictness: {default: fog}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "strictness.default", "banana")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid strictness value")
+	}
+}
+
+func TestWriteEstimatedStrictness(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+
+	initial := `
+tracker:
+  team: test
+  project: test
+strictness:
+  default: fog
+  overrides:
+    security: lockdown
+`
+	os.WriteFile(cfgPath, []byte(initial), 0644)
+
+	estimated := map[string]domain.StrictnessLevel{
+		"auth-module":     domain.StrictnessAlert,
+		"payment-billing": domain.StrictnessLockdown,
+	}
+
+	err := session.WriteEstimatedStrictness(cfgPath, estimated)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Strictness.Estimated["auth-module"] != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", cfg.Strictness.Estimated["auth-module"])
+	}
+	if cfg.Strictness.Estimated["payment-billing"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["payment-billing"])
+	}
+	// Verify overrides preserved
+	if cfg.Strictness.Overrides["security"] != domain.StrictnessLockdown {
+		t.Errorf("overrides should be preserved, got %s", cfg.Strictness.Overrides["security"])
+	}
+}
+
+func TestWriteEstimatedStrictness_OverwritesPrevious(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+
+	initial := `
+tracker:
+  team: test
+  project: test
+strictness:
+  default: fog
+  estimated:
+    old-cluster: alert
+`
+	os.WriteFile(cfgPath, []byte(initial), 0644)
+
+	newEstimated := map[string]domain.StrictnessLevel{
+		"new-cluster": domain.StrictnessLockdown,
+	}
+
+	err := session.WriteEstimatedStrictness(cfgPath, newEstimated)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.Strictness.Estimated["old-cluster"]; ok {
+		t.Error("old-cluster should be overwritten")
+	}
+	if cfg.Strictness.Estimated["new-cluster"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["new-cluster"])
+	}
+}
+
+func TestLoadConfig_EstimatedStrictnessInvalid_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(path, []byte(`
+tracker:
+  team: test
+  project: test
+strictness:
+  default: fog
+  estimated:
+    bad-cluster: nightmare
+`), 0644)
+
+	_, err := session.LoadConfig(path)
+	if err == nil {
+		t.Fatal("expected error for invalid estimated strictness value")
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")

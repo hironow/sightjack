@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/eventsource"
 )
 
 // CheckConfig validates that the config file exists and can be loaded.
@@ -81,14 +82,14 @@ func CheckClaudeAuth(ctx context.Context, cfg *domain.Config, logger domain.Logg
 				Name:    "Claude Auth",
 				Status:  domain.CheckFail,
 				Message: "not logged in",
-				Hint:    `run "claude login" then "/login" inside the session`,
+				Hint:    `run "claude login" then "/login" inside the session (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 			}
 		}
 		return domain.CheckResult{
 			Name:    "Claude Auth",
 			Status:  domain.CheckFail,
 			Message: hint,
-			Hint:    `check Claude CLI with "claude --version"; if auth issue, run "claude login"`,
+			Hint:    `check Claude CLI with "claude --version"; if auth issue, run "claude login" (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
 		}
 	}
 
@@ -118,7 +119,8 @@ func CheckLinearMCP(ctx context.Context, cfg *domain.Config, logger domain.Logge
 			Name:    "Linear MCP",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("claude execution failed: %v", err),
-			Hint:    `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`,
+			Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
+				"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
 		}
 	}
 
@@ -186,10 +188,69 @@ func CheckSkills(baseDir string) domain.CheckResult {
 		}
 	}
 
+	// Check for deprecated "kind: feedback" (split into design-feedback / implementation-feedback)
+	for _, name := range skillNames {
+		path := filepath.Join(skillsDir, name, "SKILL.md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "kind: feedback") &&
+			!strings.Contains(content, "kind: design-feedback") &&
+			!strings.Contains(content, "kind: implementation-feedback") {
+			return domain.CheckResult{
+				Name:    "Skills",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
+				Hint:    `run "sightjack init --force" to regenerate skills with updated kind (feedback → design-feedback)`,
+			}
+		}
+	}
+
 	return domain.CheckResult{
 		Name:    "Skills",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d skill(s) validated", len(skillNames)),
+	}
+}
+
+// CheckEventStore validates the event store directory structure and JSONL integrity.
+// Delegates to eventsource.ValidateStore for the actual file-level checks.
+// Returns CheckSkip if the events directory does not exist yet.
+func CheckEventStore(baseDir string) domain.CheckResult {
+	stateDir := filepath.Join(baseDir, domain.StateDir)
+	health := eventsource.ValidateStore(stateDir)
+
+	if health.NotFound {
+		return domain.CheckResult{
+			Name:    "Event Store",
+			Status:  domain.CheckSkip,
+			Message: "events/ not found",
+		}
+	}
+
+	if health.Err != nil {
+		return domain.CheckResult{
+			Name:    "Event Store",
+			Status:  domain.CheckFail,
+			Message: health.Err.Error(),
+			Hint:    health.ErrHint,
+		}
+	}
+
+	if health.Sessions == 0 {
+		return domain.CheckResult{
+			Name:    "Event Store",
+			Status:  domain.CheckOK,
+			Message: "no event files yet",
+		}
+	}
+
+	return domain.CheckResult{
+		Name:    "Event Store",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%d session(s), %d event(s) OK", health.Sessions, health.Events),
 	}
 }
 
@@ -229,6 +290,9 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 
 	// 5. Skills check
 	results = append(results, CheckSkills(baseDir))
+
+	// 5.5. Event store check
+	results = append(results, CheckEventStore(baseDir))
 
 	// 6. Claude Auth check (skip if claude binary unavailable)
 	skipClaude := claudeResult.Status != domain.CheckOK

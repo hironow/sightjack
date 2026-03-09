@@ -25,12 +25,15 @@ type ClusterClassification struct {
 // ClusterScanResult is the output of Pass 2 (per-cluster deep scan).
 // Written by Claude Code to cluster_{name}.json.
 type ClusterScanResult struct {
-	Name         string        `json:"name"`
-	Completeness float64       `json:"completeness"`
-	Issues       []IssueDetail `json:"issues"`
-	Observations []string      `json:"observations"`
-	Labels       []string      `json:"labels,omitempty"`
-	IssueCount   int           `json:"-"` // computed; used when Issues is nil (e.g. show command)
+	Name                string        `json:"name"`
+	Key                 string        `json:"key"`
+	Completeness        float64       `json:"completeness"`
+	Issues              []IssueDetail `json:"issues"`
+	Observations        []string      `json:"observations"`
+	Labels              []string      `json:"labels,omitempty"`
+	EstimatedStrictness string        `json:"estimated_strictness,omitempty"`
+	StrictnessReasoning string        `json:"strictness_reasoning,omitempty"`
+	IssueCount          int           `json:"-"` // computed; used when Issues is nil (e.g. show command)
 }
 
 // NumIssues returns the number of issues. It prefers len(Issues) when
@@ -47,6 +50,7 @@ type IssueDetail struct {
 	ID           string   `json:"id"`
 	Identifier   string   `json:"identifier"`
 	Title        string   `json:"title"`
+	Status       string   `json:"status"`
 	Completeness float64  `json:"completeness"`
 	Gaps         []string `json:"gaps"`
 }
@@ -81,9 +85,16 @@ func (r *ScanResult) ClusterLabels(clusterName string) []string {
 	return nil
 }
 
-// StrictnessKeys returns the lookup keys for ResolveStrictness: cluster name + labels.
+// StrictnessKeys returns the lookup keys for ResolveStrictness: cluster name + key + labels.
 func (r *ScanResult) StrictnessKeys(clusterName string) []string {
-	return append([]string{clusterName}, r.ClusterLabels(clusterName)...)
+	keys := []string{clusterName}
+	for _, c := range r.Clusters {
+		if c.Name == clusterName && c.Key != "" {
+			keys = append(keys, c.Key)
+			break
+		}
+	}
+	return append(keys, r.ClusterLabels(clusterName)...)
 }
 
 // CalculateCompleteness computes overall completeness as the average of cluster completeness values,
@@ -227,7 +238,7 @@ func ParseSessionMode(s string) (ResumeChoice, error) {
 	}
 }
 
-// StrictnessLevel controls DoD analysis depth (SIREN difficulty system).
+// StrictnessLevel controls change tolerance for existing implementations.
 type StrictnessLevel string
 
 const (

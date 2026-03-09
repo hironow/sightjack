@@ -3,10 +3,13 @@ Use the Linear MCP Server to fetch Issues from the specified project
 and classify them into logical clusters (functional groups).
 
 ## Strictness Level: {{.StrictnessLevel}}
-Adjust your analysis depth based on the current strictness level:
-- fog: Report DoD gaps as warnings only. NFR issues are informational.
-- alert: Propose sub-issues for Must-level DoD gaps. NFR gets dedicated attention.
-- lockdown: Flag ALL DoD gaps. Mark incomplete issues as blocked candidates.
+
+Strictness defines change tolerance for existing implementations:
+- fog: No protection for existing implementations. Free to restructure.
+- alert: Respect existing implementations. Limit blast radius of changes.
+- lockdown: Protect existing structure. Additive changes only.
+
+DoD checking: ALWAYS full-depth regardless of Strictness level.
 
 ## Filter Criteria
 - Team: {{.TeamFilter}}
@@ -32,7 +35,7 @@ Write the following JSON to **{{.OutputPath}}**:
 ```json
 {
   "clusters": [
-    { "name": "ClusterName", "issue_ids": ["issue-id-1", "issue-id-2"], "labels": ["label1", "label2"] }
+    { "name": "ClusterName", "key": "cluster-name", "issue_ids": ["issue-id-1", "issue-id-2"], "labels": ["label1", "label2"] }
   ],
   "total_issues": number,
   "shibito_warnings": [
@@ -40,6 +43,8 @@ Write the following JSON to **{{.OutputPath}}**:
   ]
 }
 ```
+
+Each cluster must have both a "name" (display name, can be any language) and a "key" (lowercase English slug with hyphens, stable across scans).
 
 {{if .LabelsEnabled}}
 After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using Linear MCP.

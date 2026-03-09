@@ -1,15 +1,15 @@
-package platform
-
-// white-box-reason: platform internals: tests unexported OTel environment configuration generation
+package platform_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 func TestOtelEnvContent_Jaeger(t *testing.T) {
 	// when
-	content, err := OtelEnvContent("jaeger", "", "")
+	content, err := platform.OtelEnvContent("jaeger", "", "")
 
 	// then
 	if err != nil {
@@ -22,7 +22,7 @@ func TestOtelEnvContent_Jaeger(t *testing.T) {
 
 func TestOtelEnvContent_Weave_Valid(t *testing.T) {
 	// when
-	content, err := OtelEnvContent("weave", "my-team", "my-project")
+	content, err := platform.OtelEnvContent("weave", "my-team", "my-project")
 
 	// then
 	if err != nil {
@@ -44,7 +44,7 @@ func TestOtelEnvContent_Weave_Valid(t *testing.T) {
 
 func TestOtelEnvContent_Weave_MissingEntity(t *testing.T) {
 	// when
-	_, err := OtelEnvContent("weave", "", "my-project")
+	_, err := platform.OtelEnvContent("weave", "", "my-project")
 
 	// then
 	if err == nil {
@@ -57,7 +57,7 @@ func TestOtelEnvContent_Weave_MissingEntity(t *testing.T) {
 
 func TestOtelEnvContent_Unknown(t *testing.T) {
 	// when
-	_, err := OtelEnvContent("datadog", "", "")
+	_, err := platform.OtelEnvContent("datadog", "", "")
 
 	// then
 	if err == nil {
@@ -70,7 +70,7 @@ func TestOtelEnvContent_Unknown(t *testing.T) {
 
 func TestOtelEnvContent_Empty(t *testing.T) {
 	// when
-	content, err := OtelEnvContent("", "", "")
+	content, err := platform.OtelEnvContent("", "", "")
 
 	// then
 	if err != nil {

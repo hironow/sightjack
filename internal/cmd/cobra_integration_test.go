@@ -413,6 +413,166 @@ func TestRunCmd_AutoApproveFlagChanged(t *testing.T) {
 	}
 }
 
+func TestStrictnessFlag_RunAndScan(t *testing.T) {
+	rootCmd := NewRootCommand()
+
+	// Verify run command has --strictness flag
+	var runCmd, scanCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		switch sub.Name() {
+		case "run":
+			runCmd = sub
+		case "scan":
+			scanCmd = sub
+		}
+	}
+	if runCmd == nil {
+		t.Fatal("run command not found")
+	}
+	if scanCmd == nil {
+		t.Fatal("scan command not found")
+	}
+
+	// run: --strictness flag exists with -s shorthand
+	runFlag := runCmd.Flags().Lookup("strictness")
+	if runFlag == nil {
+		t.Fatal("run: --strictness flag not found")
+	}
+	if runFlag.Shorthand != "s" {
+		t.Errorf("run: expected shorthand 's', got %q", runFlag.Shorthand)
+	}
+
+	// scan: --strictness flag exists with -s shorthand
+	scanFlag := scanCmd.Flags().Lookup("strictness")
+	if scanFlag == nil {
+		t.Fatal("scan: --strictness flag not found")
+	}
+	if scanFlag.Shorthand != "s" {
+		t.Errorf("scan: expected shorthand 's', got %q", scanFlag.Shorthand)
+	}
+}
+
+func TestStrictnessFlag_InvalidValueReturnsError(t *testing.T) {
+	// given: a directory with valid config
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, ".siren")
+	os.MkdirAll(sirenDir, 0755)
+	os.WriteFile(filepath.Join(sirenDir, "config.yaml"), []byte(`
+tracker:
+  team: "MY"
+  project: "Test"
+`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"scan", "--strictness", "banana", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for invalid strictness value")
+	}
+	if !strings.Contains(err.Error(), "invalid strictness") {
+		t.Errorf("expected 'invalid strictness' in error, got: %v", err)
+	}
+}
+
+func TestCobraRouting_ConfigShow(t *testing.T) {
+	// given: a directory with valid config
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, ".siren")
+	os.MkdirAll(sirenDir, 0755)
+	os.WriteFile(filepath.Join(sirenDir, "config.yaml"), []byte(`
+tracker:
+  team: "MY"
+  project: "Test"
+lang: "ja"
+`), 0644)
+
+	var stdout bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "show", dir})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("config show failed: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "team: MY") {
+		t.Errorf("expected 'team: MY' in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "lang: ja") {
+		t.Errorf("expected 'lang: ja' in output, got:\n%s", out)
+	}
+}
+
+func TestCobraRouting_ConfigSet(t *testing.T) {
+	// given: a directory with valid config
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, ".siren")
+	os.MkdirAll(sirenDir, 0755)
+	os.WriteFile(filepath.Join(sirenDir, "config.yaml"), []byte(`
+tracker:
+  team: "OLD"
+lang: "ja"
+`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "tracker.team", "NEW", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("config set failed: %v", err)
+	}
+
+	// verify: read back config
+	var stdout bytes.Buffer
+	rootCmd2 := NewRootCommand()
+	rootCmd2.SetArgs([]string{"config", "show", dir})
+	rootCmd2.SetOut(&stdout)
+	rootCmd2.SetErr(&bytes.Buffer{})
+	if err := rootCmd2.Execute(); err != nil {
+		t.Fatalf("config show failed: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "team: NEW") {
+		t.Errorf("expected 'team: NEW' after set, got:\n%s", stdout.String())
+	}
+}
+
+func TestCobraRouting_ConfigSet_InvalidKey(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, ".siren")
+	os.MkdirAll(sirenDir, 0755)
+	os.WriteFile(filepath.Join(sirenDir, "config.yaml"), []byte(`tracker: {team: "MY"}`), 0644)
+
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"config", "set", "bad.key", "value", dir})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid config key")
+	}
+}
+
 func TestAllCommands_HaveLongAndExample(t *testing.T) {
 	// given
 	rootCmd := NewRootCommand()

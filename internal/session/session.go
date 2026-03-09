@@ -123,6 +123,23 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	// Cache ScanResult + record session start / scan completed events
 	scanResultPath := RecordScanState(baseDir, sessionID, scanResult, cfg, emitter, scanTime, logger)
 
+	// Persist LLM-estimated strictness values into config for future resolution
+	estimated := make(map[string]domain.StrictnessLevel)
+	for _, c := range scanResult.Clusters {
+		if c.EstimatedStrictness != "" && c.Key != "" {
+			level := domain.StrictnessLevel(c.EstimatedStrictness)
+			if level.Valid() {
+				estimated[c.Key] = level
+			}
+		}
+	}
+	if len(estimated) > 0 {
+		cfgPath := domain.ConfigPath(baseDir)
+		if err := WriteEstimatedStrictness(cfgPath, estimated); err != nil {
+			logger.Warn("Failed to write estimated strictness: %v", err)
+		}
+	}
+
 	// --- Pass 3: Wave Generate ---
 	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
 	if err != nil {

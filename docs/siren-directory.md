@@ -15,7 +15,7 @@ This document describes what each directory/file does, who creates it, and how i
     dmail-sendable/
       SKILL.md            # agent skill manifest (produces: specification, report)
     dmail-readable/
-      SKILL.md            # agent skill manifest (consumes: feedback, convergence)
+      SKILL.md            # agent skill manifest (consumes: design-feedback, convergence)
   inbox/                  # incoming d-mails (feedback from downstream)
     *.md
   outbox/                 # outgoing d-mails (specifications, reports)
@@ -142,7 +142,7 @@ All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent p
 - **convergence gate** -> `RunConvergenceGateWithRedrain()` runs notify + approve loop before session starts. Re-drains inbox after each approval to catch late-arriving convergence D-Mails.
 - **specification/report** -> **archive/** first, then **outbox/** (archive-first write order)
 - D-mail format: YAML frontmatter (`name`, `kind`, `description`, `dmail-schema-version`, `issues`, `severity`, `metadata`) + Markdown body
-- D-mail kinds: `specification`, `report`, `feedback`, `convergence`
+- D-mail kinds: `specification`, `report`, `design-feedback`, `convergence`
 - Filename pattern: `{prefix}-{sanitized-wavekey}.md` (e.g., `spec-auth-w1.md`, `report-api-w2.md`)
 
 ## File Creators
@@ -151,7 +151,7 @@ All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent p
 |------|-----------|------|
 | `.siren/` dirs | `EnsureScanDir()` | Session startup |
 | `.gitignore` | `WriteGitIgnore()` | Session startup (via `EnsureScanDir`, idempotent) |
-| `config.yaml` | `runInit()` | `sightjack init` command |
+| `config.yaml` | `runInit()` | `sightjack init` command (use `--force` to overwrite) |
 | `events/{sessionID}.jsonl` | `SessionRecorder.Record()` | Each state-changing action during a session |
 | `skills/*/SKILL.md` | `InstallSkills()` | `sightjack init` command (overwrites existing) |
 | `inbox/*.md` | External tool (phonewave) | Before/during session |

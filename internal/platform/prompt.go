@@ -71,3 +71,15 @@ func RenderNextGenPrompt(lang string, data domain.NextGenPromptData) (string, er
 	name := fmt.Sprintf("templates/wave_nextgen_%s.md.tmpl", lang)
 	return renderPromptTemplate(name, data)
 }
+
+// RenderAutoDiscussArchitectPrompt renders the auto-discuss architect prompt.
+func RenderAutoDiscussArchitectPrompt(lang string, data domain.AutoDiscussArchitectPromptData) (string, error) {
+	name := fmt.Sprintf("templates/auto_discuss_architect_%s.md.tmpl", lang)
+	return renderPromptTemplate(name, data)
+}
+
+// RenderAutoDiscussDevilsAdvocatePrompt renders the auto-discuss Devil's Advocate prompt.
+func RenderAutoDiscussDevilsAdvocatePrompt(lang string, data domain.AutoDiscussDevilsAdvocatePromptData) (string, error) {
+	name := fmt.Sprintf("templates/auto_discuss_devils_advocate_%s.md.tmpl", lang)
+	return renderPromptTemplate(name, data)
+}

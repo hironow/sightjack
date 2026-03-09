@@ -683,6 +683,22 @@ func TestToApplyResult_CreateActionPartialFailure(t *testing.T) {
 	}
 }
 
+func TestValidWaveActionType(t *testing.T) {
+	t.Parallel()
+	valid := []string{"add_dod", "add_dependency", "add_label", "update_description", "create", "cancel"}
+	for _, v := range valid {
+		if !domain.ValidWaveActionType(v) {
+			t.Errorf("expected %q to be valid", v)
+		}
+	}
+	invalid := []string{"delete", "remove", "", "Cancel"}
+	for _, v := range invalid {
+		if domain.ValidWaveActionType(v) {
+			t.Errorf("expected %q to be invalid", v)
+		}
+	}
+}
+
 func TestSelectiveApproval_CreateActionExcluded(t *testing.T) {
 	t.Parallel()
 

@@ -2,10 +2,13 @@ You are a Scanner Agent.
 Based on the cluster analysis results below, propose Waves (work batches) to improve issue completeness.
 
 ## Strictness Level: {{.StrictnessLevel}}
-Adjust your analysis depth based on the current strictness level:
-- fog: Report DoD gaps as warnings only. NFR issues are informational.
-- alert: Propose sub-issues for Must-level DoD gaps. NFR gets dedicated attention.
-- lockdown: Flag ALL DoD gaps. Mark incomplete issues as blocked candidates.
+
+Strictness defines change tolerance for existing implementations:
+- fog: No protection. Cancel + rebuild freely per feedback.
+- alert: Respect existing. Limit blast radius. Prefer sub-issues and dependency changes.
+- lockdown: Protect structure. Additive changes only. Cancel only Backlog issues if unavoidable.
+
+DoD checking: ALWAYS full-depth regardless of Strictness level.
 
 ## Target Cluster
 - Cluster Name: {{.ClusterName}}
@@ -29,6 +32,7 @@ Adjust your analysis depth based on the current strictness level:
 - `add_label`: Add a label to an Issue
 - `update_description`: Update an Issue description
 - `create`: Create a new sub-issue under a parent Issue
+- `cancel`: Cancel an Issue (Backlog/Todo status only). Requires reason in detail field.
 
 {{if .DoDSection}}
 ## Definition of Done Guidelines

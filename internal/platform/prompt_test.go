@@ -980,6 +980,95 @@ func TestRenderNextGenPrompt_WithFeedback(t *testing.T) {
 	}
 }
 
+func TestRenderAutoDiscussArchitectPrompt(t *testing.T) {
+	// given
+	data := domain.AutoDiscussArchitectPromptData{
+		ClusterName:     "auth",
+		WaveTitle:       "Implement OAuth2",
+		WaveActions:     `[{"type":"create","description":"Add OAuth2 flow"}]`,
+		PriorContent:    "",
+		FeedbackSection: "",
+		OutputPath:      "/tmp/output.json",
+		StrictnessLevel: "fog",
+	}
+
+	// when
+	result, err := platform.RenderAutoDiscussArchitectPrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(result, "auth") {
+		t.Error("expected cluster name in output")
+	}
+	if !strings.Contains(result, "Architect Agent") {
+		t.Error("expected Architect Agent role in output")
+	}
+}
+
+func TestRenderAutoDiscussDevilsAdvocatePrompt(t *testing.T) {
+	// given
+	data := domain.AutoDiscussDevilsAdvocatePromptData{
+		ClusterName:  "auth",
+		WaveTitle:    "Implement OAuth2",
+		WaveActions:  `[{"type":"create","description":"Add OAuth2 flow"}]`,
+		PriorContent: "The wave restructures the auth module.",
+		ExistingADRs: []domain.ExistingADR{
+			{Filename: "0003-jwt-auth.md", Content: "JWT-based auth is required."},
+		},
+		CLAUDEMDContent: "Use event sourcing pattern.",
+		OutputPath:      "/tmp/output.json",
+		StrictnessLevel: "fog",
+		RoundIndex:      1,
+		TotalRounds:     2,
+		IsFinalRound:    false,
+	}
+
+	// when
+	result, err := platform.RenderAutoDiscussDevilsAdvocatePrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(result, "Devil's Advocate") {
+		t.Error("expected Devil's Advocate role in output")
+	}
+	if !strings.Contains(result, "0003-jwt-auth.md") {
+		t.Error("expected existing ADR reference in output")
+	}
+}
+
+func TestRenderAutoDiscussDevilsAdvocatePrompt_FinalRound(t *testing.T) {
+	// given
+	data := domain.AutoDiscussDevilsAdvocatePromptData{
+		ClusterName:     "auth",
+		WaveTitle:       "Implement OAuth2",
+		WaveActions:     `[]`,
+		PriorContent:    "Architect response.",
+		OutputPath:      "/tmp/output.json",
+		StrictnessLevel: "fog",
+		RoundIndex:      2,
+		TotalRounds:     2,
+		IsFinalRound:    true,
+	}
+
+	// when
+	result, err := platform.RenderAutoDiscussDevilsAdvocatePrompt("en", data)
+
+	// then
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(result, "final round") {
+		t.Error("expected final round instructions in output")
+	}
+	if !strings.Contains(result, "adr_recommended") {
+		t.Error("expected adr_recommended field in final round output schema")
+	}
+}
+
 func TestRenderNextGenPrompt_NoFeedback(t *testing.T) {
 	// given: no feedback
 	data := domain.NextGenPromptData{

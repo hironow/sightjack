@@ -46,6 +46,7 @@ sightjack archive-prune [path] [flags]
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
+      --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Verbose logging
 ```

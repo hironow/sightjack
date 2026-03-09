@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -10,8 +11,12 @@ import (
 )
 
 // InstallSkills copies embedded skill templates into baseDir/.siren/skills/.
-// Existing files are overwritten (idempotent). Directories are created as needed.
-func InstallSkills(baseDir string, skillsFS fs.FS) error {
+// Existing files are overwritten when content differs (idempotent).
+// Directories are created as needed. Logs to logger when a file is updated.
+func InstallSkills(baseDir string, skillsFS fs.FS, logger domain.Logger) error {
+	if logger == nil {
+		logger = &domain.NopLogger{}
+	}
 	const srcPrefix = "templates/skills"
 	destRoot := filepath.Join(baseDir, domain.StateDir, "skills")
 
@@ -33,6 +38,13 @@ func InstallSkills(baseDir string, skillsFS fs.FS) error {
 		if err != nil {
 			return fmt.Errorf("read embedded %s: %w", path, err)
 		}
-		return os.WriteFile(dest, data, 0644)
+		existing, readErr := os.ReadFile(dest)
+		if readErr != nil || !bytes.Equal(existing, data) {
+			if readErr == nil {
+				logger.Info("updated SKILL.md: %s (template changed)", rel)
+			}
+			return os.WriteFile(dest, data, 0644)
+		}
+		return nil
 	})
 }

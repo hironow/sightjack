@@ -305,7 +305,7 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 func TestCheckSkills_OK(t *testing.T) {
 	// given: valid SKILL.md files installed
 	baseDir := t.TempDir()
-	if err := session.InstallSkills(baseDir, platform.SkillsFS); err != nil {
+	if err := session.InstallSkills(baseDir, platform.SkillsFS, &domain.NopLogger{}); err != nil {
 		t.Fatalf("InstallSkills: %v", err)
 	}
 
@@ -352,6 +352,52 @@ func TestCheckSkills_MissingSchemaVersion(t *testing.T) {
 	}
 }
 
+func TestCheckSkills_DeprecatedFeedbackKind(t *testing.T) {
+	// given — SKILL.md with deprecated "kind: feedback" (pre-split)
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".siren", "skills", "dmail-readable")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"),
+		[]byte("---\nname: dmail-readable\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: feedback\n---\n"), 0644)
+	// Also create sendable so it doesn't fail on missing
+	sendDir := filepath.Join(dir, ".siren", "skills", "dmail-sendable")
+	os.MkdirAll(sendDir, 0755)
+	os.WriteFile(filepath.Join(sendDir, "SKILL.md"),
+		[]byte("---\nname: dmail-sendable\nmetadata:\n  dmail-schema-version: \"1\"\nproduces:\n    - kind: specification\n---\n"), 0644)
+
+	// when
+	result := session.CheckSkills(dir)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected CheckFail for deprecated kind, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "init --force") {
+		t.Errorf("hint should suggest init --force, got %q", result.Hint)
+	}
+}
+
+func TestCheckSkills_UpdatedFeedbackKind(t *testing.T) {
+	// given — SKILL.md with updated "kind: design-feedback" (post-split)
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".siren", "skills", "dmail-readable")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"),
+		[]byte("---\nname: dmail-readable\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: design-feedback\n---\n"), 0644)
+	sendDir := filepath.Join(dir, ".siren", "skills", "dmail-sendable")
+	os.MkdirAll(sendDir, 0755)
+	os.WriteFile(filepath.Join(sendDir, "SKILL.md"),
+		[]byte("---\nname: dmail-sendable\nmetadata:\n  dmail-schema-version: \"1\"\nproduces:\n    - kind: specification\n---\n"), 0644)
+
+	// when
+	result := session.CheckSkills(dir)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected CheckOK for updated kind, got %v: %s", result.Status, result.Message)
+	}
+}
+
 func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// given: nonexistent config path → config check fails, cfg=nil
 	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -365,16 +411,16 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 8 results
-	if len(results) != 8 {
-		t.Fatalf("expected 8 results, got %d", len(results))
+	// then: should have 9 results (config, state dir, claude, git, skills, event store, claude auth, linear mcp, success-rate)
+	if len(results) != 9 {
+		t.Fatalf("expected 9 results, got %d", len(results))
 	}
 	// Config should fail
 	if results[0].Status != domain.CheckFail {
 		t.Errorf("Config: expected FAIL, got %v", results[0].Status)
 	}
 	// Claude Auth should be skipped (nil config)
-	auth := results[5]
+	auth := results[6]
 	if auth.Name != "Claude Auth" {
 		t.Errorf("expected 'Claude Auth', got %q", auth.Name)
 	}
@@ -382,7 +428,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 		t.Errorf("Claude Auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
 	}
 	// Linear MCP should be skipped (nil config)
-	mcp := results[6]
+	mcp := results[7]
 	if mcp.Name != "Linear MCP" {
 		t.Errorf("expected 'Linear MCP', got %q", mcp.Name)
 	}
@@ -414,8 +460,8 @@ assistant:
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
 	// then
-	if len(results) != 8 {
-		t.Fatalf("expected 8 results, got %d", len(results))
+	if len(results) != 9 {
+		t.Fatalf("expected 9 results, got %d", len(results))
 	}
 	// Config should pass
 	if results[0].Status != domain.CheckOK {
@@ -426,7 +472,7 @@ assistant:
 		t.Errorf("claude: expected FAIL, got %v: %s", results[2].Status, results[2].Message)
 	}
 	// Claude Auth should be skipped because claude binary is unavailable
-	auth := results[5]
+	auth := results[6]
 	if auth.Status != domain.CheckSkip {
 		t.Errorf("Claude Auth: expected SKIP, got %v: %s", auth.Status, auth.Message)
 	}
@@ -434,7 +480,7 @@ assistant:
 		t.Errorf("expected 'claude not available' in message, got: %s", auth.Message)
 	}
 	// Linear MCP should be skipped because claude binary is unavailable
-	mcp := results[6]
+	mcp := results[7]
 	if mcp.Status != domain.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
 	}
@@ -460,9 +506,9 @@ tracker:
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 8 results (config, state dir, claude, git, skills, claude auth, linear mcp, success-rate)
-	if len(results) != 8 {
-		t.Fatalf("expected 8 results, got %d: %v", len(results), results)
+	// then: should have 9 results (config, state dir, claude, git, skills, event store, claude auth, linear mcp, success-rate)
+	if len(results) != 9 {
+		t.Fatalf("expected 9 results, got %d: %v", len(results), results)
 	}
 	if results[0].Name != "Config" || results[0].Status != domain.CheckOK {
 		t.Errorf("Config check: expected OK, got %v: %s", results[0].Status, results[0].Message)
@@ -470,21 +516,24 @@ tracker:
 	if results[1].Name != "State Dir" || results[1].Status != domain.CheckOK {
 		t.Errorf("State Dir check: expected OK, got %v: %s", results[1].Status, results[1].Message)
 	}
-	if results[5].Name != "Claude Auth" {
-		t.Errorf("expected 'Claude Auth', got %q", results[5].Name)
+	if results[5].Name != "Event Store" {
+		t.Errorf("expected 'Event Store', got %q", results[5].Name)
+	}
+	if results[6].Name != "Claude Auth" {
+		t.Errorf("expected 'Claude Auth', got %q", results[6].Name)
 	}
 	// Claude Auth may be OK (if claude binary exists) or SKIP (if not)
-	if results[5].Status != domain.CheckOK && results[5].Status != domain.CheckSkip {
-		t.Errorf("Claude Auth check: expected OK or SKIP, got %v: %s", results[5].Status, results[5].Message)
-	}
-	if results[6].Name != "Linear MCP" {
-		t.Errorf("expected 'Linear MCP', got %q", results[6].Name)
-	}
 	if results[6].Status != domain.CheckOK && results[6].Status != domain.CheckSkip {
-		t.Errorf("Linear MCP check: expected OK or SKIP, got %v: %s", results[6].Status, results[6].Message)
+		t.Errorf("Claude Auth check: expected OK or SKIP, got %v: %s", results[6].Status, results[6].Message)
+	}
+	if results[7].Name != "Linear MCP" {
+		t.Errorf("expected 'Linear MCP', got %q", results[7].Name)
+	}
+	if results[7].Status != domain.CheckOK && results[7].Status != domain.CheckSkip {
+		t.Errorf("Linear MCP check: expected OK or SKIP, got %v: %s", results[7].Status, results[7].Message)
 	}
 	// success-rate should be last result, OK with "no events" (no events dir in temp)
-	sr := results[7]
+	sr := results[8]
 	if sr.Name != "success-rate" {
 		t.Errorf("expected 'success-rate', got %q", sr.Name)
 	}
@@ -493,6 +542,97 @@ tracker:
 	}
 	if sr.Message != "no events" {
 		t.Errorf("success-rate: expected 'no events', got %q", sr.Message)
+	}
+}
+
+// --- CheckEventStore tests ---
+
+func TestCheckEventStore_Valid(t *testing.T) {
+	// given: valid JSONL event file in a session subdirectory
+	dir := t.TempDir()
+	sessionDir := filepath.Join(dir, ".siren", "events", "test-session-001")
+	os.MkdirAll(sessionDir, 0755)
+	os.WriteFile(filepath.Join(sessionDir, "2026-03-09.jsonl"),
+		[]byte(`{"type":"wave_applied","timestamp":"2026-03-09T00:00:00Z"}`+"\n"), 0644)
+
+	// when
+	check := session.CheckEventStore(dir)
+
+	// then
+	if check.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", check.Status, check.Message)
+	}
+	if check.Name != "Event Store" {
+		t.Errorf("expected name 'Event Store', got %q", check.Name)
+	}
+	if !strings.Contains(check.Message, "1 session") && !strings.Contains(check.Message, "1 event") {
+		t.Errorf("expected message to mention sessions and events, got: %s", check.Message)
+	}
+}
+
+func TestCheckEventStore_Corrupt(t *testing.T) {
+	// given: corrupt JSONL in a session subdirectory
+	dir := t.TempDir()
+	sessionDir := filepath.Join(dir, ".siren", "events", "test-session-001")
+	os.MkdirAll(sessionDir, 0755)
+	os.WriteFile(filepath.Join(sessionDir, "bad.jsonl"), []byte("not json\n"), 0644)
+
+	// when
+	check := session.CheckEventStore(dir)
+
+	// then
+	if check.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", check.Status, check.Message)
+	}
+}
+
+func TestCheckEventStore_NoDir(t *testing.T) {
+	// given: no events directory at all
+	dir := t.TempDir()
+
+	// when
+	check := session.CheckEventStore(dir)
+
+	// then
+	if check.Status != domain.CheckSkip {
+		t.Errorf("expected SKIP, got %v: %s", check.Status, check.Message)
+	}
+}
+
+func TestCheckEventStore_NoSessions(t *testing.T) {
+	// given: events directory exists but no session subdirectories
+	dir := t.TempDir()
+	eventsDir := filepath.Join(dir, ".siren", "events")
+	os.MkdirAll(eventsDir, 0755)
+
+	// when
+	check := session.CheckEventStore(dir)
+
+	// then
+	if check.Status != domain.CheckOK {
+		t.Errorf("expected OK for empty events, got %v: %s", check.Status, check.Message)
+	}
+}
+
+func TestCheckEventStore_MultipleSessions(t *testing.T) {
+	// given: two sessions with valid events
+	dir := t.TempDir()
+	for _, sid := range []string{"session-001", "session-002"} {
+		sessionDir := filepath.Join(dir, ".siren", "events", sid)
+		os.MkdirAll(sessionDir, 0755)
+		os.WriteFile(filepath.Join(sessionDir, "2026-03-09.jsonl"),
+			[]byte(`{"type":"wave_applied","timestamp":"2026-03-09T00:00:00Z"}`+"\n"), 0644)
+	}
+
+	// when
+	check := session.CheckEventStore(dir)
+
+	// then
+	if check.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", check.Status, check.Message)
+	}
+	if !strings.Contains(check.Message, "2 session") {
+		t.Errorf("expected message to mention 2 sessions, got: %s", check.Message)
 	}
 }
 

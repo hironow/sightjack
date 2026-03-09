@@ -84,3 +84,47 @@ func TestGenAIToolAttrs(t *testing.T) {
 		t.Errorf("tool.name = %v, want Read", v)
 	}
 }
+
+func TestGenAIAgentAttrs(t *testing.T) {
+	// given / when
+	attrs := platform.GenAIAgentAttrs("code-reviewer", "agent_01")
+	attrMap := make(map[string]any)
+	for _, a := range attrs {
+		attrMap[string(a.Key)] = a.Value.AsInterface()
+	}
+
+	// then
+	if v := attrMap["gen_ai.operation.name"]; v != "invoke_agent" {
+		t.Errorf("operation.name = %v, want invoke_agent", v)
+	}
+	if v := attrMap["gen_ai.agent.name"]; v != "code-reviewer" {
+		t.Errorf("agent.name = %v, want code-reviewer", v)
+	}
+	if v := attrMap["gen_ai.agent.id"]; v != "agent_01" {
+		t.Errorf("agent.id = %v, want agent_01", v)
+	}
+}
+
+func TestGenAISessionAttrs(t *testing.T) {
+	// given / when
+	attrs := platform.GenAISessionAttrs("sess_abc123")
+	attrMap := make(map[string]any)
+	for _, a := range attrs {
+		attrMap[string(a.Key)] = a.Value.AsInterface()
+	}
+
+	// then
+	if v := attrMap["gen_ai.session.id"]; v != "sess_abc123" {
+		t.Errorf("session.id = %v, want sess_abc123", v)
+	}
+}
+
+func TestGenAISessionAttrs_empty(t *testing.T) {
+	// given / when
+	attrs := platform.GenAISessionAttrs("")
+
+	// then
+	if attrs != nil {
+		t.Errorf("expected nil for empty session, got %v", attrs)
+	}
+}

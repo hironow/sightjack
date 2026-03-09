@@ -2,10 +2,13 @@
 以下のクラスタの分析結果に基づいて、Issue群の完成度を向上させるための Wave（作業塊）を提案してください。
 
 ## Strictness Level: {{.StrictnessLevel}}
-現在の厳格度レベルに応じて分析の深さを調整してください:
-- fog: DoD不足をWarningとして表示のみ。NFRは参考情報。
-- alert: Must級DoD欠落にはサブIssue提案。NFRにも専用の注意を。
-- lockdown: 全DoD不足をフラグ。未完了IssueをBlocked候補としてマーク。
+
+Strictnessは既存実装に対する変更許容度を定義します:
+- fog: 保護なし。フィードバックに応じて自由にキャンセル・再構築。
+- alert: 既存を尊重。影響範囲を制限。サブIssueや依存関係変更を優先。
+- lockdown: 構造を保護。追加的な変更のみ。BacklogのIssueキャンセルは不可避な場合のみ。
+
+DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 ## 対象クラスタ
 - クラスタ名: {{.ClusterName}}
@@ -29,6 +32,7 @@
 - `add_label`: Issueにラベルを付与
 - `update_description`: Issueの説明を更新
 - `create`: 親Issueの下に新しいサブIssueを作成
+- `cancel`: Issueをキャンセル（Backlog/Todoステータスのみ）。detailフィールドに理由が必要。
 
 {{if .DoDSection}}
 ## 完成基準（DoD）ガイドライン

@@ -2,10 +2,13 @@
 承認されたWaveのアクションをLinear MCP Server経由でIssueに適用してください。
 
 ## Strictness Level: {{.StrictnessLevel}}
-現在の厳格度レベルに応じて分析の深さを調整してください:
-- fog: DoD不足をWarningとして表示のみ。NFRは参考情報。
-- alert: Must級DoD欠落にはサブIssue提案。NFRにも専用の注意を。
-- lockdown: 全DoD不足をフラグ。未完了IssueをBlocked候補としてマーク。
+
+Strictnessは既存実装に対する変更許容度を定義します:
+- fog: 保護なし。フィードバックに応じて自由にキャンセル・再構築。
+- alert: 既存を尊重。影響範囲を制限。サブIssueや依存関係変更を優先。
+- lockdown: 構造を保護。追加的な変更のみ。BacklogのIssueキャンセルは不可避な場合のみ。
+
+DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 ## Wave情報
 - Wave ID: {{.WaveID}}
@@ -22,6 +25,10 @@
 3. `add_label`: Linear MCPでラベルを付与する
 4. `update_description`: IssueのDescriptionを更新する
 5. `create`: 親Issueの下に新しいサブIssueをLinear MCP経由で作成する (mcp__linear__create_issue)
+6. `cancel`: Linear MCP経由でIssueをキャンセルする。必須事項:
+   a. IssueステータスがBacklogまたはTodoであることを確認（In Progress以降はREJECT）
+   b. キャンセル理由（アクションのdetailフィールドから）をコメントとして追記
+   c. Issueステータスを Cancelled に設定
 
 適用後、他のクラスタへの波及効果（ripples）があれば記録してください。
 {{if .DoDSection}}

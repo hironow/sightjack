@@ -43,6 +43,15 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			if err != nil {
 				return err
 			}
+			if cmd.Flags().Changed("strictness") {
+				s, _ := cmd.Flags().GetString("strictness")
+				level := domain.StrictnessLevel(s)
+				if !level.Valid() {
+					return fmt.Errorf("invalid strictness %q: must be fog, alert, or lockdown", s)
+				}
+				cfg.Strictness.Default = level
+				logger.Info("Strictness override: %s", s)
+			}
 			logger.Info("Starting sightjack scan...")
 			logger.Info("Team: %s | Project: %s | Lang: %s", cfg.Tracker.Team, cfg.Tracker.Project, cfg.Lang)
 
@@ -86,6 +95,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 	}
 
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output scan result as JSON")
+	cmd.Flags().StringP("strictness", "s", "", "Override default strictness level (fog, alert, lockdown)")
 
 	return cmd
 }

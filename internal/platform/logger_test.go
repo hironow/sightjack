@@ -2,10 +2,13 @@ package platform_test
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
 )
 
@@ -145,5 +148,176 @@ func TestLogger_Writer(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	if logger.Writer() != &buf {
 		t.Error("Writer() should return the configured writer")
+	}
+}
+
+func TestLogger_NoColorWhenNotTerminal(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.Info("no terminal")
+	if strings.Contains(buf.String(), "\033[") {
+		t.Errorf("expected no ANSI codes for non-terminal writer, got %q", buf.String())
+	}
+}
+
+func TestLogger_ColorWhenEnabled(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.SetNoColor(false)
+	logger.Info("colored")
+	if !strings.Contains(buf.String(), "\033[") {
+		t.Errorf("expected ANSI codes when color enabled, got %q", buf.String())
+	}
+}
+
+func TestLogger_SetNoColor(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.SetNoColor(false)
+	logger.Info("on")
+	colored := buf.String()
+
+	buf.Reset()
+	logger.SetNoColor(true)
+	logger.Info("off")
+	plain := buf.String()
+
+	if !strings.Contains(colored, "\033[") {
+		t.Errorf("expected color when on, got %q", colored)
+	}
+	if strings.Contains(plain, "\033[") {
+		t.Errorf("expected no color when off, got %q", plain)
+	}
+}
+
+func TestLogger_NoColorEnvVar(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.Info("env test")
+	if strings.Contains(buf.String(), "\033[") {
+		t.Errorf("NO_COLOR=1 should disable color, got %q", buf.String())
+	}
+}
+
+func TestLogger_ExtraWriterPlainText(t *testing.T) {
+	var primary bytes.Buffer
+	logger := platform.NewLogger(&primary, false)
+	logger.SetNoColor(false)
+
+	var extra bytes.Buffer
+	logger.SetExtraWriter(&extra)
+
+	logger.Info("dual")
+
+	if !strings.Contains(primary.String(), "\033[") {
+		t.Errorf("primary should have ANSI codes, got %q", primary.String())
+	}
+	if strings.Contains(extra.String(), "\033[") {
+		t.Errorf("extra writer should be plain text, got %q", extra.String())
+	}
+}
+
+func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
+	logger := platform.NewLogger(io.Discard, false)
+
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			var buf bytes.Buffer
+			logger.SetExtraWriter(&buf)
+		}()
+		go func(n int) {
+			defer wg.Done()
+			logger.Info("race test info %d", n)
+			logger.Warn("race test warn %d", n)
+		}(i)
+		go func() {
+			defer wg.Done()
+			logger.SetExtraWriter(nil)
+		}()
+	}
+	wg.Wait()
+
+	// Clean up
+	logger.SetExtraWriter(nil)
+}
+
+func TestBanner_Send_Format(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	l.Banner(domain.BannerSend, "specification", "spec-auth-w1-001", "Add DoD for login")
+	out := buf.String()
+	if !strings.Contains(out, "D-MAIL SEND") {
+		t.Errorf("expected D-MAIL SEND, got: %s", out)
+	}
+	if !strings.Contains(out, "specification") {
+		t.Errorf("expected kind, got: %s", out)
+	}
+	if !strings.Contains(out, "spec-auth-w1-001") {
+		t.Errorf("expected name, got: %s", out)
+	}
+	if !strings.Contains(out, "Add DoD for login") {
+		t.Errorf("expected description, got: %s", out)
+	}
+	if !strings.Contains(out, ">>>") {
+		t.Errorf("expected >>> fallback, got: %s", out)
+	}
+}
+
+func TestBanner_Recv_Format(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	l.Banner(domain.BannerRecv, "design-feedback", "design-feedback-003", "Token rotation drift")
+	out := buf.String()
+	if !strings.Contains(out, "D-MAIL RECV") {
+		t.Errorf("expected D-MAIL RECV, got: %s", out)
+	}
+	if !strings.Contains(out, "<<<") {
+		t.Errorf("expected <<< fallback, got: %s", out)
+	}
+}
+
+func TestBanner_NoColor(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	l.Banner(domain.BannerSend, "specification", "spec-001", "desc")
+	out := buf.String()
+	if strings.Contains(out, "\033[") {
+		t.Errorf("no ANSI codes in no-color mode, got: %s", out)
+	}
+}
+
+func TestBanner_LongDescription_Truncated(t *testing.T) {
+	var buf bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(true)
+	longDesc := "This is a very long description that exceeds fifty characters easily"
+	l.Banner(domain.BannerSend, "specification", "spec-001", longDesc)
+	out := buf.String()
+	if !strings.Contains(out, "...") {
+		t.Errorf("expected truncation, got: %s", out)
+	}
+	if strings.Contains(out, "easily") {
+		t.Errorf("should be truncated before 'easily', got: %s", out)
+	}
+}
+
+func TestBanner_ExtraWriter_PlainText(t *testing.T) {
+	var buf, extra bytes.Buffer
+	l := platform.NewLogger(&buf, false)
+	l.SetNoColor(false)
+	l.SetExtraWriter(&extra)
+	l.Banner(domain.BannerSend, "specification", "spec-001", "desc")
+	if strings.Contains(extra.String(), "\033[") {
+		t.Errorf("extra writer should not have ANSI, got: %s", extra.String())
+	}
+	if !strings.Contains(extra.String(), ">>>") {
+		t.Errorf("extra writer should use plain fallback, got: %s", extra.String())
 	}
 }
