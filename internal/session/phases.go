@@ -30,7 +30,7 @@ const (
 func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	scanResult *domain.ScanResult, cfg *domain.Config, available []domain.Wave, waves []domain.Wave,
 	adrCount int, resumedAt *time.Time, shibitoShown bool,
-	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, selectPhaseResult, bool) {
+	out io.Writer, sessionSpan trace.Span, logger domain.Logger) (domain.Wave, selectPhaseResult, bool) {
 
 	gate := cfg.Gate
 
@@ -57,7 +57,7 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 	// Prompt wave selection
 	selected, err := PromptWaveSelection(ctx, out, scanner, available)
 	if err == domain.ErrQuit {
-		loopSpan.AddEvent("session.paused")
+		sessionSpan.AddEvent("session.paused")
 		logger.Info("Session paused. State saved.")
 		return domain.Wave{}, selectQuit, shibitoShown
 	}
@@ -104,13 +104,13 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
 	feedback []*DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
-	out io.Writer, loopSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
+	out io.Writer, waveSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	gate := cfg.Gate
 
 	// Auto-approve when --auto-approve is set.
 	if gate.IsAutoApprove() {
-		loopSpan.AddEvent("wave.auto_approved",
+		waveSpan.AddEvent("wave.auto_approved",
 			trace.WithAttributes(
 				attribute.String("wave.id", selected.ID),
 				attribute.String("wave.cluster_name", selected.ClusterName),
@@ -163,7 +163,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		switch choice {
 		case domain.ApprovalApprove:
 			delete(sessionRejected, domain.WaveKey(selected))
-			loopSpan.AddEvent("wave.approved",
+			waveSpan.AddEvent("wave.approved",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
 					attribute.String("wave.cluster_name", selected.ClusterName),
@@ -179,7 +179,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			return selected, approvalApproved
 		case domain.ApprovalReject:
 			delete(sessionRejected, domain.WaveKey(selected))
-			loopSpan.AddEvent("wave.rejected",
+			waveSpan.AddEvent("wave.rejected",
 				trace.WithAttributes(
 					attribute.String("wave.id", selected.ID),
 					attribute.String("wave.cluster_name", selected.ClusterName),
@@ -279,7 +279,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
-	emitter port.SessionEventEmitter, out io.Writer, loopSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
+	emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
 
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
 	if err != nil {
@@ -297,7 +297,7 @@ func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	platform.RecordWave(ctx, "applied")
 
 	if !domain.IsWaveApplyComplete(applyResult) {
-		loopSpan.AddEvent("wave.partial_failure",
+		waveSpan.AddEvent("wave.partial_failure",
 			trace.WithAttributes(
 				attribute.String("wave.id", selected.ID),
 				attribute.String("wave.cluster_name", selected.ClusterName),
@@ -318,7 +318,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	scanDir, adrDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
-	fbCollector *FeedbackCollector, emitter port.SessionEventEmitter, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, emitter port.SessionEventEmitter, waveSpan trace.Span, logger domain.Logger) {
 
 	var clusterForNextgen domain.ClusterScanResult
 	for _, c := range scanResult.Clusters {
@@ -332,7 +332,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 		return
 	}
 	if !NeedsMoreWaves(clusterForNextgen, *waves) {
-		loopSpan.AddEvent("nextgen.skipped",
+		waveSpan.AddEvent("nextgen.skipped",
 			trace.WithAttributes(
 				attribute.String("wave.cluster_name", selected.ClusterName),
 			),
@@ -409,16 +409,16 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, loopSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) {
 
 	gate := cfg.Gate
 
-	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, emitter, out, loopSpan, logger)
+	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, emitter, out, waveSpan, logger)
 	if !ok {
 		return
 	}
 
-	loopSpan.AddEvent("wave.completed",
+	waveSpan.AddEvent("wave.completed",
 		trace.WithAttributes(
 			attribute.String("wave.id", selected.ID),
 			attribute.String("wave.cluster_name", selected.ClusterName),
@@ -516,7 +516,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 	generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, selected, resolvedStrictness,
-		waves, completed, scanResult, sessionRejected, fbCollector, emitter, loopSpan, logger)
+		waves, completed, scanResult, sessionRejected, fbCollector, emitter, waveSpan, logger)
 
 	applyReadyLabelsIfEnabled(ctx, cfg, waves, completed, labeledReady, emitter, out, logger)
 

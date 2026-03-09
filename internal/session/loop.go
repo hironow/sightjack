@@ -3,6 +3,7 @@ package session
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"time"
@@ -23,12 +24,8 @@ func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessio
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
 	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) error {
 
-	ctx, loopSpan := platform.Tracer.Start(ctx, "interactive.loop",
-		trace.WithAttributes(
-			attribute.String("sightjack.session_id", sessionID),
-		),
-	)
-	defer loopSpan.End()
+	parentSpan := trace.SpanFromContext(ctx)
+	parentSpan.SetAttributes(attribute.String("sightjack.session_id", sessionID))
 
 	// --- Interactive Loop with D-Mail Waiting Cycle ---
 	shibitoShown := false
@@ -55,7 +52,7 @@ waitingCycle:
 
 			var selected domain.Wave
 			var result selectPhaseResult
-			selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, out, loopSpan, logger)
+			selected, result, shibitoShown = selectPhase(ctx, scanner, scanResult, cfg, available, waves, adrCount, resumedAt, shibitoShown, out, trace.SpanFromContext(ctx), logger)
 			switch result {
 			case selectQuit:
 				userQuit = true
@@ -66,15 +63,25 @@ waitingCycle:
 
 			resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
-			selected, approvalResult := approvalPhase(ctx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, out, loopSpan, logger)
+			waveKey := domain.WaveKey(selected)
+			waveCtx, waveSpan := platform.Tracer.Start(ctx, fmt.Sprintf("wave[%s]", waveKey),
+				trace.WithAttributes(
+					attribute.String("wave.id", selected.ID),
+					attribute.String("wave.cluster", selected.ClusterName),
+				),
+			)
+
+			selected, approvalResult := approvalPhase(waveCtx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, out, waveSpan, logger)
 			if approvalResult != approvalApproved {
+				waveSpan.End()
 				continue
 			}
 
-			applyPhase(ctx, cfg, scanDir, scanResultPath, adrDir,
+			applyPhase(waveCtx, cfg, scanDir, scanResultPath, adrDir,
 				selected, resolvedStrictness,
 				&waves, completed, scanResult, sessionRejected,
-				labeledReady, fbCollector, store, emitter, out, loopSpan, logger)
+				labeledReady, fbCollector, store, emitter, out, waveSpan, logger)
+			waveSpan.End()
 		}
 
 		// Consistency check after each outerLoop iteration
