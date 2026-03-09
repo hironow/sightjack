@@ -191,13 +191,13 @@ func LoadConfig(path string) (*domain.Config, error) {
 		cfg.Scan.MaxConcurrency = 3
 	}
 	if cfg.ClaudeCmd == "" {
-		cfg.ClaudeCmd = "claude"
+		cfg.ClaudeCmd = domain.DefaultClaudeCmd
 	}
 	if cfg.Model == "" {
-		cfg.Model = "opus"
+		cfg.Model = domain.DefaultModel
 	}
 	if cfg.TimeoutSec < 1 {
-		cfg.TimeoutSec = 1980
+		cfg.TimeoutSec = domain.DefaultTimeoutSec
 	}
 	if !cfg.Strictness.Default.Valid() { // nosemgrep: lod-excessive-dot-chain [permanent]
 		cfg.Strictness.Default = domain.StrictnessFog

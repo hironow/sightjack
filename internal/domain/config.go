@@ -98,6 +98,14 @@ func (g *GateConfig) SetReviewBudget(n int) { g.ReviewBudget = n }
 // SetWaitTimeout sets the D-Mail waiting phase timeout.
 func (g *GateConfig) SetWaitTimeout(d time.Duration) { g.WaitTimeout = d }
 
+// Default values for Config fields. Used by DefaultConfig and post-load
+// validation to avoid hardcoded strings throughout the codebase.
+const (
+	DefaultClaudeCmd  = "claude"
+	DefaultModel      = "opus"
+	DefaultTimeoutSec = 1980
+)
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
 	Tracker      IssueTrackerConfig     `yaml:"tracker"`
@@ -195,9 +203,9 @@ func DefaultConfig() Config {
 			ChunkSize:      20,
 			MaxConcurrency: 3,
 		},
-		ClaudeCmd:  "claude",
-		Model:      "opus",
-		TimeoutSec: 1980,
+		ClaudeCmd:  DefaultClaudeCmd,
+		Model:      DefaultModel,
+		TimeoutSec: DefaultTimeoutSec,
 		Scribe: ScribeConfig{
 			Enabled:           true,
 			AutoDiscussRounds: 2,

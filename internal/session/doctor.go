@@ -262,7 +262,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	}
 
 	// 3. claude binary check
-	claudeName := "claude"
+	claudeName := domain.DefaultClaudeCmd
 	if cfg != nil && cfg.ClaudeCmd != "" {
 		claudeName = cfg.ClaudeCmd
 	}
