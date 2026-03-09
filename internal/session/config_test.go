@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
@@ -1059,6 +1061,72 @@ assistant:
 	}
 	if loaded.Assistant.TimeoutSec != 600 {
 		t.Errorf("Assistant.TimeoutSec: expected 600, got %d", loaded.Assistant.TimeoutSec)
+	}
+}
+
+func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
+	// given: DefaultConfig marshalled to YAML file
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+
+	original := domain.DefaultConfig()
+	data, err := yaml.Marshal(&original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(cfgPath, data, 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// when: LoadConfig from that file
+	loaded, err := session.LoadConfig(cfgPath)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	// verify key fields survive round-trip
+	if loaded.Lang != "ja" {
+		t.Errorf("Lang: expected 'ja', got %q", loaded.Lang)
+	}
+	if loaded.Scan.ChunkSize != 20 {
+		t.Errorf("Scan.ChunkSize: expected 20, got %d", loaded.Scan.ChunkSize)
+	}
+	if loaded.Scan.MaxConcurrency != 3 {
+		t.Errorf("Scan.MaxConcurrency: expected 3, got %d", loaded.Scan.MaxConcurrency)
+	}
+	if loaded.Strictness.Default != domain.StrictnessFog {
+		t.Errorf("Strictness.Default: expected fog, got %s", loaded.Strictness.Default)
+	}
+	if loaded.Retry.MaxAttempts != 3 {
+		t.Errorf("Retry.MaxAttempts: expected 3, got %d", loaded.Retry.MaxAttempts)
+	}
+	if loaded.Retry.BaseDelaySec != 2 {
+		t.Errorf("Retry.BaseDelaySec: expected 2, got %d", loaded.Retry.BaseDelaySec)
+	}
+	if !loaded.Labels.Enabled {
+		t.Error("Labels.Enabled: expected true")
+	}
+	if loaded.Labels.Prefix != "sightjack" {
+		t.Errorf("Labels.Prefix: expected 'sightjack', got %q", loaded.Labels.Prefix)
+	}
+	if loaded.Labels.ReadyLabel != "sightjack:ready" {
+		t.Errorf("Labels.ReadyLabel: expected 'sightjack:ready', got %q", loaded.Labels.ReadyLabel)
+	}
+	if loaded.Scribe.Enabled != true {
+		t.Error("Scribe.Enabled: expected true")
+	}
+	if loaded.Scribe.AutoDiscussRounds != 2 {
+		t.Errorf("Scribe.AutoDiscussRounds: expected 2, got %d", loaded.Scribe.AutoDiscussRounds)
+	}
+	if loaded.Assistant.TimeoutSec != 300 {
+		t.Errorf("Assistant.TimeoutSec: expected 300, got %d", loaded.Assistant.TimeoutSec)
+	}
+
+	// verify ComputedConfig is zero-value (nil map) after round-trip of defaults
+	if loaded.Computed.EstimatedStrictness != nil {
+		t.Errorf("Computed.EstimatedStrictness: expected nil, got %v", loaded.Computed.EstimatedStrictness)
 	}
 }
 
