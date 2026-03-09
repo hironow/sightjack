@@ -985,6 +985,83 @@ func TestSetConfigField_RejectsComputedKey(t *testing.T) {
 	}
 }
 
+func TestWriteEstimatedStrictness_WritesToComputedConfig(t *testing.T) {
+	// given: config with user-specified fields
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY-TEAM"
+  project: "My Project"
+lang: "ja"
+strictness:
+  default: alert
+  overrides:
+    security: lockdown
+scan:
+  chunk_size: 30
+  max_concurrency: 4
+assistant:
+  model: sonnet
+  timeout_sec: 600
+`), 0644)
+
+	estimated := map[string]domain.StrictnessLevel{
+		"cluster-x": domain.StrictnessAlert,
+		"cluster-y": domain.StrictnessLockdown,
+	}
+
+	// when
+	err := session.WriteEstimatedStrictness(cfgPath, estimated)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("WriteEstimatedStrictness: %v", err)
+	}
+
+	loaded, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatalf("LoadConfig after write: %v", err)
+	}
+
+	// verify estimated strictness written to Computed path
+	if loaded.Computed.EstimatedStrictness["cluster-x"] != domain.StrictnessAlert {
+		t.Errorf("cluster-x: expected alert, got %s", loaded.Computed.EstimatedStrictness["cluster-x"])
+	}
+	if loaded.Computed.EstimatedStrictness["cluster-y"] != domain.StrictnessLockdown {
+		t.Errorf("cluster-y: expected lockdown, got %s", loaded.Computed.EstimatedStrictness["cluster-y"])
+	}
+
+	// verify user config fields preserved
+	if loaded.Lang != "ja" {
+		t.Errorf("Lang: expected 'ja', got %q", loaded.Lang)
+	}
+	if loaded.Tracker.Team != "MY-TEAM" {
+		t.Errorf("Tracker.Team: expected 'MY-TEAM', got %q", loaded.Tracker.Team)
+	}
+	if loaded.Tracker.Project != "My Project" {
+		t.Errorf("Tracker.Project: expected 'My Project', got %q", loaded.Tracker.Project)
+	}
+	if loaded.Strictness.Default != domain.StrictnessAlert {
+		t.Errorf("Strictness.Default: expected alert, got %s", loaded.Strictness.Default)
+	}
+	if loaded.Strictness.Overrides["security"] != domain.StrictnessLockdown {
+		t.Errorf("Strictness.Overrides[security]: expected lockdown, got %s", loaded.Strictness.Overrides["security"])
+	}
+	if loaded.Scan.ChunkSize != 30 {
+		t.Errorf("Scan.ChunkSize: expected 30, got %d", loaded.Scan.ChunkSize)
+	}
+	if loaded.Scan.MaxConcurrency != 4 {
+		t.Errorf("Scan.MaxConcurrency: expected 4, got %d", loaded.Scan.MaxConcurrency)
+	}
+	if loaded.Assistant.Model != "sonnet" {
+		t.Errorf("Assistant.Model: expected 'sonnet', got %q", loaded.Assistant.Model)
+	}
+	if loaded.Assistant.TimeoutSec != 600 {
+		t.Errorf("Assistant.TimeoutSec: expected 600, got %d", loaded.Assistant.TimeoutSec)
+	}
+}
+
 func TestLoadConfig_ScribeSectionMissing_DefaultsToEnabled(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
