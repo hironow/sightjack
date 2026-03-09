@@ -115,6 +115,32 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.CheckResult {
 	}
 }
 
+// checkClaudeInference determines if the Claude CLI can perform inference
+// by interpreting the result of a minimal "1+1=" prompt.
+func checkClaudeInference(output string, err error) domain.CheckResult {
+	if err != nil {
+		return domain.CheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckFail,
+			Message: "inference failed: " + err.Error(),
+			Hint:    "check API key, quota, and model access",
+		}
+	}
+	if !strings.Contains(output, "2") {
+		return domain.CheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckFail,
+			Message: "unexpected response",
+			Hint:    "check API key, quota, and model access",
+		}
+	}
+	return domain.CheckResult{
+		Name:    "claude-inference",
+		Status:  domain.CheckOK,
+		Message: "inference OK",
+	}
+}
+
 // CheckStateDir verifies that the .siren/ state directory exists or can be
 // created, and that it is writable. Uses a temporary file probe to confirm.
 func CheckStateDir(baseDir string) domain.CheckResult {
@@ -248,20 +274,16 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	}
 	var results []domain.CheckResult
 
-	// 1. Config check
-	cfgResult := CheckConfig(configPath)
-	results = append(results, cfgResult)
+	// --- Binaries ---
+	results = append(results, CheckTool(ctx, "git"))
 
-	// 2. State directory check
-	results = append(results, CheckStateDir(baseDir))
-
+	// Load config early to get claudeCmd
 	var cfg *domain.Config
+	cfgResult := CheckConfig(configPath)
 	if cfgResult.Status == domain.CheckOK {
-		// Re-load to use for subsequent checks (checkConfig already validated).
 		cfg, _ = LoadConfig(configPath)
 	}
 
-	// 3. claude binary check
 	claudeName := domain.DefaultClaudeCmd
 	if cfg != nil && cfg.ClaudeCmd != "" {
 		claudeName = cfg.ClaudeCmd
@@ -269,16 +291,15 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	claudeResult := CheckTool(ctx, claudeName)
 	results = append(results, claudeResult)
 
-	// 4. git binary check
-	results = append(results, CheckTool(ctx, "git"))
+	// --- State ---
+	results = append(results, CheckStateDir(baseDir))
+	results = append(results, cfgResult)
 
-	// 5. Skills check
+	// --- Data ---
 	results = append(results, CheckSkills(baseDir))
-
-	// 5.5. Event store check
 	results = append(results, CheckEventStore(baseDir))
 
-	// 6-7. Claude Auth + Linear MCP (run `claude mcp list` once, share output)
+	// --- Connectivity ---
 	if cfgResult.Status != domain.CheckOK {
 		results = append(results, domain.CheckResult{
 			Name:    "Claude Auth",
@@ -290,6 +311,11 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 			Status:  domain.CheckSkip,
 			Message: "skipped (config not loaded)",
 		})
+		results = append(results, domain.CheckResult{
+			Name:    "claude-inference",
+			Status:  domain.CheckSkip,
+			Message: "skipped (config not loaded)",
+		})
 	} else if claudeResult.Status != domain.CheckOK {
 		results = append(results, domain.CheckResult{
 			Name:    "Claude Auth",
@@ -298,6 +324,11 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		})
 		results = append(results, domain.CheckResult{
 			Name:    "Linear MCP",
+			Status:  domain.CheckSkip,
+			Message: "skipped (claude not available)",
+		})
+		results = append(results, domain.CheckResult{
+			Name:    "claude-inference",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
@@ -317,12 +348,23 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 				Status:  domain.CheckSkip,
 				Message: "skipped (claude not authenticated)",
 			})
+			results = append(results, domain.CheckResult{
+				Name:    "claude-inference",
+				Status:  domain.CheckSkip,
+				Message: "skipped (auth failed)",
+			})
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+
+			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
+			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferOut, inferErr := inferCmd.Output()
+			inferCancel()
+			results = append(results, checkClaudeInference(string(inferOut), inferErr))
 		}
 	}
 
-	// 8. Success rate (informational, never fails)
+	// --- Metrics ---
 	allEvents, evErr := LoadAllEvents(ctx, baseDir)
 	if evErr != nil || len(allEvents) == 0 {
 		results = append(results, domain.CheckResult{

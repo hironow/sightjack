@@ -38,6 +38,23 @@ func main() {
 		return
 	}
 
+	// Handle --print flag (used by doctor's inference check).
+	if hasFlag(os.Args[1:], "--print") {
+		prompt := ""
+		for i := len(os.Args) - 1; i >= 1; i-- {
+			if !strings.HasPrefix(os.Args[i], "-") && os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" {
+				prompt = os.Args[i]
+				break
+			}
+		}
+		if strings.Contains(prompt, "1+1") {
+			fmt.Print("2")
+		} else {
+			fmt.Print("unknown")
+		}
+		return
+	}
+
 	prompt := extractPrompt(os.Args[1:])
 	if prompt == "" {
 		// No stdout output — data exchange is file-based.
@@ -100,6 +117,16 @@ func logPrompt(dir, prompt string) {
 	seq := len(entries) + 1
 	filename := fmt.Sprintf("prompt_%03d.txt", seq)
 	os.WriteFile(filepath.Join(dir, filename), []byte(prompt), 0o644)
+}
+
+// hasFlag returns true if the given flag appears anywhere in args.
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
 }
 
 // extractPrompt finds the value of the -p flag.

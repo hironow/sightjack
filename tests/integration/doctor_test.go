@@ -280,13 +280,16 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 9 results (config, state dir, claude, git, skills, event store, claude auth, linear mcp, success-rate)
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d", len(results))
+	// then: should have 10 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, success-rate)
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results, got %d", len(results))
 	}
-	// Config should fail
-	if results[0].Status != domain.CheckFail {
-		t.Errorf("Config: expected FAIL, got %v", results[0].Status)
+	// Config should fail (index 3 in new order)
+	if results[3].Name != "Config" {
+		t.Errorf("expected 'Config' at index 3, got %q", results[3].Name)
+	}
+	if results[3].Status != domain.CheckFail {
+		t.Errorf("Config: expected FAIL, got %v", results[3].Status)
 	}
 	// Claude Auth should be skipped (nil config)
 	auth := results[6]
@@ -303,6 +306,14 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	}
 	if mcp.Status != domain.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
+	}
+	// claude-inference should be skipped (nil config)
+	infer := results[8]
+	if infer.Name != "claude-inference" {
+		t.Errorf("expected 'claude-inference', got %q", infer.Name)
+	}
+	if infer.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP (nil config), got %v: %s", infer.Status, infer.Message)
 	}
 }
 
@@ -324,16 +335,19 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
 	// then
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d", len(results))
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results, got %d", len(results))
 	}
-	// Config should pass
-	if results[0].Status != domain.CheckOK {
-		t.Errorf("Config: expected OK, got %v", results[0].Status)
+	// Config should pass (index 3 in new order)
+	if results[3].Name != "Config" {
+		t.Errorf("expected 'Config' at index 3, got %q", results[3].Name)
 	}
-	// claude binary check should fail (nonexistent binary)
-	if results[2].Status != domain.CheckFail {
-		t.Errorf("claude: expected FAIL, got %v: %s", results[2].Status, results[2].Message)
+	if results[3].Status != domain.CheckOK {
+		t.Errorf("Config: expected OK, got %v", results[3].Status)
+	}
+	// claude binary check should fail (index 1 in new order)
+	if results[1].Status != domain.CheckFail {
+		t.Errorf("claude: expected FAIL, got %v: %s", results[1].Status, results[1].Message)
 	}
 	// Claude Auth should be skipped because claude binary is unavailable
 	auth := results[6]
@@ -347,6 +361,14 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	mcp := results[7]
 	if mcp.Status != domain.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
+	}
+	// claude-inference should be skipped because claude binary is unavailable
+	infer := results[8]
+	if infer.Name != "claude-inference" {
+		t.Errorf("expected 'claude-inference', got %q", infer.Name)
+	}
+	if infer.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP, got %v: %s", infer.Status, infer.Message)
 	}
 }
 
@@ -363,43 +385,53 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 9 results (config, state dir, claude, git, skills, event store, claude auth, linear mcp, success-rate)
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d: %v", len(results), results)
+	// then: should have 10 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, success-rate)
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results, got %d: %v", len(results), results)
 	}
-	if results[0].Name != "Config" || results[0].Status != domain.CheckOK {
-		t.Errorf("Config check: expected OK, got %v: %s", results[0].Status, results[0].Message)
+	// git binary check (index 0)
+	if results[0].Name != "git" || results[0].Status != domain.CheckOK {
+		t.Errorf("git check: expected OK, got %v: %s", results[0].Status, results[0].Message)
 	}
-	if results[1].Name != "State Dir" || results[1].Status != domain.CheckOK {
-		t.Errorf("State Dir check: expected OK, got %v: %s", results[1].Status, results[1].Message)
+	// claude binary check should pass (fake-claude supports --version, index 1)
+	if results[1].Status != domain.CheckOK {
+		t.Errorf("claude check: expected OK, got %v: %s", results[1].Status, results[1].Message)
 	}
-	// claude binary check should pass (fake-claude supports --version)
-	if results[2].Name != fakeClaude {
-		// The name comes from claudeName which is the full path; just check it's there
-		t.Logf("claude check name: %q", results[2].Name)
+	// State Dir (index 2)
+	if results[2].Name != "State Dir" || results[2].Status != domain.CheckOK {
+		t.Errorf("State Dir check: expected OK, got %v: %s", results[2].Status, results[2].Message)
 	}
-	if results[2].Status != domain.CheckOK {
-		t.Errorf("claude check: expected OK, got %v: %s", results[2].Status, results[2].Message)
+	// Config (index 3)
+	if results[3].Name != "Config" || results[3].Status != domain.CheckOK {
+		t.Errorf("Config check: expected OK, got %v: %s", results[3].Status, results[3].Message)
 	}
+	// Event Store (index 5)
 	if results[5].Name != "Event Store" {
 		t.Errorf("expected 'Event Store', got %q", results[5].Name)
 	}
-	// Claude Auth should be OK (fake-claude mcp list succeeds)
+	// Claude Auth should be OK (fake-claude mcp list succeeds, index 6)
 	if results[6].Name != "Claude Auth" {
 		t.Errorf("expected 'Claude Auth', got %q", results[6].Name)
 	}
 	if results[6].Status != domain.CheckOK {
 		t.Errorf("Claude Auth: expected OK, got %v: %s", results[6].Status, results[6].Message)
 	}
-	// Linear MCP should be OK (fake-claude outputs "linear ✓ connected")
+	// Linear MCP should be OK (fake-claude outputs "linear ✓ connected", index 7)
 	if results[7].Name != "Linear MCP" {
 		t.Errorf("expected 'Linear MCP', got %q", results[7].Name)
 	}
 	if results[7].Status != domain.CheckOK {
 		t.Errorf("Linear MCP: expected OK, got %v: %s", results[7].Status, results[7].Message)
 	}
-	// success-rate should be last result, OK with "no events" (no events dir in temp)
-	sr := results[8]
+	// claude-inference should be OK (fake-claude --print responds with "2", index 8)
+	if results[8].Name != "claude-inference" {
+		t.Errorf("expected 'claude-inference', got %q", results[8].Name)
+	}
+	if results[8].Status != domain.CheckOK {
+		t.Errorf("claude-inference: expected OK, got %v: %s", results[8].Status, results[8].Message)
+	}
+	// success-rate should be last result, OK with "no events" (no events dir in temp, index 9)
+	sr := results[9]
 	if sr.Name != "success-rate" {
 		t.Errorf("expected 'success-rate', got %q", sr.Name)
 	}

@@ -1,4 +1,4 @@
-// white-box-reason: tests unexported checkClaudeAuth and checkLinearMCP pure functions
+// white-box-reason: tests unexported checkClaudeAuth, checkLinearMCP, and checkClaudeInference pure functions
 package session
 
 import (
@@ -71,5 +71,44 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 	// then: should fail because ✓ is required
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected FAIL for disconnected, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckClaudeInference_Success(t *testing.T) {
+	// given
+	output := "2"
+
+	// when
+	result := checkClaudeInference(output, nil)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "inference OK" {
+		t.Errorf("expected 'inference OK', got: %s", result.Message)
+	}
+}
+
+func TestCheckClaudeInference_Error(t *testing.T) {
+	// given
+	result := checkClaudeInference("", errors.New("exit status 1"))
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
+	// given
+	result := checkClaudeInference("I cannot compute that", nil)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
+	}
+	if result.Message != "unexpected response" {
+		t.Errorf("expected 'unexpected response', got: %s", result.Message)
 	}
 }
