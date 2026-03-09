@@ -421,6 +421,61 @@ func TestResolveStrictness_OverrideTrumpsEstimated(t *testing.T) {
 	}
 }
 
+func TestValidateConfig_DefaultConfigIsValid(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for default config, got %v", errs)
+	}
+}
+
+func TestValidateConfig_InvalidLang(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+	cfg.Lang = "fr"
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Error("expected error for invalid lang")
+	}
+}
+
+func TestValidateConfig_InvalidScanChunkSize(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+	cfg.Scan.ChunkSize = 0
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Error("expected error for zero chunk_size")
+	}
+}
+
+func TestValidateConfig_InvalidStrictnessOverride(t *testing.T) {
+	// given
+	cfg := domain.DefaultConfig()
+	cfg.Strictness.Overrides = map[string]domain.StrictnessLevel{"bad": "nightmare"}
+
+	// when
+	errs := domain.ValidateConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Error("expected error for invalid strictness override")
+	}
+}
+
 func TestResolveStrictness_MaxOfDefaultAndEstimated(t *testing.T) {
 	// given
 	cfg := domain.StrictnessConfig{

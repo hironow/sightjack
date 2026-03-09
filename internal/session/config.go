@@ -29,6 +29,11 @@ func UpdateConfig(path string, key string, value string) error {
 		return err
 	}
 
+	// Validate before writing
+	if errs := domain.ValidateConfig(cfg); len(errs) > 0 {
+		return fmt.Errorf("invalid config after update: %s", errs[0])
+	}
+
 	out, err := yaml.Marshal(&cfg)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)

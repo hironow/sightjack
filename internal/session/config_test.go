@@ -588,6 +588,21 @@ func TestUpdateConfig_InvalidLang_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestUpdateConfig_InvalidChunkSize_RejectsWrite(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`scan: {chunk_size: 20}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scan.chunk_size", "0")
+
+	// then
+	if err == nil {
+		t.Error("expected error for zero chunk_size")
+	}
+}
+
 func TestUpdateConfig_InvalidStrictness_ReturnsError(t *testing.T) {
 	// given
 	dir := t.TempDir()

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -211,4 +212,44 @@ func ValidLang(lang string) bool {
 		return true
 	}
 	return false
+}
+
+// ValidateConfig checks the config for consistency and returns a list of errors.
+// An empty slice means the config is valid.
+func ValidateConfig(cfg Config) []string {
+	var errs []string
+
+	if cfg.Lang != "" && !ValidLang(cfg.Lang) {
+		errs = append(errs, fmt.Sprintf("lang must be \"ja\" or \"en\" (got %q)", cfg.Lang))
+	}
+	if !cfg.Strictness.Default.Valid() {
+		errs = append(errs, fmt.Sprintf("strictness.default must be fog, alert, or lockdown (got %q)", cfg.Strictness.Default))
+	}
+	if cfg.Scan.ChunkSize < 1 {
+		errs = append(errs, fmt.Sprintf("scan.chunk_size must be positive (got %d)", cfg.Scan.ChunkSize))
+	}
+	if cfg.Scan.MaxConcurrency < 1 {
+		errs = append(errs, fmt.Sprintf("scan.max_concurrency must be positive (got %d)", cfg.Scan.MaxConcurrency))
+	}
+	if cfg.Assistant.TimeoutSec < 0 {
+		errs = append(errs, fmt.Sprintf("assistant.timeout_sec must be non-negative (got %d)", cfg.Assistant.TimeoutSec))
+	}
+	if cfg.Retry.MaxAttempts < 1 {
+		errs = append(errs, fmt.Sprintf("retry.max_attempts must be positive (got %d)", cfg.Retry.MaxAttempts))
+	}
+	if cfg.Retry.BaseDelaySec < 1 {
+		errs = append(errs, fmt.Sprintf("retry.base_delay_sec must be positive (got %d)", cfg.Retry.BaseDelaySec))
+	}
+	for label, level := range cfg.Strictness.Overrides {
+		if !level.Valid() {
+			errs = append(errs, fmt.Sprintf("strictness.overrides[%q] is invalid: %q", label, level))
+		}
+	}
+	for label, level := range cfg.Strictness.Estimated {
+		if !level.Valid() {
+			errs = append(errs, fmt.Sprintf("strictness.estimated[%q] is invalid: %q", label, level))
+		}
+	}
+
+	return errs
 }
