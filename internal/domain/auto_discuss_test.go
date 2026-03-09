@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests unexported AutoDiscussResult field mapping and default config values
+
 import "testing"
 
 func TestAutoDiscussResult_ToArchitectResponse(t *testing.T) {

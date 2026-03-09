@@ -1,16 +1,17 @@
-package session
+package session_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestFeedbackCollector_NotifyCh(t *testing.T) {
 	// given
-	ch := make(chan *DMail, 1)
-	fc := CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	ch := make(chan *session.DMail, 1)
+	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// NotifyCh should not fire yet
 	select {
@@ -20,7 +21,7 @@ func TestFeedbackCollector_NotifyCh(t *testing.T) {
 	}
 
 	// when: send a D-Mail
-	ch <- &DMail{Kind: DMailDesignFeedback, Name: "test-001"}
+	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "test-001"}
 	// Give goroutine time to process
 	time.Sleep(100 * time.Millisecond)
 
@@ -35,13 +36,13 @@ func TestFeedbackCollector_NotifyCh(t *testing.T) {
 
 func TestFeedbackCollector_NotifyCh_multipleDoesNotBlock(t *testing.T) {
 	// given
-	ch := make(chan *DMail, 3)
-	fc := CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	ch := make(chan *session.DMail, 3)
+	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// when: send multiple D-Mails rapidly
-	ch <- &DMail{Kind: DMailDesignFeedback, Name: "test-001"}
-	ch <- &DMail{Kind: DMailDesignFeedback, Name: "test-002"}
-	ch <- &DMail{Kind: DMailDesignFeedback, Name: "test-003"}
+	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "test-001"}
+	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "test-002"}
+	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "test-003"}
 	time.Sleep(100 * time.Millisecond)
 
 	// then: should get at least one notification without blocking

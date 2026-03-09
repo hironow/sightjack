@@ -1,6 +1,4 @@
-package session
-
-// white-box-reason: session internals: tests unexported CheckConfig/CheckTool hint generation
+package session_test
 
 import (
 	"context"
@@ -8,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestCheckConfig_Fail_HasHint(t *testing.T) {
 	// given
-	result := CheckConfig("/nonexistent/config.yaml")
+	result := session.CheckConfig("/nonexistent/config.yaml")
 
 	// when/then
 	if result.Status != domain.CheckFail {
@@ -28,7 +27,7 @@ func TestCheckConfig_Fail_HasHint(t *testing.T) {
 
 func TestCheckTool_NotFound_HasHint(t *testing.T) {
 	// given
-	result := CheckTool(context.Background(), "nonexistent-tool-xyz-99999")
+	result := session.CheckTool(context.Background(), "nonexistent-tool-xyz-99999")
 
 	// when/then
 	if result.Status != domain.CheckFail {
@@ -44,7 +43,7 @@ func TestCheckTool_NotFound_HasHint(t *testing.T) {
 
 func TestCheckStateDir_CannotCreate_HasHint(t *testing.T) {
 	// given — /dev/null is not a directory, MkdirAll will fail
-	result := CheckStateDir("/dev/null")
+	result := session.CheckStateDir("/dev/null")
 
 	// when/then
 	if result.Status != domain.CheckFail {
@@ -60,7 +59,7 @@ func TestCheckSkills_Missing_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := CheckSkills(dir)
+	result := session.CheckSkills(dir)
 
 	// then
 	if result.Status != domain.CheckFail {

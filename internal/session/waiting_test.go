@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: tests unexported waitForDMail helper that manages inbox polling with timeout
+
 import (
 	"context"
 	"testing"
