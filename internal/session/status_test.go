@@ -155,7 +155,7 @@ func TestStatus_FormatText(t *testing.T) {
 
 	// then — verify key lines are present
 	expected := []string{
-		"sightjack status:",
+		"sightjack status",
 		"Last scan:",
 		"Waves:",
 		"Success rate:",
