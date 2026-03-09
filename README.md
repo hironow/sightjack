@@ -259,7 +259,7 @@ Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stde
 
 ## Usage
 
-Flags and subcommand can be placed in any order. All flags support GNU/POSIX long (`--flag`) and short (`-f`) forms:
+All commands accept an optional `[path]` argument. When omitted, the current working directory is used. Flags and subcommand can be placed in any order. All flags support GNU/POSIX long (`--flag`) and short (`-f`) forms:
 
 ```bash
 sightjack scan --dry-run         # flags after subcommand
