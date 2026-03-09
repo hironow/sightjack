@@ -91,7 +91,8 @@ func TestE2E_Run_NewSession(t *testing.T) {
 	}
 	defer c.Close()
 
-	cmd := exec.Command(sightjackBin(), "run", dir)
+	// --wait-timeout=-1s disables D-Mail waiting mode to prevent blocking after nextgen.
+	cmd := exec.Command(sightjackBin(), "run", "--wait-timeout=-1s", dir)
 	cmd.Stdin = c.Tty()
 	cmd.Stdout = c.Tty()
 	cmd.Stderr = c.Tty()
@@ -100,6 +101,17 @@ func TestE2E_Run_NewSession(t *testing.T) {
 	if startErr := cmd.Start(); startErr != nil {
 		t.Fatalf("start run: %v", startErr)
 	}
+
+	// Safety net: kill process if it doesn't exit within 2 minutes.
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Minute):
+			cmd.Process.Kill()
+		}
+	}()
+	defer close(done)
 
 	// Expect scan progress, then wave selection prompt
 	// The scan produces output like "Found 1 clusters"
@@ -123,11 +135,13 @@ func TestE2E_Run_NewSession(t *testing.T) {
 		t.Fatalf("failed to send 'a': %v", expErr)
 	}
 
-	// After apply, the session enters nextgen which may take time.
-	// Close TTY to signal EOF — the session will save state and exit.
-	// We've already verified the full interactive path: scan → waves → select → approve.
-	// Brief pause lets apply start before TTY close signals exit.
-	time.Sleep(500 * time.Millisecond)
+	// Wait for apply + nextgen → either back to wave selection or session end.
+	if _, expErr := c.ExpectString("Select wave"); expErr == nil {
+		if _, sendErr := c.SendLine("q"); sendErr != nil {
+			t.Logf("send 'q': %v", sendErr)
+		}
+	}
+
 	c.Tty().Close()
 	if _, eofErr := c.ExpectEOF(); eofErr != nil {
 		t.Logf("ExpectEOF: %v", eofErr)
@@ -154,7 +168,7 @@ func TestE2E_Run_QuitImmediately(t *testing.T) {
 	}
 	defer c.Close()
 
-	cmd := exec.Command(sightjackBin(), "run", dir)
+	cmd := exec.Command(sightjackBin(), "run", "--wait-timeout=-1s", dir)
 	cmd.Stdin = c.Tty()
 	cmd.Stdout = c.Tty()
 	cmd.Stderr = c.Tty()
