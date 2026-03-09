@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -96,6 +97,50 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 		cfg.Labels.Prefix = value
 	case "labels.ready_label":
 		cfg.Labels.ReadyLabel = value
+	case "assistant.command":
+		cfg.Assistant.Command = value
+	case "scribe.enabled":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid scribe.enabled %q: must be true or false", value)
+		}
+		cfg.Scribe.Enabled = b
+	case "scribe.auto_discuss_rounds":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid scribe.auto_discuss_rounds %q: must be non-negative integer", value)
+		}
+		cfg.Scribe.AutoDiscussRounds = n
+	case "retry.max_attempts":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return fmt.Errorf("invalid retry.max_attempts %q: must be positive integer", value)
+		}
+		cfg.Retry.MaxAttempts = n
+	case "retry.base_delay_sec":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return fmt.Errorf("invalid retry.base_delay_sec %q: must be positive integer", value)
+		}
+		cfg.Retry.BaseDelaySec = n
+	case "gate.notify_cmd":
+		cfg.Gate.SetNotifyCmd(value)
+	case "gate.approve_cmd":
+		cfg.Gate.SetApproveCmd(value)
+	case "gate.review_cmd":
+		cfg.Gate.SetReviewCmd(value)
+	case "gate.review_budget":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid gate.review_budget %q: must be non-negative integer", value)
+		}
+		cfg.Gate.SetReviewBudget(n)
+	case "gate.wait_timeout":
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid gate.wait_timeout %q: must be duration (e.g. 30m, 1h)", value)
+		}
+		cfg.Gate.SetWaitTimeout(d)
 	default:
 		return fmt.Errorf("unknown config key %q", key)
 	}
@@ -141,7 +186,7 @@ func LoadConfig(path string) (*domain.Config, error) {
 		cfg.Scan.ChunkSize = 20
 	}
 	if cfg.Scan.MaxConcurrency < 1 {
-		cfg.Scan.MaxConcurrency = 1
+		cfg.Scan.MaxConcurrency = 3
 	}
 	if cfg.Assistant.Command == "" {
 		cfg.Assistant.Command = "claude"

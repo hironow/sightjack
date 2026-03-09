@@ -86,7 +86,7 @@ lang: "en"
 	}
 }
 
-func TestLoadConfig_ZeroConcurrency_ClampsToOne(t *testing.T) {
+func TestLoadConfig_ZeroConcurrency_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
@@ -102,8 +102,8 @@ scan:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Scan.MaxConcurrency != 1 {
-		t.Errorf("expected max_concurrency clamped to 1, got %d", cfg.Scan.MaxConcurrency)
+	if cfg.Scan.MaxConcurrency != 3 {
+		t.Errorf("expected max_concurrency clamped to default 3, got %d", cfg.Scan.MaxConcurrency)
 	}
 }
 
@@ -711,6 +711,256 @@ strictness:
 	_, err := session.LoadConfig(path)
 	if err == nil {
 		t.Fatal("expected error for invalid estimated strictness value")
+	}
+}
+
+func TestUpdateConfig_SetAssistantCommand(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "assistant.command", "cc-p")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Assistant.Command != "cc-p" {
+		t.Errorf("expected 'cc-p', got %q", cfg.Assistant.Command)
+	}
+}
+
+func TestUpdateConfig_SetScribeEnabled(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scribe.enabled", "false")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Scribe.Enabled {
+		t.Error("expected Scribe.Enabled=false")
+	}
+}
+
+func TestUpdateConfig_SetScribeAutoDiscussRounds(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scribe.auto_discuss_rounds", "5")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Scribe.AutoDiscussRounds != 5 {
+		t.Errorf("expected 5, got %d", cfg.Scribe.AutoDiscussRounds)
+	}
+}
+
+func TestUpdateConfig_SetRetryMaxAttempts(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "retry.max_attempts", "7")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Retry.MaxAttempts != 7 {
+		t.Errorf("expected 7, got %d", cfg.Retry.MaxAttempts)
+	}
+}
+
+func TestUpdateConfig_SetRetryBaseDelaySec(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "retry.base_delay_sec", "5")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Retry.BaseDelaySec != 5 {
+		t.Errorf("expected 5, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
+func TestUpdateConfig_SetGateNotifyCmd(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.notify_cmd", "echo notify")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Gate.NotifyCmd != "echo notify" {
+		t.Errorf("expected 'echo notify', got %q", cfg.Gate.NotifyCmd)
+	}
+}
+
+func TestUpdateConfig_SetGateWaitTimeout(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.wait_timeout", "1h30m")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Gate.WaitTimeout.String() != "1h30m0s" {
+		t.Errorf("expected 1h30m0s, got %s", cfg.Gate.WaitTimeout)
+	}
+}
+
+func TestUpdateConfig_SetGateReviewBudget(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.review_budget", "5")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Gate.ReviewBudget != 5 {
+		t.Errorf("expected 5, got %d", cfg.Gate.ReviewBudget)
+	}
+}
+
+func TestUpdateConfig_InvalidScribeEnabled_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scribe.enabled", "notabool")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid scribe.enabled value")
+	}
+}
+
+func TestUpdateConfig_InvalidRetryMaxAttempts_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "retry.max_attempts", "0")
+
+	// then
+	if err == nil {
+		t.Error("expected error for zero retry.max_attempts")
+	}
+}
+
+func TestUpdateConfig_InvalidGateWaitTimeout_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.wait_timeout", "notaduration")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid gate.wait_timeout")
+	}
+}
+
+func TestLoadConfig_MaxConcurrency_ClampsToDefaultThree(t *testing.T) {
+	// given: config with negative max_concurrency
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(cfgPath, []byte(`
+scan:
+  max_concurrency: -1
+`), 0644)
+
+	// when
+	cfg, err := session.LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Scan.MaxConcurrency != 3 {
+		t.Errorf("expected max_concurrency clamped to default 3, got %d", cfg.Scan.MaxConcurrency)
 	}
 }
 

@@ -80,6 +80,21 @@ func (g GateConfig) EffectiveReviewBudget() int {
 	return g.ReviewBudget
 }
 
+// SetNotifyCmd sets the notification command.
+func (g *GateConfig) SetNotifyCmd(cmd string) { g.NotifyCmd = cmd }
+
+// SetApproveCmd sets the approval command.
+func (g *GateConfig) SetApproveCmd(cmd string) { g.ApproveCmd = cmd }
+
+// SetReviewCmd sets the review command.
+func (g *GateConfig) SetReviewCmd(cmd string) { g.ReviewCmd = cmd }
+
+// SetReviewBudget sets the max review cycles.
+func (g *GateConfig) SetReviewBudget(n int) { g.ReviewBudget = n }
+
+// SetWaitTimeout sets the D-Mail waiting phase timeout.
+func (g *GateConfig) SetWaitTimeout(d time.Duration) { g.WaitTimeout = d }
+
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
 	Tracker      IssueTrackerConfig     `yaml:"tracker"`
