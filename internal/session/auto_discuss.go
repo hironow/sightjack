@@ -83,7 +83,7 @@ func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 	totalCalls := rounds * 2
 	for r := 0; r < totalCalls; r++ {
 		speaker := speakerForRound(r)
-		roundCtx, roundSpan := platform.Tracer.Start(ctx, "scribe.auto_discuss.round", // nosemgrep: adr0003-otel-span-without-defer-end — End() called after round logic below (not defer: loop iteration)
+		roundCtx, roundSpan := platform.Tracer.Start(ctx, "scribe.auto_discuss.round", // nosemgrep: adr0003-otel-span-without-defer-end — End() called after round logic below (not defer: loop iteration) [permanent]
 			trace.WithAttributes(
 				attribute.Int("round.index", r),
 				attribute.String("round.speaker", speaker),
