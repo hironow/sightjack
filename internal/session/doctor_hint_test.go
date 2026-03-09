@@ -2,6 +2,8 @@ package session_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -70,5 +72,46 @@ func TestCheckSkills_Missing_HasHint(t *testing.T) {
 	}
 	if !strings.Contains(result.Hint, "sightjack init") {
 		t.Errorf("hint should mention sightjack init, got: %s", result.Hint)
+	}
+}
+
+func TestCheckSkills_DeprecatedFeedbackKind_Fails(t *testing.T) {
+	// given — SKILL.md with deprecated "kind: feedback" (pre-split)
+	dir := t.TempDir()
+	for _, name := range []string{"dmail-sendable", "dmail-readable"} {
+		skillDir := filepath.Join(dir, domain.StateDir, "skills", name)
+		os.MkdirAll(skillDir, 0755)
+		content := "---\nname: " + name + "\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: feedback\n---\n"
+		os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(content), 0644)
+	}
+
+	// when
+	result := session.CheckSkills(dir)
+
+	// then
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected FAIL for deprecated kind, got %v: %s", result.Status.StatusLabel(), result.Message)
+	}
+	if !strings.Contains(result.Hint, "init --force") {
+		t.Errorf("hint should mention init --force, got: %s", result.Hint)
+	}
+}
+
+func TestCheckSkills_UpdatedDesignFeedbackKind_Passes(t *testing.T) {
+	// given — SKILL.md with updated "kind: design-feedback" (post-split)
+	dir := t.TempDir()
+	for _, name := range []string{"dmail-sendable", "dmail-readable"} {
+		skillDir := filepath.Join(dir, domain.StateDir, "skills", name)
+		os.MkdirAll(skillDir, 0755)
+		content := "---\nname: " + name + "\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: design-feedback\n---\n"
+		os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(content), 0644)
+	}
+
+	// when
+	result := session.CheckSkills(dir)
+
+	// then
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK for updated kind, got %v: %s", result.Status.StatusLabel(), result.Message)
 	}
 }
