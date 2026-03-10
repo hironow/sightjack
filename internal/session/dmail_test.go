@@ -2443,3 +2443,68 @@ func TestFeedbackCollector_NewSinceSnapshot_noNew(t *testing.T) {
 		t.Fatalf("got %d new mails, want 0", len(newMails))
 	}
 }
+
+func TestMarshalDMail_ContextRoundTrip(t *testing.T) {
+	// given
+	mail := &session.DMail{
+		Name:          "spec-context-01",
+		Kind:          session.DMailSpecification,
+		Description:   "wave with insight context",
+		SchemaVersion: "1",
+		Context: &domain.InsightContext{
+			Insights: []domain.InsightSummary{
+				{Source: "sightjack", Summary: "Shibito count reduced to 3"},
+				{Source: "amadeus", Summary: "ADR compliance at 95%"},
+			},
+		},
+		Body: "Wave body here.\n",
+	}
+
+	// when
+	data, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+	parsed, err := session.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail: %v", err)
+	}
+
+	// then
+	if parsed.Context == nil {
+		t.Fatal("expected non-nil Context after round-trip")
+	}
+	if len(parsed.Context.Insights) != 2 {
+		t.Fatalf("expected 2 insights, got %d", len(parsed.Context.Insights))
+	}
+	if parsed.Context.Insights[0].Source != "sightjack" {
+		t.Errorf("insight[0].Source = %q, want %q", parsed.Context.Insights[0].Source, "sightjack")
+	}
+	if parsed.Context.Insights[0].Summary != "Shibito count reduced to 3" {
+		t.Errorf("insight[0].Summary = %q, want %q", parsed.Context.Insights[0].Summary, "Shibito count reduced to 3")
+	}
+	if parsed.Context.Insights[1].Source != "amadeus" {
+		t.Errorf("insight[1].Source = %q, want %q", parsed.Context.Insights[1].Source, "amadeus")
+	}
+}
+
+func TestMarshalDMail_NilContextOmitted(t *testing.T) {
+	// given — DMail with nil Context
+	mail := &session.DMail{
+		Name:          "spec-no-context",
+		Kind:          session.DMailSpecification,
+		Description:   "no context",
+		SchemaVersion: "1",
+	}
+
+	// when
+	data, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+
+	// then — context should not appear in output
+	if strings.Contains(string(data), "context:") {
+		t.Error("nil Context should be omitted from marshalled output")
+	}
+}
