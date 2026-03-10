@@ -46,7 +46,7 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	defer ws.StopAmadeusRun(t, am)
 
 	feedbackPath := ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
-	obs.AssertDMailKind(feedbackPath, "feedback")
+	obs.AssertDMailKind(feedbackPath, "implementation-feedback")
 
 	// 4. Full closed loop verified — all 3 phases completed sequentially above.
 	// Verify all outboxes are clean (phonewave flushed everything).
