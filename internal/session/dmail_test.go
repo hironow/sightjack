@@ -2,7 +2,9 @@ package session_test
 
 import (
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -458,7 +460,7 @@ func TestReceiveDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// inbox file removed
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("inbox file should be removed after receive")
 	}
 
@@ -1084,7 +1086,7 @@ func TestReceiveDMail_MalformedContent(t *testing.T) {
 		t.Errorf("expected parse error, got: %v", err)
 	}
 	// inbox file should still exist (parse failed before move)
-	if _, statErr := os.Stat(inboxPath); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(inboxPath); errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("inbox file should remain after parse failure")
 	}
 }
@@ -2134,7 +2136,7 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 
 	// and: archive file also exists
 	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "feedback-auth-w1.md")
-	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+	if _, err := os.Stat(archivePath); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected archive file to exist")
 	}
 }

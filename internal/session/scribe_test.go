@@ -1,7 +1,9 @@
 package session_test
 
 import (
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,7 +121,7 @@ func TestClearScribeOutput_RemovesExisting(t *testing.T) {
 	session.ClearScribeOutput(scanDir, wave)
 
 	// then
-	if _, err := os.Stat(outputFile); !os.IsNotExist(err) {
+	if _, err := os.Stat(outputFile); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected stale output file to be removed")
 	}
 }
@@ -160,7 +162,7 @@ func TestRunScribeADRDryRun(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	promptFile := filepath.Join(scanDir, "scribe_auth_auth-w1_prompt.md")
-	if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+	if _, err := os.Stat(promptFile); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected scribe prompt file to be generated")
 	}
 }

@@ -1,7 +1,9 @@
 package session_test
 
 import (
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -169,7 +171,7 @@ func TestPruneArchive_DeletesExpiredFiles(t *testing.T) {
 	}
 
 	// Verify file was actually removed
-	if _, err := os.Stat(oldFile); !os.IsNotExist(err) {
+	if _, err := os.Stat(oldFile); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected old file to be deleted")
 	}
 	// Verify keep file still exists
@@ -254,7 +256,7 @@ func TestDeleteArchiveFiles_DeletesSpecifiedFiles(t *testing.T) {
 		t.Errorf("expected report-old-w1.md, got %s", deleted[0])
 	}
 	// f1 should be gone
-	if _, err := os.Stat(f1); !os.IsNotExist(err) {
+	if _, err := os.Stat(f1); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected f1 to be deleted")
 	}
 	// f2 should remain

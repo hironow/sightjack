@@ -1,8 +1,10 @@
 package session_test
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +32,7 @@ func TestClearNextgenOutput_RemovesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	session.ClearNextgenOutput(dir, wave)
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("file should have been removed")
 	}
 }
@@ -477,7 +479,7 @@ func TestGenerateNextWavesDryRun(t *testing.T) {
 
 	// Verify prompt file was created
 	promptFile := filepath.Join(scanDir, "nextgen_auth_auth-w1_prompt.md")
-	if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+	if _, err := os.Stat(promptFile); errors.Is(err, fs.ErrNotExist) {
 		t.Error("prompt file should have been created")
 	}
 }

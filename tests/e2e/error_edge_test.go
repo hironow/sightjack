@@ -4,6 +4,8 @@ package e2e
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -233,7 +235,7 @@ func TestE2E_State_ArchivePrune_WithData(t *testing.T) {
 	}
 
 	// and: old file should be removed
-	if _, statErr := os.Stat(oldFile); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("old archive file should have been pruned")
 	}
 }

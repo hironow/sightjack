@@ -3,7 +3,9 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -211,7 +213,7 @@ func extractOutputPath(prompt string) string {
 
 func assertFileExists(t *testing.T, path string) {
 	t.Helper()
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected file to exist: %s", path)
 	}
 }
@@ -1008,13 +1010,13 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	}
 
 	// Feedback should be removed from inbox (received + archived)
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should have been removed from inbox")
 	}
 
 	// Feedback should exist in archive
 	archiveFeedback := filepath.Join(domain.MailDir(baseDir, domain.ArchiveDir), feedbackMail.Filename())
-	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
+	if _, err := os.Stat(archiveFeedback); errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should exist in archive")
 	}
 
@@ -1189,11 +1191,11 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	}
 
 	// Feedback should be archived
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should have been removed from inbox")
 	}
 	archiveFeedback := filepath.Join(domain.MailDir(baseDir, domain.ArchiveDir), feedbackMail.Filename())
-	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
+	if _, err := os.Stat(archiveFeedback); errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should exist in archive")
 	}
 

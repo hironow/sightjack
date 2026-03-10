@@ -1,7 +1,9 @@
 package eventsource
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"sort"
 	"strings"
@@ -90,7 +92,7 @@ func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, error) {
 	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("load all events: %w", err)

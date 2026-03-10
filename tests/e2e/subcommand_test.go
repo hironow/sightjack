@@ -4,6 +4,8 @@ package e2e
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -143,7 +145,7 @@ func TestE2E_Init_WithFlags(t *testing.T) {
 		t.Fatalf("init failed: %v\noutput: %s", err, out)
 	}
 	cfgFile := filepath.Join(dir, ".siren", "config.yaml")
-	if _, statErr := os.Stat(cfgFile); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(cfgFile); errors.Is(statErr, fs.ErrNotExist) {
 		t.Errorf("config file not created: %s", cfgFile)
 	}
 }

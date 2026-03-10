@@ -5,7 +5,9 @@ package scenario_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -279,7 +281,7 @@ func (w *Workspace) StopPhonewave(t *testing.T, tp *ToolProcess) {
 			// PID file not removed, but process is dead -- acceptable
 			return
 		default:
-			if _, err := os.Stat(pidFile); os.IsNotExist(err) {
+			if _, err := os.Stat(pidFile); errors.Is(err, fs.ErrNotExist) {
 				return
 			}
 			time.Sleep(200 * time.Millisecond)
@@ -493,7 +495,7 @@ func (w *Workspace) CountFiles(t *testing.T, dir string) int {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return 0
 		}
 		t.Fatalf("read dir %s: %v", dir, err)
@@ -512,7 +514,7 @@ func (w *Workspace) ListFiles(t *testing.T, dir string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
 		t.Fatalf("read dir %s: %v", dir, err)

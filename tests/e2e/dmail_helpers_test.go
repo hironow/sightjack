@@ -3,6 +3,8 @@
 package e2e
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,7 +109,7 @@ func listMailDir(t *testing.T, dir, sub string) []string {
 	mailDir := filepath.Join(dir, ".siren", sub)
 	entries, err := os.ReadDir(mailDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
 		t.Fatalf("read mail dir %s: %v", mailDir, err)
@@ -146,7 +148,7 @@ func writeDMailToDir(t *testing.T, dir, sub, filename string, content []byte) st
 // assertFileExists verifies a file exists at the given path.
 func assertFileExists(t *testing.T, path string) {
 	t.Helper()
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected file to exist: %s", path)
 	}
 }
@@ -222,7 +224,7 @@ func assertNoEvents(t *testing.T, baseDir string) {
 func assertDirExists(t *testing.T, path string) {
 	t.Helper()
 	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected directory to exist: %s", path)
 		return
 	}
