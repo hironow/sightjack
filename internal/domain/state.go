@@ -18,9 +18,10 @@ func MailDir(baseDir, sub string) string {
 	return filepath.Join(baseDir, StateDir, sub)
 }
 
-// StateFormatVersion is the version string written into SessionState files.
-// Centralised so that all code paths (scan, session, recovery) produce
-// consistent state files.
+// StateFormatVersion is the wire-format version embedded in SessionState JSON files.
+// This is NOT the sightjack release version — it tracks the on-disk schema so that
+// future readers can detect and migrate older state files. Bump only when the
+// SessionState JSON structure changes in a backwards-incompatible way.
 const StateFormatVersion = "0.0.11"
 
 // ConfigPath returns the path to the config file within .siren/.
