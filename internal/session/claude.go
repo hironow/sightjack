@@ -174,6 +174,9 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 		if ioAttrs := emitter.WeaveIOAttrs(); len(ioAttrs) > 0 {
 			span.SetAttributes(ioAttrs...)
 		}
+		if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
+			span.SetAttributes(initAttrs...)
+		}
 	}()
 
 	<-done

@@ -43,9 +43,10 @@ type SpanEmittingStreamReader struct {
 	rawEvents    []string
 	maxValueLen  int
 	syntheticSeq int
-	sessionID    string // captured from stream session_id for Weave thread_id
-	resultText   string // captured from result message for Weave output.value
-	inputText    string // caller-provided prompt for Weave input.value
+	sessionID    string         // captured from stream session_id for Weave thread_id
+	resultText   string         // captured from result message for Weave output.value
+	inputText    string         // caller-provided prompt for Weave input.value
+	initMsg      *StreamMessage // captured from system:init for InitAttrs()
 }
 
 // NewSpanEmittingStreamReader creates a SpanEmittingStreamReader.
@@ -65,6 +66,7 @@ func (s *SpanEmittingStreamReader) RawEvents() []string {
 }
 
 // WeaveThreadAttrs returns Weave thread attributes for the parent (turn) span.
+// The thread_id is derived from the Claude session_id seen in the stream.
 func (s *SpanEmittingStreamReader) WeaveThreadAttrs() []attribute.KeyValue {
 	if s.sessionID == "" {
 		return nil
