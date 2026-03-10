@@ -221,7 +221,7 @@ sightjack doctor
 sightjack run
 ```
 
-Sightjack creates `.siren/` and all state/run files automatically at runtime.
+Sightjack creates `.siren/` and all state/run files automatically at runtime. The `insights/` subdirectory is git-tracked and accumulates semantic knowledge (Shibito warnings, strictness estimates) across sessions.
 
 ## Subcommands
 

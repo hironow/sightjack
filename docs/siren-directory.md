@@ -22,6 +22,9 @@ This document describes what each directory/file does, who creates it, and how i
     *.md
   archive/                # processed d-mails (permanent record)
     *.md
+  insights/               # git-tracked insight ledger (per S0030)
+    shibito.md            # Shibito revival warnings from scan
+    strictness.md         # Per-cluster strictness estimates from scan
   .run/                   # ephemeral runtime data (per-session)
     {sessionID}/
       scan_result.json    # cached ScanResult (WriteScanResult / scan --json)
@@ -37,6 +40,7 @@ This document describes what each directory/file does, who creates it, and how i
       nextgen_*.json      # Follow-up wave response per wave
       nextgen_result.json # cached WavePlan (nextgen subcommand)
       *_prompt.md         # dry-run mode only
+    insights.lock         # flock for concurrent InsightWriter access
 ```
 
 Additionally, sightjack creates files outside `.siren/`:
@@ -56,16 +60,20 @@ events/
 .run/
 inbox/
 outbox/
+.otel.env
 ```
+
+Individual entries are used instead of ignoring the parent `.siren/` directory, so that `insights/` remains git-tracked (per ADR S0030).
 
 | Path | Git Status | Reason |
 |------|-----------|--------|
 | `config.yaml` | Tracked | Project-level configuration |
 | `skills/` | Tracked | Agent capability manifests for tool discovery |
 | `archive/` | Tracked | Audit trail of all d-mail activity |
+| `insights/` | Tracked | Semantic knowledge ledger — environment-independent (per S0030) |
 | `.gitignore` | Tracked | Self-managed ignore rules |
 | `events/` | Ignored | Session-specific event logs (source of truth for state) |
-| `.run/` | Ignored | Ephemeral scan cache and Claude subprocess outputs |
+| `.run/` | Ignored | Ephemeral scan cache, Claude subprocess outputs, `insights.lock` |
 | `inbox/` | Ignored | Transient; consumed and archived by MonitorInbox |
 | `outbox/` | Ignored | Transient; courier (phonewave) picks up and delivers |
 | `docs/adr/` | Tracked | Immutable decision records |
@@ -104,6 +112,46 @@ Each session creates a unique directory under `.run/` containing all Claude subp
 | `*_prompt.md` | — | `RunClaudeDryRun()` | Prompt files saved in `--dry-run` mode |
 
 All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent path traversal.
+
+## Insight Ledger: `insights/`
+
+The `insights/` directory stores accumulated semantic knowledge from scan results. Files use YAML frontmatter with Markdown body and are git-tracked for cross-session and cross-developer persistence.
+
+### File Format
+
+```
+---
+insight-schema-version: "1"
+kind: shibito
+tool: sightjack
+updated_at: "2026-03-10T15:30:00+09:00"
+entries: 2
+---
+
+## Insight: shibito-ENG045-ENG201
+
+- **what**: Token circular dependency pattern re-emerged
+- **why**: Issue ENG-045 was closed but pattern re-emerged in ENG-201
+- **how**: Review the original fix. Consider structural prevention
+- **when**: During scan, when closed issue patterns match current open issues
+- **who**: sightjack scan (session-1710000000000-12345)
+- **constraints**: Risk level: high
+- **closed-issue-id**: ENG-045
+- **current-issue-id**: ENG-201
+```
+
+### Files
+
+| File | Kind | Content |
+|------|------|---------|
+| `shibito.md` | `shibito` | Shibito revival warnings — closed issue patterns resurfacing in current work |
+| `strictness.md` | `strictness` | Per-cluster estimated strictness levels with reasoning |
+
+### Concurrency
+
+- Writes use flock-based locking via `insights.lock` in `.run/`
+- Atomic writes via temp-file + rename
+- Title-based dedup ensures idempotent appends (same title = skip)
 
 ## D-Mail Lifecycle
 
@@ -157,6 +205,9 @@ All `{name}` values are sanitized via `sanitizeName()` (scanner.go) to prevent p
 | `inbox/*.md` | External tool (phonewave) | Before/during session |
 | `outbox/*.md` | `ComposeDMail()` | After wave approval or completion |
 | `archive/*.md` | `ComposeDMail()` + `ReceiveDMail()` | After wave approval/completion or feedback receipt |
+| `insights/shibito.md` | `WriteShibitoInsights()` | After scan, when Shibito warnings detected |
+| `insights/strictness.md` | `WriteStrictnessInsights()` | After scan, when clusters have estimated strictness |
 | `.run/{sessionID}/*` | Claude subprocess + `WriteScanResult()` | During scan/discuss/apply/scribe/nextgen |
+| `.run/insights.lock` | `InsightWriter.lock()` | During insight append (flock advisory lock) |
 | `docs/adr/NNNN-*.md` | `RunScribeADR()` | After architect modifies a wave (Scribe agent) |
 | `.doctor_probe` | `checkStateDir()` | `sightjack doctor` (temporary, immediately removed) |
