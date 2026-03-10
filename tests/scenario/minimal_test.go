@@ -4,7 +4,6 @@ package scenario_test
 
 import (
 	"context"
-	"os/exec"
 	"testing"
 	"time"
 )
@@ -42,15 +41,10 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	ws.WaitForAbsent(t, ".expedition", "outbox", 10*time.Second)
 	obs.AssertDMailKind(reportPath, "report")
 
-	// 3. Run amadeus → feedback in .gate/outbox → phonewave → .siren/inbox + .expedition/inbox
-	err = ws.RunAmadeusCheck(t, ctx)
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
-			t.Logf("amadeus check returned exit code 2 (drift detected) — expected")
-		} else {
-			t.Fatalf("amadeus check failed: %v", err)
-		}
-	}
+	// 3. Start amadeus run as daemon → feedback in .gate/outbox → phonewave → .siren/inbox + .expedition/inbox
+	am := ws.StartAmadeusRun(t, ctx)
+	defer ws.StopAmadeusRun(t, am)
+
 	feedbackPath := ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
 	obs.AssertDMailKind(feedbackPath, "feedback")
 
