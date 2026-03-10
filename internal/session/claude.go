@@ -93,7 +93,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	if len(o.allowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(o.allowedTools, ","))
 	}
-	args = append(args, "--output-format", "stream-json")
+	args = append(args, "--output-format", "stream-json", "--verbose")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, cfg.ClaudeCmd, args...)
 	cmd.Cancel = cancelFunc(cmd)
