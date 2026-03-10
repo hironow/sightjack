@@ -129,7 +129,6 @@ func TestCheckStatusLabel(t *testing.T) {
 	}
 }
 
-
 func TestCheckStateDir_Writable(t *testing.T) {
 	// given: a directory where .siren/ can be created
 	dir := t.TempDir()
