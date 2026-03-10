@@ -213,7 +213,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 				Name:    "Skills",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
-				Hint:    `run "sightjack init --force" to regenerate skills with updated kind (feedback → design-feedback)`,
+				Hint:    "deprecated kind 'feedback'; migrate to 'design-feedback' (run 'sightjack init --force' to regenerate SKILL.md)",
 			}
 		}
 	}
@@ -357,7 +357,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
 			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
-			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferCmd := newCmd(inferCtx, claudeName, "--verbose", "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			results = append(results, checkClaudeInference(string(inferOut), inferErr))
