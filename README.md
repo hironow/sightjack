@@ -119,7 +119,7 @@ SKILL.md files in `.siren/skills/` declare produces/consumes routing for phonewa
 
 ## Architecture
 
-### Pipe Architecture (v0.0.12+)
+### Pipe Architecture
 
 ```
 scan --json ──→ waves ──→ select ──→ discuss ──→ apply ──→ nextgen

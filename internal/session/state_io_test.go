@@ -148,7 +148,7 @@ func TestLoadScanResult_FileNotFound(t *testing.T) {
 }
 
 func TestLoadScanResult_SnakeCaseFormat(t *testing.T) {
-	// given: JSON with snake_case field names (v0.0.12+ wire format)
+	// given: JSON with snake_case field names (current wire format)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "scan_result.json")
 	os.WriteFile(path, []byte(`{
