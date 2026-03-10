@@ -303,7 +303,7 @@ func (w *Workspace) RunSightjack(t *testing.T, ctx context.Context, args ...stri
 // first available wave and auto-approves all actions without stdin input.
 func (w *Workspace) RunSightjackScan(t *testing.T, ctx context.Context, extraArgs ...string) error {
 	t.Helper()
-	args := []string{"run", "--auto-approve"}
+	args := []string{"run", "--auto-approve", "--wait-timeout", "-1s"}
 	args = append(args, extraArgs...)
 	args = append(args, w.RepoPath)
 
