@@ -20,9 +20,14 @@ func MailDir(baseDir, sub string) string {
 
 // StateFormatVersion is the wire-format version embedded in SessionState JSON files.
 // This is NOT the sightjack release version — it tracks the on-disk schema so that
-// future readers can detect and migrate older state files. Bump only when the
-// SessionState JSON structure changes in a backwards-incompatible way.
-const StateFormatVersion = "0.0.11"
+// future readers can detect and migrate older state files.
+//
+// Compatibility contract (ADR 0013):
+//   - Readers MUST accept all prior format versions (currently: "0.0.11", "1").
+//   - Writers MUST always emit the current version.
+//   - Bump only when the SessionState JSON structure changes incompatibly,
+//     and add a migration path for every prior version.
+const StateFormatVersion = "1"
 
 // ConfigPath returns the path to the config file within .siren/.
 func ConfigPath(baseDir string) string {
