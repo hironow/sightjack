@@ -12,6 +12,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,11 @@ import (
 var jsonPathRe = regexp.MustCompile(`(/[^\s"]+\.json)`)
 
 func main() {
+	// Log env vars when FAKE_CLAUDE_ENV_LOG_DIR is set.
+	if envLogDir := os.Getenv("FAKE_CLAUDE_ENV_LOG_DIR"); envLogDir != "" {
+		logEnv(envLogDir)
+	}
+
 	// Handle --version flag (used by doctor's CheckTool).
 	for _, a := range os.Args[1:] {
 		if a == "--version" || a == "-v" {
@@ -117,6 +123,32 @@ func logPrompt(dir, prompt string) {
 	seq := len(entries) + 1
 	filename := fmt.Sprintf("prompt_%03d.txt", seq)
 	os.WriteFile(filepath.Join(dir, filename), []byte(prompt), 0o644)
+}
+
+// logEnv writes selected environment variables and args to a JSON file.
+func logEnv(dir string) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	entries, _ := os.ReadDir(dir)
+	seq := len(entries) + 1
+	filename := fmt.Sprintf("env_%03d.json", seq)
+
+	data := map[string]any{
+		"args": os.Args[1:],
+	}
+	// Capture env vars that tools set via ParseShellCommand.
+	for _, key := range []string{"CLAUDE_CONFIG_DIR", "CLAUDE_MODEL", "ANTHROPIC_API_KEY"} {
+		if v := os.Getenv(key); v != "" {
+			data[key] = v
+		}
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(dir, filename), jsonBytes, 0o644)
 }
 
 // hasFlag returns true if the given flag appears anywhere in args.
