@@ -354,7 +354,7 @@ rules:
     pattern-regex: '(LinearConfig|ClaudeConfig|Wandb|Jaeger)'
     message: |
       domain 層に vendor 固有の語彙が含まれています。
-      汎用的な名前を使用してください（例: IssueTrackerConfig）。
+      汎用的な名前を使用してください（例: IssueTrackerConfig, AIAssistantConfig）。
     paths:
       include:
         - "/internal/domain/**"
