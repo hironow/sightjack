@@ -68,6 +68,9 @@ func (w *InsightWriter) Append(filename, kind, tool string, entry domain.Insight
 	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
 		return fmt.Errorf("write temp insight file: %w", err)
 	}
+	// NOTE: On Windows, os.Rename fails if destination exists.
+	// For cross-platform safety, consider using a rename-with-replace strategy.
+	// Current design targets Linux/macOS where rename is atomic.
 	if err := os.Rename(tmpPath, path); err != nil {
 		os.Remove(tmpPath) // best-effort cleanup
 		return fmt.Errorf("rename insight file: %w", err)
