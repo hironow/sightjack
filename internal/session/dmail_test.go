@@ -2,7 +2,9 @@ package session_test
 
 import (
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -458,7 +460,7 @@ func TestReceiveDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// inbox file removed
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("inbox file should be removed after receive")
 	}
 
@@ -1084,7 +1086,7 @@ func TestReceiveDMail_MalformedContent(t *testing.T) {
 		t.Errorf("expected parse error, got: %v", err)
 	}
 	// inbox file should still exist (parse failed before move)
-	if _, statErr := os.Stat(inboxPath); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(inboxPath); errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("inbox file should remain after parse failure")
 	}
 }
@@ -2134,7 +2136,7 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 
 	// and: archive file also exists
 	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "feedback-auth-w1.md")
-	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+	if _, err := os.Stat(archivePath); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected archive file to exist")
 	}
 }
@@ -2441,5 +2443,70 @@ func TestFeedbackCollector_NewSinceSnapshot_noNew(t *testing.T) {
 	// then
 	if len(newMails) != 0 {
 		t.Fatalf("got %d new mails, want 0", len(newMails))
+	}
+}
+
+func TestMarshalDMail_ContextRoundTrip(t *testing.T) {
+	// given
+	mail := &session.DMail{
+		Name:          "spec-context-01",
+		Kind:          session.DMailSpecification,
+		Description:   "wave with insight context",
+		SchemaVersion: "1",
+		Context: &domain.InsightContext{
+			Insights: []domain.InsightSummary{
+				{Source: "sightjack", Summary: "Shibito count reduced to 3"},
+				{Source: "amadeus", Summary: "ADR compliance at 95%"},
+			},
+		},
+		Body: "Wave body here.\n",
+	}
+
+	// when
+	data, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+	parsed, err := session.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail: %v", err)
+	}
+
+	// then
+	if parsed.Context == nil {
+		t.Fatal("expected non-nil Context after round-trip")
+	}
+	if len(parsed.Context.Insights) != 2 {
+		t.Fatalf("expected 2 insights, got %d", len(parsed.Context.Insights))
+	}
+	if parsed.Context.Insights[0].Source != "sightjack" {
+		t.Errorf("insight[0].Source = %q, want %q", parsed.Context.Insights[0].Source, "sightjack")
+	}
+	if parsed.Context.Insights[0].Summary != "Shibito count reduced to 3" {
+		t.Errorf("insight[0].Summary = %q, want %q", parsed.Context.Insights[0].Summary, "Shibito count reduced to 3")
+	}
+	if parsed.Context.Insights[1].Source != "amadeus" {
+		t.Errorf("insight[1].Source = %q, want %q", parsed.Context.Insights[1].Source, "amadeus")
+	}
+}
+
+func TestMarshalDMail_NilContextOmitted(t *testing.T) {
+	// given — DMail with nil Context
+	mail := &session.DMail{
+		Name:          "spec-no-context",
+		Kind:          session.DMailSpecification,
+		Description:   "no context",
+		SchemaVersion: "1",
+	}
+
+	// when
+	data, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+
+	// then — context should not appear in output
+	if strings.Contains(string(data), "context:") {
+		t.Error("nil Context should be omitted from marshalled output")
 	}
 }

@@ -22,7 +22,7 @@ const (
 // Returns (true, nil) if review passes or is skipped (no ReviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, gate domain.GateConfig, assistant domain.AIAssistantConfig, dir string, logger domain.Logger) (bool, error) {
+func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Config, dir string, logger domain.Logger) (bool, error) {
 	ctx, span := platform.Tracer.Start(ctx, "sightjack.review")
 	defer span.End()
 
@@ -36,7 +36,7 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, assistant domain
 
 	budget := gate.EffectiveReviewBudget()
 
-	timeoutSec := assistant.TimeoutSec
+	timeoutSec := cfg.TimeoutSec
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
@@ -79,7 +79,7 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, assistant domain
 		}
 
 		// Run Claude --continue to fix review comments
-		if err := runReviewFix(ctx, assistant, dir, lastComments, logger); err != nil {
+		if err := runReviewFix(ctx, cfg, dir, lastComments, logger); err != nil {
 			logger.Warn("Review fix failed: %v", err)
 			return false, nil
 		}
@@ -90,31 +90,25 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, assistant domain
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, assistant domain.AIAssistantConfig, dir, comments string, logger domain.Logger) error {
+func runReviewFix(ctx context.Context, cfg *domain.Config, dir, comments string, logger domain.Logger) error {
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)
 	}
 
-	claudeCmd := assistant.Command
-	if claudeCmd == "" {
-		claudeCmd = "claude"
-	}
-	model := assistant.Model
-	if model == "" {
-		model = "opus"
-	}
+	claudeCmd := cfg.ClaudeCmd
+	model := cfg.Model
 
 	prompt := BuildReviewFixPrompt(branch, comments)
 
-	fixTimeout := time.Duration(assistant.TimeoutSec) * time.Second
+	fixTimeout := time.Duration(cfg.TimeoutSec) * time.Second
 	if fixTimeout <= 0 {
 		fixTimeout = 300 * time.Second
 	}
 	fixCtx, fixCancel := context.WithTimeout(ctx, fixTimeout)
 	defer fixCancel()
 
-	cmd := exec.CommandContext(fixCtx, claudeCmd,
+	cmd := newCmd(fixCtx, claudeCmd,
 		"--model", model,
 		"--continue",
 		"--dangerously-skip-permissions",

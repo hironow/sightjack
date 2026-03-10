@@ -53,7 +53,7 @@ if event data is found in .siren/events/.`,
 			// Preflight: verify required binaries exist
 			bins := []string{"git"}
 			if !dryRun {
-				bins = append(bins, cfg.Assistant.Command)
+				bins = append(bins, cfg.ClaudeCmd)
 			}
 			if err := session.PreflightCheck(bins...); err != nil {
 				return err

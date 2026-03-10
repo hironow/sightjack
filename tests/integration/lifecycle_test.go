@@ -3,7 +3,9 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,8 +109,8 @@ func testEmitter(baseDir, sessionID string) port.SessionEventEmitter {
 // Labels and Scribe disabled to avoid extra Claude calls.
 func testConfig() *domain.Config {
 	return &domain.Config{
-		Lang:       "en",
-		Assistant:  domain.AIAssistantConfig{Command: "claude", TimeoutSec: 30},
+		Lang:      "en",
+		ClaudeCmd: "claude", TimeoutSec: 30,
 		Scan:       domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
 		Tracker:    domain.IssueTrackerConfig{Team: "ENG", Project: "TestProject"},
 		Scribe:     domain.ScribeConfig{Enabled: false},
@@ -211,7 +213,7 @@ func extractOutputPath(prompt string) string {
 
 func assertFileExists(t *testing.T, path string) {
 	t.Helper()
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected file to exist: %s", path)
 	}
 }
@@ -1008,13 +1010,13 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	}
 
 	// Feedback should be removed from inbox (received + archived)
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should have been removed from inbox")
 	}
 
 	// Feedback should exist in archive
 	archiveFeedback := filepath.Join(domain.MailDir(baseDir, domain.ArchiveDir), feedbackMail.Filename())
-	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
+	if _, err := os.Stat(archiveFeedback); errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should exist in archive")
 	}
 
@@ -1189,11 +1191,11 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	}
 
 	// Feedback should be archived
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should have been removed from inbox")
 	}
 	archiveFeedback := filepath.Join(domain.MailDir(baseDir, domain.ArchiveDir), feedbackMail.Filename())
-	if _, err := os.Stat(archiveFeedback); os.IsNotExist(err) {
+	if _, err := os.Stat(archiveFeedback); errors.Is(err, fs.ErrNotExist) {
 		t.Error("feedback should exist in archive")
 	}
 
@@ -1393,7 +1395,7 @@ func TestResultCache_ApplyResult(t *testing.T) {
 	}
 
 	wave := waves[0]
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 	internal, err := session.RunWaveApply(context.Background(), cfg, scanDir, wave, strictness, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveApply failed: %v", err)
@@ -1456,7 +1458,7 @@ func TestResultCache_DiscussResult(t *testing.T) {
 	}
 
 	wave := waves[0]
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{wave.ClusterName}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 	resp, err := session.RunArchitectDiscuss(context.Background(), cfg, scanDir, wave, "review coupling", strictness, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunArchitectDiscuss failed: %v", err)
@@ -1528,7 +1530,7 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 
 	existingADRs, _ := session.ReadExistingADRs(session.ADRDir(baseDir))
 	completedWaves := domain.CompletedWavesForCluster(waves, cluster.Name)
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, []string{cluster.Name}))
+	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
 
 	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, platform.NewLogger(io.Discard, false))
 	if err != nil {

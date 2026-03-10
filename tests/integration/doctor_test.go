@@ -14,6 +14,29 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
+// buildFakeClaude compiles the fake-claude binary and returns its absolute path.
+// The binary supports --version and `mcp list` subcommands used by doctor checks.
+func buildFakeClaude(t *testing.T) string {
+	t.Helper()
+	binDir := t.TempDir()
+	binPath := filepath.Join(binDir, "fake-claude")
+
+	// fake-claude source is at tests/scenario/testdata/fake-claude/
+	// relative to tests/integration/ (where this test runs).
+	fakeSrc, err := filepath.Abs("../scenario/testdata/fake-claude")
+	if err != nil {
+		t.Fatalf("resolve fake-claude path: %v", err)
+	}
+
+	cmd := exec.Command("go", "build", "-o", binPath, ".")
+	cmd.Dir = fakeSrc
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build fake-claude: %v\n%s", err, out)
+	}
+	return binPath
+}
+
 func TestCheckConfig_ValidConfig(t *testing.T) {
 	// given: valid config file
 	dir := t.TempDir()
@@ -103,157 +126,6 @@ func TestCheckStatusLabel(t *testing.T) {
 		if got := tt.status.StatusLabel(); got != tt.want {
 			t.Errorf("StatusLabel(%d): expected %q, got %q", tt.status, tt.want, got)
 		}
-	}
-}
-
-// --- CheckClaudeAuth tests ---
-
-func TestCheckClaudeAuth_Success(t *testing.T) {
-	// given: mock claude that responds OK
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "OK")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
-	}
-	if result.Name != "Claude Auth" {
-		t.Errorf("expected name 'Claude Auth', got %q", result.Name)
-	}
-}
-
-func TestCheckClaudeAuth_NotLoggedIn(t *testing.T) {
-	// given: mock claude that outputs "Not logged in" and exits 1
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "sh", "-c", `echo "Not logged in · Please run /login"; exit 1`)
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
-	}
-	if !strings.Contains(result.Hint, "claude login") {
-		t.Errorf("expected Hint to contain 'claude login', got: %s", result.Hint)
-	}
-}
-
-func TestCheckClaudeAuth_OtherFailure(t *testing.T) {
-	// given: mock claude that fails with unknown error
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "false")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
-	}
-}
-
-func TestCheckClaudeAuth_NilConfig_Skips(t *testing.T) {
-	// given: nil config
-	ctx := context.Background()
-
-	// when
-	result := session.CheckClaudeAuth(ctx, nil, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckSkip {
-		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
-	}
-}
-
-// --- CheckLinearMCP tests ---
-
-func TestCheckLinearMCP_Success(t *testing.T) {
-	// given: mock claude that returns team info
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", `{"teams": [{"name": "Engineering"}]}`)
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Tracker:   domain.IssueTrackerConfig{Team: "Engineering"},
-		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckLinearMCP(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
-	}
-}
-
-func TestCheckLinearMCP_Failure(t *testing.T) {
-	// given: mock claude that fails (auth is OK but MCP fails)
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "false")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 10},
-		Tracker:   domain.IssueTrackerConfig{Team: "Engineering"},
-		Retry:     domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	ctx := context.Background()
-
-	// when
-	result := session.CheckLinearMCP(ctx, cfg, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckFail {
-		t.Errorf("expected CheckFail, got %v: %s", result.Status, result.Message)
-	}
-	if !strings.Contains(result.Hint, "claude mcp add") {
-		t.Errorf("expected Hint to contain 'claude mcp add', got: %s", result.Hint)
-	}
-}
-
-func TestCheckLinearMCP_NilConfig_Skips(t *testing.T) {
-	// given: nil config (config load failed)
-	ctx := context.Background()
-
-	// when
-	result := session.CheckLinearMCP(ctx, nil, platform.NewLogger(io.Discard, false))
-
-	// then
-	if result.Status != domain.CheckSkip {
-		t.Errorf("expected CheckSkip, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -400,24 +272,23 @@ func TestCheckSkills_UpdatedFeedbackKind(t *testing.T) {
 
 func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// given: nonexistent config path → config check fails, cfg=nil
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
-
+	// No mock needed: config failure causes auth/MCP to skip regardless of claude binary.
 	dir := t.TempDir()
 	ctx := context.Background()
 
 	// when
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 9 results (config, state dir, claude, git, skills, event store, claude auth, linear mcp, success-rate)
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d", len(results))
+	// then: should have 10 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, success-rate)
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results, got %d", len(results))
 	}
-	// Config should fail
-	if results[0].Status != domain.CheckFail {
-		t.Errorf("Config: expected FAIL, got %v", results[0].Status)
+	// Config should fail (index 3 in new order)
+	if results[3].Name != "Config" {
+		t.Errorf("expected 'Config' at index 3, got %q", results[3].Name)
+	}
+	if results[3].Status != domain.CheckFail {
+		t.Errorf("Config: expected FAIL, got %v", results[3].Status)
 	}
 	// Claude Auth should be skipped (nil config)
 	auth := results[6]
@@ -435,23 +306,26 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if mcp.Status != domain.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
 	}
+	// claude-inference should be skipped (nil config)
+	infer := results[8]
+	if infer.Name != "claude-inference" {
+		t.Errorf("expected 'claude-inference', got %q", infer.Name)
+	}
+	if infer.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP (nil config), got %v: %s", infer.Status, infer.Message)
+	}
 }
 
 func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
 	// given: claude binary does not exist → Claude Auth + Linear MCP should be skipped
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
-
+	// No mock needed: nonexistent claude_cmd causes CheckTool to fail, auth/MCP skip.
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(cfgPath, []byte(`
 tracker:
   team: "Test"
   project: "Project"
-assistant:
-  command: "nonexistent-claude-binary-xyz"
+claude_cmd: "nonexistent-claude-binary-xyz"
 `), 0644)
 
 	ctx := context.Background()
@@ -460,16 +334,19 @@ assistant:
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
 	// then
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d", len(results))
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results, got %d", len(results))
 	}
-	// Config should pass
-	if results[0].Status != domain.CheckOK {
-		t.Errorf("Config: expected OK, got %v", results[0].Status)
+	// Config should pass (index 3 in new order)
+	if results[3].Name != "Config" {
+		t.Errorf("expected 'Config' at index 3, got %q", results[3].Name)
 	}
-	// claude binary check should fail (nonexistent binary)
-	if results[2].Status != domain.CheckFail {
-		t.Errorf("claude: expected FAIL, got %v: %s", results[2].Status, results[2].Message)
+	if results[3].Status != domain.CheckOK {
+		t.Errorf("Config: expected OK, got %v", results[3].Status)
+	}
+	// claude binary check should fail (index 1 in new order)
+	if results[1].Status != domain.CheckFail {
+		t.Errorf("claude: expected FAIL, got %v: %s", results[1].Status, results[1].Message)
 	}
 	// Claude Auth should be skipped because claude binary is unavailable
 	auth := results[6]
@@ -484,56 +361,76 @@ assistant:
 	if mcp.Status != domain.CheckSkip {
 		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
 	}
+	// claude-inference should be skipped because claude binary is unavailable
+	infer := results[8]
+	if infer.Name != "claude-inference" {
+		t.Errorf("expected 'claude-inference', got %q", infer.Name)
+	}
+	if infer.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP, got %v: %s", infer.Status, infer.Message)
+	}
 }
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
-	// given: mock claude for auth + MCP checks
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
+	// given: fake-claude binary via config claude_cmd
+	fakeClaude := buildFakeClaude(t)
 
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
-	os.WriteFile(cfgPath, []byte(`
-tracker:
-  team: "Test"
-  project: "Project"
-`), 0644)
+	os.WriteFile(cfgPath, []byte("tracker:\n  team: \"Test\"\n  project: \"Project\"\nclaude_cmd: \""+fakeClaude+"\"\n"), 0644)
 
 	ctx := context.Background()
 
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 9 results (config, state dir, claude, git, skills, event store, claude auth, linear mcp, success-rate)
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d: %v", len(results), results)
+	// then: should have 10 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, success-rate)
+	if len(results) != 10 {
+		t.Fatalf("expected 10 results, got %d: %v", len(results), results)
 	}
-	if results[0].Name != "Config" || results[0].Status != domain.CheckOK {
-		t.Errorf("Config check: expected OK, got %v: %s", results[0].Status, results[0].Message)
+	// git binary check (index 0)
+	if results[0].Name != "git" || results[0].Status != domain.CheckOK {
+		t.Errorf("git check: expected OK, got %v: %s", results[0].Status, results[0].Message)
 	}
-	if results[1].Name != "State Dir" || results[1].Status != domain.CheckOK {
-		t.Errorf("State Dir check: expected OK, got %v: %s", results[1].Status, results[1].Message)
+	// claude binary check should pass (fake-claude supports --version, index 1)
+	if results[1].Status != domain.CheckOK {
+		t.Errorf("claude check: expected OK, got %v: %s", results[1].Status, results[1].Message)
 	}
+	// State Dir (index 2)
+	if results[2].Name != "State Dir" || results[2].Status != domain.CheckOK {
+		t.Errorf("State Dir check: expected OK, got %v: %s", results[2].Status, results[2].Message)
+	}
+	// Config (index 3)
+	if results[3].Name != "Config" || results[3].Status != domain.CheckOK {
+		t.Errorf("Config check: expected OK, got %v: %s", results[3].Status, results[3].Message)
+	}
+	// Event Store (index 5)
 	if results[5].Name != "Event Store" {
 		t.Errorf("expected 'Event Store', got %q", results[5].Name)
 	}
+	// Claude Auth should be OK (fake-claude mcp list succeeds, index 6)
 	if results[6].Name != "Claude Auth" {
 		t.Errorf("expected 'Claude Auth', got %q", results[6].Name)
 	}
-	// Claude Auth may be OK (if claude binary exists) or SKIP (if not)
-	if results[6].Status != domain.CheckOK && results[6].Status != domain.CheckSkip {
-		t.Errorf("Claude Auth check: expected OK or SKIP, got %v: %s", results[6].Status, results[6].Message)
+	if results[6].Status != domain.CheckOK {
+		t.Errorf("Claude Auth: expected OK, got %v: %s", results[6].Status, results[6].Message)
 	}
+	// Linear MCP should be OK (fake-claude outputs "linear ✓ connected", index 7)
 	if results[7].Name != "Linear MCP" {
 		t.Errorf("expected 'Linear MCP', got %q", results[7].Name)
 	}
-	if results[7].Status != domain.CheckOK && results[7].Status != domain.CheckSkip {
-		t.Errorf("Linear MCP check: expected OK or SKIP, got %v: %s", results[7].Status, results[7].Message)
+	if results[7].Status != domain.CheckOK {
+		t.Errorf("Linear MCP: expected OK, got %v: %s", results[7].Status, results[7].Message)
 	}
-	// success-rate should be last result, OK with "no events" (no events dir in temp)
-	sr := results[8]
+	// claude-inference should be OK (fake-claude --print responds with "2", index 8)
+	if results[8].Name != "claude-inference" {
+		t.Errorf("expected 'claude-inference', got %q", results[8].Name)
+	}
+	if results[8].Status != domain.CheckOK {
+		t.Errorf("claude-inference: expected OK, got %v: %s", results[8].Status, results[8].Message)
+	}
+	// success-rate should be last result, OK with "no events" (no events dir in temp, index 9)
+	sr := results[9]
 	if sr.Name != "success-rate" {
 		t.Errorf("expected 'success-rate', got %q", sr.Name)
 	}
@@ -637,19 +534,12 @@ func TestCheckEventStore_MultipleSessions(t *testing.T) {
 }
 
 func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
-	// given: mock claude, valid config, and event data in .siren/events/{session-id}/
-	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
+	// given: fake-claude binary via config, valid config, and event data
+	fakeClaude := buildFakeClaude(t)
 
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
-	os.WriteFile(cfgPath, []byte(`
-tracker:
-  team: "Test"
-  project: "Project"
-`), 0644)
+	os.WriteFile(cfgPath, []byte("tracker:\n  team: \"Test\"\n  project: \"Project\"\nclaude_cmd: \""+fakeClaude+"\"\n"), 0644)
 
 	// Create event store with 2 applied and 1 rejected wave events
 	sessionDir := filepath.Join(dir, ".siren", "events", "test-session-001")

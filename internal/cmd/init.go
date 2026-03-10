@@ -47,10 +47,10 @@ d-mail skills, and sets up mail directories.`,
 
 			// Apply defaults at cmd layer (previously done by WithDefaults)
 			if lang == "" {
-				lang = "ja"
+				lang = domain.DefaultConfig().Lang
 			}
 			if strictness == "" {
-				strictness = "fog"
+				strictness = string(domain.DefaultConfig().Strictness.Default)
 			}
 
 			rp, rpErr := domain.NewRepoPath(baseDir)

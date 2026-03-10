@@ -8,10 +8,11 @@
 //   - Produces no stdout output (avoids leaking into pipe JSON).
 //
 // Install as /usr/local/bin/claude inside the E2E Docker container so that
-// cfg.Assistant.Command = "claude" resolves to this binary.
+// cfg.ClaudeCmd = "claude" resolves to this binary.
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,43 @@ import (
 var jsonPathRe = regexp.MustCompile(`(/[^\s"]+\.json)`)
 
 func main() {
+	// Log env vars when FAKE_CLAUDE_ENV_LOG_DIR is set.
+	if envLogDir := os.Getenv("FAKE_CLAUDE_ENV_LOG_DIR"); envLogDir != "" {
+		logEnv(envLogDir)
+	}
+
+	// Handle --version flag (used by doctor's CheckTool).
+	for _, a := range os.Args[1:] {
+		if a == "--version" || a == "-v" {
+			fmt.Println("fake-claude 0.0.0-test")
+			return
+		}
+	}
+
+	// Handle `mcp list` subcommand (used by doctor's auth/MCP checks).
+	if len(os.Args) >= 3 && os.Args[1] == "mcp" && os.Args[2] == "list" {
+		fmt.Println("  linear        ✓  connected")
+		return
+	}
+
+	// Handle --print flag WITHOUT -p (used by doctor's inference check).
+	// When -p is also present, fall through to protocol detection (sightjack/paintress).
+	if hasFlag(os.Args[1:], "--print") && extractPrompt(os.Args[1:]) == "" {
+		prompt := ""
+		for i := len(os.Args) - 1; i >= 1; i-- {
+			if !strings.HasPrefix(os.Args[i], "-") && os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" {
+				prompt = os.Args[i]
+				break
+			}
+		}
+		if strings.Contains(prompt, "1+1") {
+			fmt.Print("2")
+		} else {
+			fmt.Print("unknown")
+		}
+		return
+	}
+
 	prompt := extractPrompt(os.Args[1:])
 	if prompt == "" {
 		// No stdout output — data exchange is file-based.
@@ -86,6 +124,42 @@ func logPrompt(dir, prompt string) {
 	seq := len(entries) + 1
 	filename := fmt.Sprintf("prompt_%03d.txt", seq)
 	os.WriteFile(filepath.Join(dir, filename), []byte(prompt), 0o644)
+}
+
+// logEnv writes selected environment variables and args to a JSON file.
+func logEnv(dir string) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	entries, _ := os.ReadDir(dir)
+	seq := len(entries) + 1
+	filename := fmt.Sprintf("env_%03d.json", seq)
+
+	data := map[string]any{
+		"args": os.Args[1:],
+	}
+	// Capture env vars that tools set via ParseShellCommand.
+	for _, key := range []string{"CLAUDE_CONFIG_DIR", "CLAUDE_MODEL", "ANTHROPIC_API_KEY"} {
+		if v := os.Getenv(key); v != "" {
+			data[key] = v
+		}
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(dir, filename), jsonBytes, 0o644)
+}
+
+// hasFlag returns true if the given flag appears anywhere in args.
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
 }
 
 // extractPrompt finds the value of the -p flag.

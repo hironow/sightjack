@@ -5,6 +5,8 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +76,7 @@ func TestArchivePruneCmd_JSONOutput_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, statErr := os.Stat(oldFile); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldFile); errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("dry-run should NOT delete the file")
 	}
 
@@ -120,7 +122,7 @@ func TestArchivePruneCmd_JSONOutput_Execute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, statErr := os.Stat(oldFile); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("--execute should delete the expired file")
 	}
 

@@ -16,33 +16,29 @@ type StatusReport struct {
 	SuccessRate  float64   `json:"success_rate"`
 }
 
-// FormatText returns a human-readable status report string suitable for stderr.
+// FormatText returns a human-readable status report string suitable for stdout.
 func (r StatusReport) FormatText() string {
 	var b strings.Builder
-	b.WriteString("sightjack status:\n")
+	b.WriteString("sightjack status\n\n")
 
 	// Last scan
 	if r.LastScanned.IsZero() {
-		b.WriteString("  Last scan:     no scans yet\n")
+		fmt.Fprintf(&b, "  %-16s %s\n", "Last scan:", "no scans yet")
 	} else {
-		b.WriteString(fmt.Sprintf("  Last scan:     %s\n", r.LastScanned.Format(time.RFC3339)))
+		fmt.Fprintf(&b, "  %-16s %s\n", "Last scan:", r.LastScanned.Format(time.RFC3339))
 	}
 
-	// Waves
-	b.WriteString(fmt.Sprintf("  Waves:         %d total\n", r.WavesTotal))
+	fmt.Fprintf(&b, "  %-16s %d total\n", "Waves:", r.WavesTotal)
 
 	// Success rate
 	if r.WavesTotal == 0 {
-		b.WriteString("  Success rate:  no events\n")
+		fmt.Fprintf(&b, "  %-16s %s\n", "Success rate:", "no events")
 	} else {
-		b.WriteString(fmt.Sprintf("  Success rate:  %.1f%%\n", r.SuccessRate*100))
+		fmt.Fprintf(&b, "  %-16s %.1f%%\n", "Success rate:", r.SuccessRate*100)
 	}
 
-	// Inbox
-	b.WriteString(fmt.Sprintf("  Inbox:         %d pending\n", r.InboxCount))
-
-	// Archive
-	b.WriteString(fmt.Sprintf("  Archive:       %d processed\n", r.ArchiveCount))
+	fmt.Fprintf(&b, "  %-16s %d pending\n", "Inbox:", r.InboxCount)
+	fmt.Fprintf(&b, "  %-16s %d processed\n", "Archive:", r.ArchiveCount)
 
 	return b.String()
 }

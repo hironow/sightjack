@@ -4,8 +4,6 @@ package cmd
 
 import (
 	"testing"
-
-	"github.com/Masterminds/semver/v3"
 )
 
 func TestUpdateCmd_Exists(t *testing.T) {
@@ -45,30 +43,28 @@ func TestUpdateCmd_CheckFlag(t *testing.T) {
 	t.Fatal("update command not found")
 }
 
-func TestUpdateCmd_DevVersionIsNotSemver(t *testing.T) {
-	// given: default version is "dev" which is not valid semver
-	// This test ensures the semver guard in update.go would catch it
-	// and prevent a panic from LessOrEqual.
-
-	// when
-	_, err := semver.NewVersion("dev")
-
-	// then: "dev" must NOT be valid semver
-	if err == nil {
-		t.Fatal("expected 'dev' to be invalid semver, but it parsed successfully")
+func TestUpdateCmd_IsUpToDate(t *testing.T) {
+	cases := []struct {
+		name     string
+		current  string
+		latest   string
+		upToDate bool
+	}{
+		{name: "same version", current: "1.0.0", latest: "1.0.0", upToDate: true},
+		{name: "current newer", current: "2.0.0", latest: "1.0.0", upToDate: true},
+		{name: "current older", current: "1.0.0", latest: "2.0.0", upToDate: false},
+		{name: "dev version", current: "dev", latest: "1.0.0", upToDate: false},
+		{name: "v-prefixed", current: "v1.0.0", latest: "1.0.0", upToDate: true},
 	}
-}
 
-func TestUpdateCmd_TaggedVersionIsSemver(t *testing.T) {
-	// given: a typical GoReleaser-injected version
-	for _, v := range []string{"0.0.12", "1.0.0", "2.1.3-rc1"} {
-		t.Run(v, func(t *testing.T) {
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			// when
-			_, err := semver.NewVersion(v)
+			got := isUpToDate(tc.current, tc.latest)
 
 			// then
-			if err != nil {
-				t.Errorf("expected %q to be valid semver: %v", v, err)
+			if got != tc.upToDate {
+				t.Errorf("isUpToDate(%q, %q) = %v, want %v", tc.current, tc.latest, got, tc.upToDate)
 			}
 		})
 	}

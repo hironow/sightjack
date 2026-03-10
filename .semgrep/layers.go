@@ -113,7 +113,7 @@ type JaegerExporter struct{}
 type IssueTrackerConfig struct{}
 
 // ok: domain-no-vendor-vocabulary
-type AIAssistantConfig struct{}
+type AssistantInvocationConfig struct{}
 
 // --- Rule: session-no-direct-new-event (pattern) ---
 

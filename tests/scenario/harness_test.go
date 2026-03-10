@@ -5,7 +5,9 @@ package scenario_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,6 +51,7 @@ func NewWorkspace(t *testing.T, level string) *Workspace {
 	runCmd(t, repoPath, "git", "config", "user.email", "test@scenario.test")
 	runCmd(t, repoPath, "git", "config", "user.name", "Scenario Test")
 	runCmd(t, repoPath, "git", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "init")
+	runCmd(t, repoPath, "git", "remote", "add", "origin", "https://github.com/test/scenario-repo.git")
 
 	// Resolve testdata/fixtures directory
 	here, err := os.Getwd()
@@ -149,13 +152,8 @@ func (w *Workspace) overrideSightjackClaudeCommand(t *testing.T) {
 		t.Fatalf("parse sightjack config: %v", err)
 	}
 
-	// Ensure claude section exists with command = "claude"
-	claudeSection, ok := cfg["claude"].(map[string]any)
-	if !ok {
-		claudeSection = make(map[string]any)
-	}
-	claudeSection["command"] = "claude"
-	cfg["claude"] = claudeSection
+	// Ensure claude_cmd is set to "claude" (the fake-claude binary in PATH)
+	cfg["claude_cmd"] = "claude"
 
 	out, err := yaml.Marshal(cfg)
 	if err != nil {
@@ -171,8 +169,8 @@ func (w *Workspace) phonewaveConfigPath() string {
 	return filepath.Join(w.Root, "phonewave.yaml")
 }
 
-// verifyPhonewaveRoutes reads phonewave.yaml and verifies that routes exist
-// for specification, report, and feedback kinds.
+// verifyPhonewaveRoutes reads phonewave.yaml and verifies that endpoints
+// produce/consume the required D-Mail kinds.
 func (w *Workspace) verifyPhonewaveRoutes(t *testing.T) {
 	t.Helper()
 	cfgPath := w.phonewaveConfigPath()
@@ -181,13 +179,15 @@ func (w *Workspace) verifyPhonewaveRoutes(t *testing.T) {
 		t.Fatalf("read phonewave.yaml: %v", err)
 	}
 
-	// Parse the routes section
 	var cfg struct {
-		Routes []struct {
-			Kind string   `yaml:"kind"`
-			From string   `yaml:"from"`
-			To   []string `yaml:"to"`
-		} `yaml:"routes"`
+		Repositories []struct {
+			Path      string `yaml:"path"`
+			Endpoints []struct {
+				Dir      string   `yaml:"dir"`
+				Produces []string `yaml:"produces"`
+				Consumes []string `yaml:"consumes"`
+			} `yaml:"endpoints"`
+		} `yaml:"repositories"`
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		t.Fatalf("parse phonewave.yaml: %v", err)
@@ -196,17 +196,26 @@ func (w *Workspace) verifyPhonewaveRoutes(t *testing.T) {
 	requiredKinds := map[string]bool{
 		"specification": false,
 		"report":        false,
-		"feedback":      false,
 	}
-	for _, route := range cfg.Routes {
-		if _, ok := requiredKinds[route.Kind]; ok {
-			requiredKinds[route.Kind] = true
+
+	for _, repo := range cfg.Repositories {
+		for _, ep := range repo.Endpoints {
+			for _, kind := range ep.Produces {
+				if _, ok := requiredKinds[kind]; ok {
+					requiredKinds[kind] = true
+				}
+			}
+			for _, kind := range ep.Consumes {
+				if _, ok := requiredKinds[kind]; ok {
+					requiredKinds[kind] = true
+				}
+			}
 		}
 	}
 
 	for kind, found := range requiredKinds {
 		if !found {
-			t.Fatalf("phonewave.yaml missing required route kind: %s\nconfig content:\n%s", kind, string(data))
+			t.Fatalf("phonewave.yaml missing required kind: %s\nconfig content:\n%s", kind, string(data))
 		}
 	}
 }
@@ -238,9 +247,10 @@ func (w *Workspace) StartPhonewave(t *testing.T, ctx context.Context) *ToolProce
 		Stderr: &stderr,
 	}
 
-	// Wait for the PID file to appear, confirming the daemon started
-	stateDir := filepath.Join(w.Root, ".phonewave")
-	pidFile := filepath.Join(stateDir, "watch.pid")
+	// Wait for the PID file to appear, confirming the daemon started.
+	// phonewave uses configBase (= dir of config file) as stateDir.
+	// Config is at w.Root/phonewave.yaml, so stateDir = w.Root.
+	pidFile := filepath.Join(w.Root, "watch.pid")
 	deadline := time.After(15 * time.Second)
 	for {
 		select {
@@ -263,7 +273,7 @@ func (w *Workspace) StopPhonewave(t *testing.T, tp *ToolProcess) {
 	_ = tp.Cmd.Wait()
 
 	// Wait for PID file removal (graceful shutdown)
-	pidFile := filepath.Join(w.Root, ".phonewave", "watch.pid")
+	pidFile := filepath.Join(w.Root, "watch.pid")
 	deadline := time.After(10 * time.Second)
 	for {
 		select {
@@ -271,7 +281,7 @@ func (w *Workspace) StopPhonewave(t *testing.T, tp *ToolProcess) {
 			// PID file not removed, but process is dead -- acceptable
 			return
 		default:
-			if _, err := os.Stat(pidFile); os.IsNotExist(err) {
+			if _, err := os.Stat(pidFile); errors.Is(err, fs.ErrNotExist) {
 				return
 			}
 			time.Sleep(200 * time.Millisecond)
@@ -295,7 +305,7 @@ func (w *Workspace) RunSightjack(t *testing.T, ctx context.Context, args ...stri
 // first available wave and auto-approves all actions without stdin input.
 func (w *Workspace) RunSightjackScan(t *testing.T, ctx context.Context, extraArgs ...string) error {
 	t.Helper()
-	args := []string{"run", "--auto-approve"}
+	args := []string{"run", "--auto-approve", "--wait-timeout", "-1s"}
 	args = append(args, extraArgs...)
 	args = append(args, w.RepoPath)
 
@@ -340,12 +350,51 @@ func (w *Workspace) RunAmadeus(t *testing.T, ctx context.Context, args ...string
 }
 
 // RunAmadeusCheck runs amadeus check with --auto-approve and waits for completion.
+// NOTE: amadeus "run" is a daemon — this waits for ctx cancellation or timeout.
+// For scenario tests that need to run amadeus as a background daemon, use
+// StartAmadeusRun/StopAmadeusRun instead.
 func (w *Workspace) RunAmadeusCheck(t *testing.T, ctx context.Context, extraArgs ...string) error {
 	t.Helper()
-	args := []string{"check", "--auto-approve"}
+	args := []string{"run", "--auto-approve"}
 	args = append(args, extraArgs...)
 	args = append(args, w.RepoPath)
 	return w.RunAmadeus(t, ctx, args...)
+}
+
+// StartAmadeusRun starts amadeus run as a background daemon process.
+// Returns a ToolProcess that can be stopped later.
+func (w *Workspace) StartAmadeusRun(t *testing.T, ctx context.Context, extraArgs ...string) *ToolProcess {
+	t.Helper()
+	args := []string{"run", "--auto-approve"}
+	args = append(args, extraArgs...)
+	args = append(args, w.RepoPath)
+
+	daemonCtx, cancel := context.WithCancel(ctx)
+	cmd := w.runToolCmd(daemonCtx, "amadeus", args...)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Start(); err != nil {
+		cancel()
+		t.Fatalf("start amadeus run: %v", err)
+	}
+
+	return &ToolProcess{
+		Cmd:    cmd,
+		Cancel: cancel,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+}
+
+// StopAmadeusRun stops the amadeus daemon and returns stderr output.
+func (w *Workspace) StopAmadeusRun(t *testing.T, tp *ToolProcess) string {
+	t.Helper()
+	tp.Cancel()
+	_ = tp.Cmd.Wait()
+	return tp.Stderr.String()
 }
 
 // --- Observation Helpers ---
@@ -446,7 +495,7 @@ func (w *Workspace) CountFiles(t *testing.T, dir string) int {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return 0
 		}
 		t.Fatalf("read dir %s: %v", dir, err)
@@ -465,7 +514,7 @@ func (w *Workspace) ListFiles(t *testing.T, dir string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
 		t.Fatalf("read dir %s: %v", dir, err)

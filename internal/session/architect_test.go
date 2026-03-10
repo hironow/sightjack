@@ -2,7 +2,9 @@ package session_test
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,7 +111,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 	scanDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang:      "en",
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		ClaudeCmd: "claude", TimeoutSec: 60,
 	}
 	wave := domain.Wave{
 		ID:          "auth-w1",
@@ -126,7 +128,7 @@ func TestRunArchitectDiscuss_DryRun(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	promptFile := filepath.Join(scanDir, "architect_auth_auth-w1_prompt.md")
-	if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+	if _, err := os.Stat(promptFile); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected architect prompt file to be generated")
 	}
 }
@@ -194,7 +196,7 @@ func TestRunArchitectDiscussDryRun_NilActions(t *testing.T) {
 	scanDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang:      "en",
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
+		ClaudeCmd: "claude", TimeoutSec: 60,
 	}
 	wave := domain.Wave{
 		ID:          "auth-w1",
@@ -231,14 +233,14 @@ func TestRunArchitectDiscuss_RemovesStaleOutputBeforeRun(t *testing.T) {
 	}
 
 	// when: verify the stale file exists before the function runs
-	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+	if _, err := os.Stat(outputFile); errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("precondition: stale file should exist")
 	}
 
 	// then: ClearArchitectOutput removes it
 	session.ClearArchitectOutput(scanDir, wave)
 
-	if _, err := os.Stat(outputFile); !os.IsNotExist(err) {
+	if _, err := os.Stat(outputFile); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected stale output file to be removed")
 	}
 }

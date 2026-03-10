@@ -18,6 +18,31 @@ D-Mail filenames MUST follow the pattern:
 - Allowed characters: lowercase ASCII alphanumeric (`a-z`, `0-9`), hyphen (`-`), underscore (`_`)
 - The complete filename MUST be unique across all d-mails (MUST)
 
+### 1-bis. Context Field (v1, per S0031)
+
+D-Mail envelopes support an optional `context` field for cross-tool insight propagation:
+
+```yaml
+---
+dmail-schema-version: "1"
+name: spec-auth-w1
+kind: specification
+description: Auth wave 1 specification
+context:
+  insights:
+    - source: ".siren/insights/shibito.md"
+      summary: "Token circular dependency risk in auth module"
+    - source: ".siren/insights/strictness.md"
+      summary: "auth cluster estimated lockdown"
+---
+```
+
+- `context` is optional — omission is valid
+- `context.insights` is a list of `{source, summary}` pairs
+- Schema version remains "1" (additive, backward-compatible)
+- Receivers MUST NOT reject unknown context fields (Postel's Law, S0019)
+- phonewave relays context without interpretation
+
 ### 2. Namespace Separation (Kind Prefix)
 
 Each tool uses a prefix derived from the d-mail kind it produces.

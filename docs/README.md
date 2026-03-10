@@ -6,14 +6,14 @@
 - [siren-directory.md](siren-directory.md) — `.siren/` directory structure specification
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
-- [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail protocol conventions
+- [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
 - [testing.md](testing.md) — Test strategy and conventions
 
 ## CLI Reference
 
 - [sightjack](cli/sightjack.md) — Root command
 - [sightjack init](cli/sightjack_init.md) — Initialize a project (`--force` to overwrite)
-- sightjack config show / config set — Show or set configuration values
+- [sightjack config show](cli/sightjack_config_show.md) / [config set](cli/sightjack_config_set.md) — Show or set configuration values
 - [sightjack scan](cli/sightjack_scan.md) — Classify and deep-scan Linear issues
 - [sightjack run](cli/sightjack_run.md) — Run the full interactive session
 - [sightjack waves](cli/sightjack_waves.md) — Generate execution waves
@@ -32,4 +32,5 @@
 
 ## Architecture Decision Records
 
-See [adr/README.md](adr/README.md) for the full index.
+- [adr/](adr/README.md) — Tool-specific ADRs
+- [shared-adr/](shared-adr/README.md) — Cross-tool shared ADRs (S0001–S0031)

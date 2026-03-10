@@ -48,5 +48,19 @@ func RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *
 	}
 	logger.OK("Events saved to %s", EventStorePath(baseDir, sessionID))
 
+	// Best-effort: generate insight files from scan results.
+	writeScanInsights(baseDir, sessionID, result, logger)
+
 	return scanResultPath
+}
+
+// writeScanInsights generates shibito and strictness insight files from scan results.
+// Errors are logged but never propagated — insight writing must not fail the scan.
+func writeScanInsights(baseDir, sessionID string, result *domain.ScanResult, logger domain.Logger) {
+	insightsDir := filepath.Join(baseDir, domain.StateDir, "insights")
+	runDir := filepath.Join(baseDir, domain.StateDir, ".run")
+	w := NewInsightWriter(insightsDir, runDir)
+
+	WriteShibitoInsights(w, result.ShibitoWarnings, sessionID, logger)
+	WriteStrictnessInsights(w, result.Clusters, sessionID, logger)
 }

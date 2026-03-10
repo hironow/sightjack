@@ -3,7 +3,10 @@ package session_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
@@ -38,11 +41,11 @@ tracker:
 	if cfg.Scan.MaxConcurrency != 3 {
 		t.Errorf("expected default max_concurrency 3, got %d", cfg.Scan.MaxConcurrency)
 	}
-	if cfg.Assistant.Command != "claude" {
-		t.Errorf("expected default command 'claude', got %s", cfg.Assistant.Command)
+	if cfg.ClaudeCmd != "claude" {
+		t.Errorf("expected default command 'claude', got %s", cfg.ClaudeCmd)
 	}
-	if cfg.Assistant.TimeoutSec != 300 {
-		t.Errorf("expected default timeout 300, got %d", cfg.Assistant.TimeoutSec)
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected default timeout 1980, got %d", cfg.TimeoutSec)
 	}
 	if cfg.Lang != "ja" {
 		t.Errorf("expected default lang 'ja', got %s", cfg.Lang)
@@ -60,10 +63,9 @@ tracker:
 scan:
   chunk_size: 50
   max_concurrency: 5
-assistant:
-  command: "cc-p"
-  model: "sonnet"
-  timeout_sec: 600
+claude_cmd: "cc-p"
+model: "sonnet"
+timeout_sec: 600
 lang: "en"
 `), 0644)
 	if err != nil {
@@ -78,15 +80,15 @@ lang: "en"
 	if cfg.Scan.ChunkSize != 50 {
 		t.Errorf("expected 50, got %d", cfg.Scan.ChunkSize)
 	}
-	if cfg.Assistant.Model != "sonnet" {
-		t.Errorf("expected sonnet, got %s", cfg.Assistant.Model)
+	if cfg.Model != "sonnet" {
+		t.Errorf("expected sonnet, got %s", cfg.Model)
 	}
 	if cfg.Lang != "en" {
 		t.Errorf("expected en, got %s", cfg.Lang)
 	}
 }
 
-func TestLoadConfig_ZeroConcurrency_ClampsToOne(t *testing.T) {
+func TestLoadConfig_ZeroConcurrency_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
@@ -102,8 +104,8 @@ scan:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Scan.MaxConcurrency != 1 {
-		t.Errorf("expected max_concurrency clamped to 1, got %d", cfg.Scan.MaxConcurrency)
+	if cfg.Scan.MaxConcurrency != 3 {
+		t.Errorf("expected max_concurrency clamped to default 3, got %d", cfg.Scan.MaxConcurrency)
 	}
 }
 
@@ -132,8 +134,7 @@ func TestLoadConfig_ZeroTimeout_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-assistant:
-  timeout_sec: 0
+timeout_sec: 0
 `), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -144,8 +145,8 @@ assistant:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Assistant.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Assistant.TimeoutSec)
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected timeout clamped to default 1980, got %d", cfg.TimeoutSec)
 	}
 }
 
@@ -153,8 +154,7 @@ func TestLoadConfig_NegativeTimeout_ClampsToDefault(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-assistant:
-  timeout_sec: -10
+timeout_sec: -10
 `), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -165,8 +165,8 @@ assistant:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Assistant.TimeoutSec != 300 {
-		t.Errorf("expected timeout clamped to default 300, got %d", cfg.Assistant.TimeoutSec)
+	if cfg.TimeoutSec != 1980 {
+		t.Errorf("expected timeout clamped to default 1980, got %d", cfg.TimeoutSec)
 	}
 }
 
@@ -588,6 +588,21 @@ func TestUpdateConfig_InvalidLang_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestUpdateConfig_InvalidChunkSize_RejectsWrite(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`scan: {chunk_size: 20}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scan.chunk_size", "0")
+
+	// then
+	if err == nil {
+		t.Error("expected error for zero chunk_size")
+	}
+}
+
 func TestUpdateConfig_InvalidStrictness_ReturnsError(t *testing.T) {
 	// given
 	dir := t.TempDir()
@@ -632,11 +647,11 @@ strictness:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Strictness.Estimated["auth-module"] != domain.StrictnessAlert {
-		t.Errorf("expected alert, got %s", cfg.Strictness.Estimated["auth-module"])
+	if cfg.Computed.EstimatedStrictness["auth-module"] != domain.StrictnessAlert {
+		t.Errorf("expected alert, got %s", cfg.Computed.EstimatedStrictness["auth-module"])
 	}
-	if cfg.Strictness.Estimated["payment-billing"] != domain.StrictnessLockdown {
-		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["payment-billing"])
+	if cfg.Computed.EstimatedStrictness["payment-billing"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Computed.EstimatedStrictness["payment-billing"])
 	}
 	// Verify overrides preserved
 	if cfg.Strictness.Overrides["security"] != domain.StrictnessLockdown {
@@ -654,7 +669,8 @@ tracker:
   project: test
 strictness:
   default: fog
-  estimated:
+computed:
+  estimated_strictness:
     old-cluster: alert
 `
 	os.WriteFile(cfgPath, []byte(initial), 0644)
@@ -672,11 +688,11 @@ strictness:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := cfg.Strictness.Estimated["old-cluster"]; ok {
+	if _, ok := cfg.Computed.EstimatedStrictness["old-cluster"]; ok {
 		t.Error("old-cluster should be overwritten")
 	}
-	if cfg.Strictness.Estimated["new-cluster"] != domain.StrictnessLockdown {
-		t.Errorf("expected lockdown, got %s", cfg.Strictness.Estimated["new-cluster"])
+	if cfg.Computed.EstimatedStrictness["new-cluster"] != domain.StrictnessLockdown {
+		t.Errorf("expected lockdown, got %s", cfg.Computed.EstimatedStrictness["new-cluster"])
 	}
 }
 
@@ -689,13 +705,424 @@ tracker:
   project: test
 strictness:
   default: fog
-  estimated:
+computed:
+  estimated_strictness:
     bad-cluster: nightmare
 `), 0644)
 
 	_, err := session.LoadConfig(path)
 	if err == nil {
 		t.Fatal("expected error for invalid estimated strictness value")
+	}
+}
+
+func TestUpdateConfig_SetAssistantCommand(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "assistant.command", "cc-p")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.ClaudeCmd != "cc-p" {
+		t.Errorf("expected 'cc-p', got %q", cfg.ClaudeCmd)
+	}
+}
+
+func TestUpdateConfig_SetScribeEnabled(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scribe.enabled", "false")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Scribe.Enabled {
+		t.Error("expected Scribe.Enabled=false")
+	}
+}
+
+func TestUpdateConfig_SetScribeAutoDiscussRounds(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scribe.auto_discuss_rounds", "5")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Scribe.AutoDiscussRounds != 5 {
+		t.Errorf("expected 5, got %d", cfg.Scribe.AutoDiscussRounds)
+	}
+}
+
+func TestUpdateConfig_SetRetryMaxAttempts(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "retry.max_attempts", "7")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Retry.MaxAttempts != 7 {
+		t.Errorf("expected 7, got %d", cfg.Retry.MaxAttempts)
+	}
+}
+
+func TestUpdateConfig_SetRetryBaseDelaySec(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "retry.base_delay_sec", "5")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Retry.BaseDelaySec != 5 {
+		t.Errorf("expected 5, got %d", cfg.Retry.BaseDelaySec)
+	}
+}
+
+func TestUpdateConfig_SetGateNotifyCmd(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.notify_cmd", "echo notify")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Gate.NotifyCmd != "echo notify" {
+		t.Errorf("expected 'echo notify', got %q", cfg.Gate.NotifyCmd)
+	}
+}
+
+func TestUpdateConfig_SetGateWaitTimeout(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.wait_timeout", "1h30m")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Gate.WaitTimeout.String() != "1h30m0s" {
+		t.Errorf("expected 1h30m0s, got %s", cfg.Gate.WaitTimeout)
+	}
+}
+
+func TestUpdateConfig_SetGateReviewBudget(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY"
+lang: "ja"
+`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.review_budget", "5")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateConfig: %v", err)
+	}
+	cfg, _ := session.LoadConfig(cfgPath)
+	if cfg.Gate.ReviewBudget != 5 {
+		t.Errorf("expected 5, got %d", cfg.Gate.ReviewBudget)
+	}
+}
+
+func TestUpdateConfig_InvalidScribeEnabled_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "scribe.enabled", "notabool")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid scribe.enabled value")
+	}
+}
+
+func TestUpdateConfig_InvalidRetryMaxAttempts_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "retry.max_attempts", "0")
+
+	// then
+	if err == nil {
+		t.Error("expected error for zero retry.max_attempts")
+	}
+}
+
+func TestUpdateConfig_InvalidGateWaitTimeout_ReturnsError(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "gate.wait_timeout", "notaduration")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid gate.wait_timeout")
+	}
+}
+
+func TestLoadConfig_MaxConcurrency_ClampsToDefaultThree(t *testing.T) {
+	// given: config with negative max_concurrency
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(cfgPath, []byte(`
+scan:
+  max_concurrency: -1
+`), 0644)
+
+	// when
+	cfg, err := session.LoadConfig(cfgPath)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Scan.MaxConcurrency != 3 {
+		t.Errorf("expected max_concurrency clamped to default 3, got %d", cfg.Scan.MaxConcurrency)
+	}
+}
+
+func TestSetConfigField_RejectsComputedKey(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
+
+	// when
+	err := session.UpdateConfig(cfgPath, "strictness.estimated", "fog")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for computed key strictness.estimated")
+	}
+	if !strings.Contains(err.Error(), "computed") {
+		t.Errorf("expected error to contain 'computed', got %q", err.Error())
+	}
+}
+
+func TestWriteEstimatedStrictness_WritesToComputedConfig(t *testing.T) {
+	// given: config with user-specified fields
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+	os.WriteFile(cfgPath, []byte(`
+tracker:
+  team: "MY-TEAM"
+  project: "My Project"
+lang: "ja"
+strictness:
+  default: alert
+  overrides:
+    security: lockdown
+scan:
+  chunk_size: 30
+  max_concurrency: 4
+model: sonnet
+timeout_sec: 600
+`), 0644)
+
+	estimated := map[string]domain.StrictnessLevel{
+		"cluster-x": domain.StrictnessAlert,
+		"cluster-y": domain.StrictnessLockdown,
+	}
+
+	// when
+	err := session.WriteEstimatedStrictness(cfgPath, estimated)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("WriteEstimatedStrictness: %v", err)
+	}
+
+	loaded, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatalf("LoadConfig after write: %v", err)
+	}
+
+	// verify estimated strictness written to Computed path
+	if loaded.Computed.EstimatedStrictness["cluster-x"] != domain.StrictnessAlert {
+		t.Errorf("cluster-x: expected alert, got %s", loaded.Computed.EstimatedStrictness["cluster-x"])
+	}
+	if loaded.Computed.EstimatedStrictness["cluster-y"] != domain.StrictnessLockdown {
+		t.Errorf("cluster-y: expected lockdown, got %s", loaded.Computed.EstimatedStrictness["cluster-y"])
+	}
+
+	// verify user config fields preserved
+	if loaded.Lang != "ja" {
+		t.Errorf("Lang: expected 'ja', got %q", loaded.Lang)
+	}
+	if loaded.Tracker.Team != "MY-TEAM" {
+		t.Errorf("Tracker.Team: expected 'MY-TEAM', got %q", loaded.Tracker.Team)
+	}
+	if loaded.Tracker.Project != "My Project" {
+		t.Errorf("Tracker.Project: expected 'My Project', got %q", loaded.Tracker.Project)
+	}
+	if loaded.Strictness.Default != domain.StrictnessAlert {
+		t.Errorf("Strictness.Default: expected alert, got %s", loaded.Strictness.Default)
+	}
+	if loaded.Strictness.Overrides["security"] != domain.StrictnessLockdown {
+		t.Errorf("Strictness.Overrides[security]: expected lockdown, got %s", loaded.Strictness.Overrides["security"])
+	}
+	if loaded.Scan.ChunkSize != 30 {
+		t.Errorf("Scan.ChunkSize: expected 30, got %d", loaded.Scan.ChunkSize)
+	}
+	if loaded.Scan.MaxConcurrency != 4 {
+		t.Errorf("Scan.MaxConcurrency: expected 4, got %d", loaded.Scan.MaxConcurrency)
+	}
+	if loaded.Model != "sonnet" {
+		t.Errorf("Assistant.Model: expected 'sonnet', got %q", loaded.Model)
+	}
+	if loaded.TimeoutSec != 600 {
+		t.Errorf("Assistant.TimeoutSec: expected 600, got %d", loaded.TimeoutSec)
+	}
+}
+
+func TestConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
+	// given: DefaultConfig marshalled to YAML file
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "sightjack.yaml")
+
+	original := domain.DefaultConfig()
+	data, err := yaml.Marshal(&original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(cfgPath, data, 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// when: LoadConfig from that file
+	loaded, err := session.LoadConfig(cfgPath)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	// verify key fields survive round-trip
+	if loaded.Lang != "ja" {
+		t.Errorf("Lang: expected 'ja', got %q", loaded.Lang)
+	}
+	if loaded.Scan.ChunkSize != 20 {
+		t.Errorf("Scan.ChunkSize: expected 20, got %d", loaded.Scan.ChunkSize)
+	}
+	if loaded.Scan.MaxConcurrency != 3 {
+		t.Errorf("Scan.MaxConcurrency: expected 3, got %d", loaded.Scan.MaxConcurrency)
+	}
+	if loaded.Strictness.Default != domain.StrictnessFog {
+		t.Errorf("Strictness.Default: expected fog, got %s", loaded.Strictness.Default)
+	}
+	if loaded.Retry.MaxAttempts != 3 {
+		t.Errorf("Retry.MaxAttempts: expected 3, got %d", loaded.Retry.MaxAttempts)
+	}
+	if loaded.Retry.BaseDelaySec != 2 {
+		t.Errorf("Retry.BaseDelaySec: expected 2, got %d", loaded.Retry.BaseDelaySec)
+	}
+	if !loaded.Labels.Enabled {
+		t.Error("Labels.Enabled: expected true")
+	}
+	if loaded.Labels.Prefix != "sightjack" {
+		t.Errorf("Labels.Prefix: expected 'sightjack', got %q", loaded.Labels.Prefix)
+	}
+	if loaded.Labels.ReadyLabel != "sightjack:ready" {
+		t.Errorf("Labels.ReadyLabel: expected 'sightjack:ready', got %q", loaded.Labels.ReadyLabel)
+	}
+	if loaded.Scribe.Enabled != true {
+		t.Error("Scribe.Enabled: expected true")
+	}
+	if loaded.Scribe.AutoDiscussRounds != 2 {
+		t.Errorf("Scribe.AutoDiscussRounds: expected 2, got %d", loaded.Scribe.AutoDiscussRounds)
+	}
+	if loaded.TimeoutSec != 1980 {
+		t.Errorf("Assistant.TimeoutSec: expected 1980, got %d", loaded.TimeoutSec)
+	}
+
+	// verify ComputedConfig is zero-value (nil map) after round-trip of defaults
+	if loaded.Computed.EstimatedStrictness != nil {
+		t.Errorf("Computed.EstimatedStrictness: expected nil, got %v", loaded.Computed.EstimatedStrictness)
 	}
 }
 

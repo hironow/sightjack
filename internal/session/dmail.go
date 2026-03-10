@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -29,8 +31,9 @@ type DMail struct {
 	Severity      string            `yaml:"severity,omitempty"`
 	Action        string            `yaml:"action,omitempty"`
 	Priority      int               `yaml:"priority,omitempty"`
-	Metadata      map[string]string `yaml:"metadata,omitempty"`
-	Body          string            `yaml:"-"`
+	Metadata      map[string]string        `yaml:"metadata,omitempty"`
+	Context       *domain.InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
+	Body          string                   `yaml:"-"`
 }
 
 // DMailKind is the message type for d-mails.
@@ -200,7 +203,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
 	// for the same wave must use a distinct filename (e.g. append a sequence number).
 	archivePath := filepath.Join(domain.MailDir(baseDir, domain.ArchiveDir), filename)
 	if _, err := os.Stat(archivePath); err == nil {
-		if rmErr := os.Remove(filepath.Join(domain.MailDir(baseDir, domain.InboxDir), filename)); rmErr != nil && !os.IsNotExist(rmErr) {
+		if rmErr := os.Remove(filepath.Join(domain.MailDir(baseDir, domain.InboxDir), filename)); rmErr != nil && !errors.Is(rmErr, fs.ErrNotExist) {
 			logger.Warn("dedup remove %s: %v", filename, rmErr)
 		}
 		return nil

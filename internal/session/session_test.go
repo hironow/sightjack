@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,11 +77,9 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	// given: dry-run session should generate both classify and wave_generate prompts
 	baseDir := t.TempDir()
 	cfg := &domain.Config{
-		Lang: "en",
-		Assistant: domain.AIAssistantConfig{
-			Command:    "claude",
-			TimeoutSec: 60,
-		},
+		Lang:       "en",
+		ClaudeCmd:  "claude",
+		TimeoutSec: 60,
 		Scan: domain.ScanConfig{
 			MaxConcurrency: 1,
 			ChunkSize:      50,
@@ -104,25 +104,25 @@ func TestRunSession_DryRunGeneratesWavePrompts(t *testing.T) {
 	// then: classify prompt was generated (Pass 1)
 	scanDir := domain.ScanDir(baseDir, sessionID)
 	classifyPrompt := filepath.Join(scanDir, "classify_prompt.md")
-	if _, err := os.Stat(classifyPrompt); os.IsNotExist(err) {
+	if _, err := os.Stat(classifyPrompt); errors.Is(err, fs.ErrNotExist) {
 		t.Error("classify_prompt.md not generated")
 	}
 
 	// then: wave_generate prompt was generated (Pass 3)
 	wavePrompt := filepath.Join(scanDir, "wave_00_sample_prompt.md")
-	if _, err := os.Stat(wavePrompt); os.IsNotExist(err) {
+	if _, err := os.Stat(wavePrompt); errors.Is(err, fs.ErrNotExist) {
 		t.Error("wave_00_sample_prompt.md not generated — dry-run did not reach Pass 3")
 	}
 
 	// then: architect discuss prompt was generated
 	architectPrompt := filepath.Join(scanDir, "architect_sample_sample-w1_prompt.md")
-	if _, err := os.Stat(architectPrompt); os.IsNotExist(err) {
+	if _, err := os.Stat(architectPrompt); errors.Is(err, fs.ErrNotExist) {
 		t.Error("architect_sample_sample-w1_prompt.md not generated — dry-run did not reach architect step")
 	}
 
 	// then: scribe ADR prompt was generated
 	scribePrompt := filepath.Join(scanDir, "scribe_sample_sample-w1_prompt.md")
-	if _, err := os.Stat(scribePrompt); os.IsNotExist(err) {
+	if _, err := os.Stat(scribePrompt); errors.Is(err, fs.ErrNotExist) {
 		t.Error("scribe_sample_sample-w1_prompt.md not generated — dry-run did not reach scribe step")
 	}
 }
@@ -131,11 +131,9 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	// given: dry-run with Scribe disabled
 	baseDir := t.TempDir()
 	cfg := &domain.Config{
-		Lang: "en",
-		Assistant: domain.AIAssistantConfig{
-			Command:    "claude",
-			TimeoutSec: 60,
-		},
+		Lang:       "en",
+		ClaudeCmd:  "claude",
+		TimeoutSec: 60,
 		Scan: domain.ScanConfig{
 			MaxConcurrency: 1,
 			ChunkSize:      50,
@@ -160,7 +158,7 @@ func TestRunSession_DryRunSkipsScribeWhenDisabled(t *testing.T) {
 	// then: scribe prompt should NOT be generated
 	scanDir := domain.ScanDir(baseDir, sessionID)
 	scribePrompt := filepath.Join(scanDir, "scribe_sample_sample-w1_prompt.md")
-	if _, err := os.Stat(scribePrompt); !os.IsNotExist(err) {
+	if _, err := os.Stat(scribePrompt); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("scribe prompt should not be generated when Scribe is disabled")
 	}
 }
@@ -169,9 +167,9 @@ func TestRunSession_NilInputReturnsError(t *testing.T) {
 	// given: non-dry-run session with nil input should return error early
 	cfg := &domain.Config{
 		Lang:      "en",
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Scan:      domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		ClaudeCmd: "claude", TimeoutSec: 60,
+		Scan:    domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 
 	// when
@@ -906,10 +904,10 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	baseDir := t.TempDir()
 	cfg := &domain.Config{
 		Lang:      "en",
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Scan:      domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
-		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
-		Scribe:    domain.ScribeConfig{Enabled: true},
+		ClaudeCmd: "claude", TimeoutSec: 60,
+		Scan:    domain.ScanConfig{MaxConcurrency: 1, ChunkSize: 50},
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		Scribe:  domain.ScribeConfig{Enabled: true},
 	}
 	sessionID := "test-no-cache"
 	ctx := context.Background()
@@ -923,7 +921,7 @@ func TestRunSession_DryRunDoesNotCacheScanResult(t *testing.T) {
 	}
 	scanDir := domain.ScanDir(baseDir, sessionID)
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
-	if _, err := os.Stat(scanResultPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(scanResultPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("scan_result.json should not exist in dry-run mode")
 	}
 }
@@ -1081,8 +1079,8 @@ func TestRunResumeSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
 	cfg := &domain.Config{
 		Lang:      "en",
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		ClaudeCmd: "claude", TimeoutSec: 60,
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 	state := &domain.SessionState{
 		Version:        "0.5",
@@ -1106,8 +1104,8 @@ func TestRunRescanSession_NilInputReturnsError(t *testing.T) {
 	// given: nil input should return error
 	cfg := &domain.Config{
 		Lang:      "en",
-		Assistant: domain.AIAssistantConfig{Command: "claude", TimeoutSec: 60},
-		Tracker:   domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
+		ClaudeCmd: "claude", TimeoutSec: 60,
+		Tracker: domain.IssueTrackerConfig{Team: "ENG", Project: "Test"},
 	}
 	state := &domain.SessionState{
 		Version:   "0.5",

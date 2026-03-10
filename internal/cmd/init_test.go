@@ -40,7 +40,7 @@ func TestInitCmd_CreatesConfigFile(t *testing.T) {
 	if !strings.Contains(content, "Hades") {
 		t.Errorf("expected project in config, got:\n%s", content)
 	}
-	if !strings.Contains(content, `lang: "en"`) {
+	if !strings.Contains(content, "lang: en") {
 		t.Errorf("expected lang 'en' in config, got:\n%s", content)
 	}
 	if !strings.Contains(content, "default: alert") {
@@ -67,7 +67,7 @@ func TestInitCmd_DefaultLangAndStrictness(t *testing.T) {
 	}
 	data, _ := os.ReadFile(domain.ConfigPath(dir))
 	content := string(data)
-	if !strings.Contains(content, `lang: "ja"`) {
+	if !strings.Contains(content, "lang: ja") {
 		t.Errorf("expected default lang 'ja' in config, got:\n%s", content)
 	}
 	if !strings.Contains(content, "default: fog") {
@@ -260,6 +260,71 @@ func TestInitCmd_FlagsOnly(t *testing.T) {
 	}
 	if !strings.Contains(content, "Hades") {
 		t.Errorf("expected project in config, got:\n%s", content)
+	}
+}
+
+func TestInitCmd_Force_MergesExistingConfig(t *testing.T) {
+	// given: existing config with user customization
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
+	os.WriteFile(domain.ConfigPath(dir), []byte("lang: en\ntracker:\n  team: OldTeam\n  project: OldProject\nretry:\n  max_attempts: 5\n"), 0644)
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--force", "--team", "NewTeam", "--project", "NewProject", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init --force failed: %v", err)
+	}
+	data, _ := os.ReadFile(domain.ConfigPath(dir))
+	content := string(data)
+	// CLI flags should win
+	if !strings.Contains(content, "NewTeam") {
+		t.Errorf("expected CLI team 'NewTeam', got:\n%s", content)
+	}
+	// User's retry.max_attempts=5 should be preserved
+	if !strings.Contains(content, "max_attempts: 5") {
+		t.Errorf("expected user's max_attempts=5 preserved, got:\n%s", content)
+	}
+	// New defaults should appear (e.g. labels section)
+	if !strings.Contains(content, "labels:") {
+		t.Errorf("expected default labels section, got:\n%s", content)
+	}
+}
+
+func TestInitCmd_ConfigHasAllDefaults(t *testing.T) {
+	// given: fresh init
+	dir := t.TempDir()
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+	data, _ := os.ReadFile(domain.ConfigPath(dir))
+	content := string(data)
+	// Verify comprehensive defaults are present
+	for _, expected := range []string{
+		"scan:", "chunk_size:", "retry:", "labels:", "gate:", "scribe:",
+	} {
+		if !strings.Contains(content, expected) {
+			t.Errorf("expected %q in config defaults, got:\n%s", expected, content)
+		}
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -27,6 +28,11 @@ func UpdateConfig(path string, key string, value string) error {
 
 	if err := setConfigField(&cfg, key, value); err != nil {
 		return err
+	}
+
+	// Validate before writing
+	if errs := domain.ValidateConfig(cfg); len(errs) > 0 {
+		return fmt.Errorf("invalid config after update: %s", errs[0])
 	}
 
 	out, err := yaml.Marshal(&cfg)
@@ -67,14 +73,14 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid max_concurrency %q: must be positive integer", value)
 		}
 		cfg.Scan.MaxConcurrency = n
-	case "assistant.model":
-		cfg.Assistant.Model = value
-	case "assistant.timeout_sec":
+	case "model", "assistant.model":
+		cfg.Model = value
+	case "timeout_sec", "assistant.timeout_sec":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 1 {
 			return fmt.Errorf("invalid timeout_sec %q: must be positive integer", value)
 		}
-		cfg.Assistant.TimeoutSec = n
+		cfg.TimeoutSec = n
 	case "gate.auto_approve":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
@@ -91,6 +97,52 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 		cfg.Labels.Prefix = value
 	case "labels.ready_label":
 		cfg.Labels.ReadyLabel = value
+	case "claude_cmd", "assistant.command":
+		cfg.ClaudeCmd = value
+	case "scribe.enabled":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid scribe.enabled %q: must be true or false", value)
+		}
+		cfg.Scribe.Enabled = b
+	case "scribe.auto_discuss_rounds":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid scribe.auto_discuss_rounds %q: must be non-negative integer", value)
+		}
+		cfg.Scribe.AutoDiscussRounds = n
+	case "retry.max_attempts":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return fmt.Errorf("invalid retry.max_attempts %q: must be positive integer", value)
+		}
+		cfg.Retry.MaxAttempts = n
+	case "retry.base_delay_sec":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return fmt.Errorf("invalid retry.base_delay_sec %q: must be positive integer", value)
+		}
+		cfg.Retry.BaseDelaySec = n
+	case "gate.notify_cmd":
+		cfg.Gate.SetNotifyCmd(value)
+	case "gate.approve_cmd":
+		cfg.Gate.SetApproveCmd(value)
+	case "gate.review_cmd":
+		cfg.Gate.SetReviewCmd(value)
+	case "gate.review_budget":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid gate.review_budget %q: must be non-negative integer", value)
+		}
+		cfg.Gate.SetReviewBudget(n)
+	case "gate.wait_timeout":
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid gate.wait_timeout %q: must be duration (e.g. 30m, 1h)", value)
+		}
+		cfg.Gate.SetWaitTimeout(d)
+	case "strictness.estimated", "computed.estimated_strictness":
+		return fmt.Errorf("key %q is computed (read-only): cannot be set manually", key)
 	default:
 		return fmt.Errorf("unknown config key %q", key)
 	}
@@ -110,7 +162,7 @@ func WriteEstimatedStrictness(path string, estimated map[string]domain.Strictnes
 		return fmt.Errorf("parse config for estimated strictness: %w", err)
 	}
 
-	cfg.Strictness.Estimated = estimated
+	cfg.Computed.EstimatedStrictness = estimated
 
 	out, err := yaml.Marshal(&cfg)
 	if err != nil {
@@ -136,16 +188,16 @@ func LoadConfig(path string) (*domain.Config, error) {
 		cfg.Scan.ChunkSize = 20
 	}
 	if cfg.Scan.MaxConcurrency < 1 {
-		cfg.Scan.MaxConcurrency = 1
+		cfg.Scan.MaxConcurrency = 3
 	}
-	if cfg.Assistant.Command == "" {
-		cfg.Assistant.Command = "claude"
+	if cfg.ClaudeCmd == "" {
+		cfg.ClaudeCmd = domain.DefaultClaudeCmd
 	}
-	if cfg.Assistant.Model == "" {
-		cfg.Assistant.Model = "opus"
+	if cfg.Model == "" {
+		cfg.Model = domain.DefaultModel
 	}
-	if cfg.Assistant.TimeoutSec < 1 {
-		cfg.Assistant.TimeoutSec = 300
+	if cfg.TimeoutSec < 1 {
+		cfg.TimeoutSec = domain.DefaultTimeoutSec
 	}
 	if !cfg.Strictness.Default.Valid() { // nosemgrep: lod-excessive-dot-chain [permanent]
 		cfg.Strictness.Default = domain.StrictnessFog
@@ -155,7 +207,7 @@ func LoadConfig(path string) (*domain.Config, error) {
 			return nil, fmt.Errorf("invalid strictness override for %q: %q", label, level)
 		}
 	}
-	for label, level := range cfg.Strictness.Estimated {
+	for label, level := range cfg.Computed.EstimatedStrictness {
 		if !level.Valid() {
 			return nil, fmt.Errorf("invalid estimated strictness for %q: %q", label, level)
 		}

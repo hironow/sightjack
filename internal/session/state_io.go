@@ -21,7 +21,7 @@ var sirenGitignoreEntries = []string{
 
 // EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.
 func EnsureMailDirs(baseDir string) error {
-	for _, sub := range []string{domain.InboxDir, domain.OutboxDir, domain.ArchiveDir} {
+	for _, sub := range []string{domain.InboxDir, domain.OutboxDir, domain.ArchiveDir, "insights"} {
 		if err := os.MkdirAll(domain.MailDir(baseDir, sub), 0755); err != nil {
 			return fmt.Errorf("create %s dir: %w", sub, err)
 		}
