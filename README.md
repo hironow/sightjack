@@ -357,22 +357,7 @@ cat wave.json | sightjack apply | sightjack nextgen
 | `--dry-run` | `-n` | `false` | Generate prompts without executing Claude |
 | `--no-color` | | `false` | Disable colored output (also respects `NO_COLOR` env) |
 
-### Subcommand flags
-
-| Subcommand | Flag | Short | Default | Description |
-|------------|------|-------|---------|-------------|
-| `run` | `--notify-cmd` | | `""` | Notification command ({title}, {message} placeholders) |
-| `run` | `--approve-cmd` | | `""` | Approval command ({message} placeholder, exit 0 = approve) |
-| `run` | `--auto-approve` | | `false` | Skip approval gate for convergence D-Mail |
-| `run` | `--review-cmd` | | `""` | Review command (exit 0 = pass, non-zero = comments found) |
-| `run` | `--session-mode` | | `""` | Session mode: `resume`, `new`, or `rescan` (skip interactive prompt) |
-| `run` | `--wait-timeout` | | `30m` | D-Mail waiting phase timeout (`0` = indefinite, negative = disable) |
-| `init` | `--force` | | `false` | Overwrite existing config and regenerate SKILL.md files |
-| `scan` | `--json` | `-j` | `false` | Output structured JSON |
-| `version` | `--json` | `-j` | `false` | Output version info as JSON |
-| `update` | `--check` | `-C` | `false` | Check for updates without installing |
-| `archive-prune` | `--days` | `-d` | `30` | Retention days |
-| `archive-prune` | `--execute` | `-x` | `false` | Execute deletion (default: dry-run) |
+For full flag reference per subcommand, see [docs/cli/](docs/cli/).
 
 ## Configuration
 
