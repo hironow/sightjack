@@ -119,18 +119,7 @@ waitingCycle:
 
 		// Classify new D-Mails since snapshot
 		newMails := fbCollector.NewSinceSnapshot()
-		hasSpec := false
-		hasReport := false
-		var reportIssueIDs []string
-		for _, m := range newMails {
-			switch m.Kind {
-			case DMailSpecification:
-				hasSpec = true
-			case DMailReport:
-				hasReport = true
-				reportIssueIDs = append(reportIssueIDs, m.Issues...)
-			}
-		}
+		hasSpec, hasReport, reportIssueIDs := classifyNewMails(newMails)
 
 		if hasSpec {
 			logger.Info("New specification received. Rescanning not yet supported in waiting mode.")
@@ -168,4 +157,19 @@ waitingCycle:
 
 	logger.OK("Session events saved to %s", filepath.Join(baseDir, domain.StateDir, "events"))
 	return nil
+}
+
+// classifyNewMails categorizes newly arrived D-Mails into specification,
+// report (with issue IDs), or other feedback kinds.
+func classifyNewMails(mails []*DMail) (hasSpec, hasReport bool, reportIssueIDs []string) {
+	for _, m := range mails {
+		switch m.Kind {
+		case DMailSpecification:
+			hasSpec = true
+		case DMailReport:
+			hasReport = true
+			reportIssueIDs = append(reportIssueIDs, m.Issues...)
+		}
+	}
+	return
 }
