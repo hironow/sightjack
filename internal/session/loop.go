@@ -135,13 +135,14 @@ waitingCycle:
 					continue
 				}
 				logger.Info("Report D-Mail triggered nextgen for cluster %s", cluster.Name)
+				resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, scanResult.StrictnessKeys(cluster.Name)))
 				_, waveSpan := platform.Tracer.Start(ctx, fmt.Sprintf("report-nextgen[%s]", cluster.Name), // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after generateNextWavesIfNeeded below [permanent]
 					trace.WithAttributes(
 						attribute.String("wave.cluster", platform.SanitizeUTF8(cluster.Name)),
 						attribute.String("trigger", "report-dmail"),
 					),
 				)
-				generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, lastWave, "",
+				generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, lastWave, resolvedStrictness,
 					&waves, completed, scanResult, sessionRejected, fbCollector, emitter, waveSpan, logger)
 				waveSpan.End()
 			}

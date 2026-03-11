@@ -163,6 +163,30 @@ func TestClassifyNewMails_FeedbackOnly(t *testing.T) {
 	}
 }
 
+func TestClassifyNewMails_ConvergenceAndCIResult(t *testing.T) {
+	t.Parallel()
+
+	// given: convergence and ci-result D-Mails (neither spec nor report)
+	mails := []*DMail{
+		{Kind: DMailConvergence, Name: "conv-1"},
+		{Kind: DMailCIResult, Name: "ci-1"},
+	}
+
+	// when
+	hasSpec, hasReport, issueIDs := classifyNewMails(mails)
+
+	// then: these kinds fall through to "feedback" path in waiting cycle
+	if hasSpec {
+		t.Error("expected hasSpec=false for convergence/ci-result")
+	}
+	if hasReport {
+		t.Error("expected hasReport=false for convergence/ci-result")
+	}
+	if len(issueIDs) != 0 {
+		t.Errorf("expected empty issueIDs, got %v", issueIDs)
+	}
+}
+
 // TestReportNextgenOrchestration_EndToEnd tests the full report → cluster → wave → nextgen
 // decision path using only domain-layer functions (no session dependencies).
 func TestReportNextgenOrchestration_EndToEnd(t *testing.T) {
