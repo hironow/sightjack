@@ -89,3 +89,78 @@ func TestNormalizeJSONFile_MissingFile(t *testing.T) {
 		t.Error("expected error for missing file")
 	}
 }
+
+func TestNormalizeJSONFile_TextPrefixBeforeJSON(t *testing.T) {
+	// given: Claude sometimes returns natural language before JSON
+	dir := t.TempDir()
+	path := filepath.Join(dir, "text_prefix.json")
+	content := "Certainly, here's the analysis:\n\n" + `{"clusters":[],"total_issues":0}`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	err := session.NormalizeJSONFile(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("expected text-prefixed JSON to normalize, got: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"total_issues"`) {
+		t.Errorf("expected normalized JSON, got: %s", string(data))
+	}
+}
+
+func TestNormalizeJSONFile_MarkdownCodeBlock(t *testing.T) {
+	// given: Claude wraps JSON in markdown code block
+	dir := t.TempDir()
+	path := filepath.Join(dir, "markdown.json")
+	content := "```json\n" + `{"clusters":[],"total_issues":0}` + "\n```"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	err := session.NormalizeJSONFile(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("expected markdown-wrapped JSON to normalize, got: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "```") {
+		t.Errorf("expected markdown fences removed, got: %s", string(data))
+	}
+}
+
+func TestNormalizeJSONFile_TextSuffixAfterJSON(t *testing.T) {
+	// given: Claude appends text after JSON
+	dir := t.TempDir()
+	path := filepath.Join(dir, "suffix.json")
+	content := `{"clusters":[],"total_issues":0}` + "\n\nLet me know if you need more details."
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	err := session.NormalizeJSONFile(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("expected JSON-with-suffix to normalize, got: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "Let me know") {
+		t.Errorf("expected suffix removed, got: %s", string(data))
+	}
+}
