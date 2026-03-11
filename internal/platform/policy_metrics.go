@@ -16,8 +16,8 @@ func (*OTelPolicyMetrics) RecordPolicyEvent(ctx context.Context, eventType, stat
 	)
 	c.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String("event_type", eventType),
-			attribute.String("status", status),
+			attribute.String("event_type", eventType), // nosemgrep: otel-attribute-string-unsanitized -- eventType is always a string literal from policy_handlers.go [permanent]
+			attribute.String("status", status),         // nosemgrep: otel-attribute-string-unsanitized -- status is always a string literal from policy_handlers.go [permanent]
 		),
 	)
 }

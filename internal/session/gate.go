@@ -74,7 +74,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Noti
 	approved, err := approver.RequestApproval(ctx, summary)
 	if err != nil {
 		gateSpan.AddEvent("gate.convergence.error",
-			trace.WithAttributes(attribute.String("error", err.Error())),
+			trace.WithAttributes(attribute.String("error", platform.SanitizeUTF8(err.Error()))),
 		)
 		return false, fmt.Errorf("convergence approval: %w", err)
 	}

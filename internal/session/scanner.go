@@ -64,7 +64,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 		logger = &domain.NopLogger{}
 	}
 	ctx, scanSpan := platform.Tracer.Start(ctx, "scan",
-		trace.WithAttributes(attribute.String("sightjack.session_id", sessionID)),
+		trace.WithAttributes(attribute.String("sightjack.session_id", platform.SanitizeUTF8(sessionID))),
 	)
 	defer scanSpan.End()
 
@@ -158,7 +158,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 
 	deepScanFn := func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
 		ctx, clusterSpan := platform.Tracer.Start(ctx, "deepscan.cluster",
-			trace.WithAttributes(attribute.String("cluster.name", cluster.Name)),
+			trace.WithAttributes(attribute.String("cluster.name", platform.SanitizeUTF8(cluster.Name))),
 		)
 		defer clusterSpan.End()
 

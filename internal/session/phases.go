@@ -112,8 +112,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	if gate.IsAutoApprove() {
 		waveSpan.AddEvent("wave.auto_approved",
 			trace.WithAttributes(
-				attribute.String("wave.id", selected.ID),
-				attribute.String("wave.cluster_name", selected.ClusterName),
+				attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
+				attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 			),
 		)
 		emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -165,8 +165,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			delete(sessionRejected, domain.WaveKey(selected))
 			waveSpan.AddEvent("wave.approved",
 				trace.WithAttributes(
-					attribute.String("wave.id", selected.ID),
-					attribute.String("wave.cluster_name", selected.ClusterName),
+					attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
+					attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 				),
 			)
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -181,8 +181,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			delete(sessionRejected, domain.WaveKey(selected))
 			waveSpan.AddEvent("wave.rejected",
 				trace.WithAttributes(
-					attribute.String("wave.id", selected.ID),
-					attribute.String("wave.cluster_name", selected.ClusterName),
+					attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
+					attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 				),
 			)
 			emitter.EmitRejectWave(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -299,8 +299,8 @@ func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	if !domain.IsWaveApplyComplete(applyResult) {
 		waveSpan.AddEvent("wave.partial_failure",
 			trace.WithAttributes(
-				attribute.String("wave.id", selected.ID),
-				attribute.String("wave.cluster_name", selected.ClusterName),
+				attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
+				attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 				attribute.Int("wave.error_count", len(applyResult.Errors)),
 			),
 		)
@@ -334,7 +334,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	if !NeedsMoreWaves(clusterForNextgen, *waves) {
 		waveSpan.AddEvent("nextgen.skipped",
 			trace.WithAttributes(
-				attribute.String("wave.cluster_name", selected.ClusterName),
+				attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 			),
 		)
 		logger.Debug("Skipping nextgen for %s (complete, waves remain, or cap reached)", selected.ClusterName)
@@ -420,8 +420,8 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 
 	waveSpan.AddEvent("wave.completed",
 		trace.WithAttributes(
-			attribute.String("wave.id", selected.ID),
-			attribute.String("wave.cluster_name", selected.ClusterName),
+			attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
+			attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 			attribute.Int("wave.action_count", len(selected.Actions)),
 		),
 	)
@@ -445,13 +445,13 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	if gate.HasReviewCmd() {
 		_, reviewSpan := platform.Tracer.Start(ctx, "wave.review", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 			trace.WithAttributes(
-				attribute.String("wave.id", selected.ID),
-				attribute.String("wave.cluster_name", selected.ClusterName),
+				attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
+				attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 			),
 		)
 		passed, reviewErr := RunReviewGate(ctx, gate, cfg, scanDir, logger)
 		if reviewErr != nil {
-			reviewSpan.SetAttributes(attribute.String("review.error", reviewErr.Error()))
+			reviewSpan.SetAttributes(attribute.String("review.error", platform.SanitizeUTF8(reviewErr.Error())))
 			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
 		}
 		reviewSpan.SetAttributes(attribute.Bool("review.passed", passed))

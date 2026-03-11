@@ -14,7 +14,7 @@ func RecordWave(ctx context.Context, status string) {
 	)
 	c.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String("status", status),
+			attribute.String("status", status), // nosemgrep: otel-attribute-string-unsanitized -- status is always a string literal from callers ("applied"/"rejected") [permanent]
 		),
 	)
 }
