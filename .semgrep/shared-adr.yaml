@@ -268,9 +268,13 @@ rules:
     languages: [go]
     message: |
       attribute.StringSlice() に渡すスライスの各要素を SanitizeUTF8 でラップしてください。
+      platform.SanitizeUTF8Slice(vals) または SanitizeUTF8Slice(vals) でラップしてください。
       外部データには無効な UTF-8 バイトが含まれる可能性があります。
     severity: ERROR
-    pattern: attribute.StringSlice($KEY, $VAL)
+    patterns:
+      - pattern: attribute.StringSlice($KEY, $VAL)
+      - pattern-not: attribute.StringSlice($KEY, platform.SanitizeUTF8Slice(...))
+      - pattern-not: attribute.StringSlice($KEY, SanitizeUTF8Slice(...))
 
   # --- D4: Resource leak detection ---
 
