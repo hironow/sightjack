@@ -3,6 +3,7 @@ package session
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -118,7 +119,7 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	if result.Status != domain.CheckFail {
 		t.Errorf("expected FAIL, got %v: %s", result.Status, result.Message)
 	}
-	if result.Message != "unexpected response" {
-		t.Errorf("expected 'unexpected response', got: %s", result.Message)
+	if !strings.HasPrefix(result.Message, "unexpected response: ") {
+		t.Errorf("expected message starting with 'unexpected response: ', got: %s", result.Message)
 	}
 }
