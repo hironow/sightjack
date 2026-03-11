@@ -11,6 +11,8 @@ type RunOption func(*RunConfig)
 // RunConfig holds per-invocation configuration for ClaudeRunner.
 type RunConfig struct {
 	AllowedTools []string
+	WorkDir      string // sets cmd.Dir for the subprocess
+	Continue     bool   // passes --continue to resume a prior session
 }
 
 // ApplyOptions applies RunOption functions to a RunConfig and returns it.
@@ -26,6 +28,20 @@ func ApplyOptions(opts ...RunOption) RunConfig {
 func WithAllowedTools(tools ...string) RunOption {
 	return func(c *RunConfig) {
 		c.AllowedTools = tools
+	}
+}
+
+// WithWorkDir sets the working directory for the Claude subprocess.
+func WithWorkDir(dir string) RunOption {
+	return func(c *RunConfig) {
+		c.WorkDir = dir
+	}
+}
+
+// WithContinue enables --continue mode to resume a prior Claude session.
+func WithContinue() RunOption {
+	return func(c *RunConfig) {
+		c.Continue = true
 	}
 }
 

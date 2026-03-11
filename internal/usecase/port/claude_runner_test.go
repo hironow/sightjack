@@ -67,3 +67,43 @@ func TestApplyOptions_Empty(t *testing.T) {
 		t.Errorf("expected nil AllowedTools, got %v", cfg.AllowedTools)
 	}
 }
+
+func TestWithWorkDir_SetsConfig(t *testing.T) {
+	// when
+	cfg := ApplyOptions(WithWorkDir("/tmp/repo"))
+
+	// then
+	if cfg.WorkDir != "/tmp/repo" {
+		t.Errorf("expected WorkDir '/tmp/repo', got %q", cfg.WorkDir)
+	}
+}
+
+func TestWithContinue_SetsConfig(t *testing.T) {
+	// when
+	cfg := ApplyOptions(WithContinue())
+
+	// then
+	if !cfg.Continue {
+		t.Error("expected Continue to be true")
+	}
+}
+
+func TestApplyOptions_Combined(t *testing.T) {
+	// when
+	cfg := ApplyOptions(
+		WithAllowedTools("Read"),
+		WithWorkDir("/repo"),
+		WithContinue(),
+	)
+
+	// then
+	if len(cfg.AllowedTools) != 1 || cfg.AllowedTools[0] != "Read" {
+		t.Errorf("unexpected AllowedTools: %v", cfg.AllowedTools)
+	}
+	if cfg.WorkDir != "/repo" {
+		t.Errorf("expected WorkDir '/repo', got %q", cfg.WorkDir)
+	}
+	if !cfg.Continue {
+		t.Error("expected Continue to be true")
+	}
+}
