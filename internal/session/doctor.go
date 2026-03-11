@@ -418,7 +418,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	return results
 }
 
-// extractStreamResult parses stream-json output and returns the "result" field
+// ExtractStreamResult parses stream-json output and returns the "result" field
 // from the result message. Used to reuse inference check output for inference validation.
 func ExtractStreamResult(streamJSON string) string {
 	for _, line := range strings.Split(streamJSON, "\n") {
@@ -437,7 +437,7 @@ func ExtractStreamResult(streamJSON string) string {
 	return ""
 }
 
-// checkContextBudget parses stream-json output from a Claude CLI invocation
+// CheckContextBudget parses stream-json output from a Claude CLI invocation
 // and reports context budget health based on hooks, plugins, skills, and MCP servers.
 func CheckContextBudget(streamJSON string) domain.CheckResult {
 	var messages []*platform.StreamMessage
