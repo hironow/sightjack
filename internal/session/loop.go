@@ -119,17 +119,36 @@ waitingCycle:
 
 		// Classify new D-Mails since snapshot
 		newMails := fbCollector.NewSinceSnapshot()
-		hasSpec := false
-		for _, m := range newMails {
-			if m.Kind == DMailSpecification {
-				hasSpec = true
-				break
-			}
-		}
+		hasSpec, hasReport, reportIssueIDs := classifyNewMails(newMails)
 
 		if hasSpec {
 			logger.Info("New specification received. Rescanning not yet supported in waiting mode.")
-		} else {
+		}
+
+		// Generate next waves for clusters affected by report D-Mails
+		if hasReport && len(reportIssueIDs) > 0 {
+			affectedClusters := domain.ClustersForIssueIDs(scanResult.Clusters, reportIssueIDs)
+			for _, cluster := range affectedClusters {
+				lastWave, ok := domain.LastCompletedWaveForCluster(waves, cluster.Name)
+				if !ok {
+					logger.Debug("No completed wave for cluster %s; skipping nextgen from report", cluster.Name)
+					continue
+				}
+				logger.Info("Report D-Mail triggered nextgen for cluster %s", cluster.Name)
+				resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, scanResult.StrictnessKeys(cluster.Name)))
+				_, waveSpan := platform.Tracer.Start(ctx, fmt.Sprintf("report-nextgen[%s]", cluster.Name), // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after generateNextWavesIfNeeded below [permanent]
+					trace.WithAttributes(
+						attribute.String("wave.cluster", platform.SanitizeUTF8(cluster.Name)),
+						attribute.String("trigger", "report-dmail"),
+					),
+				)
+				generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, lastWave, resolvedStrictness,
+					&waves, completed, scanResult, sessionRejected, fbCollector, emitter, waveSpan, logger)
+				waveSpan.End()
+			}
+		}
+
+		if !hasSpec && !hasReport {
 			logger.Info("New feedback received. Resuming interactive loop...")
 		}
 
@@ -139,4 +158,19 @@ waitingCycle:
 
 	logger.OK("Session events saved to %s", filepath.Join(baseDir, domain.StateDir, "events"))
 	return nil
+}
+
+// classifyNewMails categorizes newly arrived D-Mails into specification,
+// report (with issue IDs), or other feedback kinds.
+func classifyNewMails(mails []*DMail) (hasSpec, hasReport bool, reportIssueIDs []string) {
+	for _, m := range mails {
+		switch m.Kind {
+		case DMailSpecification:
+			hasSpec = true
+		case DMailReport:
+			hasReport = true
+			reportIssueIDs = append(reportIssueIDs, m.Issues...)
+		}
+	}
+	return
 }

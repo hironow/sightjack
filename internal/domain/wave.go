@@ -395,6 +395,46 @@ func ReadyIssueIDs(waves []Wave) []string {
 	return ready
 }
 
+// ClustersForIssueIDs returns the unique clusters that contain any of the given issue IDs.
+// This is used to identify which clusters are affected by a report D-Mail.
+func ClustersForIssueIDs(clusters []ClusterScanResult, issueIDs []string) []ClusterScanResult {
+	if len(issueIDs) == 0 {
+		return nil
+	}
+	// Build reverse map: issueID -> cluster index
+	issueToCluster := make(map[string]int, len(clusters)*2)
+	for i, c := range clusters {
+		for _, issue := range c.Issues {
+			issueToCluster[issue.Identifier] = i
+		}
+	}
+	// Collect unique clusters
+	seen := make(map[int]bool)
+	var result []ClusterScanResult
+	for _, id := range issueIDs {
+		if idx, ok := issueToCluster[id]; ok && !seen[idx] {
+			seen[idx] = true
+			result = append(result, clusters[idx])
+		}
+	}
+	return result
+}
+
+// LastCompletedWaveForCluster returns the last completed wave for the given cluster.
+// Waves are assumed to be in insertion order, so the last match wins.
+// Returns false if no completed wave exists for the cluster.
+func LastCompletedWaveForCluster(waves []Wave, clusterName string) (Wave, bool) {
+	var last Wave
+	found := false
+	for _, w := range waves {
+		if w.ClusterName == clusterName && w.Status == "completed" {
+			last = w
+			found = true
+		}
+	}
+	return last, found
+}
+
 // validWaveActionTypes is the set of recognized wave action types.
 var validWaveActionTypes = map[string]bool{
 	"add_dod":            true,
