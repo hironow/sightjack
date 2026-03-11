@@ -54,11 +54,17 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	if len(rc.AllowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
+	if rc.Continue {
+		args = append(args, "--continue")
+	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, a.ClaudeCmd, args...)
 	cmd.Cancel = cancelFunc(cmd)
 	cmd.WaitDelay = 3 * time.Second
+	if rc.WorkDir != "" {
+		cmd.Dir = rc.WorkDir
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

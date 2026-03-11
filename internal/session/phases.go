@@ -449,7 +449,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 				attribute.String("wave.cluster_name", platform.SanitizeUTF8(selected.ClusterName)),
 			),
 		)
-		passed, reviewErr := RunReviewGate(ctx, gate, cfg, scanDir, logger)
+		passed, reviewErr := RunReviewGate(ctx, gate, cfg, NewClaudeAdapter(cfg, logger), scanDir, logger)
 		if reviewErr != nil {
 			reviewSpan.SetAttributes(attribute.String("review.error", platform.SanitizeUTF8(reviewErr.Error())))
 			logger.Warn("Review gate error (non-fatal): %v", reviewErr)
