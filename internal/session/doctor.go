@@ -356,7 +356,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
-			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
+			inferCtx, inferCancel := context.WithTimeout(ctx, 60*time.Second)
 			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
 			inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 			inferOut, inferErr := inferCmd.Output()
