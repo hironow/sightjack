@@ -60,7 +60,7 @@ func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave d
 func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*DMail, reports []*DMail, logger domain.Logger) ([]domain.Wave, error) {
 	ctx, nextgenSpan := platform.Tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
-			attribute.String("wave.cluster_name", completedWave.ClusterName),
+			attribute.String("wave.cluster_name", platform.SanitizeUTF8(completedWave.ClusterName)),
 		),
 	)
 	defer nextgenSpan.End()

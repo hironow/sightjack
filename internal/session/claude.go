@@ -64,7 +64,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", cfg.Model),
+				attribute.String("claude.model", platform.SanitizeUTF8(cfg.Model)),
 				attribute.Int("claude.timeout_sec", cfg.TimeoutSec),
 			}, platform.GenAISpanAttrs(cfg.Model)...)...,
 		),
@@ -161,7 +161,11 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 
 		// Attach raw events and session ID to the invoke span
 		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
-			span.SetAttributes(attribute.StringSlice("stream.raw_events", rawEvents))
+			sanitized := make([]string, len(rawEvents))
+			for i, e := range rawEvents {
+				sanitized[i] = platform.SanitizeUTF8(e)
+			}
+			span.SetAttributes(attribute.StringSlice("stream.raw_events", sanitized))
 		}
 		if result != nil && result.SessionID != "" {
 			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
@@ -253,7 +257,7 @@ func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writ
 		span.AddEvent("claude.retry",
 			trace.WithAttributes(
 				attribute.Int("claude.attempt", attempt),
-				attribute.String("claude.error", err.Error()),
+				attribute.String("claude.error", platform.SanitizeUTF8(err.Error())),
 			),
 		)
 	}

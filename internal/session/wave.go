@@ -59,8 +59,8 @@ func WaveApplyFileName(wave domain.Wave) string {
 func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, strictness string, out io.Writer, logger domain.Logger) (*domain.WaveApplyResult, error) {
 	ctx, applySpan := platform.Tracer.Start(ctx, "wave.apply",
 		trace.WithAttributes(
-			attribute.String("wave.id", wave.ID),
-			attribute.String("wave.cluster_name", wave.ClusterName),
+			attribute.String("wave.id", platform.SanitizeUTF8(wave.ID)),
+			attribute.String("wave.cluster_name", platform.SanitizeUTF8(wave.ClusterName)),
 			attribute.Int("wave.action_count", len(wave.Actions)),
 		),
 	)

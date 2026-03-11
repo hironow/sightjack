@@ -47,8 +47,8 @@ func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 
 	ctx, span := platform.Tracer.Start(ctx, "scribe.auto_discuss",
 		trace.WithAttributes(
-			attribute.String("wave.id", wave.ID),
-			attribute.String("wave.cluster_name", wave.ClusterName),
+			attribute.String("wave.id", platform.SanitizeUTF8(wave.ID)),
+			attribute.String("wave.cluster_name", platform.SanitizeUTF8(wave.ClusterName)),
 			attribute.Int("discuss.rounds", rounds),
 		),
 	)
@@ -86,7 +86,7 @@ func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 		roundCtx, roundSpan := platform.Tracer.Start(ctx, "scribe.auto_discuss.round", // nosemgrep: adr0003-otel-span-without-defer-end — End() called after round logic below (not defer: loop iteration) [permanent]
 			trace.WithAttributes(
 				attribute.Int("round.index", r),
-				attribute.String("round.speaker", speaker),
+				attribute.String("round.speaker", platform.SanitizeUTF8(speaker)),
 			),
 		)
 

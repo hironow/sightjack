@@ -25,7 +25,7 @@ func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessio
 	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) error {
 
 	parentSpan := trace.SpanFromContext(ctx)
-	parentSpan.SetAttributes(attribute.String("sightjack.session_id", sessionID))
+	parentSpan.SetAttributes(attribute.String("sightjack.session_id", platform.SanitizeUTF8(sessionID)))
 
 	// --- Interactive Loop with D-Mail Waiting Cycle ---
 	shibitoShown := false
@@ -66,8 +66,8 @@ waitingCycle:
 			waveKey := domain.WaveKey(selected)
 			waveCtx, waveSpan := platform.Tracer.Start(ctx, fmt.Sprintf("wave[%s]", waveKey), // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch in loop [permanent]
 				trace.WithAttributes(
-					attribute.String("wave.id", selected.ID),
-					attribute.String("wave.cluster", selected.ClusterName),
+					attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
+					attribute.String("wave.cluster", platform.SanitizeUTF8(selected.ClusterName)),
 				),
 			)
 
