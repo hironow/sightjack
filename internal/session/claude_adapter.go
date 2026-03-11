@@ -17,28 +17,29 @@ import (
 // ClaudeAdapter implements port.ClaudeRunner by executing the Claude CLI
 // as a subprocess. It does NOT retry; wrap with RetryRunner for that.
 type ClaudeAdapter struct {
-	Cfg    *domain.Config
-	Logger domain.Logger
+	ClaudeCmd  string
+	Model      string
+	TimeoutSec int
+	Logger     domain.Logger
 }
 
 // Run executes the Claude CLI once without retry.
 func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
-	cfg := a.Cfg
 	logger := a.Logger
 
 	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", platform.SanitizeUTF8(cfg.Model)),
-				attribute.Int("claude.timeout_sec", cfg.TimeoutSec),
-			}, platform.GenAISpanAttrs(cfg.Model)...)...,
+				attribute.String("claude.model", platform.SanitizeUTF8(a.Model)),
+				attribute.Int("claude.timeout_sec", a.TimeoutSec),
+			}, platform.GenAISpanAttrs(a.Model)...)...,
 		),
 	)
 	defer span.End()
 
 	// Apply per-call timeout only when the caller has not already set a deadline.
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		timeout := time.Duration(cfg.TimeoutSec) * time.Second
+		timeout := time.Duration(a.TimeoutSec) * time.Second
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
@@ -47,15 +48,15 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	rc := port.ApplyOptions(opts...)
 
 	var args []string
-	if cfg.Model != "" {
-		args = append(args, "--model", cfg.Model)
+	if a.Model != "" {
+		args = append(args, "--model", a.Model)
 	}
 	if len(rc.AllowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
-	cmd := newCmd(ctx, cfg.ClaudeCmd, args...)
+	cmd := newCmd(ctx, a.ClaudeCmd, args...)
 	cmd.Cancel = cancelFunc(cmd)
 	cmd.WaitDelay = 3 * time.Second
 
@@ -161,7 +162,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			span.AddEvent("claude.timeout",
-				trace.WithAttributes(attribute.Int("claude.timeout_sec", cfg.TimeoutSec)),
+				trace.WithAttributes(attribute.Int("claude.timeout_sec", a.TimeoutSec)),
 			)
 		}
 		return output.String(), fmt.Errorf("claude exit: %w", err)
