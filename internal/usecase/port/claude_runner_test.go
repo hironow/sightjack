@@ -1,5 +1,7 @@
 package port
 
+// white-box-reason: port layer semgrep constraint: tests must use package port (not port_test) to avoid self-import triggering layer-port-no-import-upper rule
+
 import (
 	"context"
 	"errors"
