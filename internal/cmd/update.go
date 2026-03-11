@@ -57,13 +57,16 @@ installing.`,
 				return nil
 			}
 
+			cleanVersion := strings.TrimPrefix(Version, "v")
+			cleanLatest := strings.TrimPrefix(latest.Version(), "v")
+
 			if isUpToDate(Version, latest.Version()) {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", strings.TrimPrefix(Version, "v"))
+				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", cleanVersion)
 				return nil
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", strings.TrimPrefix(Version, "v"), latest.Version())
+				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", cleanVersion, cleanLatest)
 				return nil
 			}
 
@@ -76,7 +79,7 @@ installing.`,
 				return fmt.Errorf("update failed: %w", err)
 			}
 
-			fmt.Fprintf(cmd.ErrOrStderr(), "Updated to v%s\n", strings.TrimPrefix(latest.Version(), "v"))
+			fmt.Fprintf(cmd.ErrOrStderr(), "Updated to v%s\n", cleanLatest)
 			return nil
 		},
 	}

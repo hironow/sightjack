@@ -93,7 +93,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 	if len(o.allowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(o.allowedTools, ","))
 	}
-	args = append(args, "--output-format", "stream-json")
+	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, cfg.ClaudeCmd, args...)
 	cmd.Cancel = cancelFunc(cmd)
@@ -122,6 +122,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 			sr.SetLogger(logger)
 		}
 		emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
+		emitter.SetInput(prompt)
 		result, messages, readErr := emitter.CollectAll()
 		if readErr != nil {
 			streamErr <- readErr
@@ -164,6 +165,17 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 		}
 		if result != nil && result.SessionID != "" {
 			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
+		}
+
+		// Weave thread attributes for trace organization
+		if weaveAttrs := emitter.WeaveThreadAttrs(); len(weaveAttrs) > 0 {
+			span.SetAttributes(weaveAttrs...)
+		}
+		if ioAttrs := emitter.WeaveIOAttrs(); len(ioAttrs) > 0 {
+			span.SetAttributes(ioAttrs...)
+		}
+		if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
+			span.SetAttributes(initAttrs...)
 		}
 	}()
 

@@ -24,9 +24,11 @@ version to `"1"` and establish a formal backward-compatibility contract.
 ## Consequences
 
 ### Positive
+
 - Clear separation between release version and wire-format version
 - Explicit contract prevents accidental breaking of existing state files
 - Clean numbering going forward
 
 ### Negative
+
 - Must maintain migration code for each prior version indefinitely

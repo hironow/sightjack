@@ -123,15 +123,17 @@ func checkClaudeInference(output string, err error) domain.CheckResult {
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
 			Message: "inference failed: " + err.Error(),
-			Hint:    "check API key, quota, and model access",
+			Hint: `"signal: killed" = CLI startup too slow (timeout 60s); ` +
+				`"nested session" = CLAUDECODE env var leaked (doctor should filter it); ` +
+				`otherwise check API key, quota, and model access`,
 		}
 	}
 	if strings.TrimSpace(output) != "2" {
 		return domain.CheckResult{
 			Name:    "claude-inference",
 			Status:  domain.CheckFail,
-			Message: "unexpected response",
-			Hint:    "check API key, quota, and model access",
+			Message: "unexpected response: " + strings.TrimSpace(output),
+			Hint:    "model returned unexpected output; check model access and API quota",
 		}
 	}
 	return domain.CheckResult{
@@ -213,7 +215,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 				Name:    "Skills",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
-				Hint:    `run "sightjack init --force" to regenerate skills with updated kind (feedback → design-feedback)`,
+				Hint:    "deprecated kind 'feedback'; migrate to 'design-feedback' (run 'sightjack init --force' to regenerate SKILL.md)",
 			}
 		}
 	}
@@ -356,8 +358,9 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
-			inferCtx, inferCancel := context.WithTimeout(ctx, 15*time.Second)
+			inferCtx, inferCancel := context.WithTimeout(ctx, 60*time.Second)
 			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			results = append(results, checkClaudeInference(string(inferOut), inferErr))
@@ -392,4 +395,18 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	}
 
 	return results
+}
+
+// filterEnv returns a copy of env with the named variable removed.
+// Used to unset CLAUDECODE so that doctor's inference check does not
+// trigger the nested-session guard in Claude Code.
+func filterEnv(env []string, name string) []string {
+	prefix := name + "="
+	out := make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
