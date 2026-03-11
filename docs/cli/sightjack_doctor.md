@@ -10,10 +10,6 @@ Verifies that the sightjack config is valid, required tools
 (claude, git) are installed, and the Linear MCP connection
 is working. Reports pass/fail/skip for each check.
 
-The context-budget check estimates token overhead from tools, skills,
-plugins, MCP servers, and hook stdout in the Claude CLI context window.
-Warns when estimated usage exceeds the threshold (default 20K tokens).
-
 ```
 sightjack doctor [path] [flags]
 ```
