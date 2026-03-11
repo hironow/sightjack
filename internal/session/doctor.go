@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 // CheckConfig validates that the config file exists and can be loaded.
@@ -318,6 +320,11 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 			Status:  domain.CheckSkip,
 			Message: "skipped (config not loaded)",
 		})
+		results = append(results, domain.CheckResult{
+			Name:    "context-budget",
+			Status:  domain.CheckSkip,
+			Message: "skipped (config not loaded)",
+		})
 	} else if claudeResult.Status != domain.CheckOK {
 		results = append(results, domain.CheckResult{
 			Name:    "Claude Auth",
@@ -331,6 +338,11 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		})
 		results = append(results, domain.CheckResult{
 			Name:    "claude-inference",
+			Status:  domain.CheckSkip,
+			Message: "skipped (claude not available)",
+		})
+		results = append(results, domain.CheckResult{
+			Name:    "context-budget",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
@@ -355,15 +367,24 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 				Status:  domain.CheckSkip,
 				Message: "skipped (auth failed)",
 			})
+			results = append(results, domain.CheckResult{
+				Name:    "context-budget",
+				Status:  domain.CheckSkip,
+				Message: "skipped (auth failed)",
+			})
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
 			inferCtx, inferCancel := context.WithTimeout(ctx, 60*time.Second)
-			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
 			inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
-			results = append(results, checkClaudeInference(string(inferOut), inferErr))
+			inferOutput := string(inferOut)
+			results = append(results, checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr))
+
+			// Context budget check: reuse inference stream-json output
+			results = append(results, CheckContextBudget(inferOutput))
 		}
 	}
 
@@ -395,6 +416,56 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	}
 
 	return results
+}
+
+// extractStreamResult parses stream-json output and returns the "result" field
+// from the result message. Used to reuse inference check output for inference validation.
+func ExtractStreamResult(streamJSON string) string {
+	for _, line := range strings.Split(streamJSON, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var msg struct {
+			Type   string `json:"type"`
+			Result string `json:"result"`
+		}
+		if err := json.Unmarshal([]byte(line), &msg); err == nil && msg.Type == "result" {
+			return msg.Result
+		}
+	}
+	return ""
+}
+
+// checkContextBudget parses stream-json output from a Claude CLI invocation
+// and reports context budget health based on hooks, plugins, skills, and MCP servers.
+func CheckContextBudget(streamJSON string) domain.CheckResult {
+	var messages []*platform.StreamMessage
+	for _, line := range strings.Split(streamJSON, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		msg, err := platform.ParseStreamMessage([]byte(line))
+		if err != nil {
+			continue
+		}
+		messages = append(messages, msg)
+	}
+
+	report := platform.CalculateContextBudget(messages)
+
+	result := domain.CheckResult{
+		Name:   "context-budget",
+		Status: domain.CheckOK,
+		Message: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
+			report.EstimatedTokens, report.ToolCount, report.SkillCount,
+			report.PluginCount, report.MCPServerCount, report.HookContextBytes),
+	}
+	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
+		result.Hint = "context consumption is high; consider reducing installed plugins/skills or using an allowlist"
+	}
+	return result
 }
 
 // filterEnv returns a copy of env with the named variable removed.
