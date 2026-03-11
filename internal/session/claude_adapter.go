@@ -138,6 +138,15 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
 			span.SetAttributes(initAttrs...)
 		}
+
+		// Context budget measurement
+		budget := platform.CalculateContextBudget(messages)
+		span.SetAttributes(budget.Attrs()...)
+		if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
+			if logger != nil {
+				logger.Warn("%s", warning)
+			}
+		}
 	}()
 
 	<-done
