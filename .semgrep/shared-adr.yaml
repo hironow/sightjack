@@ -256,7 +256,7 @@ rules:
       無効な UTF-8 バイトが含まれる可能性があり、OTel export 時にエラーになります。
       platform.SanitizeUTF8(val) または SanitizeUTF8(val) でラップしてください。
       文字列リテラルの場合は nosemgrep を付与してください。
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: attribute.String($KEY, $VAL)
       - pattern-not: attribute.String($KEY, "...")
@@ -269,7 +269,7 @@ rules:
     message: |
       attribute.StringSlice() に渡すスライスの各要素を SanitizeUTF8 でラップしてください。
       外部データには無効な UTF-8 バイトが含まれる可能性があります。
-    severity: WARNING
+    severity: ERROR
     pattern: attribute.StringSlice($KEY, $VAL)
 
   # --- D4: Resource leak detection ---

@@ -141,7 +141,7 @@ var rootSpan trace.Span
 func startRootSpan(ctx context.Context, command string) context.Context {
 	ctx, rootSpan = platform.Tracer.Start(ctx, "sightjack."+command,
 		trace.WithAttributes(
-			attribute.String("sightjack.command", command),
+			attribute.String("sightjack.command", command), // nosemgrep: otel-attribute-string-unsanitized -- command is a cobra subcommand name (ASCII literal) [permanent]
 		),
 	)
 	return ctx

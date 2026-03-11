@@ -165,7 +165,7 @@ func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.
 			for i, e := range rawEvents {
 				sanitized[i] = platform.SanitizeUTF8(e)
 			}
-			span.SetAttributes(attribute.StringSlice("stream.raw_events", sanitized))
+			span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(sanitized))) // nosemgrep: otel-attribute-stringslice-unsanitized — elements already sanitized above
 		}
 		if result != nil && result.SessionID != "" {
 			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
