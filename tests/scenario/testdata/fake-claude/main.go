@@ -69,10 +69,14 @@ func main() {
 				break
 			}
 		}
+		body := "unknown"
 		if strings.Contains(prompt, "1+1") {
-			fmt.Print("2")
+			body = "2"
+		}
+		if extractOutputFormat(os.Args[1:]) == "stream-json" {
+			fmt.Print(wrapStreamJSON(body))
 		} else {
-			fmt.Print("unknown")
+			fmt.Print(body)
 		}
 		return
 	}

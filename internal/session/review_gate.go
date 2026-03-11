@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 const (
@@ -22,7 +24,7 @@ const (
 // Returns (true, nil) if review passes or is skipped (no ReviewCmd).
 // Returns (false, nil) if review fails after all cycles.
 // Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Config, dir string, logger domain.Logger) (bool, error) {
+func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Config, runner port.ClaudeRunner, dir string, logger domain.Logger) (bool, error) {
 	ctx, span := platform.Tracer.Start(ctx, "sightjack.review")
 	defer span.End()
 
@@ -79,7 +81,7 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Conf
 		}
 
 		// Run Claude --continue to fix review comments
-		if err := runReviewFix(ctx, cfg, dir, lastComments, logger); err != nil {
+		if err := runReviewFix(ctx, runner, dir, lastComments, logger); err != nil {
 			logger.Warn("Review fix failed: %v", err)
 			return false, nil
 		}
@@ -90,38 +92,18 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Conf
 }
 
 // runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, cfg *domain.Config, dir, comments string, logger domain.Logger) error {
+func runReviewFix(ctx context.Context, runner port.ClaudeRunner, dir, comments string, logger domain.Logger) error {
 	branch, err := currentBranch(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("detect branch: %w", err)
 	}
 
-	claudeCmd := cfg.ClaudeCmd
-	model := cfg.Model
-
 	prompt := BuildReviewFixPrompt(branch, comments)
 
-	fixTimeout := time.Duration(cfg.TimeoutSec) * time.Second
-	if fixTimeout <= 0 {
-		fixTimeout = 300 * time.Second
-	}
-	fixCtx, fixCancel := context.WithTimeout(ctx, fixTimeout)
-	defer fixCancel()
-
-	cmd := newCmd(fixCtx, claudeCmd,
-		"--model", model,
-		"--continue",
-		"--dangerously-skip-permissions",
-		"--print",
-		"-p", prompt,
-	)
-	cmd.Dir = dir
-	cmd.WaitDelay = 3 * time.Second
-
-	logger.Info("Review fix: running %s --model %s --continue", claudeCmd, model)
-	out, err := cmd.CombinedOutput()
+	logger.Info("Review fix: running claude --continue")
+	out, err := runner.Run(ctx, prompt, io.Discard, port.WithContinue(), port.WithWorkDir(dir))
 	if err != nil {
-		return fmt.Errorf("claude fix: %w\noutput: %s", err, domain.SummarizeReview(string(out)))
+		return fmt.Errorf("claude fix: %w\noutput: %s", err, domain.SummarizeReview(out))
 	}
 	return nil
 }

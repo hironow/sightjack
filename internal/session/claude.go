@@ -46,7 +46,12 @@ var WithAllowedTools = port.WithAllowedTools
 
 // NewClaudeAdapter creates a ClaudeAdapter implementing port.ClaudeRunner.
 func NewClaudeAdapter(cfg *domain.Config, logger domain.Logger) *ClaudeAdapter {
-	return &ClaudeAdapter{Cfg: cfg, Logger: logger}
+	return &ClaudeAdapter{
+		ClaudeCmd:  cfg.ClaudeCmd,
+		Model:      cfg.Model,
+		TimeoutSec: cfg.TimeoutSec,
+		Logger:     logger,
+	}
 }
 
 // NewRetryRunner creates a RetryRunner wrapping the given ClaudeRunner.

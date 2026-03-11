@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -279,9 +280,9 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 10 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, success-rate)
-	if len(results) != 10 {
-		t.Fatalf("expected 10 results, got %d", len(results))
+	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
+	if len(results) != 11 {
+		t.Fatalf("expected 11 results, got %d", len(results))
 	}
 	// Config should fail (index 3 in new order)
 	if results[3].Name != "Config" {
@@ -314,6 +315,14 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if infer.Status != domain.CheckSkip {
 		t.Errorf("claude-inference: expected SKIP (nil config), got %v: %s", infer.Status, infer.Message)
 	}
+	// context-budget should be skipped (nil config)
+	cb := results[9]
+	if cb.Name != "context-budget" {
+		t.Errorf("expected 'context-budget', got %q", cb.Name)
+	}
+	if cb.Status != domain.CheckSkip {
+		t.Errorf("context-budget: expected SKIP (nil config), got %v: %s", cb.Status, cb.Message)
+	}
 }
 
 func TestRunDoctor_ClaudeUnavailable_AuthAndMCPSkipped(t *testing.T) {
@@ -334,8 +343,8 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
 	// then
-	if len(results) != 10 {
-		t.Fatalf("expected 10 results, got %d", len(results))
+	if len(results) != 11 {
+		t.Fatalf("expected 11 results, got %d", len(results))
 	}
 	// Config should pass (index 3 in new order)
 	if results[3].Name != "Config" {
@@ -369,6 +378,14 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	if infer.Status != domain.CheckSkip {
 		t.Errorf("claude-inference: expected SKIP, got %v: %s", infer.Status, infer.Message)
 	}
+	// context-budget should be skipped because claude binary is unavailable
+	cb := results[9]
+	if cb.Name != "context-budget" {
+		t.Errorf("expected 'context-budget', got %q", cb.Name)
+	}
+	if cb.Status != domain.CheckSkip {
+		t.Errorf("context-budget: expected SKIP, got %v: %s", cb.Status, cb.Message)
+	}
 }
 
 func TestRunDoctor_ReturnsAllResults(t *testing.T) {
@@ -384,9 +401,9 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
 
-	// then: should have 10 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, success-rate)
-	if len(results) != 10 {
-		t.Fatalf("expected 10 results, got %d: %v", len(results), results)
+	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
+	if len(results) != 11 {
+		t.Fatalf("expected 11 results, got %d: %v", len(results), results)
 	}
 	// git binary check (index 0)
 	if results[0].Name != "git" || results[0].Status != domain.CheckOK {
@@ -429,8 +446,15 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	if results[8].Status != domain.CheckOK {
 		t.Errorf("claude-inference: expected OK, got %v: %s", results[8].Status, results[8].Message)
 	}
-	// success-rate should be last result, OK with "no events" (no events dir in temp, index 9)
-	sr := results[9]
+	// context-budget should be OK (index 9)
+	if results[9].Name != "context-budget" {
+		t.Errorf("expected 'context-budget', got %q", results[9].Name)
+	}
+	if results[9].Status != domain.CheckOK {
+		t.Errorf("context-budget: expected OK, got %v: %s", results[9].Status, results[9].Message)
+	}
+	// success-rate should be last result, OK with "no events" (no events dir in temp, index 10)
+	sr := results[10]
 	if sr.Name != "success-rate" {
 		t.Errorf("expected 'success-rate', got %q", sr.Name)
 	}
@@ -573,5 +597,118 @@ func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("success-rate check not found in results (got %d results)", len(results))
+	}
+}
+
+// --- Context Budget tests ---
+
+func TestCheckContextBudget_LowUsage(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with small init (2 tools, 1 skill)
+	streamJSON := `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write"],"skills":["commit"],"plugins":[],"mcp_servers":[]}
+{"type":"result","result":"2"}`
+
+	// when
+	result := session.CheckContextBudget(streamJSON)
+
+	// then: should be OK (well under threshold)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Hint != "" {
+		t.Errorf("expected no hint for low usage, got %q", result.Hint)
+	}
+}
+
+func TestCheckContextBudget_HighUsage(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with many tools/skills/plugins + large hook output
+	initLine := `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Edit","Grep","Glob","Bash","Agent"],"skills":["commit","review","test","deploy","lint","format","debug"],"plugins":["p1","p2","p3","p4","p5"],"mcp_servers":[{"name":"linear","status":"connected"},{"name":"filesystem","status":"connected"},{"name":"github","status":"connected"}]}`
+	largeStdout := strings.Repeat("x", 100000)
+	hookLine := fmt.Sprintf(`{"type":"system","subtype":"hook_response","hook_id":"h1","stdout":"%s","exit_code":0}`, largeStdout)
+	resultLine := `{"type":"result","result":"2"}`
+	streamJSON := initLine + "\n" + hookLine + "\n" + resultLine
+
+	// when
+	result := session.CheckContextBudget(streamJSON)
+
+	// then: should be OK but with hint (over threshold)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Hint == "" {
+		t.Error("expected non-empty hint for high usage")
+	}
+}
+
+func TestCheckContextBudget_EmptyStream(t *testing.T) {
+	t.Parallel()
+
+	// given: empty stream
+	result := session.CheckContextBudget("")
+
+	// then: should be OK (nothing to measure)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK for empty stream, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckContextBudget_NoInitMessage(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with no init message
+	result := session.CheckContextBudget(`{"type":"result","result":"2"}`)
+
+	// then: should be OK (no init = no overhead)
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected OK for no-init stream, got %v: %s", result.Status, result.Message)
+	}
+}
+
+// --- ExtractStreamResult tests ---
+
+func TestExtractStreamResult_WithResult(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with result
+	streamJSON := `{"type":"system","subtype":"init","session_id":"s1"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"2"}]}}
+{"type":"result","result":"2"}`
+
+	// when
+	result := session.ExtractStreamResult(streamJSON)
+
+	// then
+	if result != "2" {
+		t.Errorf("expected '2', got %q", result)
+	}
+}
+
+func TestExtractStreamResult_Empty(t *testing.T) {
+	t.Parallel()
+
+	// given: empty stream
+	result := session.ExtractStreamResult("")
+
+	// then
+	if result != "" {
+		t.Errorf("expected empty, got %q", result)
+	}
+}
+
+func TestExtractStreamResult_NoResult(t *testing.T) {
+	t.Parallel()
+
+	// given: stream-json with no result message
+	streamJSON := `{"type":"system","subtype":"init","session_id":"s1"}`
+
+	// when
+	result := session.ExtractStreamResult(streamJSON)
+
+	// then
+	if result != "" {
+		t.Errorf("expected empty, got %q", result)
 	}
 }

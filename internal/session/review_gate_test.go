@@ -35,8 +35,8 @@ func TestRunReviewGate_SkippedWhenNoCmd(t *testing.T) {
 	gate := domain.GateConfig{} // ReviewCmd empty
 	assistant := &domain.Config{}
 
-	// when
-	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
+	// when — runner is nil because it's never used when ReviewCmd is empty
+	passed, err := session.RunReviewGate(ctx, gate, assistant, nil, t.TempDir(), nil)
 
 	// then
 	if err != nil {
@@ -53,8 +53,8 @@ func TestRunReviewGate_PassingReview(t *testing.T) {
 	gate := domain.GateConfig{ReviewCmd: "echo 'all good'"}
 	assistant := &domain.Config{ClaudeCmd: "true", TimeoutSec: 30}
 
-	// when
-	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
+	// when — runner is nil because fix is never reached when review passes
+	passed, err := session.RunReviewGate(ctx, gate, assistant, nil, t.TempDir(), nil)
 
 	// then
 	if err != nil {
@@ -72,9 +72,10 @@ func TestRunReviewGate_FailingReviewExhaustedCycles(t *testing.T) {
 	assistant := &domain.Config{ClaudeCmd: "true", TimeoutSec: 30}
 	dir := t.TempDir()
 	initGitRepo(t, dir)
+	runner := session.NewClaudeAdapter(assistant, nil)
 
 	// when
-	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, runner, dir, nil)
 
 	// then — should return false (not passed), no error
 	if err != nil {
@@ -93,8 +94,8 @@ func TestRunReviewGate_BudgetExceeded(t *testing.T) {
 	dir := t.TempDir()
 	initGitRepo(t, dir)
 
-	// when
-	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
+	// when — budget=1 means no fix cycle, runner is never used
+	passed, err := session.RunReviewGate(ctx, gate, assistant, nil, dir, nil)
 
 	// then
 	if err != nil {
@@ -111,8 +112,8 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 	gate := domain.GateConfig{ReviewCmd: "echo ok"}
 	assistant := &domain.Config{TimeoutSec: 30}
 
-	// when
-	passed, err := session.RunReviewGate(ctx, gate, assistant, t.TempDir(), nil)
+	// when — review passes immediately, runner is never used
+	passed, err := session.RunReviewGate(ctx, gate, assistant, nil, t.TempDir(), nil)
 
 	// then
 	if err != nil {
@@ -148,10 +149,11 @@ exit 0
 
 	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2}
 	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
+	runner := session.NewClaudeAdapter(assistant, nil)
 	ctx := context.Background()
 
 	// when — review fails, fix is called with review comments in prompt
-	session.RunReviewGate(ctx, gate, assistant, dir, nil)
+	session.RunReviewGate(ctx, gate, assistant, runner, dir, nil)
 
 	// then — captured prompt should contain the review comments
 	captured, err := os.ReadFile(promptCapture)
@@ -190,10 +192,11 @@ exit 0
 
 	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 3}
 	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
+	runner := session.NewClaudeAdapter(assistant, nil)
 	ctx := context.Background()
 
 	// when — review fail → fix (fake claude) → review pass
-	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, runner, dir, nil)
 
 	// then
 	if err != nil {
@@ -217,10 +220,11 @@ func TestRunReviewGate_FixFailure_ReturnsFalse(t *testing.T) {
 
 	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2}
 	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
+	runner := session.NewClaudeAdapter(assistant, nil)
 	ctx := context.Background()
 
 	// when — fix fails
-	passed, err := session.RunReviewGate(ctx, gate, assistant, dir, nil)
+	passed, err := session.RunReviewGate(ctx, gate, assistant, runner, dir, nil)
 
 	// then — should return false (not error)
 	if err != nil {
