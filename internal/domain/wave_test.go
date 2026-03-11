@@ -738,3 +738,110 @@ func TestSelectiveApproval_CreateActionExcluded(t *testing.T) {
 		t.Errorf("delta.After = %f, want ~0.7", wave.Delta.After)
 	}
 }
+
+func TestClustersForIssueIDs(t *testing.T) {
+	t.Parallel()
+
+	clusters := []domain.ClusterScanResult{
+		{
+			Name: "auth",
+			Issues: []domain.IssueDetail{
+				{Identifier: "MY-100"},
+				{Identifier: "MY-101"},
+			},
+		},
+		{
+			Name: "billing",
+			Issues: []domain.IssueDetail{
+				{Identifier: "MY-200"},
+			},
+		},
+	}
+
+	t.Run("single issue maps to cluster", func(t *testing.T) {
+		// when
+		result := domain.ClustersForIssueIDs(clusters, []string{"MY-100"})
+
+		// then
+		if len(result) != 1 {
+			t.Fatalf("len = %d, want 1", len(result))
+		}
+		if result[0].Name != "auth" {
+			t.Errorf("name = %q, want auth", result[0].Name)
+		}
+	})
+
+	t.Run("multiple issues same cluster deduplicates", func(t *testing.T) {
+		// when
+		result := domain.ClustersForIssueIDs(clusters, []string{"MY-100", "MY-101"})
+
+		// then
+		if len(result) != 1 {
+			t.Fatalf("len = %d, want 1", len(result))
+		}
+	})
+
+	t.Run("issues across clusters returns both", func(t *testing.T) {
+		// when
+		result := domain.ClustersForIssueIDs(clusters, []string{"MY-100", "MY-200"})
+
+		// then
+		if len(result) != 2 {
+			t.Fatalf("len = %d, want 2", len(result))
+		}
+	})
+
+	t.Run("unknown issue returns empty", func(t *testing.T) {
+		// when
+		result := domain.ClustersForIssueIDs(clusters, []string{"UNKNOWN-999"})
+
+		// then
+		if len(result) != 0 {
+			t.Fatalf("len = %d, want 0", len(result))
+		}
+	})
+
+	t.Run("empty issues returns empty", func(t *testing.T) {
+		// when
+		result := domain.ClustersForIssueIDs(clusters, nil)
+
+		// then
+		if len(result) != 0 {
+			t.Fatalf("len = %d, want 0", len(result))
+		}
+	})
+}
+
+func TestLastCompletedWaveForCluster(t *testing.T) {
+	t.Parallel()
+
+	waves := []domain.Wave{
+		{ClusterName: "auth", ID: "w1", Status: "completed"},
+		{ClusterName: "auth", ID: "w2", Status: "completed"},
+		{ClusterName: "auth", ID: "w3", Status: "available"},
+		{ClusterName: "billing", ID: "w1", Status: "completed"},
+	}
+
+	t.Run("returns last completed wave", func(t *testing.T) {
+		// when
+		w, ok := domain.LastCompletedWaveForCluster(waves, "auth")
+
+		// then
+		if !ok {
+			t.Fatal("expected ok=true")
+		}
+		if w.ID != "w2" {
+			t.Errorf("ID = %q, want w2", w.ID)
+		}
+	})
+
+	t.Run("no completed waves returns false", func(t *testing.T) {
+		// when
+		_, ok := domain.LastCompletedWaveForCluster(waves, "unknown")
+
+		// then
+		if ok {
+			t.Error("expected ok=false for unknown cluster")
+		}
+	})
+}
