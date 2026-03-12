@@ -8,19 +8,14 @@ Check environment health and tool availability.
 
 Verifies that the sightjack config is valid, required tools
 (claude, git) are installed, and the Linear MCP connection
-is working. Reports each check with one of four statuses:
+is working. Each check reports one of four statuses:
+OK (passed), FAIL (exit 1), SKIP (dependency missing),
+WARN (advisory, exit 0).
 
-- **OK** — check passed
-- **FAIL** — check failed (exit code 1)
-- **SKIP** — check skipped (dependency missing)
-- **WARN** — advisory warning (exit code 0, not a failure)
-
-The context-budget check estimates total token consumption and
-provides per-item diagnostics when the threshold (20,000 tokens)
-is exceeded. Categories include tools, skills, plugins, mcp, and
-hooks. The heaviest category is marked, and a category-specific
-hint is shown (e.g., recommending `.claude/settings.json` to
-limit enabled plugins).
+The context-budget check estimates token consumption per category
+(tools, skills, plugins, mcp, hooks) and marks the heaviest.
+When the threshold (20,000 tokens) is exceeded, a category-specific
+hint recommends adjusting .claude/settings.json.
 
 ```
 sightjack doctor [path] [flags]

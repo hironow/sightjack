@@ -20,7 +20,14 @@ func newDoctorCmd() *cobra.Command {
 
 Verifies that the sightjack config is valid, required tools
 (claude, git) are installed, and the Linear MCP connection
-is working. Reports pass/fail/skip for each check.`,
+is working. Each check reports one of four statuses:
+OK (passed), FAIL (exit 1), SKIP (dependency missing),
+WARN (advisory, exit 0).
+
+The context-budget check estimates token consumption per category
+(tools, skills, plugins, mcp, hooks) and marks the heaviest.
+When the threshold (20,000 tokens) is exceeded, a category-specific
+hint recommends adjusting .claude/settings.json.`,
 		Example: `  # Run environment check
   sightjack doctor
 
