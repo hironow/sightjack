@@ -254,6 +254,35 @@ func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 	}
 }
 
+func TestConvergenceGateWithRedrain_CapsRedrainCycles(t *testing.T) {
+	// given: approver that injects convergence D-Mail on every approval
+	ch := make(chan *session.DMail, 100)
+	approver := &alwaysInjectingApprover{ch: ch}
+	notifier := &port.NopNotifier{}
+	logger := platform.NewLogger(io.Discard, false)
+
+	initial := []*session.DMail{
+		{Name: "conv-initial", Kind: session.DMailConvergence, Description: "initial"},
+	}
+
+	// when
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, approved, err := session.RunConvergenceGateWithRedrain(ctx, initial, ch, notifier, approver, logger)
+
+	// then: must terminate (not hang until 10s timeout)
+	if ctx.Err() != nil {
+		t.Fatal("redrain loop did not terminate — hit context timeout")
+	}
+	// fail-closed: cap reached means we CANNOT confirm convergence
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected approved=false (fail-closed on redrain cap)")
+	}
+}
+
 // --- test helpers ---
 
 // blockingNotifier blocks forever on Notify — simulates a hung notify command.
@@ -294,4 +323,19 @@ type errorApprover struct {
 
 func (a *errorApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
 	return false, a.err
+}
+
+// alwaysInjectingApprover approves every call and injects a convergence
+// D-Mail into the channel each time — simulating infinite arrivals.
+type alwaysInjectingApprover struct {
+	ch chan *session.DMail
+}
+
+func (a *alwaysInjectingApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
+	a.ch <- &session.DMail{
+		Name:        fmt.Sprintf("conv-inject-%d", time.Now().UnixNano()),
+		Kind:        session.DMailConvergence,
+		Description: "injected convergence",
+	}
+	return true, nil
 }

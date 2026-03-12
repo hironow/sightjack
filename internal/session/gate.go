@@ -86,15 +86,21 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Noti
 	return true, nil
 }
 
+// maxRedrainCycles caps how many times the convergence gate re-drains
+// the inbox. Prevents infinite looping when convergence D-Mails arrive
+// faster than the approval cycle.
+const maxRedrainCycles = 3
+
 // RunConvergenceGateWithRedrain runs the convergence gate in a loop,
 // re-draining the inbox channel after each approval to catch late-arriving
 // convergence D-Mails. Returns the accumulated D-Mails, approval status,
 // and any error. The loop exits when no new convergence D-Mails arrived
-// during the approval prompt.
+// during the approval prompt, or when maxRedrainCycles is reached
+// (fail-closed: approved=false).
 func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
 	notifier port.Notifier, approver port.Approver, logger domain.Logger) (dmails []*DMail, approved bool, err error) {
 	all := append([]*DMail{}, initial...)
-	for {
+	for cycle := 0; cycle < maxRedrainCycles; cycle++ {
 		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)
 		if gateErr != nil {
 			return nil, false, gateErr
@@ -107,8 +113,11 @@ func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxC
 		if len(FilterConvergence(late)) == 0 {
 			return all, true, nil
 		}
-		logger.Info("[CONVERGENCE] Late convergence detected during approval, re-checking gate")
+		logger.Info("[CONVERGENCE] Late convergence detected during approval, re-checking gate (%d/%d)", cycle+1, maxRedrainCycles)
 	}
+	// Fail-closed: convergence not confirmed after maxRedrainCycles.
+	logger.Warn("[CONVERGENCE] Redrain cap reached (%d cycles) — fail-closed, convergence unconfirmed", maxRedrainCycles)
+	return all, false, nil
 }
 
 // BuildNotifier creates the appropriate Notifier based on config.
