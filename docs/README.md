@@ -24,7 +24,7 @@
 - [sightjack adr](cli/sightjack_adr.md) — Generate ADRs from discussion
 - [sightjack nextgen](cli/sightjack_nextgen.md) — Generate next-generation waves
 - [sightjack status](cli/sightjack_status.md) — Show session status
-- [sightjack doctor](cli/sightjack_doctor.md) — Diagnose configuration issues
+- [sightjack doctor](cli/sightjack_doctor.md) — Diagnose configuration issues (context-budget per-item diagnostics, WARN status)
 - [sightjack clean](cli/sightjack_clean.md) — Clean state files
 - [sightjack archive-prune](cli/sightjack_archive-prune.md) — Prune archived data
 - [sightjack version](cli/sightjack_version.md) — Show version
