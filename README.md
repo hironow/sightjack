@@ -225,6 +225,8 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime. Th
 
 ## Subcommands
 
+Running `sightjack` without a subcommand defaults to `scan` (classify and deep-scan Linear issues). Unlike the other three tools (phonewave, amadeus, paintress) which default to `run`, sightjack's primary operation is scanning — the interactive `run` loop builds on top of scan results.
+
 ### Interactive
 
 | Command | Description |
