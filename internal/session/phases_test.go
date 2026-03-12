@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: tests unexported approvalPhase discussion retry cap via internal stubRunner
+
 import (
 	"bufio"
 	"bytes"
