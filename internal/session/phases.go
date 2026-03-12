@@ -94,6 +94,10 @@ const (
 	approvalRejected
 )
 
+// maxDiscussFailures is the maximum number of consecutive architect discussion
+// failures before the approval phase gives up and rejects the wave.
+const maxDiscussFailures = 5
+
 // discussRunnerFunc is the signature for architect discussion execution.
 // Extracted for testability (inject failing implementations in tests).
 type discussRunnerFunc func(ctx context.Context, cfg *domain.Config, scanDir string,
@@ -157,6 +161,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		return selected, approvalApproved
 	}
 
+	discussFailures := 0
 	for {
 		choice, err := PromptWaveApproval(ctx, out, scanner, selected)
 		if err == domain.ErrQuit {
@@ -207,9 +212,15 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			}
 			result, discussErr := discuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
 			if discussErr != nil {
+				discussFailures++
 				logger.Error("Architect discussion failed: %v", discussErr)
+				if discussFailures >= maxDiscussFailures {
+					logger.Warn("Discussion failure cap reached (%d) — approval denied", maxDiscussFailures)
+					return selected, approvalRejected
+				}
 				continue
 			}
+			discussFailures = 0 // reset on success
 			DisplayArchitectResponse(out, result)
 			if result.ModifiedWave != nil {
 				selected = domain.ApplyModifiedWave(selected, *result.ModifiedWave, completed)
