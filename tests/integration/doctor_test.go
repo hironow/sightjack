@@ -291,21 +291,21 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if results[3].Status != domain.CheckFail {
 		t.Errorf("Config: expected FAIL, got %v", results[3].Status)
 	}
-	// Claude Auth should be skipped (nil config)
+	// claude-auth should be skipped (nil config)
 	auth := results[6]
-	if auth.Name != "Claude Auth" {
-		t.Errorf("expected 'Claude Auth', got %q", auth.Name)
+	if auth.Name != "claude-auth" {
+		t.Errorf("expected 'claude-auth', got %q", auth.Name)
 	}
 	if auth.Status != domain.CheckSkip {
-		t.Errorf("Claude Auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
+		t.Errorf("claude-auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
 	}
-	// Linear MCP should be skipped (nil config)
+	// linear-mcp should be skipped (nil config)
 	mcp := results[7]
-	if mcp.Name != "Linear MCP" {
-		t.Errorf("expected 'Linear MCP', got %q", mcp.Name)
+	if mcp.Name != "linear-mcp" {
+		t.Errorf("expected 'linear-mcp', got %q", mcp.Name)
 	}
 	if mcp.Status != domain.CheckSkip {
-		t.Errorf("Linear MCP: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
+		t.Errorf("linear-mcp: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
 	}
 	// claude-inference should be skipped (nil config)
 	infer := results[8]
@@ -425,19 +425,19 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	if results[5].Name != "Event Store" {
 		t.Errorf("expected 'Event Store', got %q", results[5].Name)
 	}
-	// Claude Auth should be OK (fake-claude mcp list succeeds, index 6)
-	if results[6].Name != "Claude Auth" {
-		t.Errorf("expected 'Claude Auth', got %q", results[6].Name)
+	// claude-auth should be OK (fake-claude mcp list succeeds, index 6)
+	if results[6].Name != "claude-auth" {
+		t.Errorf("expected 'claude-auth', got %q", results[6].Name)
 	}
 	if results[6].Status != domain.CheckOK {
-		t.Errorf("Claude Auth: expected OK, got %v: %s", results[6].Status, results[6].Message)
+		t.Errorf("claude-auth: expected OK, got %v: %s", results[6].Status, results[6].Message)
 	}
-	// Linear MCP should be OK (fake-claude outputs "linear ✓ connected", index 7)
-	if results[7].Name != "Linear MCP" {
-		t.Errorf("expected 'Linear MCP', got %q", results[7].Name)
+	// linear-mcp should be OK (fake-claude outputs "linear ✓ connected", index 7)
+	if results[7].Name != "linear-mcp" {
+		t.Errorf("expected 'linear-mcp', got %q", results[7].Name)
 	}
 	if results[7].Status != domain.CheckOK {
-		t.Errorf("Linear MCP: expected OK, got %v: %s", results[7].Status, results[7].Message)
+		t.Errorf("linear-mcp: expected OK, got %v: %s", results[7].Status, results[7].Message)
 	}
 	// claude-inference should be OK (fake-claude --print responds with "2", index 8)
 	if results[8].Name != "claude-inference" {

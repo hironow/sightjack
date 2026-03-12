@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,6 +12,13 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
+	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
+	defer cancel()
+
 	rootCmd := cmd.NewRootCommand()
 	// NOTE: RewriteBoolFlags was removed intentionally (MY-336, per MY-334 consensus).
 	// The rewriter converted "--dry-run false" → "--dry-run=false", overriding pflag's
@@ -26,11 +34,12 @@ func main() {
 	}
 	rootCmd.SetArgs(args)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
-	defer cancel()
-
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(domain.ExitCode(err))
+	err := rootCmd.ExecuteContext(ctx)
+	if err != nil {
+		var silent *domain.SilentError
+		if !errors.As(err, &silent) {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		}
 	}
+	return domain.ExitCode(err)
 }
