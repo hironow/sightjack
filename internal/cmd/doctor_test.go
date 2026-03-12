@@ -12,7 +12,7 @@ import (
 
 func TestPrintDoctorJSON_Parseable(t *testing.T) {
 	// given
-	results := []domain.CheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "config", Status: domain.CheckOK, Message: "valid"},
 		{Name: "claude", Status: domain.CheckFail, Message: "not found", Hint: "install claude"},
 		{Name: "linear", Status: domain.CheckSkip, Message: "no API key"},
@@ -42,7 +42,7 @@ func TestPrintDoctorJSON_Parseable(t *testing.T) {
 
 func TestPrintDoctorJSON_FailReturnsError(t *testing.T) {
 	// given — results with a failure
-	results := []domain.CheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "claude", Status: domain.CheckFail, Message: "not found"},
 	}
 
@@ -58,7 +58,7 @@ func TestPrintDoctorJSON_FailReturnsError(t *testing.T) {
 
 func TestPrintDoctorJSON_NoFailNoError(t *testing.T) {
 	// given — all passing
-	results := []domain.CheckResult{
+	results := []domain.DoctorCheck{
 		{Name: "config", Status: domain.CheckOK, Message: "valid"},
 	}
 
