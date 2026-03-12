@@ -71,7 +71,7 @@ waitingCycle:
 				),
 			)
 
-			selected, approvalResult := approvalPhase(waveCtx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, out, waveSpan, logger)
+			selected, approvalResult := approvalPhase(waveCtx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, RunArchitectDiscuss, out, waveSpan, logger)
 			if approvalResult != approvalApproved {
 				waveSpan.End()
 				continue

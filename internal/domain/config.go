@@ -48,7 +48,7 @@ type GateConfig struct {
 	AutoApprove  bool          `yaml:"auto_approve"`
 	ReviewCmd    string        `yaml:"review_cmd"`
 	ReviewBudget int           `yaml:"review_budget"` // max review cycles (0 = default 3)
-	WaitTimeout  time.Duration `yaml:"wait_timeout"`  // D-Mail waiting phase timeout (0 = no timeout, <0 = disable waiting)
+	WaitTimeout  time.Duration `yaml:"wait_timeout"`  // D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable waiting)
 }
 
 // IsAutoApprove reports whether the gate is configured to auto-approve.

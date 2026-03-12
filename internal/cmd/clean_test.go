@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -11,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hironow/sightjack/internal/cmd"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -19,14 +18,14 @@ func TestCleanCmd_NothingToClean(t *testing.T) {
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, domain.StateDir)
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"--config", filepath.Join(stateDir, "config.yaml"), "clean", "--yes"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"--config", filepath.Join(stateDir, "config.yaml"), "clean", "--yes"})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then: should succeed with "nothing to clean" message
 	if err != nil {
@@ -49,14 +48,14 @@ func TestCleanCmd_DeletesStateDir(t *testing.T) {
 		t.Fatalf("create config: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"--config", cfgPath, "clean", "--yes"})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"--config", cfgPath, "clean", "--yes"})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then: should succeed and delete .siren/
 	if err != nil {

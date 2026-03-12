@@ -43,7 +43,7 @@ sightjack run [path] [flags]
       --review-cmd string       Review command (exit 0 = pass, non-zero = comments found)
       --session-mode string     Session mode: resume, new, or rescan (skip interactive prompt)
   -s, --strictness string       Override default strictness level (fog, alert, lockdown)
-      --wait-timeout duration   D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting) (default 30m0s)
+      --wait-timeout duration   D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting) (default 30m0s)
 ```
 
 ### Options inherited from parent commands

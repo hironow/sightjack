@@ -185,7 +185,7 @@ if event data is found in .siren/events/.`,
 	cmd.Flags().String("review-cmd", "", "Review command (exit 0 = pass, non-zero = comments found)")
 	cmd.Flags().String("session-mode", "", "Session mode: resume, new, or rescan (skip interactive prompt)")
 	cmd.Flags().StringP("strictness", "s", "", "Override default strictness level (fog, alert, lockdown)")
-	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting)")
+	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
 
 	return cmd
 }

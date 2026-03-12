@@ -1,25 +1,25 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack/internal/cmd"
 )
 
 func TestRunCmd_FailsWithoutInit(t *testing.T) {
 	// given: empty directory with no .siren/ or config
 	dir := t.TempDir()
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"--config", dir + "/siren.yaml", "run", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"--config", dir + "/siren.yaml", "run", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then: should fail with init guidance
 	if err == nil {

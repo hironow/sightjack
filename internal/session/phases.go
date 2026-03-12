@@ -94,6 +94,16 @@ const (
 	approvalRejected
 )
 
+// maxDiscussFailures is the maximum number of consecutive architect discussion
+// failures before the approval phase gives up and rejects the wave.
+const maxDiscussFailures = 5
+
+// discussRunnerFunc is the signature for architect discussion execution.
+// Extracted for testability (inject failing implementations in tests).
+type discussRunnerFunc func(ctx context.Context, cfg *domain.Config, scanDir string,
+	wave domain.Wave, topic string, strictness string,
+	out io.Writer, logger domain.Logger) (*domain.ArchitectResponse, error)
+
 // approvalPhase handles the wave approval/reject/discuss/selective loop.
 // waves is passed by value (not pointer) because this phase only mutates
 // existing elements via PropagateWaveUpdate — it never appends or reassigns.
@@ -104,6 +114,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
 	feedback []*DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
+	discuss discussRunnerFunc,
 	out io.Writer, waveSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	gate := cfg.Gate
@@ -150,6 +161,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		return selected, approvalApproved
 	}
 
+	discussFailures := 0
 	for {
 		choice, err := PromptWaveApproval(ctx, out, scanner, selected)
 		if err == domain.ErrQuit {
@@ -198,11 +210,17 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				logger.Warn("Invalid topic: %v", topicErr)
 				continue
 			}
-			result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
+			result, discussErr := discuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
 			if discussErr != nil {
+				discussFailures++
 				logger.Error("Architect discussion failed: %v", discussErr)
+				if discussFailures >= maxDiscussFailures {
+					logger.Warn("Discussion failure cap reached (%d) — approval denied", maxDiscussFailures)
+					return selected, approvalRejected
+				}
 				continue
 			}
+			discussFailures = 0 // reset on success
 			DisplayArchitectResponse(out, result)
 			if result.ModifiedWave != nil {
 				selected = domain.ApplyModifiedWave(selected, *result.ModifiedWave, completed)

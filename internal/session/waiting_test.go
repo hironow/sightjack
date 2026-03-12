@@ -80,3 +80,27 @@ func TestWaitForDMail_noTimeout(t *testing.T) {
 		t.Error("expected arrived=false on context timeout")
 	}
 }
+
+func TestWaitForDMail_zeroTimeout_usesMaxWaitDuration(t *testing.T) {
+	// given — timeout=0 should use maxWaitDuration safety cap, not block forever
+	old := maxWaitDuration
+	maxWaitDuration = 20 * time.Millisecond
+	t.Cleanup(func() { maxWaitDuration = old })
+	fc := &FeedbackCollector{notify: make(chan struct{}, 1)} // no arrival
+
+	// when
+	start := time.Now()
+	arrived, err := waitForDMail(context.Background(), fc, 0, &domain.NopLogger{})
+	elapsed := time.Since(start)
+
+	// then — should return via safety cap, not hang
+	if err != nil {
+		t.Fatal(err)
+	}
+	if arrived {
+		t.Error("expected arrived=false on safety cap timeout")
+	}
+	if elapsed > 1*time.Second {
+		t.Errorf("expected quick return via safety cap, took %s", elapsed)
+	}
+}

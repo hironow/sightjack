@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -9,21 +7,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hironow/sightjack/internal/cmd"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
 func TestInitCmd_CreatesConfigFile(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Engineering", "--project", "Hades", "--lang", "en", "--strictness", "alert", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Engineering", "--project", "Hades", "--lang", "en", "--strictness", "alert", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -51,15 +50,15 @@ func TestInitCmd_CreatesConfigFile(t *testing.T) {
 func TestInitCmd_DefaultLangAndStrictness(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -80,15 +79,15 @@ func TestInitCmd_AlreadyExists(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 	os.WriteFile(domain.ConfigPath(dir), []byte("existing"), 0644)
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err == nil {
@@ -104,15 +103,15 @@ func TestInitCmd_AlreadyExists_SuggestsForce(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 	os.WriteFile(domain.ConfigPath(dir), []byte("existing"), 0644)
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err == nil {
@@ -129,15 +128,15 @@ func TestInitCmd_Force_OverwritesExisting(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 	os.WriteFile(domain.ConfigPath(dir), []byte("old content"), 0644)
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--force", "--team", "NewTeam", "--project", "NewProject", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--force", "--team", "NewTeam", "--project", "NewProject", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -153,15 +152,15 @@ func TestInitCmd_Force_OverwritesExisting(t *testing.T) {
 func TestInitCmd_CreatesGitIgnore(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -179,15 +178,15 @@ func TestInitCmd_CreatesGitIgnore(t *testing.T) {
 func TestInitCmd_InstallsSkills(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -205,15 +204,15 @@ func TestInitCmd_InstallsSkills(t *testing.T) {
 func TestInitCmd_CreatesMailDirs(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -235,15 +234,15 @@ func TestInitCmd_CreatesMailDirs(t *testing.T) {
 func TestInitCmd_FlagsOnly(t *testing.T) {
 	// given — init via cobra command with flags, no stdin
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader("")) // empty stdin — must NOT hang
-	cmd.SetArgs([]string{"init", "--team", "Engineering", "--project", "Hades", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader("")) // empty stdin — must NOT hang
+	rootCmd.SetArgs([]string{"init", "--team", "Engineering", "--project", "Hades", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -269,15 +268,15 @@ func TestInitCmd_Force_MergesExistingConfig(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 	os.WriteFile(domain.ConfigPath(dir), []byte("lang: en\ntracker:\n  team: OldTeam\n  project: OldProject\nretry:\n  max_attempts: 5\n"), 0644)
 
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--force", "--team", "NewTeam", "--project", "NewProject", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--force", "--team", "NewTeam", "--project", "NewProject", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -302,15 +301,15 @@ func TestInitCmd_Force_MergesExistingConfig(t *testing.T) {
 func TestInitCmd_ConfigHasAllDefaults(t *testing.T) {
 	// given: fresh init
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "Team", "--project", "Project", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then
 	if err != nil {
@@ -331,15 +330,15 @@ func TestInitCmd_ConfigHasAllDefaults(t *testing.T) {
 func TestInitCmd_MissingTeamFlag_UsesDefault(t *testing.T) {
 	// given — init with no --team flag, should use default (empty or DefaultConfig value)
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader("")) // empty stdin
-	cmd.SetArgs([]string{"init", dir})
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader("")) // empty stdin
+	rootCmd.SetArgs([]string{"init", dir})
 
 	// when
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 
 	// then — should succeed with defaults (no interactive prompt, no hang)
 	if err != nil {
