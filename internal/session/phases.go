@@ -94,6 +94,12 @@ const (
 	approvalRejected
 )
 
+// discussRunnerFunc is the signature for architect discussion execution.
+// Extracted for testability (inject failing implementations in tests).
+type discussRunnerFunc func(ctx context.Context, cfg *domain.Config, scanDir string,
+	wave domain.Wave, topic string, strictness string,
+	out io.Writer, logger domain.Logger) (*domain.ArchitectResponse, error)
+
 // approvalPhase handles the wave approval/reject/discuss/selective loop.
 // waves is passed by value (not pointer) because this phase only mutates
 // existing elements via PropagateWaveUpdate — it never appends or reassigns.
@@ -104,6 +110,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
 	feedback []*DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
+	discuss discussRunnerFunc,
 	out io.Writer, waveSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	gate := cfg.Gate
@@ -198,7 +205,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				logger.Warn("Invalid topic: %v", topicErr)
 				continue
 			}
-			result, discussErr := RunArchitectDiscuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
+			result, discussErr := discuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
 			if discussErr != nil {
 				logger.Error("Architect discussion failed: %v", discussErr)
 				continue
