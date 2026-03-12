@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -13,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/sightjack/internal/cmd"
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -28,7 +27,7 @@ func TestArchivePruneCmd_TextOutput_StdoutClean(t *testing.T) {
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
 	os.Chtimes(oldFile, oldTime, oldTime)
 
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	rootCmd.SetOut(outBuf)
@@ -62,7 +61,7 @@ func TestArchivePruneCmd_JSONOutput_DryRun(t *testing.T) {
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
 	os.Chtimes(oldFile, oldTime, oldTime)
 
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	rootCmd.SetOut(outBuf)
@@ -108,7 +107,7 @@ func TestArchivePruneCmd_JSONOutput_Execute(t *testing.T) {
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
 	os.Chtimes(oldFile, oldTime, oldTime)
 
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	rootCmd.SetOut(outBuf)

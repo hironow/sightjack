@@ -1,18 +1,18 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/hironow/sightjack/internal/cmd"
 )
 
 func TestVersionCmd_TextOutput(t *testing.T) {
 	// given
 	var stdout bytes.Buffer
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	rootCmd.SetArgs([]string{"version"})
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&bytes.Buffer{})
@@ -39,7 +39,7 @@ func TestVersionCmd_TextOutput(t *testing.T) {
 func TestVersionCmd_JSONOutput(t *testing.T) {
 	// given
 	var stdout bytes.Buffer
-	rootCmd := NewRootCommand()
+	rootCmd := cmd.NewRootCommand()
 	rootCmd.SetArgs([]string{"version", "--json"})
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&bytes.Buffer{})
