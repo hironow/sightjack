@@ -135,14 +135,27 @@ func TestCheckStateDir_Writable(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := session.CheckStateDir(dir)
+	result := session.CheckStateDir(dir, false)
 
-	// then
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	// then: without repair, missing dir = FAIL
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected CheckFail for missing .siren/ without repair, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "State Dir" {
 		t.Errorf("expected name 'State Dir', got %q", result.Name)
+	}
+}
+
+func TestCheckStateDir_RepairCreatesMissing(t *testing.T) {
+	// given: a directory where .siren/ does not exist
+	dir := t.TempDir()
+
+	// when: repair=true
+	result := session.CheckStateDir(dir, true)
+
+	// then: should create and return Fixed
+	if result.Status != domain.CheckFixed {
+		t.Errorf("expected CheckFixed, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -153,7 +166,7 @@ func TestCheckStateDir_NotWritable(t *testing.T) {
 	defer os.Chmod(dir, 0755) // cleanup
 
 	// when
-	result := session.CheckStateDir(dir)
+	result := session.CheckStateDir(dir, true)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -167,7 +180,7 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 
 	// when
-	result := session.CheckStateDir(dir)
+	result := session.CheckStateDir(dir, false)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -278,11 +291,11 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false)
 
 	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
-	if len(results) != 11 {
-		t.Fatalf("expected 11 results, got %d", len(results))
+	if len(results) != 12 {
+		t.Fatalf("expected 12 results, got %d", len(results))
 	}
 	// Config should fail (index 3 in new order)
 	if results[3].Name != "Config" {
@@ -291,21 +304,21 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	if results[3].Status != domain.CheckFail {
 		t.Errorf("Config: expected FAIL, got %v", results[3].Status)
 	}
-	// Claude Auth should be skipped (nil config)
+	// claude-auth should be skipped (nil config)
 	auth := results[6]
-	if auth.Name != "Claude Auth" {
-		t.Errorf("expected 'Claude Auth', got %q", auth.Name)
+	if auth.Name != "claude-auth" {
+		t.Errorf("expected 'claude-auth', got %q", auth.Name)
 	}
 	if auth.Status != domain.CheckSkip {
-		t.Errorf("Claude Auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
+		t.Errorf("claude-auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
 	}
-	// Linear MCP should be skipped (nil config)
+	// linear-mcp should be skipped (nil config)
 	mcp := results[7]
-	if mcp.Name != "Linear MCP" {
-		t.Errorf("expected 'Linear MCP', got %q", mcp.Name)
+	if mcp.Name != "linear-mcp" {
+		t.Errorf("expected 'linear-mcp', got %q", mcp.Name)
 	}
 	if mcp.Status != domain.CheckSkip {
-		t.Errorf("Linear MCP: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
+		t.Errorf("linear-mcp: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
 	}
 	// claude-inference should be skipped (nil config)
 	infer := results[8]
@@ -340,11 +353,11 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
 
 	// then
-	if len(results) != 11 {
-		t.Fatalf("expected 11 results, got %d", len(results))
+	if len(results) != 12 {
+		t.Fatalf("expected 12 results, got %d", len(results))
 	}
 	// Config should pass (index 3 in new order)
 	if results[3].Name != "Config" {
@@ -393,17 +406,19 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	fakeClaude := buildFakeClaude(t)
 
 	dir := t.TempDir()
+	// Create .siren/ so CheckStateDir reports OK without repair
+	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(cfgPath, []byte("tracker:\n  team: \"Test\"\n  project: \"Project\"\nclaude_cmd: \""+fakeClaude+"\"\n"), 0644)
 
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
 
-	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
-	if len(results) != 11 {
-		t.Fatalf("expected 11 results, got %d: %v", len(results), results)
+	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, skills-ref, success-rate)
+	if len(results) != 12 {
+		t.Fatalf("expected 12 results, got %d: %v", len(results), results)
 	}
 	// git binary check (index 0)
 	if results[0].Name != "git" || results[0].Status != domain.CheckOK {
@@ -425,19 +440,19 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	if results[5].Name != "Event Store" {
 		t.Errorf("expected 'Event Store', got %q", results[5].Name)
 	}
-	// Claude Auth should be OK (fake-claude mcp list succeeds, index 6)
-	if results[6].Name != "Claude Auth" {
-		t.Errorf("expected 'Claude Auth', got %q", results[6].Name)
+	// claude-auth should be OK (fake-claude mcp list succeeds, index 6)
+	if results[6].Name != "claude-auth" {
+		t.Errorf("expected 'claude-auth', got %q", results[6].Name)
 	}
 	if results[6].Status != domain.CheckOK {
-		t.Errorf("Claude Auth: expected OK, got %v: %s", results[6].Status, results[6].Message)
+		t.Errorf("claude-auth: expected OK, got %v: %s", results[6].Status, results[6].Message)
 	}
-	// Linear MCP should be OK (fake-claude outputs "linear ✓ connected", index 7)
-	if results[7].Name != "Linear MCP" {
-		t.Errorf("expected 'Linear MCP', got %q", results[7].Name)
+	// linear-mcp should be OK (fake-claude outputs "linear ✓ connected", index 7)
+	if results[7].Name != "linear-mcp" {
+		t.Errorf("expected 'linear-mcp', got %q", results[7].Name)
 	}
 	if results[7].Status != domain.CheckOK {
-		t.Errorf("Linear MCP: expected OK, got %v: %s", results[7].Status, results[7].Message)
+		t.Errorf("linear-mcp: expected OK, got %v: %s", results[7].Status, results[7].Message)
 	}
 	// claude-inference should be OK (fake-claude --print responds with "2", index 8)
 	if results[8].Name != "claude-inference" {
@@ -578,7 +593,7 @@ func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
 
 	// then: find success-rate result
 	var found bool
@@ -610,7 +625,7 @@ func TestCheckContextBudget_LowUsage(t *testing.T) {
 {"type":"result","result":"2"}`
 
 	// when
-	result := session.CheckContextBudget(streamJSON)
+	result := session.CheckContextBudget(streamJSON, "")
 
 	// then: should be OK (well under threshold)
 	if result.Status != domain.CheckOK {
@@ -625,18 +640,18 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 	t.Parallel()
 
 	// given: stream-json with many tools/skills/plugins + large hook output
-	initLine := `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Edit","Grep","Glob","Bash","Agent"],"skills":["commit","review","test","deploy","lint","format","debug"],"plugins":["p1","p2","p3","p4","p5"],"mcp_servers":[{"name":"linear","status":"connected"},{"name":"filesystem","status":"connected"},{"name":"github","status":"connected"}]}`
+	initLine := `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Edit","Grep","Glob","Bash","Agent"],"skills":["commit","review","test","deploy","lint","format","debug"],"plugins":[{"name":"p1"},{"name":"p2"},{"name":"p3"},{"name":"p4"},{"name":"p5"}],"mcp_servers":[{"name":"linear","status":"connected"},{"name":"filesystem","status":"connected"},{"name":"github","status":"connected"}]}`
 	largeStdout := strings.Repeat("x", 100000)
 	hookLine := fmt.Sprintf(`{"type":"system","subtype":"hook_response","hook_id":"h1","stdout":"%s","exit_code":0}`, largeStdout)
 	resultLine := `{"type":"result","result":"2"}`
 	streamJSON := initLine + "\n" + hookLine + "\n" + resultLine
 
 	// when
-	result := session.CheckContextBudget(streamJSON)
+	result := session.CheckContextBudget(streamJSON, "")
 
-	// then: should be OK but with hint (over threshold)
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected OK, got %v: %s", result.Status, result.Message)
+	// then: should be WARN with hint (over threshold)
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v: %s", result.Status, result.Message)
 	}
 	if result.Hint == "" {
 		t.Error("expected non-empty hint for high usage")
@@ -647,7 +662,7 @@ func TestCheckContextBudget_EmptyStream(t *testing.T) {
 	t.Parallel()
 
 	// given: empty stream
-	result := session.CheckContextBudget("")
+	result := session.CheckContextBudget("", "")
 
 	// then: should be OK (nothing to measure)
 	if result.Status != domain.CheckOK {
@@ -659,11 +674,56 @@ func TestCheckContextBudget_NoInitMessage(t *testing.T) {
 	t.Parallel()
 
 	// given: stream-json with no init message
-	result := session.CheckContextBudget(`{"type":"result","result":"2"}`)
+	result := session.CheckContextBudget(`{"type":"result","result":"2"}`, "")
 
 	// then: should be OK (no init = no overhead)
 	if result.Status != domain.CheckOK {
 		t.Errorf("expected OK for no-init stream, got %v: %s", result.Status, result.Message)
+	}
+}
+
+func TestCheckContextBudget_WarnWithBreakdown(t *testing.T) {
+	t.Parallel()
+
+	// given: stream with many skills (exceeds threshold)
+	initMsg := `{"type":"system","subtype":"init","tools":["Read","Write"],"skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an"],"plugins":[{"name":"p1"},{"name":"p2"},{"name":"p3"},{"name":"p4"},{"name":"p5"}],"mcp_servers":[{"name":"linear","status":"connected"}]}`
+	streamJSON := initMsg + "\n"
+
+	// when
+	result := session.CheckContextBudget(streamJSON, "")
+
+	// then
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v", result.Status.StatusLabel())
+	}
+	if !strings.Contains(result.Message, "skills") {
+		t.Errorf("message should contain breakdown with 'skills', got: %s", result.Message)
+	}
+	if result.Hint == "" {
+		t.Error("expected hint for threshold exceeded")
+	}
+}
+
+func TestCheckContextBudget_WarnHintWithSettingsFile(t *testing.T) {
+	t.Parallel()
+
+	// given: project with .claude/settings.json
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".claude", "settings.json"), []byte(`{}`), 0o644)
+
+	initMsg := `{"type":"system","subtype":"init","skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an","ao","ap"]}`
+	streamJSON := initMsg + "\n"
+
+	// when
+	result := session.CheckContextBudget(streamJSON, dir)
+
+	// then
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v", result.Status.StatusLabel())
+	}
+	if !strings.Contains(result.Hint, "見直して") {
+		t.Errorf("hint should say review settings, got: %s", result.Hint)
 	}
 }
 

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 
@@ -11,13 +13,34 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
+	// Two-context pattern for graceful shutdown with handover.
+	// 1st signal: cancel workCtx → interrupt active work, write handover.
+	// 2nd signal: cancel outerCtx → abort handover, let defers run.
+	outerCtx, outerCancel := context.WithCancel(context.Background())
+	defer outerCancel()
+
+	workCtx, workCancel := context.WithCancel(outerCtx)
+	defer workCancel()
+
+	sigCh := make(chan os.Signal, 2)
+	signal.Notify(sigCh, shutdownSignals...)
+	defer signal.Stop(sigCh)
+
+	go func() {
+		<-sigCh        // 1st signal: cancel work
+		workCancel()
+		<-sigCh        // 2nd signal: cancel outer (NO os.Exit!)
+		outerCancel()
+	}()
+
+	// Embed outerCtx in workCtx so commands can retrieve it for handover writing.
+	workCtx = context.WithValue(workCtx, domain.ShutdownKey, outerCtx)
+
 	rootCmd := cmd.NewRootCommand()
-	// NOTE: RewriteBoolFlags was removed intentionally (MY-336, per MY-334 consensus).
-	// The rewriter converted "--dry-run false" → "--dry-run=false", overriding pflag's
-	// NoOptDefVal behavior. This was identified as non-POSIX in MY-334 cross-tool review
-	// and all 4 tools (phonewave, amadeus, paintress, sightjack) agreed to remove it.
-	// Standard behavior: "--dry-run false" = --dry-run (true) + positional "false".
-	// To explicitly set false, use the equals form: "--dry-run=false".
 	args := os.Args[1:]
 	if cmd.NeedsDefaultScan(rootCmd, args) {
 		args = append([]string{"scan"}, args...)
@@ -26,11 +49,26 @@ func main() {
 	}
 	rootCmd.SetArgs(args)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
-	defer cancel()
+	err := rootCmd.ExecuteContext(workCtx)
 
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(domain.ExitCode(err))
+	// Signal-induced context cancellation is not an application error.
+	// Exit with 128+SIGINT=130 per UNIX convention instead of printing
+	// "error: context canceled" and exiting with code 1.
+	if err != nil && errors.Is(err, context.Canceled) && workCtx.Err() != nil {
+		return 130
 	}
+
+	return handleError(err, os.Stderr)
+}
+
+// handleError processes an error from command execution, printing to w only
+// when the error is not silent. Returns the appropriate exit code.
+func handleError(err error, w io.Writer) int {
+	if err != nil {
+		var silent *domain.SilentError
+		if !errors.As(err, &silent) {
+			fmt.Fprintf(w, "error: %v\n", err)
+		}
+	}
+	return domain.ExitCode(err)
 }

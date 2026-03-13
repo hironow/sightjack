@@ -165,6 +165,11 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	default:
 	}
 
+	// Log captured stderr at debug level for diagnostics.
+	if stderrBuf.Len() > 0 && logger != nil {
+		logger.Debug("claude stderr:\n%s", stderrBuf.String())
+	}
+
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			span.AddEvent("claude.timeout",

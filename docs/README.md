@@ -12,23 +12,25 @@
 ## CLI Reference
 
 - [sightjack](cli/sightjack.md) — Root command
-- [sightjack init](cli/sightjack_init.md) — Initialize a project (`--force` to overwrite)
-- [sightjack config show](cli/sightjack_config_show.md) / [config set](cli/sightjack_config_set.md) — Show or set configuration values
+- [sightjack init](cli/sightjack_init.md) — Create .siren/config.yaml
+- [sightjack config](cli/sightjack_config.md) — View or update configuration
+- [sightjack config show](cli/sightjack_config_show.md) — Show current configuration
+- [sightjack config set](cli/sightjack_config_set.md) — Update configuration values
 - [sightjack scan](cli/sightjack_scan.md) — Classify and deep-scan Linear issues
-- [sightjack run](cli/sightjack_run.md) — Run the full interactive session
-- [sightjack waves](cli/sightjack_waves.md) — Generate execution waves
-- [sightjack show](cli/sightjack_show.md) — Display scan/wave results
-- [sightjack select](cli/sightjack_select.md) — Select a wave
-- [sightjack discuss](cli/sightjack_discuss.md) — Discuss with Architect agent
-- [sightjack apply](cli/sightjack_apply.md) — Apply changes to Linear
-- [sightjack adr](cli/sightjack_adr.md) — Generate ADRs from discussion
-- [sightjack nextgen](cli/sightjack_nextgen.md) — Generate next-generation waves
-- [sightjack status](cli/sightjack_status.md) — Show session status
-- [sightjack doctor](cli/sightjack_doctor.md) — Diagnose configuration issues
-- [sightjack clean](cli/sightjack_clean.md) — Clean state files
-- [sightjack archive-prune](cli/sightjack_archive-prune.md) — Prune archived data
-- [sightjack version](cli/sightjack_version.md) — Show version
-- [sightjack update](cli/sightjack_update.md) — Self-update
+- [sightjack run](cli/sightjack_run.md) — Interactive wave approval and apply loop
+- [sightjack waves](cli/sightjack_waves.md) — Generate waves from stdin ScanResult JSON
+- [sightjack show](cli/sightjack_show.md) — Display last scan results
+- [sightjack select](cli/sightjack_select.md) — Interactively pick a wave from stdin WavePlan
+- [sightjack discuss](cli/sightjack_discuss.md) — Architect discussion from stdin Wave JSON
+- [sightjack apply](cli/sightjack_apply.md) — Apply a wave to Linear from stdin Wave JSON
+- [sightjack adr](cli/sightjack_adr.md) — Generate ADR Markdown from stdin DiscussResult
+- [sightjack nextgen](cli/sightjack_nextgen.md) — Generate follow-up waves from stdin ApplyResult
+- [sightjack status](cli/sightjack_status.md) — Show operational status
+- [sightjack doctor](cli/sightjack_doctor.md) — Check environment and tool availability
+- [sightjack clean](cli/sightjack_clean.md) — Remove state directory (.siren/)
+- [sightjack archive-prune](cli/sightjack_archive-prune.md) — Prune expired d-mails and event files
+- [sightjack version](cli/sightjack_version.md) — Print version, commit, and build information
+- [sightjack update](cli/sightjack_update.md) — Self-update sightjack to the latest release
 
 ## Architecture Decision Records
 

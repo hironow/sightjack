@@ -214,7 +214,7 @@ sightjack init
 # Re-initialize (upgrade SKILL.md, regenerate config)
 sightjack init --force
 
-# Check environment (config, tools, skills, event store, context-budget, Docker)
+# Check environment (config, tools, skills, event store, context-budget with per-item diagnostics, Docker)
 sightjack doctor
 
 # Run — .siren/ is created automatically
@@ -225,6 +225,8 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime. Th
 
 ## Subcommands
 
+Running `sightjack` without a subcommand defaults to `scan` (classify and deep-scan Linear issues). Unlike the other three tools (phonewave, amadeus, paintress) which default to `run`, sightjack's primary operation is scanning — the interactive `run` loop builds on top of scan results.
+
 ### Interactive
 
 | Command | Description |
@@ -233,7 +235,7 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime. Th
 | `sightjack run` | Interactive wave approval and apply loop (auto-resumes from state) |
 | `sightjack show` | Display last scan results (or pipe JSON from stdin) |
 | `sightjack init` | Initialize `.siren/config.yaml` interactively (`--force` to overwrite) |
-| `sightjack doctor` | Check environment, tools, skills, event store integrity, context-budget, Docker |
+| `sightjack doctor` | Check environment, tools, skills, event store integrity, context-budget (per-item diagnostics), Docker |
 | `sightjack config show` | Display current configuration |
 | `sightjack config set` | Set a configuration value (e.g., `config set strictness.default alert`) |
 | `sightjack version` | Print version, commit, date, and Go version (`-j` for JSON) |

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,18 +16,68 @@ import (
 	"github.com/hironow/sightjack/internal/platform"
 )
 
+// installSkillsRefFn runs "uv tool install skills-ref". Injectable for testing.
+var installSkillsRefFn = func() error {
+	cmd := exec.Command("uv", "tool", "install", "skills-ref")
+	return cmd.Run()
+}
+
+// findSkillsRefDirFn searches for skills-ref submodule directory relative to baseDir.
+var findSkillsRefDirFn = findSkillsRefDir
+
+// generateSkillsFn regenerates SKILL.md files. Injectable for testing.
+var generateSkillsFn = func(baseDir string, logger domain.Logger) error {
+	return InstallSkills(baseDir, platform.SkillsFS, logger)
+}
+
+// OverrideInstallSkillsRef replaces the skills-ref installer for testing.
+func OverrideInstallSkillsRef(fn func() error) func() {
+	old := installSkillsRefFn
+	installSkillsRefFn = fn
+	return func() { installSkillsRefFn = old }
+}
+
+// OverrideFindSkillsRefDir replaces the skills-ref directory finder for testing.
+func OverrideFindSkillsRefDir(fn func(string) string) func() {
+	old := findSkillsRefDirFn
+	findSkillsRefDirFn = fn
+	return func() { findSkillsRefDirFn = old }
+}
+
+// OverrideGenerateSkills replaces the skills generator for testing.
+func OverrideGenerateSkills(fn func(string, domain.Logger) error) func() {
+	old := generateSkillsFn
+	generateSkillsFn = fn
+	return func() { generateSkillsFn = old }
+}
+
+// findSkillsRefDir searches for skills-ref in common submodule locations
+// relative to baseDir (the target repository root), not the current working directory.
+func findSkillsRefDir(baseDir string) string {
+	candidates := []string{
+		filepath.Join(baseDir, "..", "skills-ref"),
+		filepath.Join(baseDir, "..", "..", "skills-ref"),
+	}
+	for _, c := range candidates {
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			return c
+		}
+	}
+	return ""
+}
+
 // CheckConfig validates that the config file exists and can be loaded.
-func CheckConfig(configPath string) domain.CheckResult {
+func CheckConfig(configPath string) domain.DoctorCheck {
 	_, err := LoadConfig(configPath)
 	if err != nil {
-		return domain.CheckResult{
+		return domain.DoctorCheck{
 			Name:    "Config",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s: %v", configPath, err),
 			Hint:    `run "sightjack init --team <TEAM> --project <PROJECT>" to create a config file`,
 		}
 	}
-	return domain.CheckResult{
+	return domain.DoctorCheck{
 		Name:    "Config",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s loaded successfully", configPath),
@@ -34,10 +86,10 @@ func CheckConfig(configPath string) domain.CheckResult {
 
 // CheckTool verifies that a CLI tool is installed and executable.
 // It runs `<tool> --version` to confirm functionality.
-func CheckTool(ctx context.Context, name string) domain.CheckResult {
+func CheckTool(ctx context.Context, name string) domain.DoctorCheck {
 	path, err := lookPath(name)
 	if err != nil {
-		return domain.CheckResult{
+		return domain.DoctorCheck{
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: "command not found",
@@ -47,7 +99,7 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 
 	out, err := newCmd(ctx, name, "--version").Output()
 	if err != nil {
-		return domain.CheckResult{
+		return domain.DoctorCheck{
 			Name:    name,
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("found at %s but --version failed: %v", path, err),
@@ -56,110 +108,53 @@ func CheckTool(ctx context.Context, name string) domain.CheckResult {
 	}
 
 	version := strings.TrimSpace(strings.Split(string(out), "\n")[0])
-	return domain.CheckResult{
+	return domain.DoctorCheck{
 		Name:    name,
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s (%s)", path, version),
 	}
 }
 
-// checkClaudeAuth determines if the Claude CLI is authenticated by
-// interpreting the result of running `claude mcp list`. A successful
-// command execution (no error) indicates the CLI is authenticated.
-func checkClaudeAuth(mcpOutput string, mcpErr error) domain.CheckResult {
-	if mcpErr != nil {
-		return domain.CheckResult{
-			Name:    "Claude Auth",
-			Status:  domain.CheckFail,
-			Message: "not authenticated: " + mcpErr.Error(),
-			Hint:    `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
-		}
-	}
-	return domain.CheckResult{
-		Name:    "Claude Auth",
-		Status:  domain.CheckOK,
-		Message: "authenticated",
-	}
-}
-
-// checkLinearMCP parses `claude mcp list` output for Linear MCP connection.
-// Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
-// Requires "✓" to avoid false positives from "disconnected" or "not connected".
-func checkLinearMCP(mcpOutput string, mcpErr error) domain.CheckResult {
-	if mcpErr != nil {
-		return domain.CheckResult{
-			Name:    "Linear MCP",
-			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("claude mcp list failed: %v", mcpErr),
-			Hint:    `ensure Claude CLI is authenticated with "claude login"`,
-		}
-	}
-
-	output := strings.ToLower(mcpOutput)
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "linear") &&
-			strings.Contains(line, "✓") &&
-			strings.Contains(line, "connected") {
-			return domain.CheckResult{
-				Name:    "Linear MCP",
-				Status:  domain.CheckOK,
-				Message: "Linear MCP connected",
+// CheckStateDir verifies that the .siren/ state directory exists and is
+// writable. When repair is true and the directory is missing, it creates
+// the directory and returns CheckFixed.
+func CheckStateDir(baseDir string, repair bool) domain.DoctorCheck {
+	dir := filepath.Join(baseDir, domain.StateDir)
+	info, statErr := os.Stat(dir)
+	if statErr != nil {
+		if !repair {
+			return domain.DoctorCheck{
+				Name:    "State Dir",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("%s not found", dir),
+				Hint:    `run "sightjack init" or "sightjack doctor --repair"`,
 			}
 		}
-	}
-
-	return domain.CheckResult{
-		Name:    "Linear MCP",
-		Status:  domain.CheckFail,
-		Message: "Linear MCP not found or not connected",
-		Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
-			"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
-	}
-}
-
-// checkClaudeInference determines if the Claude CLI can perform inference
-// by interpreting the result of a minimal "1+1=" prompt.
-func checkClaudeInference(output string, err error) domain.CheckResult {
-	if err != nil {
-		return domain.CheckResult{
-			Name:    "claude-inference",
-			Status:  domain.CheckFail,
-			Message: "inference failed: " + err.Error(),
-			Hint: `"signal: killed" = CLI startup too slow (timeout 60s); ` +
-				`"nested session" = CLAUDECODE env var leaked (doctor should filter it); ` +
-				`otherwise check API key, quota, and model access`,
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return domain.DoctorCheck{
+				Name:    "State Dir",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("cannot create %s: %v", dir, err),
+				Hint:    `check directory permissions or run "sightjack init"`,
+			}
+		}
+		return domain.DoctorCheck{
+			Name:    "State Dir",
+			Status:  domain.CheckFixed,
+			Message: fmt.Sprintf("created %s", dir),
 		}
 	}
-	if strings.TrimSpace(output) != "2" {
-		return domain.CheckResult{
-			Name:    "claude-inference",
-			Status:  domain.CheckFail,
-			Message: "unexpected response: " + strings.TrimSpace(output),
-			Hint:    "model returned unexpected output; check model access and API quota",
-		}
-	}
-	return domain.CheckResult{
-		Name:    "claude-inference",
-		Status:  domain.CheckOK,
-		Message: "inference OK",
-	}
-}
-
-// CheckStateDir verifies that the .siren/ state directory exists or can be
-// created, and that it is writable. Uses a temporary file probe to confirm.
-func CheckStateDir(baseDir string) domain.CheckResult {
-	dir := filepath.Join(baseDir, domain.StateDir)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return domain.CheckResult{
+	if !info.IsDir() {
+		return domain.DoctorCheck{
 			Name:    "State Dir",
 			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("cannot create %s: %v", dir, err),
-			Hint:    `check directory permissions or run "sightjack init"`,
+			Message: fmt.Sprintf("%s exists but is not a directory", dir),
+			Hint:    `remove the .siren file and run "sightjack init"`,
 		}
 	}
 	probe := filepath.Join(dir, ".doctor_probe")
 	if err := os.WriteFile(probe, []byte("ok"), 0644); err != nil {
-		return domain.CheckResult{
+		return domain.DoctorCheck{
 			Name:    "State Dir",
 			Status:  domain.CheckFail,
 			Message: fmt.Sprintf("%s is not writable: %v", dir, err),
@@ -167,7 +162,7 @@ func CheckStateDir(baseDir string) domain.CheckResult {
 		}
 	}
 	_ = os.Remove(probe)
-	return domain.CheckResult{
+	return domain.DoctorCheck{
 		Name:    "State Dir",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%s writable", dir),
@@ -176,7 +171,7 @@ func CheckStateDir(baseDir string) domain.CheckResult {
 
 // CheckSkills verifies that SKILL.md files exist under .siren/skills/
 // and that their frontmatter contains a dmail-schema-version field.
-func CheckSkills(baseDir string) domain.CheckResult {
+func CheckSkills(baseDir string) domain.DoctorCheck {
 	skillNames := []string{"dmail-sendable", "dmail-readable"}
 	skillsDir := filepath.Join(baseDir, domain.StateDir, "skills")
 
@@ -184,7 +179,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 		path := filepath.Join(skillsDir, name, "SKILL.md")
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return domain.CheckResult{
+			return domain.DoctorCheck{
 				Name:    "Skills",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md: %v", name, err),
@@ -193,7 +188,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 		}
 		content := string(data)
 		if !strings.Contains(content, "dmail-schema-version:") {
-			return domain.CheckResult{
+			return domain.DoctorCheck{
 				Name:    "Skills",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md: missing dmail-schema-version", name),
@@ -213,7 +208,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 		if strings.Contains(content, "kind: feedback") &&
 			!strings.Contains(content, "kind: design-feedback") &&
 			!strings.Contains(content, "kind: implementation-feedback") {
-			return domain.CheckResult{
+			return domain.DoctorCheck{
 				Name:    "Skills",
 				Status:  domain.CheckFail,
 				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", name),
@@ -222,7 +217,7 @@ func CheckSkills(baseDir string) domain.CheckResult {
 		}
 	}
 
-	return domain.CheckResult{
+	return domain.DoctorCheck{
 		Name:    "Skills",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d skill(s) validated", len(skillNames)),
@@ -232,12 +227,12 @@ func CheckSkills(baseDir string) domain.CheckResult {
 // CheckEventStore validates the event store directory structure and JSONL integrity.
 // Delegates to eventsource.ValidateStore for the actual file-level checks.
 // Returns CheckSkip if the events directory does not exist yet.
-func CheckEventStore(baseDir string) domain.CheckResult {
+func CheckEventStore(baseDir string) domain.DoctorCheck {
 	stateDir := filepath.Join(baseDir, domain.StateDir)
 	health := eventsource.ValidateStore(stateDir)
 
 	if health.NotFound {
-		return domain.CheckResult{
+		return domain.DoctorCheck{
 			Name:    "Event Store",
 			Status:  domain.CheckSkip,
 			Message: "events/ not found",
@@ -245,7 +240,7 @@ func CheckEventStore(baseDir string) domain.CheckResult {
 	}
 
 	if health.Err != nil {
-		return domain.CheckResult{
+		return domain.DoctorCheck{
 			Name:    "Event Store",
 			Status:  domain.CheckFail,
 			Message: health.Err.Error(),
@@ -254,14 +249,14 @@ func CheckEventStore(baseDir string) domain.CheckResult {
 	}
 
 	if health.Sessions == 0 {
-		return domain.CheckResult{
+		return domain.DoctorCheck{
 			Name:    "Event Store",
 			Status:  domain.CheckOK,
 			Message: "no event files yet",
 		}
 	}
 
-	return domain.CheckResult{
+	return domain.DoctorCheck{
 		Name:    "Event Store",
 		Status:  domain.CheckOK,
 		Message: fmt.Sprintf("%d session(s), %d event(s) OK", health.Sessions, health.Events),
@@ -272,11 +267,11 @@ func CheckEventStore(baseDir string) domain.CheckResult {
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
 // baseDir is used to verify the .siren/ state directory is writable.
-func RunDoctor(ctx context.Context, configPath string, baseDir string, logger domain.Logger) []domain.CheckResult {
+func RunDoctor(ctx context.Context, configPath string, baseDir string, logger domain.Logger, repair bool) []domain.DoctorCheck {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
-	var results []domain.CheckResult
+	var results []domain.DoctorCheck
 
 	// --- Binaries ---
 	results = append(results, CheckTool(ctx, "git"))
@@ -296,52 +291,69 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	results = append(results, claudeResult)
 
 	// --- State ---
-	results = append(results, CheckStateDir(baseDir))
+	results = append(results, CheckStateDir(baseDir, repair))
 	results = append(results, cfgResult)
 
 	// --- Data ---
-	results = append(results, CheckSkills(baseDir))
+	skillResult := CheckSkills(baseDir)
+	if repair && skillResult.Status == domain.CheckFail {
+		if err := generateSkillsFn(baseDir, logger); err == nil {
+			recheck := CheckSkills(baseDir)
+			if recheck.Status == domain.CheckOK {
+				results = append(results, domain.DoctorCheck{
+					Name: "Skills", Status: domain.CheckFixed,
+					Message: "regenerated SKILL.md files",
+				})
+			} else {
+				results = append(results, skillResult)
+			}
+		} else {
+			results = append(results, skillResult)
+		}
+	} else {
+		results = append(results, skillResult)
+	}
 	results = append(results, CheckEventStore(baseDir))
 
 	// --- Connectivity ---
 	if cfgResult.Status != domain.CheckOK {
-		results = append(results, domain.CheckResult{
-			Name:    "Claude Auth",
+		results = append(results, domain.DoctorCheck{
+			Name:    "claude-auth",
 			Status:  domain.CheckSkip,
 			Message: "skipped (config not loaded)",
 		})
-		results = append(results, domain.CheckResult{
-			Name:    "Linear MCP",
+		results = append(results, domain.DoctorCheck{
+			Name:    "linear-mcp",
 			Status:  domain.CheckSkip,
 			Message: "skipped (config not loaded)",
 		})
-		results = append(results, domain.CheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "claude-inference",
 			Status:  domain.CheckSkip,
 			Message: "skipped (config not loaded)",
 		})
-		results = append(results, domain.CheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "context-budget",
 			Status:  domain.CheckSkip,
 			Message: "skipped (config not loaded)",
 		})
 	} else if claudeResult.Status != domain.CheckOK {
-		results = append(results, domain.CheckResult{
-			Name:    "Claude Auth",
+		results = append(results, domain.DoctorCheck{
+			Name:    "claude-auth",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
-		results = append(results, domain.CheckResult{
-			Name:    "Linear MCP",
+		results = append(results, domain.DoctorCheck{
+			Name:    "linear-mcp",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
-		results = append(results, domain.CheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "claude-inference",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
 		})
-		results = append(results, domain.CheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "context-budget",
 			Status:  domain.CheckSkip,
 			Message: "skipped (claude not available)",
@@ -353,45 +365,54 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		mcpCancel()
 		mcpOutput := string(out)
 
-		authResult := checkClaudeAuth(mcpOutput, mcpErr)
+		authResult := checkClaudeAuth(mcpOutput, mcpErr, claudeName)
 		results = append(results, authResult)
 
+		// Linear MCP: skip if auth failed (mcp list output unreliable)
 		if authResult.Status != domain.CheckOK {
-			results = append(results, domain.CheckResult{
-				Name:    "Linear MCP",
-				Status:  domain.CheckSkip,
-				Message: "skipped (claude not authenticated)",
-			})
-			results = append(results, domain.CheckResult{
-				Name:    "claude-inference",
-				Status:  domain.CheckSkip,
-				Message: "skipped (auth failed)",
-			})
-			results = append(results, domain.CheckResult{
-				Name:    "context-budget",
+			results = append(results, domain.DoctorCheck{
+				Name:    "linear-mcp",
 				Status:  domain.CheckSkip,
 				Message: "skipped (auth failed)",
 			})
 		} else {
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+		}
 
-			inferCtx, inferCancel := context.WithTimeout(ctx, 60*time.Second)
-			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
-			inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
-			inferOut, inferErr := inferCmd.Output()
-			inferCancel()
-			inferOutput := string(inferOut)
-			results = append(results, checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr))
+		// Inference: runs independently of mcp list result.
+		// MCP config issues don't affect core inference capability.
+		inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
+		inferCmd := newCmd(inferCtx, claudeName, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
+		// Filter CLAUDECODE only for the doctor inference probe to prevent
+		// nested-session errors. Other subprocesses (scan/run/discuss/apply)
+		// must preserve CLAUDECODE for the nested-session guard to work.
+		if inferCmd.Env != nil {
+			inferCmd.Env = platform.FilterEnv(inferCmd.Env, "CLAUDECODE")
+		} else {
+			inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
+		}
+		inferOut, inferErr := inferCmd.Output()
+		inferCancel()
+		inferOutput := string(inferOut)
+		inferResult := checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr)
+		results = append(results, inferResult)
 
-			// Context budget check: reuse inference stream-json output
-			results = append(results, CheckContextBudget(inferOutput))
+		// Context budget check: skip if inference failed
+		if inferResult.Status != domain.CheckOK {
+			results = append(results, domain.DoctorCheck{
+				Name:    "context-budget",
+				Status:  domain.CheckSkip,
+				Message: "skipped (inference failed)",
+			})
+		} else {
+			results = append(results, CheckContextBudget(inferOutput, baseDir))
 		}
 	}
 
 	// --- Metrics ---
 	allEvents, evErr := LoadAllEvents(ctx, baseDir)
 	if evErr != nil || len(allEvents) == 0 {
-		results = append(results, domain.CheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "success-rate",
 			Status:  domain.CheckOK,
 			Message: "no events",
@@ -408,15 +429,84 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 				total++
 			}
 		}
-		results = append(results, domain.CheckResult{
+		results = append(results, domain.DoctorCheck{
 			Name:    "success-rate",
 			Status:  domain.CheckOK,
 			Message: domain.FormatSuccessRate(rate, success, total),
 		})
 	}
 
+	// --- skills-ref toolchain ---
+	results = append(results, checkSkillsRefToolchain(baseDir, repair)...)
+
+	// --- Repair: stale PID cleanup ---
+	if repair {
+		pidPath := filepath.Join(baseDir, domain.StateDir, "watch.pid")
+		if data, err := os.ReadFile(pidPath); err == nil {
+			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			if pid > 0 && !platform.IsProcessAlive(pid) {
+				_ = os.Remove(pidPath)
+				results = append(results, domain.DoctorCheck{
+					Name: "stale-pid", Status: domain.CheckFixed,
+					Message: "removed stale PID file",
+				})
+			}
+		}
+	}
+
 	return results
 }
+
+func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
+	if _, err := lookPath("skills-ref"); err == nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckOK,
+			Message: "skills-ref found on PATH",
+		}}
+	}
+	_, uvErr := lookPath("uv")
+	if uvErr != nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckWarn,
+			Message: "uv not found on PATH: SKILL.md spec validation is unavailable",
+			Hint:    `install uv (https://docs.astral.sh/uv/) or "uv tool install skills-ref"`,
+		}}
+	}
+	subDir := findSkillsRefDirFn(baseDir)
+	if repair {
+		if err := installSkillsRefFn(); err != nil {
+			return []domain.DoctorCheck{{
+				Name: "skills-ref", Status: domain.CheckWarn,
+				Message: fmt.Sprintf("uv tool install skills-ref failed: %v", err),
+				Hint:    `try manually: "uv tool install skills-ref"`,
+			}}
+		}
+		// Verify that skills-ref is now actually on PATH after install.
+		if _, err := lookPath("skills-ref"); err != nil {
+			return []domain.DoctorCheck{{
+				Name: "skills-ref", Status: domain.CheckWarn,
+				Message: "uv tool install succeeded but skills-ref still not on PATH",
+				Hint:    `ensure uv tool bin directory is in PATH`,
+			}}
+		}
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckFixed,
+			Message: "installed skills-ref via uv tool install",
+		}}
+	}
+	hint := `run "sightjack doctor --repair" or "uv tool install skills-ref"`
+	msg := "uv found but skills-ref not installed"
+	if subDir != "" {
+		msg = "uv found and checkout exists but skills-ref not on PATH"
+		hint = `run "uv tool install skills-ref" or "sightjack doctor --repair"`
+	}
+	return []domain.DoctorCheck{{
+		Name: "skills-ref", Status: domain.CheckWarn,
+		Message: msg,
+		Hint:    hint,
+	}}
+}
+
 
 // ExtractStreamResult parses stream-json output and returns the "result" field
 // from the result message. Used to reuse inference check output for inference validation.
@@ -438,8 +528,8 @@ func ExtractStreamResult(streamJSON string) string {
 }
 
 // CheckContextBudget parses stream-json output from a Claude CLI invocation
-// and reports context budget health based on hooks, plugins, skills, and MCP servers.
-func CheckContextBudget(streamJSON string) domain.CheckResult {
+// and estimates context consumption by category.
+func CheckContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 	var messages []*platform.StreamMessage
 	for _, line := range strings.Split(streamJSON, "\n") {
 		line = strings.TrimSpace(line)
@@ -454,30 +544,70 @@ func CheckContextBudget(streamJSON string) domain.CheckResult {
 	}
 
 	report := platform.CalculateContextBudget(messages)
+	breakdown := report.DetailedBreakdown()
 
-	result := domain.CheckResult{
-		Name:   "context-budget",
-		Status: domain.CheckOK,
-		Message: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
-			report.EstimatedTokens, report.ToolCount, report.SkillCount,
-			report.PluginCount, report.MCPServerCount, report.HookContextBytes),
+	// Build detailed message lines
+	var lines []string
+	for _, item := range breakdown {
+		marker := ""
+		if item.Heaviest {
+			marker = " <- heaviest"
+		}
+		if item.Category == "hooks" {
+			if item.Bytes > 0 {
+				lines = append(lines, fmt.Sprintf("  hooks: %d bytes (%d tok)%s", item.Bytes, item.Tokens, marker))
+			}
+		} else {
+			if item.Count > 0 {
+				lines = append(lines, fmt.Sprintf("  %s: %d (%d tok)%s", item.Category, item.Count, item.Tokens, marker))
+			}
+		}
 	}
+
+	status := domain.CheckOK
+	msg := fmt.Sprintf("estimated %d tokens", report.EstimatedTokens)
 	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
-		result.Hint = "context consumption is high; consider reducing installed plugins/skills or using an allowlist"
+		status = domain.CheckWarn
+		msg = fmt.Sprintf("estimated %d tokens (threshold: %d)", report.EstimatedTokens, platform.DefaultContextBudgetThreshold)
 	}
+	if len(lines) > 0 {
+		msg += "\n" + strings.Join(lines, "\n")
+	}
+
+	result := domain.DoctorCheck{
+		Name:    "context-budget",
+		Status:  status,
+		Message: msg,
+	}
+
+	// Hint logic: only when threshold exceeded
+	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
+		projectSettings := filepath.Join(baseDir, ".claude", "settings.json")
+		if _, err := os.Stat(projectSettings); err == nil {
+			result.Hint = ".claude/settings.json の設定を見直してください"
+		} else {
+			var heaviest string
+			for _, item := range breakdown {
+				if item.Heaviest {
+					heaviest = item.Category
+					break
+				}
+			}
+			switch heaviest {
+			case "mcp_servers":
+				result.Hint = ".claude/settings.json をプロジェクトに作成し、必要な MCP server のみ定義を推奨"
+			case "tools":
+				result.Hint = "tools は plugins/MCP 由来 → .claude/settings.json で plugins/MCP を絞ることを推奨"
+			case "skills":
+				result.Hint = "review SKILL.md files in .siren/skills/ for unnecessary content"
+			case "hooks":
+				result.Hint = "review hook configurations for unnecessary output"
+			default:
+				result.Hint = ".claude/settings.json をプロジェクトに作成し、必要なプラグインのみ有効化を推奨"
+			}
+		}
+	}
+
 	return result
 }
 
-// filterEnv returns a copy of env with the named variable removed.
-// Used to unset CLAUDECODE so that doctor's inference check does not
-// trigger the nested-session guard in Claude Code.
-func filterEnv(env []string, name string) []string {
-	prefix := name + "="
-	out := make([]string, 0, len(env))
-	for _, e := range env {
-		if !strings.HasPrefix(e, prefix) {
-			out = append(out, e)
-		}
-	}
-	return out
-}

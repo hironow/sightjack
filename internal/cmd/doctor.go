@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -20,7 +21,14 @@ func newDoctorCmd() *cobra.Command {
 
 Verifies that the sightjack config is valid, required tools
 (claude, git) are installed, and the Linear MCP connection
-is working. Reports pass/fail/skip for each check.`,
+is working. Each check reports one of four statuses:
+OK (passed), FAIL (exit 1), SKIP (dependency missing),
+WARN (advisory, exit 0).
+
+The context-budget check estimates token consumption per category
+(tools, skills, plugins, mcp, hooks) and marks the heaviest.
+When the threshold (20,000 tokens) is exceeded, a category-specific
+hint recommends adjusting .claude/settings.json.`,
 		Example: `  # Run environment check
   sightjack doctor
 
@@ -36,16 +44,19 @@ is working. Reports pass/fail/skip for each check.`,
 			jsonOut, _ := cmd.Flags().GetBool("json")
 
 			logger := loggerFrom(cmd)
-			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger)
+			repair, _ := cmd.Flags().GetBool("repair")
+			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger, repair)
 
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)
 			}
-			return printDoctorText(cmd.ErrOrStderr(), results)
+			pl := platform.NewLogger(cmd.ErrOrStderr(), false)
+			return printDoctorText(cmd.ErrOrStderr(), pl, results)
 		},
 	}
 
 	cmd.Flags().BoolP("json", "j", false, "output as JSON")
+	cmd.Flags().Bool("repair", false, "Auto-fix repairable issues")
 
 	return cmd
 }
@@ -57,7 +68,7 @@ type doctorJSONCheck struct {
 	Hint    string `json:"hint,omitempty"`
 }
 
-func printDoctorJSON(w io.Writer, results []domain.CheckResult) error {
+func printDoctorJSON(w io.Writer, results []domain.DoctorCheck) error {
 	checks := make([]doctorJSONCheck, len(results))
 	hasFail := false
 	for i, r := range results {
@@ -79,18 +90,19 @@ func printDoctorJSON(w io.Writer, results []domain.CheckResult) error {
 	}
 	fmt.Fprintln(w, string(data))
 	if hasFail {
-		return fmt.Errorf("some checks failed")
+		return &domain.SilentError{Err: fmt.Errorf("some checks failed")}
 	}
 	return nil
 }
 
-func printDoctorText(w io.Writer, results []domain.CheckResult) error {
+func printDoctorText(w io.Writer, logger *platform.Logger, results []domain.DoctorCheck) error {
 	fmt.Fprintln(w, "sightjack doctor — environment health check")
 	fmt.Fprintln(w)
 
-	var fails, skips int
+	var fails, skips, warns int
 	for _, r := range results {
-		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", r.Status.StatusLabel(), r.Name, r.Message)
+		label := logger.Colorize(fmt.Sprintf("%-4s", r.Status.StatusLabel()), platform.StatusColor(r.Status))
+		fmt.Fprintf(w, "  [%s] %-16s %s\n", label, r.Name, r.Message)
 		if r.Hint != "" {
 			fmt.Fprintf(w, "         %-16s hint: %s\n", "", r.Hint)
 		}
@@ -99,11 +111,13 @@ func printDoctorText(w io.Writer, results []domain.CheckResult) error {
 			fails++
 		case domain.CheckSkip:
 			skips++
+		case domain.CheckWarn:
+			warns++
 		}
 	}
 
 	fmt.Fprintln(w)
-	if fails == 0 && skips == 0 {
+	if fails == 0 && skips == 0 && warns == 0 {
 		fmt.Fprintln(w, "All checks passed.")
 		return nil
 	}
@@ -111,12 +125,15 @@ func printDoctorText(w io.Writer, results []domain.CheckResult) error {
 	if fails > 0 {
 		parts = append(parts, fmt.Sprintf("%d check(s) failed", fails))
 	}
+	if warns > 0 {
+		parts = append(parts, fmt.Sprintf("%d warning(s)", warns))
+	}
 	if skips > 0 {
 		parts = append(parts, fmt.Sprintf("%d skipped", skips))
 	}
 	fmt.Fprintln(w, strings.Join(parts, ", ")+".")
 	if fails > 0 {
-		return fmt.Errorf("%d check(s) failed", fails)
+		return &domain.SilentError{Err: fmt.Errorf("%d check(s) failed", fails)}
 	}
 	return nil
 }
