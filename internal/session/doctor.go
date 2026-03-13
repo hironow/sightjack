@@ -5,14 +5,66 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/platform"
 )
+
+// installSkillsRefFn runs "uv tool install skills-ref". Injectable for testing.
+var installSkillsRefFn = func() error {
+	cmd := exec.Command("uv", "tool", "install", "skills-ref")
+	return cmd.Run()
+}
+
+// findSkillsRefDirFn searches for skills-ref submodule directory.
+var findSkillsRefDirFn = findSkillsRefDir
+
+// generateSkillsFn regenerates SKILL.md files. Injectable for testing.
+var generateSkillsFn = func(baseDir string, logger domain.Logger) error {
+	return InstallSkills(baseDir, platform.SkillsFS, logger)
+}
+
+// OverrideInstallSkillsRef replaces the skills-ref installer for testing.
+func OverrideInstallSkillsRef(fn func() error) func() {
+	old := installSkillsRefFn
+	installSkillsRefFn = fn
+	return func() { installSkillsRefFn = old }
+}
+
+// OverrideFindSkillsRefDir replaces the skills-ref directory finder for testing.
+func OverrideFindSkillsRefDir(fn func() string) func() {
+	old := findSkillsRefDirFn
+	findSkillsRefDirFn = fn
+	return func() { findSkillsRefDirFn = old }
+}
+
+// OverrideGenerateSkills replaces the skills generator for testing.
+func OverrideGenerateSkills(fn func(string, domain.Logger) error) func() {
+	old := generateSkillsFn
+	generateSkillsFn = fn
+	return func() { generateSkillsFn = old }
+}
+
+// findSkillsRefDir searches for skills-ref in common submodule locations.
+func findSkillsRefDir() string {
+	candidates := []string{
+		filepath.Join("..", "skills-ref"),
+		filepath.Join("..", "..", "skills-ref"),
+	}
+	for _, c := range candidates {
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			return c
+		}
+	}
+	return ""
+}
 
 // CheckConfig validates that the config file exists and can be loaded.
 func CheckConfig(configPath string) domain.DoctorCheck {
@@ -272,7 +324,7 @@ func CheckEventStore(baseDir string) domain.DoctorCheck {
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
 // baseDir is used to verify the .siren/ state directory is writable.
-func RunDoctor(ctx context.Context, configPath string, baseDir string, logger domain.Logger) []domain.DoctorCheck {
+func RunDoctor(ctx context.Context, configPath string, baseDir string, logger domain.Logger, repair bool) []domain.DoctorCheck {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -300,7 +352,24 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	results = append(results, cfgResult)
 
 	// --- Data ---
-	results = append(results, CheckSkills(baseDir))
+	skillResult := CheckSkills(baseDir)
+	if repair && skillResult.Status == domain.CheckFail {
+		if err := generateSkillsFn(baseDir, logger); err == nil {
+			recheck := CheckSkills(baseDir)
+			if recheck.Status == domain.CheckOK {
+				results = append(results, domain.DoctorCheck{
+					Name: "Skills", Status: domain.CheckFixed,
+					Message: "regenerated SKILL.md files",
+				})
+			} else {
+				results = append(results, skillResult)
+			}
+		} else {
+			results = append(results, skillResult)
+		}
+	} else {
+		results = append(results, skillResult)
+	}
 	results = append(results, CheckEventStore(baseDir))
 
 	// --- Connectivity ---
@@ -423,7 +492,70 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		})
 	}
 
+	// --- skills-ref toolchain ---
+	results = append(results, checkSkillsRefToolchain(repair)...)
+
+	// --- Repair: stale PID cleanup ---
+	if repair {
+		pidPath := filepath.Join(baseDir, domain.StateDir, "watch.pid")
+		if data, err := os.ReadFile(pidPath); err == nil {
+			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			if pid > 0 {
+				proc, _ := os.FindProcess(pid)
+				if proc == nil || proc.Signal(syscall.Signal(0)) != nil {
+					_ = os.Remove(pidPath)
+					results = append(results, domain.DoctorCheck{
+						Name: "stale-pid", Status: domain.CheckFixed,
+						Message: "removed stale PID file",
+					})
+				}
+			}
+		}
+	}
+
 	return results
+}
+
+func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
+	if _, err := lookPath("skills-ref"); err == nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckOK,
+			Message: "skills-ref found on PATH",
+		}}
+	}
+	_, uvErr := lookPath("uv")
+	if uvErr != nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckWarn,
+			Message: "uv not found on PATH: SKILL.md spec validation is unavailable",
+			Hint:    `install uv (https://docs.astral.sh/uv/) or "uv tool install skills-ref"`,
+		}}
+	}
+	subDir := findSkillsRefDirFn()
+	if subDir != "" {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckOK,
+			Message: "uv + submodule ready",
+		}}
+	}
+	if repair {
+		if err := installSkillsRefFn(); err != nil {
+			return []domain.DoctorCheck{{
+				Name: "skills-ref", Status: domain.CheckWarn,
+				Message: fmt.Sprintf("uv tool install skills-ref failed: %v", err),
+				Hint:    `try manually: "uv tool install skills-ref"`,
+			}}
+		}
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckFixed,
+			Message: "installed skills-ref via uv tool install",
+		}}
+	}
+	return []domain.DoctorCheck{{
+		Name: "skills-ref", Status: domain.CheckWarn,
+		Message: "uv found but skills-ref not installed",
+		Hint:    `run "sightjack doctor --repair" or "uv tool install skills-ref"`,
+	}}
 }
 
 // ExtractStreamResult parses stream-json output and returns the "result" field

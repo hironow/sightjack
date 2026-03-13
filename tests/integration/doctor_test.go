@@ -278,11 +278,11 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false)
 
 	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
-	if len(results) != 11 {
-		t.Fatalf("expected 11 results, got %d", len(results))
+	if len(results) != 12 {
+		t.Fatalf("expected 12 results, got %d", len(results))
 	}
 	// Config should fail (index 3 in new order)
 	if results[3].Name != "Config" {
@@ -340,11 +340,11 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
 
 	// then
-	if len(results) != 11 {
-		t.Fatalf("expected 11 results, got %d", len(results))
+	if len(results) != 12 {
+		t.Fatalf("expected 12 results, got %d", len(results))
 	}
 	// Config should pass (index 3 in new order)
 	if results[3].Name != "Config" {
@@ -399,11 +399,11 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
 
 	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
-	if len(results) != 11 {
-		t.Fatalf("expected 11 results, got %d: %v", len(results), results)
+	if len(results) != 12 {
+		t.Fatalf("expected 12 results, got %d: %v", len(results), results)
 	}
 	// git binary check (index 0)
 	if results[0].Name != "git" || results[0].Status != domain.CheckOK {
@@ -578,7 +578,7 @@ func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false))
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
 
 	// then: find success-rate result
 	var found bool
@@ -625,7 +625,7 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 	t.Parallel()
 
 	// given: stream-json with many tools/skills/plugins + large hook output
-	initLine := `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Edit","Grep","Glob","Bash","Agent"],"skills":["commit","review","test","deploy","lint","format","debug"],"plugins":["p1","p2","p3","p4","p5"],"mcp_servers":[{"name":"linear","status":"connected"},{"name":"filesystem","status":"connected"},{"name":"github","status":"connected"}]}`
+	initLine := `{"type":"system","subtype":"init","model":"claude-opus-4-6","tools":["Read","Write","Edit","Grep","Glob","Bash","Agent"],"skills":["commit","review","test","deploy","lint","format","debug"],"plugins":[{"name":"p1"},{"name":"p2"},{"name":"p3"},{"name":"p4"},{"name":"p5"}],"mcp_servers":[{"name":"linear","status":"connected"},{"name":"filesystem","status":"connected"},{"name":"github","status":"connected"}]}`
 	largeStdout := strings.Repeat("x", 100000)
 	hookLine := fmt.Sprintf(`{"type":"system","subtype":"hook_response","hook_id":"h1","stdout":"%s","exit_code":0}`, largeStdout)
 	resultLine := `{"type":"result","result":"2"}`
@@ -671,7 +671,7 @@ func TestCheckContextBudget_WarnWithBreakdown(t *testing.T) {
 	t.Parallel()
 
 	// given: stream with many skills (exceeds threshold)
-	initMsg := `{"type":"system","subtype":"init","tools":["Read","Write"],"skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an"],"plugins":["p1","p2","p3","p4","p5"],"mcp_servers":[{"name":"linear","status":"connected"}]}`
+	initMsg := `{"type":"system","subtype":"init","tools":["Read","Write"],"skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an"],"plugins":[{"name":"p1"},{"name":"p2"},{"name":"p3"},{"name":"p4"},{"name":"p5"}],"mcp_servers":[{"name":"linear","status":"connected"}]}`
 	streamJSON := initMsg + "\n"
 
 	// when
