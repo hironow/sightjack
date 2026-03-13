@@ -368,51 +368,44 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		authResult := checkClaudeAuth(mcpOutput, mcpErr)
 		results = append(results, authResult)
 
+		// Linear MCP: skip if auth failed (mcp list output unreliable)
 		if authResult.Status != domain.CheckOK {
 			results = append(results, domain.DoctorCheck{
 				Name:    "linear-mcp",
 				Status:  domain.CheckSkip,
 				Message: "skipped (auth failed)",
 			})
-			results = append(results, domain.DoctorCheck{
-				Name:    "claude-inference",
-				Status:  domain.CheckSkip,
-				Message: "skipped (auth failed)",
-			})
+		} else {
+			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
+		}
+
+		// Inference: runs independently of mcp list result.
+		// MCP config issues don't affect core inference capability.
+		inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
+		inferCmd := newCmd(inferCtx, claudeName, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
+		// Filter CLAUDECODE only for the doctor inference probe to prevent
+		// nested-session errors. Other subprocesses (scan/run/discuss/apply)
+		// must preserve CLAUDECODE for the nested-session guard to work.
+		if inferCmd.Env != nil {
+			inferCmd.Env = platform.FilterEnv(inferCmd.Env, "CLAUDECODE")
+		} else {
+			inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
+		}
+		inferOut, inferErr := inferCmd.Output()
+		inferCancel()
+		inferOutput := string(inferOut)
+		inferResult := checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr)
+		results = append(results, inferResult)
+
+		// Context budget check: skip if inference failed
+		if inferResult.Status != domain.CheckOK {
 			results = append(results, domain.DoctorCheck{
 				Name:    "context-budget",
 				Status:  domain.CheckSkip,
-				Message: "skipped (auth failed)",
+				Message: "skipped (inference failed)",
 			})
 		} else {
-			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
-
-			inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
-			inferCmd := newCmd(inferCtx, claudeName, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
-			// Filter CLAUDECODE only for the doctor inference probe to prevent
-			// nested-session errors. Other subprocesses (scan/run/discuss/apply)
-			// must preserve CLAUDECODE for the nested-session guard to work.
-			if inferCmd.Env != nil {
-				inferCmd.Env = platform.FilterEnv(inferCmd.Env, "CLAUDECODE")
-			} else {
-				inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
-			}
-			inferOut, inferErr := inferCmd.Output()
-			inferCancel()
-			inferOutput := string(inferOut)
-			inferResult := checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr)
-			results = append(results, inferResult)
-
-			// Context budget check: skip if inference failed
-			if inferResult.Status != domain.CheckOK {
-				results = append(results, domain.DoctorCheck{
-					Name:    "context-budget",
-					Status:  domain.CheckSkip,
-					Message: "skipped (inference failed)",
-				})
-			} else {
-				results = append(results, CheckContextBudget(inferOutput, baseDir))
-			}
+			results = append(results, CheckContextBudget(inferOutput, baseDir))
 		}
 	}
 
