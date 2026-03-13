@@ -198,12 +198,14 @@ rules:
       signal.Notify() ではなく signal.NotifyContext() を使用してください。
       signal.NotifyContext は context のキャンセルチェーンに統合され、
       goroutine リークのリスクも低減されます。
+      例外: main.go の two-context shutdown pattern では signal.Notify が必要です。
       Ref: phonewave docs/adr/0008-signal-context-propagation.md
     severity: ERROR
     pattern: signal.Notify(...)
     paths:
       exclude:
         - "*_test.go"
+        - "cmd/*/main.go"
 
   # Rule 11: Execute() without context
   # Source: ADR 0008 — "ExecuteContext(ctx) passes context to cobra root command"
