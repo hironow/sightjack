@@ -1,3 +1,4 @@
+// white-box-reason: testing unexported ContextBudgetReport struct fields and DetailedBreakdown method
 package platform
 
 import "testing"

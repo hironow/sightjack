@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,17 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+func requireDocker(t *testing.T) {
+	t.Helper()
+	dockerPath, err := exec.LookPath("docker")
+	if err != nil || dockerPath == "" {
+		t.Skip("skipping: docker not found in PATH")
+	}
+	if err := exec.Command("docker", "info").Run(); err != nil {
+		t.Skip("skipping: docker daemon not available")
+	}
+}
 
 func buildDoctorContainer(t *testing.T, ctx context.Context) testcontainers.Container {
 	t.Helper()
@@ -111,6 +123,7 @@ func initProject(t *testing.T, ctx context.Context, c testcontainers.Container, 
 }
 
 func TestDoctorRepair_StalePID(t *testing.T) {
+	requireDocker(t)
 	// given: a stale watch.pid with a dead PID
 	ctx := context.Background()
 	c := buildDoctorContainer(t, ctx)
@@ -159,6 +172,7 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 }
 
 func TestDoctorRepair_MissingSkillMD(t *testing.T) {
+	requireDocker(t)
 	// given: initialized project with SKILL.md deleted
 	ctx := context.Background()
 	c := buildDoctorContainer(t, ctx)
@@ -197,6 +211,7 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 }
 
 func TestDoctorRepair_NoRepairFlag(t *testing.T) {
+	requireDocker(t)
 	// given: stale PID file exists but --repair is NOT passed
 	ctx := context.Background()
 	c := buildDoctorContainer(t, ctx)
