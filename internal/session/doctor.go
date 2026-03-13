@@ -392,7 +392,11 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 			// Filter CLAUDECODE only for the doctor inference probe to prevent
 			// nested-session errors. Other subprocesses (scan/run/discuss/apply)
 			// must preserve CLAUDECODE for the nested-session guard to work.
-			inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
+			if inferCmd.Env != nil {
+				inferCmd.Env = platform.FilterEnv(inferCmd.Env, "CLAUDECODE")
+			} else {
+				inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
+			}
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			inferOutput := string(inferOut)
@@ -476,12 +480,6 @@ func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 		}}
 	}
 	subDir := findSkillsRefDirFn(baseDir)
-	if subDir != "" {
-		return []domain.DoctorCheck{{
-			Name: "skills-ref", Status: domain.CheckOK,
-			Message: "uv + submodule ready",
-		}}
-	}
 	if repair {
 		if err := installSkillsRefFn(); err != nil {
 			return []domain.DoctorCheck{{
@@ -490,15 +488,29 @@ func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 				Hint:    `try manually: "uv tool install skills-ref"`,
 			}}
 		}
+		// Verify that skills-ref is now actually on PATH after install.
+		if _, err := lookPath("skills-ref"); err != nil {
+			return []domain.DoctorCheck{{
+				Name: "skills-ref", Status: domain.CheckWarn,
+				Message: "uv tool install succeeded but skills-ref still not on PATH",
+				Hint:    `ensure uv tool bin directory is in PATH`,
+			}}
+		}
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckFixed,
 			Message: "installed skills-ref via uv tool install",
 		}}
 	}
+	hint := `run "sightjack doctor --repair" or "uv tool install skills-ref"`
+	msg := "uv found but skills-ref not installed"
+	if subDir != "" {
+		msg = "uv found and checkout exists but skills-ref not on PATH"
+		hint = `run "uv tool install skills-ref" or "sightjack doctor --repair"`
+	}
 	return []domain.DoctorCheck{{
 		Name: "skills-ref", Status: domain.CheckWarn,
-		Message: "uv found but skills-ref not installed",
-		Hint:    `run "sightjack doctor --repair" or "uv tool install skills-ref"`,
+		Message: msg,
+		Hint:    hint,
 	}}
 }
 
