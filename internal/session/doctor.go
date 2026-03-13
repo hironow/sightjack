@@ -376,7 +376,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 			results = append(results, checkLinearMCP(mcpOutput, mcpErr))
 
 			inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
-			inferCmd := newCmd(inferCtx, claudeName, "--print", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
+			inferCmd := newCmd(inferCtx, claudeName, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			inferOutput := string(inferOut)
