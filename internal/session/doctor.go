@@ -3,15 +3,12 @@ package session
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -450,7 +447,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		pidPath := filepath.Join(baseDir, domain.StateDir, "watch.pid")
 		if data, err := os.ReadFile(pidPath); err == nil {
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-			if pid > 0 && !isProcessAlive(pid) {
+			if pid > 0 && !platform.IsProcessAlive(pid) {
 				_ = os.Remove(pidPath)
 				results = append(results, domain.DoctorCheck{
 					Name: "stale-pid", Status: domain.CheckFixed,
@@ -505,30 +502,6 @@ func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 	}}
 }
 
-// isProcessAlive checks whether a process with the given PID is still running.
-// On Unix, it sends signal 0 and interprets the error. On Windows, Signal(0) is
-// not supported, so FindProcess success alone is used (which on Windows actually
-// checks PID existence).
-func isProcessAlive(pid int) bool {
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-	err = proc.Signal(syscall.Signal(0))
-	if err == nil {
-		return true
-	}
-	// EPERM = alive but can't signal (different user)
-	if errors.Is(err, syscall.EPERM) {
-		return true
-	}
-	// On Windows, Signal(0) is not supported — fall back to FindProcess success
-	// which on Windows actually checks if the PID exists.
-	if runtime.GOOS == "windows" {
-		return true
-	}
-	return false
-}
 
 // ExtractStreamResult parses stream-json output and returns the "result" field
 // from the result message. Used to reuse inference check output for inference validation.
