@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -24,7 +25,7 @@ var installSkillsRefFn = func() error {
 	return cmd.Run()
 }
 
-// findSkillsRefDirFn searches for skills-ref submodule directory.
+// findSkillsRefDirFn searches for skills-ref submodule directory relative to baseDir.
 var findSkillsRefDirFn = findSkillsRefDir
 
 // generateSkillsFn regenerates SKILL.md files. Injectable for testing.
@@ -40,7 +41,7 @@ func OverrideInstallSkillsRef(fn func() error) func() {
 }
 
 // OverrideFindSkillsRefDir replaces the skills-ref directory finder for testing.
-func OverrideFindSkillsRefDir(fn func() string) func() {
+func OverrideFindSkillsRefDir(fn func(string) string) func() {
 	old := findSkillsRefDirFn
 	findSkillsRefDirFn = fn
 	return func() { findSkillsRefDirFn = old }
@@ -53,11 +54,12 @@ func OverrideGenerateSkills(fn func(string, domain.Logger) error) func() {
 	return func() { generateSkillsFn = old }
 }
 
-// findSkillsRefDir searches for skills-ref in common submodule locations.
-func findSkillsRefDir() string {
+// findSkillsRefDir searches for skills-ref in common submodule locations
+// relative to baseDir (the target repository root), not the current working directory.
+func findSkillsRefDir(baseDir string) string {
 	candidates := []string{
-		filepath.Join("..", "skills-ref"),
-		filepath.Join("..", "..", "skills-ref"),
+		filepath.Join(baseDir, "..", "skills-ref"),
+		filepath.Join(baseDir, "..", "..", "skills-ref"),
 	}
 	for _, c := range candidates {
 		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
@@ -390,6 +392,10 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 
 			inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
 			inferCmd := newCmd(inferCtx, claudeName, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
+			// Filter CLAUDECODE only for the doctor inference probe to prevent
+			// nested-session errors. Other subprocesses (scan/run/discuss/apply)
+			// must preserve CLAUDECODE for the nested-session guard to work.
+			inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
 			inferOut, inferErr := inferCmd.Output()
 			inferCancel()
 			inferOutput := string(inferOut)
@@ -437,36 +443,19 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	}
 
 	// --- skills-ref toolchain ---
-	results = append(results, checkSkillsRefToolchain(repair)...)
+	results = append(results, checkSkillsRefToolchain(baseDir, repair)...)
 
 	// --- Repair: stale PID cleanup ---
 	if repair {
 		pidPath := filepath.Join(baseDir, domain.StateDir, "watch.pid")
 		if data, err := os.ReadFile(pidPath); err == nil {
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-			if pid > 0 {
-				proc, _ := os.FindProcess(pid)
-				if proc != nil {
-					sigErr := proc.Signal(syscall.Signal(0))
-					if sigErr != nil && !errors.Is(sigErr, syscall.EPERM) {
-						// ESRCH or other error = truly stale, safe to delete
-						_ = os.Remove(pidPath)
-						results = append(results, domain.DoctorCheck{
-							Name: "stale-pid", Status: domain.CheckFixed,
-							Message: "removed stale PID file",
-						})
-					}
-					// sigErr == nil means process is alive (ours)
-					// EPERM means process is alive but owned by another user
-					// In both cases, do NOT delete the PID file.
-				} else {
-					// proc == nil should not happen on Unix, but treat as stale
-					_ = os.Remove(pidPath)
-					results = append(results, domain.DoctorCheck{
-						Name: "stale-pid", Status: domain.CheckFixed,
-						Message: "removed stale PID file",
-					})
-				}
+			if pid > 0 && !isProcessAlive(pid) {
+				_ = os.Remove(pidPath)
+				results = append(results, domain.DoctorCheck{
+					Name: "stale-pid", Status: domain.CheckFixed,
+					Message: "removed stale PID file",
+				})
 			}
 		}
 	}
@@ -474,7 +463,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	return results
 }
 
-func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
+func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 	if _, err := lookPath("skills-ref"); err == nil {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckOK,
@@ -489,7 +478,7 @@ func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
 			Hint:    `install uv (https://docs.astral.sh/uv/) or "uv tool install skills-ref"`,
 		}}
 	}
-	subDir := findSkillsRefDirFn()
+	subDir := findSkillsRefDirFn(baseDir)
 	if subDir != "" {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckOK,
@@ -514,6 +503,31 @@ func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
 		Message: "uv found but skills-ref not installed",
 		Hint:    `run "sightjack doctor --repair" or "uv tool install skills-ref"`,
 	}}
+}
+
+// isProcessAlive checks whether a process with the given PID is still running.
+// On Unix, it sends signal 0 and interprets the error. On Windows, Signal(0) is
+// not supported, so FindProcess success alone is used (which on Windows actually
+// checks PID existence).
+func isProcessAlive(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	err = proc.Signal(syscall.Signal(0))
+	if err == nil {
+		return true
+	}
+	// EPERM = alive but can't signal (different user)
+	if errors.Is(err, syscall.EPERM) {
+		return true
+	}
+	// On Windows, Signal(0) is not supported — fall back to FindProcess success
+	// which on Windows actually checks if the PID exists.
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	return false
 }
 
 // ExtractStreamResult parses stream-json output and returns the "result" field

@@ -68,14 +68,11 @@ func NewShellCmd(ctx context.Context, cmdLine string, args ...string) *exec.Cmd 
 	allArgs = append(allArgs, cmdArgs...)
 	allArgs = append(allArgs, args...)
 	cmd := exec.CommandContext(ctx, bin, allArgs...)
-	// Always start from os.Environ() and filter CLAUDECODE to prevent
-	// nested-session errors when invoking the Claude CLI as a subprocess.
-	base := FilterEnv(os.Environ(), "CLAUDECODE")
 	if len(env) > 0 {
-		cmd.Env = append(base, env...)
-	} else {
-		cmd.Env = base
+		// Merge parsed KEY=VALUE env vars onto the inherited environment.
+		cmd.Env = append(os.Environ(), env...)
 	}
+	// When env is empty, cmd.Env remains nil → inherits parent environment.
 	return cmd
 }
 

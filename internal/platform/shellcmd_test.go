@@ -2,6 +2,7 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -117,6 +118,32 @@ func TestIsEnvKey(t *testing.T) {
 		if got := isEnvKey(tt.key); got != tt.want {
 			t.Errorf("isEnvKey(%q) = %v, want %v", tt.key, got, tt.want)
 		}
+	}
+}
+
+func TestNewShellCmd_PreservesCLAUDECODE(t *testing.T) {
+	// given: CLAUDECODE is set in the environment
+	t.Setenv("CLAUDECODE", "1")
+
+	// when: NewShellCmd creates a command
+	ctx := context.Background()
+	cmd := NewShellCmd(ctx, "echo", "hello")
+
+	// then: cmd.Env should either be nil (inherit all) or contain CLAUDECODE=1.
+	// It must NOT strip CLAUDECODE — that filtering belongs only in doctor's inference probe.
+	if cmd.Env == nil {
+		// nil means inherit parent env, which includes CLAUDECODE — OK
+		return
+	}
+	found := false
+	for _, e := range cmd.Env {
+		if e == "CLAUDECODE=1" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("NewShellCmd stripped CLAUDECODE from env; want it preserved (got %d env vars)", len(cmd.Env))
 	}
 }
 
