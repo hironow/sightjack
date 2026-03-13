@@ -121,7 +121,7 @@ func TestIsEnvKey(t *testing.T) {
 	}
 }
 
-func TestNewShellCmd_PreservesCLAUDECODE(t *testing.T) {
+func TestNewShellCmd_FiltersCLAUDECODE(t *testing.T) {
 	// given: CLAUDECODE is set in the environment
 	t.Setenv("CLAUDECODE", "1")
 
@@ -129,21 +129,12 @@ func TestNewShellCmd_PreservesCLAUDECODE(t *testing.T) {
 	ctx := context.Background()
 	cmd := NewShellCmd(ctx, "echo", "hello")
 
-	// then: cmd.Env should either be nil (inherit all) or contain CLAUDECODE=1.
-	// It must NOT strip CLAUDECODE — that filtering belongs only in doctor's inference probe.
-	if cmd.Env == nil {
-		// nil means inherit parent env, which includes CLAUDECODE — OK
-		return
-	}
-	found := false
+	// then: cmd.Env must NOT contain CLAUDECODE — it is always stripped
+	// to prevent nested-session errors when invoking the Claude CLI.
 	for _, e := range cmd.Env {
 		if e == "CLAUDECODE=1" {
-			found = true
-			break
+			t.Error("NewShellCmd should strip CLAUDECODE from env to prevent nested-session errors")
 		}
-	}
-	if !found {
-		t.Errorf("NewShellCmd stripped CLAUDECODE from env; want it preserved (got %d env vars)", len(cmd.Env))
 	}
 }
 
