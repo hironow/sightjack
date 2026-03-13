@@ -58,3 +58,8 @@
 | [0007](0007-root-package-io-cleanup.md) | Root Package IO Cleanup |
 | [0008](0008-usecase-adapter-dependency-inversion.md) | Usecase-Adapter Dependency Inversion |
 | [0009](0009-parse-dont-validate-commands.md) | Parse-Don't-Validate Commands |
+| [0010](0010-auto-discuss-adr-generation.md) | Auto-Discuss ADR Generation |
+| [0011](0011-dmail-waiting-mode.md) | D-Mail Waiting Mode |
+| [0012](0012-strictness-redefinition.md) | Strictness Redefinition |
+| [0013](0013-state-format-version-contract.md) | State Format Version Contract |
+| [0015](0015-claude-cli-stream-json-requires-verbose.md) | Claude CLI stream-json Requires --verbose |
