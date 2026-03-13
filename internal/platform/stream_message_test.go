@@ -142,6 +142,40 @@ func TestParseStreamMessage_InitEmptyCollections(t *testing.T) {
 	}
 }
 
+func TestParseStreamMessage_InitWithPluginStrings(t *testing.T) {
+	t.Parallel()
+
+	// given: init message from older Claude CLI (plugins as string array)
+	initJSON := `{
+		"type": "system",
+		"subtype": "init",
+		"session_id": "test-session",
+		"model": "claude-sonnet-4-20250514",
+		"tools": ["Read", "Write"],
+		"plugins": ["superpowers", "linear"]
+	}`
+
+	// when
+	msg, err := ParseStreamMessage([]byte(initJSON))
+
+	// then
+	if err != nil {
+		t.Fatalf("ParseStreamMessage failed: %v", err)
+	}
+	if len(msg.Plugins) != 2 {
+		t.Fatalf("Plugins count = %d, want 2", len(msg.Plugins))
+	}
+	if msg.Plugins[0].Name != "superpowers" {
+		t.Errorf("Plugins[0].Name = %q, want superpowers", msg.Plugins[0].Name)
+	}
+	if msg.Plugins[0].Path != "" {
+		t.Errorf("Plugins[0].Path = %q, want empty for legacy format", msg.Plugins[0].Path)
+	}
+	if msg.Plugins[1].Name != "linear" {
+		t.Errorf("Plugins[1].Name = %q, want linear", msg.Plugins[1].Name)
+	}
+}
+
 func TestPluginInfo_JSONRoundTrip(t *testing.T) {
 	t.Parallel()
 

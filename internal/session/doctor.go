@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -527,7 +528,21 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
 			if pid > 0 {
 				proc, _ := os.FindProcess(pid)
-				if proc == nil || proc.Signal(syscall.Signal(0)) != nil {
+				if proc != nil {
+					sigErr := proc.Signal(syscall.Signal(0))
+					if sigErr != nil && !errors.Is(sigErr, syscall.EPERM) {
+						// ESRCH or other error = truly stale, safe to delete
+						_ = os.Remove(pidPath)
+						results = append(results, domain.DoctorCheck{
+							Name: "stale-pid", Status: domain.CheckFixed,
+							Message: "removed stale PID file",
+						})
+					}
+					// sigErr == nil means process is alive (ours)
+					// EPERM means process is alive but owned by another user
+					// In both cases, do NOT delete the PID file.
+				} else {
+					// proc == nil should not happen on Unix, but treat as stale
 					_ = os.Remove(pidPath)
 					results = append(results, domain.DoctorCheck{
 						Name: "stale-pid", Status: domain.CheckFixed,
@@ -673,6 +688,10 @@ func CheckContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 				result.Hint = ".claude/settings.json をプロジェクトに作成し、必要な MCP server のみ定義を推奨"
 			case "tools":
 				result.Hint = "tools は plugins/MCP 由来 → .claude/settings.json で plugins/MCP を絞ることを推奨"
+			case "skills":
+				result.Hint = "review SKILL.md files in .siren/skills/ for unnecessary content"
+			case "hooks":
+				result.Hint = "review hook configurations for unnecessary output"
 			default:
 				result.Hint = ".claude/settings.json をプロジェクトに作成し、必要なプラグインのみ有効化を推奨"
 			}
