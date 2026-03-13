@@ -1,5 +1,4 @@
-// white-box-reason: tests that inference probe preserves claude_cmd env overrides via newCmd + FilterEnv interaction
-package session
+package session_test
 
 import (
 	"context"

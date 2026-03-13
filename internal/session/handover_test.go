@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/session"
 )
 
 func TestFileHandoverWriter_WritesMarkdown(t *testing.T) {
@@ -18,7 +19,7 @@ func TestFileHandoverWriter_WritesMarkdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := &FileHandoverWriter{}
+	w := &session.FileHandoverWriter{}
 	state := domain.HandoverState{
 		Tool:       "sightjack",
 		Operation:  "wave",
@@ -64,7 +65,7 @@ func TestFileHandoverWriter_OverwritesPrevious(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := &FileHandoverWriter{}
+	w := &session.FileHandoverWriter{}
 	first := domain.HandoverState{
 		Tool: "sightjack", Operation: "wave",
 		Timestamp: time.Now(), InProgress: "first",
@@ -96,7 +97,7 @@ func TestFileHandoverWriter_RespectsContextCancellation(t *testing.T) {
 	cancel() // already cancelled
 
 	dir := t.TempDir()
-	w := &FileHandoverWriter{}
+	w := &session.FileHandoverWriter{}
 	state := domain.HandoverState{
 		Tool: "sightjack", Operation: "wave", Timestamp: time.Now(),
 	}
