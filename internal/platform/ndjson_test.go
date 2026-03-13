@@ -1,3 +1,4 @@
+// white-box-reason: tests unexported NDJSON detection helpers (IsNDJSON, SummarizeNDJSON) for error output suppression
 package platform
 
 import (
