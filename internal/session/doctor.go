@@ -197,16 +197,41 @@ func checkClaudeInference(output string, err error) domain.DoctorCheck {
 	}
 }
 
-// CheckStateDir verifies that the .siren/ state directory exists or can be
-// created, and that it is writable. Uses a temporary file probe to confirm.
-func CheckStateDir(baseDir string) domain.DoctorCheck {
+// CheckStateDir verifies that the .siren/ state directory exists and is
+// writable. When repair is true and the directory is missing, it creates
+// the directory and returns CheckFixed.
+func CheckStateDir(baseDir string, repair bool) domain.DoctorCheck {
 	dir := filepath.Join(baseDir, domain.StateDir)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	info, statErr := os.Stat(dir)
+	if statErr != nil {
+		if !repair {
+			return domain.DoctorCheck{
+				Name:    "State Dir",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("%s not found", dir),
+				Hint:    `run "sightjack init" or "sightjack doctor --repair"`,
+			}
+		}
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return domain.DoctorCheck{
+				Name:    "State Dir",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("cannot create %s: %v", dir, err),
+				Hint:    `check directory permissions or run "sightjack init"`,
+			}
+		}
+		return domain.DoctorCheck{
+			Name:    "State Dir",
+			Status:  domain.CheckFixed,
+			Message: fmt.Sprintf("created %s", dir),
+		}
+	}
+	if !info.IsDir() {
 		return domain.DoctorCheck{
 			Name:    "State Dir",
 			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("cannot create %s: %v", dir, err),
-			Hint:    `check directory permissions or run "sightjack init"`,
+			Message: fmt.Sprintf("%s exists but is not a directory", dir),
+			Hint:    `remove the .siren file and run "sightjack init"`,
 		}
 	}
 	probe := filepath.Join(dir, ".doctor_probe")
@@ -348,7 +373,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	results = append(results, claudeResult)
 
 	// --- State ---
-	results = append(results, CheckStateDir(baseDir))
+	results = append(results, CheckStateDir(baseDir, repair))
 	results = append(results, cfgResult)
 
 	// --- Data ---

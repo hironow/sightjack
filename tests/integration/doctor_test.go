@@ -135,14 +135,27 @@ func TestCheckStateDir_Writable(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result := session.CheckStateDir(dir)
+	result := session.CheckStateDir(dir, false)
 
-	// then
-	if result.Status != domain.CheckOK {
-		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	// then: without repair, missing dir = FAIL
+	if result.Status != domain.CheckFail {
+		t.Errorf("expected CheckFail for missing .siren/ without repair, got %v: %s", result.Status, result.Message)
 	}
 	if result.Name != "State Dir" {
 		t.Errorf("expected name 'State Dir', got %q", result.Name)
+	}
+}
+
+func TestCheckStateDir_RepairCreatesMissing(t *testing.T) {
+	// given: a directory where .siren/ does not exist
+	dir := t.TempDir()
+
+	// when: repair=true
+	result := session.CheckStateDir(dir, true)
+
+	// then: should create and return Fixed
+	if result.Status != domain.CheckFixed {
+		t.Errorf("expected CheckFixed, got %v: %s", result.Status, result.Message)
 	}
 }
 
@@ -153,7 +166,7 @@ func TestCheckStateDir_NotWritable(t *testing.T) {
 	defer os.Chmod(dir, 0755) // cleanup
 
 	// when
-	result := session.CheckStateDir(dir)
+	result := session.CheckStateDir(dir, true)
 
 	// then
 	if result.Status != domain.CheckFail {
@@ -167,7 +180,7 @@ func TestCheckStateDir_ExistingDir(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 
 	// when
-	result := session.CheckStateDir(dir)
+	result := session.CheckStateDir(dir, false)
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -393,6 +406,8 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	fakeClaude := buildFakeClaude(t)
 
 	dir := t.TempDir()
+	// Create .siren/ so CheckStateDir reports OK without repair
+	os.MkdirAll(filepath.Join(dir, ".siren"), 0755)
 	cfgPath := filepath.Join(dir, "sightjack.yaml")
 	os.WriteFile(cfgPath, []byte("tracker:\n  team: \"Test\"\n  project: \"Project\"\nclaude_cmd: \""+fakeClaude+"\"\n"), 0644)
 
@@ -401,7 +416,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
 
-	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
+	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, skills-ref, success-rate)
 	if len(results) != 12 {
 		t.Fatalf("expected 12 results, got %d: %v", len(results), results)
 	}

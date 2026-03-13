@@ -45,7 +45,7 @@ func TestCheckTool_NotFound_HasHint(t *testing.T) {
 
 func TestCheckStateDir_CannotCreate_HasHint(t *testing.T) {
 	// given — /dev/null is not a directory, MkdirAll will fail
-	result := session.CheckStateDir("/dev/null")
+	result := session.CheckStateDir("/dev/null", true)
 
 	// when/then
 	if result.Status != domain.CheckFail {
