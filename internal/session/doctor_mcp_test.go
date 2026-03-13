@@ -11,7 +11,7 @@ import (
 
 func TestCheckClaudeAuth_Success(t *testing.T) {
 	// given: mcp list succeeded
-	result := checkClaudeAuth("linear  ✓  connected\n", nil)
+	result := checkClaudeAuth("linear  ✓  connected\n", nil, "claude")
 
 	// then
 	if result.Status != domain.CheckOK {
@@ -21,7 +21,7 @@ func TestCheckClaudeAuth_Success(t *testing.T) {
 
 func TestCheckClaudeAuth_Error(t *testing.T) {
 	// given: mcp list failed
-	result := checkClaudeAuth("", errors.New("exit status 1"))
+	result := checkClaudeAuth("", errors.New("exit status 1"), "claude")
 
 	// then
 	if result.Status != domain.CheckWarn {
@@ -29,6 +29,22 @@ func TestCheckClaudeAuth_Error(t *testing.T) {
 	}
 	if result.Name != "claude-auth" {
 		t.Errorf("expected name 'claude-auth', got %q", result.Name)
+	}
+}
+
+func TestCheckClaudeAuth_WithEnvPrefix(t *testing.T) {
+	// given: mcp list failed with env-prefixed command
+	result := checkClaudeAuth("", errors.New("exit status 1"), "CLAUDE_CONFIG_DIR=/foo claude")
+
+	// then
+	if result.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v: %s", result.Status, result.Message)
+	}
+	if !strings.Contains(result.Hint, "CLAUDE_CONFIG_DIR=/foo") {
+		t.Errorf("expected hint to include env prefix, got: %s", result.Hint)
+	}
+	if !strings.Contains(result.Hint, "login") {
+		t.Errorf("expected hint to mention login, got: %s", result.Hint)
 	}
 }
 

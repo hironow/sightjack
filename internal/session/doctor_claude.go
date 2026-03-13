@@ -10,13 +10,15 @@ import (
 // checkClaudeAuth determines if the Claude CLI is authenticated by
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
-func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
+// claudeCmd is the configured command string (may include env prefix).
+func checkClaudeAuth(mcpOutput string, mcpErr error, claudeCmd string) domain.DoctorCheck {
 	if mcpErr != nil {
+		hint := buildLoginHint(claudeCmd)
 		return domain.DoctorCheck{
 			Name:    "claude-auth",
 			Status:  domain.CheckWarn,
 			Message: "not authenticated: " + mcpErr.Error(),
-			Hint:    `run "claude login" to authenticate`,
+			Hint:    hint,
 		}
 	}
 	return domain.DoctorCheck{
@@ -24,6 +26,31 @@ func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
 		Status:  domain.CheckOK,
 		Message: "authenticated",
 	}
+}
+
+// buildLoginHint constructs a login hint that preserves any env prefix
+// from the configured claude command (e.g. "CLAUDE_CONFIG_DIR=/path claude").
+func buildLoginHint(claudeCmd string) string {
+	envPrefix := extractEnvPrefix(claudeCmd)
+	if envPrefix == "" {
+		return `run "claude login" to authenticate`
+	}
+	return fmt.Sprintf(`run "%s claude login" to authenticate`, envPrefix)
+}
+
+// extractEnvPrefix extracts leading KEY=VALUE pairs from a command string.
+// Returns the env prefix portion or empty string if none.
+func extractEnvPrefix(cmd string) string {
+	parts := strings.Fields(cmd)
+	var envParts []string
+	for _, p := range parts {
+		if strings.Contains(p, "=") {
+			envParts = append(envParts, p)
+		} else {
+			break
+		}
+	}
+	return strings.Join(envParts, " ")
 }
 
 // checkLinearMCP parses `claude mcp list` output for Linear MCP connection.

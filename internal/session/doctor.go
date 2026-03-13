@@ -365,7 +365,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		mcpCancel()
 		mcpOutput := string(out)
 
-		authResult := checkClaudeAuth(mcpOutput, mcpErr)
+		authResult := checkClaudeAuth(mcpOutput, mcpErr, claudeName)
 		results = append(results, authResult)
 
 		// Linear MCP: skip if auth failed (mcp list output unreliable)
