@@ -158,6 +158,150 @@ func TestConfigCmd_Show_FailsWithoutInit(t *testing.T) {
 	}
 }
 
+func TestConfigCmd_SetAllKeys(t *testing.T) {
+	tests := []struct {
+		key      string
+		value    string
+		contains string
+	}{
+		// tracker keys
+		{"tracker.team", "NEWTEAM", "team: NEWTEAM"},
+		{"tracker.project", "MyProj", "project: MyProj"},
+		{"tracker.cycle", "2026-Q1", "cycle: 2026-Q1"},
+		// lang
+		{"lang", "en", "lang: en"},
+		// strictness
+		{"strictness.default", "alert", "default: alert"},
+		// scan
+		{"scan.chunk_size", "20", "chunk_size: 20"},
+		{"scan.max_concurrency", "4", "max_concurrency: 4"},
+		// assistant aliases
+		{"model", "sonnet", "model: sonnet"},
+		{"claude_cmd", "claude-dev", "claude_cmd: claude-dev"},
+		{"timeout_sec", "120", "timeout_sec: 120"},
+		// scribe
+		{"scribe.enabled", "true", "enabled: true"},
+		{"scribe.auto_discuss_rounds", "3", "auto_discuss_rounds: 3"},
+		// retry
+		{"retry.max_attempts", "5", "max_attempts: 5"},
+		{"retry.base_delay_sec", "10", "base_delay_sec: 10"},
+		// gate
+		{"gate.auto_approve", "true", "auto_approve: true"},
+		{"gate.notify_cmd", "notify-send", "notify_cmd: notify-send"},
+		{"gate.approve_cmd", "approve-it", "approve_cmd: approve-it"},
+		{"gate.review_cmd", "pnpm lint", "review_cmd: pnpm lint"},
+		{"gate.review_budget", "3", "review_budget: 3"},
+		{"gate.wait_timeout", "45m0s", "wait_timeout: 45m0s"},
+		// labels
+		{"labels.enabled", "true", "enabled: true"},
+		{"labels.prefix", "sj-", "prefix: sj-"},
+		{"labels.ready_label", "ready-to-wave", "ready_label: ready-to-wave"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			// given
+			dir := initProject(t)
+
+			rootCmd := cmd.NewRootCommand()
+			buf := new(bytes.Buffer)
+			rootCmd.SetOut(buf)
+			rootCmd.SetErr(buf)
+			rootCmd.SetArgs([]string{"config", "set", tt.key, tt.value, dir})
+
+			// when
+			err := rootCmd.Execute()
+
+			// then
+			if err != nil {
+				t.Fatalf("config set %s=%s failed: %v", tt.key, tt.value, err)
+			}
+			data, readErr := os.ReadFile(domain.ConfigPath(dir))
+			if readErr != nil {
+				t.Fatalf("read config: %v", readErr)
+			}
+			if !strings.Contains(string(data), tt.contains) {
+				t.Errorf("expected %q in config, got:\n%s", tt.contains, string(data))
+			}
+		})
+	}
+}
+
+func TestConfigCmd_Set_RejectsUnknownKey(t *testing.T) {
+	// given
+	dir := initProject(t)
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"config", "set", "nonexistent.key", "value", dir})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for unknown config key")
+	}
+	if !strings.Contains(err.Error(), "unknown") {
+		t.Errorf("expected 'unknown' in error, got: %s", err.Error())
+	}
+}
+
+func TestConfigCmd_Set_RejectsInvalidLang(t *testing.T) {
+	// given
+	dir := initProject(t)
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"config", "set", "lang", "fr", dir})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for invalid lang 'fr'")
+	}
+}
+
+func TestConfigCmd_Set_RejectsInvalidIntValue(t *testing.T) {
+	// given
+	dir := initProject(t)
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"config", "set", "scan.chunk_size", "not-a-number", dir})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for non-integer value")
+	}
+}
+
+func TestConfigCmd_Set_RejectsInvalidBoolValue(t *testing.T) {
+	// given
+	dir := initProject(t)
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"config", "set", "gate.auto_approve", "maybe", dir})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for invalid bool value")
+	}
+}
+
 func TestConfigCmd_Set_FailsWithoutInit(t *testing.T) {
 	// given: uninitialized directory — config file does not exist
 	dir := t.TempDir()
