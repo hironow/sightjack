@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/hironow/sightjack/internal/cmd"
 	"github.com/hironow/sightjack/internal/domain"
 )
@@ -347,5 +349,29 @@ func TestInitCmd_MissingTeamFlag_UsesDefault(t *testing.T) {
 	cfgPath := domain.ConfigPath(dir)
 	if _, readErr := os.Stat(cfgPath); readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
+	}
+}
+
+func TestInitCmd_OtelFlags_Exist(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+
+	// when — find init subcommand
+	var initCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "init" {
+			initCmd = sub
+			break
+		}
+	}
+	if initCmd == nil {
+		t.Fatal("init subcommand not found")
+	}
+
+	// then — otel flags exist
+	for _, flag := range []string{"otel-backend", "otel-entity", "otel-project"} {
+		if initCmd.Flags().Lookup(flag) == nil {
+			t.Errorf("init flag --%s not found", flag)
+		}
 	}
 }

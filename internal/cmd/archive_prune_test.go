@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/hironow/sightjack/internal/cmd"
 	"github.com/hironow/sightjack/internal/domain"
 )
@@ -137,5 +139,76 @@ func TestArchivePruneCmd_JSONOutput_Execute(t *testing.T) {
 	}
 	if result.EventDeleted != 1 {
 		t.Errorf("event_deleted = %d, want 1", result.EventDeleted)
+	}
+}
+
+func TestArchivePruneCmd_RebuildIndexFlag_Exists(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+
+	// when — find archive-prune subcommand
+	var apCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "archive-prune" {
+			apCmd = sub
+			break
+		}
+	}
+	if apCmd == nil {
+		t.Fatal("archive-prune subcommand not found")
+	}
+
+	// then
+	f := apCmd.Flags().Lookup("rebuild-index")
+	if f == nil {
+		t.Fatal("--rebuild-index flag not found on archive-prune")
+	}
+}
+
+func TestArchivePruneCmd_RebuildIndex_ConflictsWithExecute(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"archive-prune", "--rebuild-index", "--execute", dir})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then — should fail
+	if err == nil {
+		t.Fatal("expected error when combining --rebuild-index with --execute")
+	}
+	if !strings.Contains(err.Error(), "rebuild-index") {
+		t.Errorf("error should mention rebuild-index, got: %v", err)
+	}
+}
+
+func TestArchivePruneCmd_RebuildIndex_CreatesIndex(t *testing.T) {
+	// given — state directory with archive subdirectory
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, ".siren")
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0o755)
+	os.WriteFile(filepath.Join(archiveDir, "2025-01-01.jsonl"), []byte(`{"id":"1","tool":"sightjack"}`+"\n"), 0o644)
+
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"archive-prune", "--rebuild-index", dir})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then — should succeed and create index file
+	if err != nil {
+		t.Fatalf("--rebuild-index failed: %v", err)
+	}
+	indexPath := filepath.Join(archiveDir, "index.jsonl")
+	if _, statErr := os.Stat(indexPath); os.IsNotExist(statErr) {
+		t.Error("expected index.jsonl to be created by --rebuild-index")
 	}
 }
