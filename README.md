@@ -242,7 +242,7 @@ Running `sightjack` without a subcommand defaults to `scan` (classify and deep-s
 | `sightjack update` | Self-update to the latest GitHub release (`-C` to check only) |
 | `sightjack status` | Show sightjack operational status |
 | `sightjack clean` | Remove state directory (`.siren/`) |
-| `sightjack archive-prune` | Remove expired scan archives (`-x` to execute, default: dry-run) |
+| `sightjack archive-prune` | Remove expired scan archives (`-x` to execute, `--rebuild-index` to rebuild JSONL index) |
 
 ### Pipe-friendly (Unix pipeline)
 
@@ -325,6 +325,7 @@ sightjack update                 # check and install
 # Archive pruning
 sightjack archive-prune -d 14   # 14-day retention (dry-run)
 sightjack archive-prune -x      # execute deletion
+sightjack archive-prune --rebuild-index  # rebuild archive index
 ```
 
 ### Unix pipeline
