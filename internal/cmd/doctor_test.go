@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/hironow/sightjack/internal/domain"
 )
 
@@ -69,5 +71,31 @@ func TestPrintDoctorJSON_NoFailNoError(t *testing.T) {
 	// then
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestDoctorCmd_RepairFlag_Exists(t *testing.T) {
+	// given
+	rootCmd := NewRootCommand()
+
+	// when — find doctor subcommand
+	var doctorCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "doctor" {
+			doctorCmd = sub
+			break
+		}
+	}
+	if doctorCmd == nil {
+		t.Fatal("doctor subcommand not found")
+	}
+
+	// then
+	f := doctorCmd.Flags().Lookup("repair")
+	if f == nil {
+		t.Fatal("--repair flag not found on doctor command")
+	}
+	if f.DefValue != "false" {
+		t.Errorf("--repair default = %q, want %q", f.DefValue, "false")
 	}
 }

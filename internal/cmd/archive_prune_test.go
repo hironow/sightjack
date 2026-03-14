@@ -186,6 +186,35 @@ func TestArchivePruneCmd_RebuildIndex_ConflictsWithExecute(t *testing.T) {
 	}
 }
 
+func TestArchivePruneCmd_YesFlag_Exists(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+
+	// when — find archive-prune subcommand
+	var apCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "archive-prune" {
+			apCmd = sub
+			break
+		}
+	}
+	if apCmd == nil {
+		t.Fatal("archive-prune subcommand not found")
+	}
+
+	// then
+	f := apCmd.Flags().Lookup("yes")
+	if f == nil {
+		t.Fatal("--yes flag not found on archive-prune")
+	}
+	if f.DefValue != "false" {
+		t.Errorf("--yes default = %q, want %q", f.DefValue, "false")
+	}
+	if f.Shorthand != "y" {
+		t.Errorf("--yes shorthand = %q, want %q", f.Shorthand, "y")
+	}
+}
+
 func TestArchivePruneCmd_RebuildIndex_CreatesIndex(t *testing.T) {
 	// given — state directory with archive subdirectory
 	dir := t.TempDir()
