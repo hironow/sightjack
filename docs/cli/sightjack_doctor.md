@@ -29,6 +29,12 @@ sightjack doctor [path] [flags]
 
   # Check a specific project directory
   sightjack doctor /path/to/project
+
+  # JSON output for scripting
+  sightjack doctor -o json
+
+  # Auto-fix repairable issues
+  sightjack doctor --repair
 ```
 
 ### Options
@@ -52,5 +58,4 @@ sightjack doctor [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear

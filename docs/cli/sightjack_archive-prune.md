@@ -29,6 +29,9 @@ sightjack archive-prune [path] [flags]
 
   # Custom retention period
   sightjack archive-prune --days 7 --execute
+
+  # Rebuild archive index from existing files
+  sightjack archive-prune --rebuild-index
 ```
 
 ### Options
@@ -54,5 +57,4 @@ sightjack archive-prune [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear

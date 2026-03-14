@@ -13,8 +13,13 @@ sightjack clean [path] [flags]
 ### Examples
 
 ```
+  # Clean current directory
   sightjack clean
+
+  # Clean a specific project
   sightjack clean /path/to/project
+
+  # Skip confirmation prompt
   sightjack clean --yes
 ```
 
@@ -38,5 +43,4 @@ sightjack clean [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear

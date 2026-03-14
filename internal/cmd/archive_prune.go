@@ -38,7 +38,10 @@ Pass --execute to actually remove the files.`,
   sightjack archive-prune -o json
 
   # Custom retention period
-  sightjack archive-prune --days 7 --execute`,
+  sightjack archive-prune --days 7 --execute
+
+  # Rebuild archive index from existing files
+  sightjack archive-prune --rebuild-index`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if execute && dryRun {
