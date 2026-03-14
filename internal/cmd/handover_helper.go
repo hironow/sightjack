@@ -13,7 +13,7 @@ import (
 // tryWriteHandover writes a handover document if the error is due to context
 // cancellation and the outer (shutdown) context is still alive. Returns the
 // original error unchanged.
-func tryWriteHandover(ctx context.Context, err error, repoDir string, inProgress string, logger domain.Logger) error {
+func tryWriteHandover(ctx context.Context, err error, repoDir string, state domain.HandoverState, logger domain.Logger) error {
 	if err == nil || !errors.Is(err, context.Canceled) {
 		return err
 	}
@@ -23,12 +23,7 @@ func tryWriteHandover(ctx context.Context, err error, repoDir string, inProgress
 	}
 
 	hw := &session.FileHandoverWriter{}
-	state := domain.HandoverState{
-		Tool:       "sightjack",
-		Operation:  "wave",
-		Timestamp:  time.Now(),
-		InProgress: inProgress,
-	}
+	state.Timestamp = time.Now()
 	stateDir := filepath.Join(repoDir, domain.StateDir)
 	if hwErr := hw.WriteHandover(outerCtx, stateDir, state); hwErr != nil {
 		if logger != nil {
