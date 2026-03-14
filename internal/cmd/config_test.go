@@ -3,7 +3,6 @@ package cmd_test
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -305,8 +304,6 @@ func TestConfigCmd_Set_RejectsInvalidBoolValue(t *testing.T) {
 func TestConfigCmd_Set_FailsWithoutInit(t *testing.T) {
 	// given: uninitialized directory — config file does not exist
 	dir := t.TempDir()
-	// Ensure the .siren directory does not exist
-	cfgPath := filepath.Join(dir, ".siren", "config.yaml")
 
 	rootCmd := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
@@ -319,9 +316,6 @@ func TestConfigCmd_Set_FailsWithoutInit(t *testing.T) {
 
 	// then: should fail because config file doesn't exist
 	if err == nil {
-		// If it somehow succeeds, the file should not have been created from scratch
-		if _, statErr := os.Stat(cfgPath); statErr == nil {
-			t.Fatal("expected error for uninitialized config set, but command succeeded and created config")
-		}
+		t.Fatal("expected error for uninitialized config set, but command succeeded")
 	}
 }

@@ -3,7 +3,6 @@ package cmd_test
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/cmd"
@@ -60,7 +59,7 @@ func TestStatusCmd_RejectsTooManyArgs(t *testing.T) {
 }
 
 func TestStatusCmd_RunsOnUninitializedDir(t *testing.T) {
-	// given: status should work even without init (shows empty state)
+	// given: status returns empty report for uninitialized dirs (no error)
 	dir := t.TempDir()
 	root := cmd.NewRootCommand()
 	var stdout, stderr bytes.Buffer
@@ -71,13 +70,9 @@ func TestStatusCmd_RunsOnUninitializedDir(t *testing.T) {
 	// when
 	err := root.Execute()
 
-	// then: status should not fail — it should report "no state" gracefully
+	// then: status must succeed (returns empty report, not an error)
 	if err != nil {
-		errMsg := err.Error()
-		// Only fail if it's an unexpected error (not init-related)
-		if !strings.Contains(errMsg, "init") && !strings.Contains(errMsg, "siren") {
-			t.Errorf("unexpected error: %v", err)
-		}
+		t.Fatalf("status should succeed on uninitialized dir, got: %v", err)
 	}
 }
 
