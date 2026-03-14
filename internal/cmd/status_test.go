@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -96,5 +97,27 @@ func TestStatusCmd_RunsOnInitializedDir(t *testing.T) {
 	// then
 	if err != nil {
 		t.Fatalf("status on initialized dir failed: %v", err)
+	}
+}
+
+func TestStatusCmd_JSONOutput(t *testing.T) {
+	// given: initialized project
+	dir := initProject(t)
+
+	root := cmd.NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"status", "-o", "json", dir})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("status -o json failed: %v", err)
+	}
+	if !json.Valid(stdout.Bytes()) {
+		t.Errorf("stdout is not valid JSON: %s", stdout.String())
 	}
 }

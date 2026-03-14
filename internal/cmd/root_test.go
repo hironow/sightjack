@@ -175,3 +175,22 @@ func TestNoColorFlag_Exists(t *testing.T) {
 		t.Errorf("--no-color default = %q, want %q", f.DefValue, "false")
 	}
 }
+
+func TestRootCmd_OutputFlagExists(t *testing.T) {
+	// given
+	rootCmd := NewRootCommand()
+
+	// when
+	f := rootCmd.PersistentFlags().Lookup("output")
+
+	// then
+	if f == nil {
+		t.Fatal("--output flag not found")
+	}
+	if f.DefValue != "text" {
+		t.Errorf("default = %q, want text", f.DefValue)
+	}
+	if f.Shorthand != "o" {
+		t.Errorf("shorthand = %q, want o", f.Shorthand)
+	}
+}
