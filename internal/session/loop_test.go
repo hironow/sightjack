@@ -379,7 +379,7 @@ func TestReportNextgenOrchestration_WaveCapReached(t *testing.T) {
 		{
 			Name:         "auth",
 			Completeness: 0.5,
-			Issues: []domain.IssueDetail{{Identifier: "AUTH-100"}},
+			Issues:       []domain.IssueDetail{{Identifier: "AUTH-100"}},
 		},
 	}
 	waves := make([]domain.Wave, domain.MaxWavesPerCluster)

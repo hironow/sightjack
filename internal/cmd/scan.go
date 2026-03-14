@@ -68,7 +68,7 @@ Use --json to output structured JSON for piping into downstream commands.`,
 			scanCmd := domain.NewRunScanCommand(rp, dryRun)
 			result, err := usecase.RunScan(cmd.Context(), scanCmd, cfg, baseDir, sessionID, dryRun, streamOut, logger, session.NewScanRunnerAdapter(), session.NewRecorderFactoryAdapter())
 			if err != nil {
-					_ = tryWriteHandover(cmd.Context(), err, baseDir, domain.HandoverState{
+				_ = tryWriteHandover(cmd.Context(), err, baseDir, domain.HandoverState{
 					Tool:       "sightjack",
 					Operation:  "wave",
 					InProgress: fmt.Sprintf("Scan in %s", baseDir),

@@ -507,7 +507,6 @@ func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 	}}
 }
 
-
 // ExtractStreamResult parses stream-json output and returns the "result" field
 // from the result message. Used to reuse inference check output for inference validation.
 func ExtractStreamResult(streamJSON string) string {
@@ -610,4 +609,3 @@ func CheckContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 
 	return result
 }
-
