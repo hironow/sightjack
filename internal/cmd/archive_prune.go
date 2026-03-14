@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -47,6 +49,23 @@ Pass --execute to actually remove the files.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 			logger := loggerFrom(cmd)
+
+			rebuildIndex, _ := cmd.Flags().GetBool("rebuild-index")
+			if rebuildIndex {
+				if execute {
+					return fmt.Errorf("--rebuild-index cannot be combined with --execute")
+				}
+				stateDir := filepath.Join(baseDir, domain.StateDir)
+				indexPath := filepath.Join(stateDir, "archive", "index.jsonl")
+				iw := &session.IndexWriter{}
+				n, rbErr := iw.Rebuild(indexPath, stateDir, "sightjack")
+				if rbErr != nil {
+					return fmt.Errorf("rebuild index: %w", rbErr)
+				}
+				logger.Info("Rebuilt index: %d entries → %s", n, indexPath)
+				return nil
+			}
+
 			outputFmt, _ := cmd.Flags().GetString("output")
 
 			files, err := session.ListExpiredArchive(baseDir, days, logger)
@@ -74,6 +93,11 @@ Pass --execute to actually remove the files.`,
 					EventFiles:        eventFiles,
 				}
 				if execute {
+					// Index archive candidates before deletion
+					if len(files) > 0 {
+						stateDir := filepath.Join(baseDir, domain.StateDir)
+						indexSightjackArchive(files, stateDir, logger)
+					}
 					if len(files) > 0 {
 						deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
 						if delErr != nil {
@@ -148,6 +172,12 @@ Pass --execute to actually remove the files.`,
 				}
 			}
 
+			// Index archive candidates before deletion
+			if len(files) > 0 {
+				stateDir := filepath.Join(baseDir, domain.StateDir)
+				indexSightjackArchive(files, stateDir, logger)
+			}
+
 			if len(files) > 0 {
 				deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
 				if delErr != nil {
@@ -179,6 +209,29 @@ Pass --execute to actually remove the files.`,
 	cmd.Flags().BoolVarP(&execute, "execute", "x", false, "Execute archive pruning (default: dry-run)")
 	cmd.Flags().IntVarP(&days, "days", "d", 30, "Retention days for archive-prune")
 	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().Bool("rebuild-index", false, "Rebuild the archive index from existing files")
 
 	return cmd
+}
+
+func indexSightjackArchive(files []string, stateDir string, logger domain.Logger) {
+	archiveDir := filepath.Join(stateDir, "archive")
+	var indexEntries []domain.IndexEntry
+	for _, f := range files {
+		if filepath.Ext(f) != ".md" {
+			continue
+		}
+		fullPath := filepath.Join(archiveDir, f)
+		indexEntries = append(indexEntries, session.ExtractMeta(fullPath, stateDir, "sightjack"))
+	}
+	if len(indexEntries) == 0 {
+		return
+	}
+	indexPath := filepath.Join(stateDir, "archive", "index.jsonl")
+	iw := &session.IndexWriter{}
+	if err := iw.Append(indexPath, indexEntries); err != nil {
+		logger.Warn("index append: %v", err)
+	} else {
+		logger.Info("Indexed %d entries → %s", len(indexEntries), indexPath)
+	}
 }
