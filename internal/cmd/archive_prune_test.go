@@ -237,7 +237,7 @@ func TestArchivePruneCmd_RebuildIndex_CreatesIndex(t *testing.T) {
 		t.Fatalf("--rebuild-index failed: %v", err)
 	}
 	indexPath := filepath.Join(archiveDir, "index.jsonl")
-	if _, statErr := os.Stat(indexPath); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(indexPath); errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("expected index.jsonl to be created by --rebuild-index")
 	}
 }
