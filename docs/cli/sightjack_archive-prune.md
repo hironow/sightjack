@@ -29,19 +29,16 @@ sightjack archive-prune [path] [flags]
 
   # Custom retention period
   sightjack archive-prune --days 7 --execute
-
-  # Rebuild archive index from existing files
-  sightjack archive-prune --rebuild-index
 ```
 
 ### Options
 
 ```
-  -d, --days int       Retention days for archive-prune (default 30)
-  -x, --execute        Execute archive pruning (default: dry-run)
-  -h, --help           help for archive-prune
-      --rebuild-index  Rebuild archive index from existing files without pruning
-  -y, --yes            Skip confirmation prompt
+  -d, --days int        Retention days for archive-prune (default 30)
+  -x, --execute         Execute archive pruning (default: dry-run)
+  -h, --help            help for archive-prune
+      --rebuild-index   Rebuild the archive index from existing files
+  -y, --yes             Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
