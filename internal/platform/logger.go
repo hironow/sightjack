@@ -23,12 +23,12 @@ var _ domain.BannerLogger = (*Logger)(nil)
 //
 // Respects NO_COLOR (https://no-color.org/) and auto-detects terminal output.
 const (
-	ansiReset     = "\033[0m"
-	ansiCyan      = "\033[36m"   // INFO — blue axis, universally visible
+	ansiReset    = "\033[0m"
+	ansiCyan     = "\033[36m"   // INFO — blue axis, universally visible
 	ansiBoldBlue = "\033[1;34m" // OK   — blue axis, universally visible for red-green CVD
-	ansiYellow    = "\033[33m"   // WARN — yellow axis, safe for common CVD
-	ansiBoldRed   = "\033[1;31m" // ERR  — convention + bold brightness for CVD
-	ansiGray      = "\033[90m"   // DBUG — brightness-only, no hue dependency
+	ansiYellow   = "\033[33m"   // WARN — yellow axis, safe for common CVD
+	ansiBoldRed  = "\033[1;31m" // ERR  — convention + bold brightness for CVD
+	ansiGray     = "\033[90m"   // DBUG — brightness-only, no hue dependency
 
 	ansiInvertGreen = "\033[7;32m" // SEND banner — CVD-safe green inversion
 	ansiInvertCyan  = "\033[7;36m" // RECV banner — CVD-safe cyan inversion

@@ -14,8 +14,13 @@ func newCleanCmd() *cobra.Command {
 		Use:   "clean [path]",
 		Short: "Remove state directory (.siren/)",
 		Long:  "Delete the .siren/ directory to reset to a clean state. Use 'sightjack init' to reinitialize.",
-		Example: `  sightjack clean
+		Example: `  # Clean current directory
+  sightjack clean
+
+  # Clean a specific project
   sightjack clean /path/to/project
+
+  # Skip confirmation prompt
   sightjack clean --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

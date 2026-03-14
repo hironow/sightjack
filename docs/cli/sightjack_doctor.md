@@ -29,6 +29,12 @@ sightjack doctor [path] [flags]
 
   # Check a specific project directory
   sightjack doctor /path/to/project
+
+  # JSON output for scripting
+  sightjack doctor -o json
+
+  # Auto-fix repairable issues
+  sightjack doctor --repair
 ```
 
 ### Options

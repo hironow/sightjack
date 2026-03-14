@@ -225,141 +225,56 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime. Th
 
 ## Subcommands
 
-Running `sightjack` without a subcommand defaults to `scan` (classify and deep-scan Linear issues). Unlike the other three tools (phonewave, amadeus, paintress) which default to `run`, sightjack's primary operation is scanning — the interactive `run` loop builds on top of scan results.
+Running `sightjack` without a subcommand defaults to `scan` (classify and deep-scan Linear issues).
 
 ### Interactive
 
 | Command | Description |
 |---------|-------------|
-| `sightjack scan` | Classify and deep-scan Linear issues (default when no subcommand given) |
-| `sightjack run` | Interactive wave approval and apply loop (auto-resumes from state) |
-| `sightjack show` | Display last scan results (or pipe JSON from stdin) |
-| `sightjack init` | Initialize `.siren/config.yaml` interactively (`--force` to overwrite) |
-| `sightjack doctor` | Check environment, tools, skills, event store integrity, context-budget (per-item diagnostics), Docker |
-| `sightjack config show` | Display current configuration |
-| `sightjack config set` | Set a configuration value (e.g., `config set strictness.default alert`) |
-| `sightjack version` | Print version, commit, date, and Go version (`-j` for JSON) |
-| `sightjack update` | Self-update to the latest GitHub release (`-C` to check only) |
-| `sightjack status` | Show sightjack operational status |
-| `sightjack clean` | Remove state directory (`.siren/`) |
-| `sightjack archive-prune` | Remove expired scan archives (`-x` to execute, default: dry-run) |
+| `scan` | Classify and deep-scan Linear issues (default) |
+| `run` | Interactive wave approval and apply loop |
+| `show` | Display last scan results |
+| `init` | Initialize `.siren/config.yaml` |
+| `doctor` | Check environment health |
+| `config show` / `config set` | View or update configuration |
+| `status` | Show operational status |
+| `clean` | Remove state directory |
+| `archive-prune` | Remove expired scan archives |
+| `version` | Print version info |
+| `update` | Self-update to the latest release |
 
 ### Pipe-friendly (Unix pipeline)
 
-Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stderr. Interactive prompts use `/dev/tty` (falls back to `CONIN$` on Windows).
+Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stderr.
 
-| Command | stdin | stdout | Description |
-|---------|-------|--------|-------------|
-| `sightjack scan --json` | — | `ScanResult` | Scan and output structured JSON |
-| `sightjack waves` | `ScanResult` | `WavePlan` | Generate execution waves |
-| `sightjack select` | `WavePlan` | `Wave` | Interactive wave selection (tty) |
-| `sightjack discuss` | `Wave` | `DiscussResult` | Architect discussion (tty) |
-| `sightjack apply` | `Wave` | `ApplyResult` | Apply wave actions to Linear |
-| `sightjack adr` | `DiscussResult` | ADR Markdown | Generate ADR document |
-| `sightjack nextgen` | `ApplyResult` | `WavePlan` | Generate follow-up waves |
-| `sightjack show` | `ScanResult` or `WavePlan` | human-readable | Render piped JSON for display |
+| Command | stdin | stdout |
+|---------|-------|--------|
+| `scan --json` | — | `ScanResult` |
+| `waves` | `ScanResult` | `WavePlan` |
+| `select` | `WavePlan` | `Wave` |
+| `discuss` | `Wave` | `DiscussResult` |
+| `apply` | `Wave` | `ApplyResult` |
+| `adr` | `DiscussResult` | ADR Markdown |
+| `nextgen` | `ApplyResult` | `WavePlan` |
+| `show` | `ScanResult` or `WavePlan` | human-readable |
 
-## Usage
+All commands accept an optional `[path]` argument (defaults to cwd). For flags, examples, and full reference per subcommand, see [docs/cli/](docs/cli/).
 
-All commands accept an optional `[path]` argument. When omitted, the current working directory is used. Flags and subcommand can be placed in any order. All flags support GNU/POSIX long (`--flag`) and short (`-f`) forms:
-
-```bash
-sightjack scan --dry-run         # flags after subcommand
-sightjack --dry-run scan         # flags before subcommand
-sightjack -n scan                # short alias
-sightjack --lang=ja run          # --flag=value form
-```
+## Quick Start
 
 ```bash
-# Scan only (classify + deep-scan, no interactive loop)
-sightjack scan
-
-# Full interactive loop (scan + wave approval + apply)
-sightjack run
-
-# Display last scan results
-sightjack show
-
-# Dry run (generate prompts without executing Claude)
-sightjack scan -n
-sightjack run --dry-run
-
-# Japanese prompts
-sightjack run -l ja
-
-# Custom config path
-sightjack run -c .siren/config.yaml
-
-# Auto-approve convergence gate (CI mode)
-sightjack run --auto-approve
-
-# D-Mail waiting mode with custom timeout (default: 30m)
-sightjack run --wait-timeout 10m
-
-# Disable D-Mail waiting phase
-sightjack run --wait-timeout=-1s
-
-# Skip session prompt (rescan without interaction)
-sightjack run --session-mode rescan --auto-approve
-
-# Custom notification command
-sightjack run --notify-cmd 'echo {title}: {message}'
-
-# Custom approval command (exit 0 = approve)
-sightjack run --approve-cmd 'my-approval-tool {message}'
-
-# Verbose logging
-sightjack run -v
-
-# Scan a different repository
-sightjack scan /path/to/repo
-
-# Version info
-sightjack version
-sightjack version -j             # JSON output
-
-# Check for updates
-sightjack update -C              # check only
-sightjack update                 # check and install
-
-# Archive pruning
-sightjack archive-prune -d 14   # 14-day retention (dry-run)
-sightjack archive-prune -x      # execute deletion
+sightjack init          # set up .siren/
+sightjack scan          # classify issues
+sightjack run           # interactive loop
+sightjack scan -n       # dry run
 ```
 
 ### Unix pipeline
 
 ```bash
-# Full pipeline: scan → select wave → discuss → apply
 sightjack scan --json | sightjack waves | sightjack select | sightjack apply
-
-# Generate ADR from discussion
 sightjack scan --json | sightjack waves | sightjack select | sightjack discuss | sightjack adr > docs/adr/0005-foo.md
-
-# Preview scan results
-sightjack scan --json | sightjack show
-
-# Save intermediate results
-sightjack scan --json | tee scan.json | sightjack waves | tee plan.json | sightjack select > wave.json
-
-# Generate follow-up waves after apply
-cat wave.json | sightjack apply | sightjack nextgen
 ```
-
-## Options
-
-### Global flags (all subcommands)
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--config` | `-c` | `.siren/config.yaml` | Config file path |
-| `--lang` | `-l` | config (`ja`) | Language override (`en` / `ja`) |
-| `--verbose` | `-v` | `false` | Verbose logging |
-| `--output` | `-o` | `text` | Output format: `text` or `json` |
-| `--dry-run` | `-n` | `false` | Generate prompts without executing Claude |
-| `--no-color` | | `false` | Disable colored output (also respects `NO_COLOR` env) |
-
-For full flag reference per subcommand, see [docs/cli/](docs/cli/).
 
 ## Configuration
 

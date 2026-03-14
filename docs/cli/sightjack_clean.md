@@ -13,8 +13,13 @@ sightjack clean [path] [flags]
 ### Examples
 
 ```
+  # Clean current directory
   sightjack clean
+
+  # Clean a specific project
   sightjack clean /path/to/project
+
+  # Skip confirmation prompt
   sightjack clean --yes
 ```
 

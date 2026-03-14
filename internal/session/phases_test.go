@@ -25,7 +25,7 @@ func TestApprovalPhase_CapsDiscussionFailures(t *testing.T) {
 
 	wave := domain.Wave{
 		ID: "test-wave", ClusterName: "test", Title: "Test Wave",
-		Status: "proposed",
+		Status:  "proposed",
 		Actions: []domain.WaveAction{{IssueID: "TEST-1", Type: "add_dod", Description: "test"}},
 	}
 

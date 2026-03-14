@@ -33,7 +33,13 @@ hint recommends adjusting .claude/settings.json.`,
   sightjack doctor
 
   # Check a specific project directory
-  sightjack doctor /path/to/project`,
+  sightjack doctor /path/to/project
+
+  # JSON output for scripting
+  sightjack doctor -o json
+
+  # Auto-fix repairable issues
+  sightjack doctor --repair`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			baseDir, err := resolveBaseDir(args)

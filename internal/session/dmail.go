@@ -23,17 +23,17 @@ import (
 
 // DMail represents a d-mail message: YAML frontmatter + Markdown body.
 type DMail struct {
-	Name          string            `yaml:"name"`
-	Kind          DMailKind         `yaml:"kind"`
-	Description   string            `yaml:"description"`
-	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
-	Issues        []string          `yaml:"issues,omitempty"`
-	Severity      string            `yaml:"severity,omitempty"`
-	Action        string            `yaml:"action,omitempty"`
-	Priority      int               `yaml:"priority,omitempty"`
-	Metadata      map[string]string        `yaml:"metadata,omitempty"`
-	Context       *domain.InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
-	Body          string                   `yaml:"-"`
+	Name          string                 `yaml:"name"`
+	Kind          DMailKind              `yaml:"kind"`
+	Description   string                 `yaml:"description"`
+	SchemaVersion string                 `yaml:"dmail-schema-version,omitempty"`
+	Issues        []string               `yaml:"issues,omitempty"`
+	Severity      string                 `yaml:"severity,omitempty"`
+	Action        string                 `yaml:"action,omitempty"`
+	Priority      int                    `yaml:"priority,omitempty"`
+	Metadata      map[string]string      `yaml:"metadata,omitempty"`
+	Context       *domain.InsightContext `yaml:"context,omitempty" json:"context,omitempty"`
+	Body          string                 `yaml:"-"`
 }
 
 // DMailKind is the message type for d-mails.
