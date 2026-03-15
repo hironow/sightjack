@@ -3,85 +3,14 @@
 package e2e
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
-
-func requireDocker(t *testing.T) {
-	t.Helper()
-	dockerPath, err := exec.LookPath("docker")
-	if err != nil || dockerPath == "" {
-		t.Skip("skipping: docker not found in PATH")
-	}
-	if err := exec.Command("docker", "info").Run(); err != nil {
-		t.Skip("skipping: docker daemon not available")
-	}
-}
-
-func buildDoctorContainer(t *testing.T, ctx context.Context) testcontainers.Container {
-	t.Helper()
-	req := testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			FromDockerfile: testcontainers.FromDockerfile{
-				Context:       "../..",
-				Dockerfile:    "tests/e2e/testdata/Dockerfile.test",
-				PrintBuildLog: true,
-			},
-			WaitingFor: wait.ForExec([]string{"sightjack", "version"}).
-				WithStartupTimeout(120 * time.Second),
-		},
-		Started: true,
-	}
-	container, err := testcontainers.GenericContainer(ctx, req)
-	if err != nil {
-		t.Fatalf("failed to start container: %v", err)
-	}
-	t.Cleanup(func() {
-		if cErr := container.Terminate(ctx); cErr != nil {
-			t.Logf("failed to terminate container: %v", cErr)
-		}
-	})
-	return container
-}
-
-func execCmd(t *testing.T, ctx context.Context, c testcontainers.Container, cmd []string) string {
-	t.Helper()
-	code, output := execCmdNoFail(t, ctx, c, cmd)
-	if code != 0 {
-		t.Fatalf("command %v failed (exit %d): %s", cmd, code, output)
-	}
-	return output
-}
-
-func execCmdNoFail(t *testing.T, ctx context.Context, c testcontainers.Container, cmd []string) (int, string) {
-	t.Helper()
-	code, reader, err := c.Exec(ctx, cmd)
-	if err != nil {
-		t.Fatalf("exec error: %v", err)
-	}
-	buf := new(strings.Builder)
-	if reader != nil {
-		b := make([]byte, 4096)
-		for {
-			n, readErr := reader.Read(b)
-			if n > 0 {
-				buf.Write(b[:n])
-			}
-			if readErr != nil {
-				break
-			}
-		}
-	}
-	return code, buf.String()
-}
 
 type doctorOutput struct {
 	Checks []struct {
@@ -94,7 +23,6 @@ type doctorOutput struct {
 
 func parseDoctorJSON(t *testing.T, output string) doctorOutput {
 	t.Helper()
-	// The output may contain Docker multiplexing header bytes; find the JSON object
 	idx := strings.Index(output, "{")
 	if idx < 0 {
 		t.Fatalf("no JSON object found in output: %s", output)
@@ -107,47 +35,43 @@ func parseDoctorJSON(t *testing.T, output string) doctorOutput {
 	return result
 }
 
-func initProject(t *testing.T, ctx context.Context, c testcontainers.Container, workDir string) {
+// initTestProject creates a temp directory with git repo + sightjack init.
+func initTestProject(t *testing.T) string {
 	t.Helper()
-	// Initialize git repo (required for sightjack init)
-	execCmd(t, ctx, c, []string{"git", "init", workDir})
-	execCmd(t, ctx, c, []string{"git", "-C", workDir, "config", "user.email", "test@test.com"})
-	execCmd(t, ctx, c, []string{"git", "-C", workDir, "config", "user.name", "test"})
-	// Initialize sightjack project
-	execCmd(t, ctx, c, []string{
-		"sightjack", "init",
-		"--team", "TEST",
-		"--project", "TestProject",
-		workDir,
-	})
+	dir := t.TempDir()
+
+	for _, args := range [][]string{
+		{"git", "init", "--initial-branch", "main", dir},
+		{"git", "-C", dir, "config", "user.email", "test@test.com"},
+		{"git", "-C", dir, "config", "user.name", "test"},
+	} {
+		cmd := exec.Command(args[0], args[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command — static test fixture args [permanent]
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git setup %v failed: %v\n%s", args, err, out)
+		}
+	}
+
+	out, err := runCmd(t, "init", "--team", "TEST", "--project", "TestProject", dir)
+	if err != nil {
+		t.Fatalf("sightjack init failed: %v\n%s", err, out)
+	}
+	return dir
 }
 
 func TestDoctorRepair_StalePID(t *testing.T) {
-	requireDocker(t)
-	// given: a stale watch.pid with a dead PID
-	ctx := context.Background()
-	c := buildDoctorContainer(t, ctx)
-	workDir := "/workspace/test-stale-pid"
-
-	initProject(t, ctx, c, workDir)
-
-	// Create stale PID file with a dead process ID
-	pidDir := fmt.Sprintf("%s/.siren", workDir)
-	execCmd(t, ctx, c, []string{"mkdir", "-p", pidDir})
-	execCmd(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo 99999 > %s/watch.pid", pidDir)})
-
-	// Verify PID file exists
-	execCmd(t, ctx, c, []string{"test", "-f", fmt.Sprintf("%s/watch.pid", pidDir)})
+	// given: initialized project with stale PID file
+	dir := initTestProject(t)
+	pidDir := filepath.Join(dir, ".siren")
+	pidFile := filepath.Join(pidDir, "watch.pid")
+	if err := os.WriteFile(pidFile, []byte("99999"), 0o644); err != nil {
+		t.Fatalf("create stale PID: %v", err)
+	}
 
 	// when: run doctor --repair --json
-	code, output := execCmdNoFail(t, ctx, c, []string{
-		"sightjack", "doctor", "--repair", "--json", workDir,
-	})
+	out, _ := runCmd(t, "doctor", "--repair", "--json", dir)
 
-	// then: PID file should be removed and output should contain "fixed"/"FIX"
-	t.Logf("doctor --repair output (exit %d): %s", code, output)
-
-	result := parseDoctorJSON(t, output)
+	// then: stale-pid should be fixed
+	result := parseDoctorJSON(t, out)
 	found := false
 	for _, check := range result.Checks {
 		if check.Name == "stale-pid" {
@@ -161,37 +85,31 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("stale-pid check not found in results")
+		t.Errorf("stale-pid check not found in results: %+v", result.Checks)
 	}
 
 	// Verify PID file was actually removed
-	exitCode, _ := execCmdNoFail(t, ctx, c, []string{"test", "-f", fmt.Sprintf("%s/watch.pid", pidDir)})
-	if exitCode == 0 {
+	if _, err := os.Stat(pidFile); err == nil {
 		t.Error("watch.pid should have been removed but still exists")
 	}
 }
 
 func TestDoctorRepair_MissingSkillMD(t *testing.T) {
-	requireDocker(t)
 	// given: initialized project with SKILL.md deleted
-	ctx := context.Background()
-	c := buildDoctorContainer(t, ctx)
-	workDir := "/workspace/test-missing-skill"
-
-	initProject(t, ctx, c, workDir)
-
-	// Delete SKILL.md files
-	execCmd(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("rm -f %s/.siren/skills/dmail-sendable/SKILL.md %s/.siren/skills/dmail-readable/SKILL.md", workDir, workDir)})
+	dir := initTestProject(t)
+	skillPaths := []string{
+		filepath.Join(dir, ".siren", "skills", "dmail-sendable", "SKILL.md"),
+		filepath.Join(dir, ".siren", "skills", "dmail-readable", "SKILL.md"),
+	}
+	for _, p := range skillPaths {
+		os.Remove(p)
+	}
 
 	// when: run doctor --repair --json
-	code, output := execCmdNoFail(t, ctx, c, []string{
-		"sightjack", "doctor", "--repair", "--json", workDir,
-	})
+	out, _ := runCmd(t, "doctor", "--repair", "--json", dir)
 
-	// then: SKILL.md should be regenerated
-	t.Logf("doctor --repair output (exit %d): %s", code, output)
-
-	result := parseDoctorJSON(t, output)
+	// then: Skills should be regenerated
+	result := parseDoctorJSON(t, out)
 	found := false
 	for _, check := range result.Checks {
 		if check.Name == "Skills" && check.Status == "FIX" {
@@ -206,30 +124,27 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 	}
 
 	// Verify SKILL.md was actually regenerated
-	execCmd(t, ctx, c, []string{"test", "-f", fmt.Sprintf("%s/.siren/skills/dmail-sendable/SKILL.md", workDir)})
-	execCmd(t, ctx, c, []string{"test", "-f", fmt.Sprintf("%s/.siren/skills/dmail-readable/SKILL.md", workDir)})
+	for _, p := range skillPaths {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("expected %s to be regenerated: %v", filepath.Base(filepath.Dir(p)), err)
+		}
+	}
 }
 
 func TestDoctorRepair_NoRepairFlag(t *testing.T) {
-	requireDocker(t)
 	// given: stale PID file exists but --repair is NOT passed
-	ctx := context.Background()
-	c := buildDoctorContainer(t, ctx)
-	workDir := "/workspace/test-no-repair"
-
-	initProject(t, ctx, c, workDir)
-
-	// Create stale PID file
-	pidDir := fmt.Sprintf("%s/.siren", workDir)
-	execCmd(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo 99999 > %s/watch.pid", pidDir)})
+	dir := initTestProject(t)
+	pidDir := filepath.Join(dir, ".siren")
+	pidFile := filepath.Join(pidDir, "watch.pid")
+	if err := os.WriteFile(pidFile, []byte("99999"), 0o644); err != nil {
+		t.Fatalf("create stale PID: %v", err)
+	}
 
 	// when: run doctor --json WITHOUT --repair
-	_, output := execCmdNoFail(t, ctx, c, []string{
-		"sightjack", "doctor", "--json", workDir,
-	})
+	out, _ := runCmd(t, "doctor", "--json", dir)
 
-	// then: PID file should NOT be removed (no stale-pid check in output)
-	result := parseDoctorJSON(t, output)
+	// then: PID file should NOT be removed
+	result := parseDoctorJSON(t, out)
 	for _, check := range result.Checks {
 		if check.Name == "stale-pid" {
 			t.Errorf("stale-pid check should not appear without --repair flag")
@@ -237,5 +152,20 @@ func TestDoctorRepair_NoRepairFlag(t *testing.T) {
 	}
 
 	// Verify PID file still exists
-	execCmd(t, ctx, c, []string{"test", "-f", fmt.Sprintf("%s/watch.pid", pidDir)})
+	if _, err := os.Stat(pidFile); err != nil {
+		t.Errorf("watch.pid should still exist without --repair: %v", err)
+	}
+}
+
+// requireBinary skips the test if the named binary is not available.
+func requireBinary(t *testing.T, name string) {
+	t.Helper()
+	if _, err := exec.LookPath(name); err != nil {
+		t.Skipf("skipping: %s not found in PATH", name)
+	}
+}
+
+func init() {
+	// Ensure sightjack binary is available for doctor repair tests.
+	_ = fmt.Sprintf("doctor_repair_test uses sightjackBin() from subcommand_test.go")
 }
