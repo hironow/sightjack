@@ -1,0 +1,78 @@
+rules:
+  # ==========================================================================
+  # sightjack-specific layer rules
+  # Rules that reference sightjack domain concepts or literals
+  # ==========================================================================
+
+  # --- Rule: GateConfig raw field access guard ---
+
+  - id: gate-config-raw-field-access
+    languages: [go]
+    severity: ERROR
+    pattern-regex: '\.Gate\.(ReviewCmd|NotifyCmd|ApproveCmd|AutoApprove|ReviewBudget)\b'
+    paths:
+      include:
+        - "/internal/session/**"
+      exclude:
+        - "*_test.go"
+    message: |
+      session 層で GateConfig の raw フィールドに直接アクセスしています。
+      Why: raw フィールドへの直接アクセスは Tell-Don't-Ask 原則に違反し、ビジネスルールが session 層に漏洩する (Law of Demeter)
+      How: intent メソッド経由でアクセスしてください（例: .Gate.ReviewCmd → .Gate.HasReviewCmd() / .Gate.ReviewCmdString()）
+
+  # --- Rule: No computed field assignment in setConfigField ---
+
+  - id: config-no-computed-field-in-set
+    severity: ERROR
+    message: |
+      setConfigField 内で ComputedConfig フィールドへの代入は禁止です。
+      Why: ComputedConfig は読み取り専用であり、setConfigField からの代入はシステム計算値の上書きを許してしまう
+      How: WriteEstimatedStrictness() などシステム用の書き込みメソッドを使用してください
+    languages: [go]
+    patterns:
+      - pattern: cfg.Computed.$FIELD = $VALUE
+      - pattern-inside: |
+          func setConfigField(...) error {
+            ...
+          }
+    paths:
+      include:
+        - /internal/session/config.go
+
+  # --- Rule: No direct computed field write from cmd layer ---
+
+  - id: config-no-direct-computed-write
+    severity: ERROR
+    message: |
+      cmd 層から ComputedConfig フィールドへの直接書き込みは禁止です。
+      Why: ComputedConfig はシステムが算出する値であり、cmd 層からの直接書き込みは責務境界を超える
+      How: session.WriteEstimatedStrictness() を使用してください
+    languages: [go]
+    patterns:
+      - pattern-either:
+          - pattern: $CFG.Computed.EstimatedStrictness = $VALUE
+          - pattern: $CFG.Computed.EstimatedStrictness[$KEY] = $VALUE
+    paths:
+      include:
+        - /internal/cmd/
+      exclude:
+        - '*_test.go'
+
+  # --- Rule: No state dir literal in filepath.Join ---
+
+  - id: no-state-dir-literal-in-path-join
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: filepath.Join($X, ".siren")
+      - pattern: filepath.Join($X, ".siren", ...)
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+        - "/internal/domain/**"
+    message: |
+      filepath.Join での state dir literal ".siren" 直書きは禁止です。
+      Why: マジックストリングの散在は変更時の修正漏れやタイポを引き起こす
+      How: domain.StateDir 定数を使用してください
