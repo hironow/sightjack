@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/hironow/sightjack/internal/cmd"
 	"github.com/hironow/sightjack/internal/domain"
 )
@@ -347,5 +349,56 @@ func TestInitCmd_MissingTeamFlag_UsesDefault(t *testing.T) {
 	cfgPath := domain.ConfigPath(dir)
 	if _, readErr := os.Stat(cfgPath); readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
+	}
+}
+
+func TestInitCmd_OtelBackend_CreatesOtelEnv(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	rootCmd := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(""))
+	rootCmd.SetArgs([]string{"init", "--team", "TEST", "--project", "TEST", "--otel-backend", "jaeger", dir})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init --otel-backend jaeger failed: %v", err)
+	}
+	otelPath := filepath.Join(dir, ".siren", ".otel.env")
+	data, readErr := os.ReadFile(otelPath)
+	if readErr != nil {
+		t.Fatalf(".otel.env not created: %v", readErr)
+	}
+	if !strings.Contains(string(data), "OTEL_EXPORTER_OTLP_ENDPOINT") {
+		t.Errorf("expected OTEL_EXPORTER_OTLP_ENDPOINT in .otel.env, got:\n%s", data)
+	}
+}
+
+func TestInitCmd_OtelFlags_Exist(t *testing.T) {
+	// given
+	rootCmd := cmd.NewRootCommand()
+
+	// when — find init subcommand
+	var initCmd *cobra.Command
+	for _, sub := range rootCmd.Commands() {
+		if sub.Name() == "init" {
+			initCmd = sub
+			break
+		}
+	}
+	if initCmd == nil {
+		t.Fatal("init subcommand not found")
+	}
+
+	// then — otel flags exist
+	for _, flag := range []string{"otel-backend", "otel-entity", "otel-project"} {
+		if initCmd.Flags().Lookup(flag) == nil {
+			t.Errorf("init flag --%s not found", flag)
+		}
 	}
 }
