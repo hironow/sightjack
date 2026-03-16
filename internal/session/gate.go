@@ -131,12 +131,13 @@ func BuildNotifier(gate domain.GateConfig) port.Notifier {
 
 // BuildApprover creates the appropriate Approver based on config.
 // Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(gate domain.GateConfig, input io.Reader, out io.Writer) port.Approver {
-	if gate.IsAutoApprove() {
+func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writer) port.Approver {
+	switch {
+	case cfg.IsAutoApprove():
 		return &port.AutoApprover{}
+	case cfg.ApproveCmdString() != "":
+		return NewCmdApprover(cfg.ApproveCmdString())
+	default:
+		return NewStdinApprover(input, promptOut)
 	}
-	if gate.HasApproveCmd() {
-		return NewCmdApprover(gate.ApproveCmdString())
-	}
-	return NewStdinApprover(input, out)
 }
