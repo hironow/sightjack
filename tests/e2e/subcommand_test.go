@@ -29,9 +29,17 @@ func sightjackBin() string {
 	return p
 }
 
-// runCmd executes sightjack with args and returns stdout only.
-// stderr is captured separately and logged on failure.
+// runCmd executes sightjack with args and returns stdout+stderr combined.
 func runCmd(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	cmd := exec.Command(sightjackBin(), args...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// runCmdStdout executes sightjack with args and returns stdout only.
+// Use for commands whose stdout must be machine-parseable (e.g. --json).
+func runCmdStdout(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.Command(sightjackBin(), args...)
 	var stderr bytes.Buffer
@@ -58,7 +66,7 @@ func TestE2E_Version(t *testing.T) {
 
 func TestE2E_VersionJSON(t *testing.T) {
 	// when
-	out, err := runCmd(t, "version", "--json")
+	out, err := runCmdStdout(t, "version", "--json")
 
 	// then
 	if err != nil {
