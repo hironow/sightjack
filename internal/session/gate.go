@@ -3,7 +3,6 @@ package session
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -129,15 +128,3 @@ func BuildNotifier(gate domain.GateConfig) port.Notifier {
 	return &LocalNotifier{}
 }
 
-// BuildApprover creates the appropriate Approver based on config.
-// Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writer) port.Approver {
-	switch {
-	case cfg.IsAutoApprove():
-		return &port.AutoApprover{}
-	case cfg.ApproveCmdString() != "":
-		return NewCmdApprover(cfg.ApproveCmdString())
-	default:
-		return NewStdinApprover(input, promptOut)
-	}
-}
