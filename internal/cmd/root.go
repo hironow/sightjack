@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -62,7 +63,12 @@ func NewRootCommand() *cobra.Command {
 			if noColor {
 				os.Setenv("NO_COLOR", "1")
 			}
-			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
+			out := cmd.ErrOrStderr()
+			quiet, _ := cmd.Flags().GetBool("quiet")
+			if quiet {
+				out = io.Discard
+			}
+			logger := platform.NewLogger(out, verbose)
 			logger.Header("sightjack", Version)
 			logger.Section(cmd.Name())
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
@@ -92,6 +98,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringVarP(&lang, "lang", "l", "", "Language override (ja/en)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (respects NO_COLOR env)")
+	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress all stderr output")
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false, "Generate prompts without executing Claude")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 
