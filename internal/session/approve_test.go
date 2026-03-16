@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os/exec"
@@ -356,5 +357,68 @@ func TestBuildApprover_StdinApprover(t *testing.T) {
 	}
 	if _, ok := approver.(*port.AutoApprover); ok {
 		t.Error("expected StdinApprover, got AutoApprover")
+	}
+}
+
+func TestStdinApprover_Timeout(t *testing.T) {
+	// given
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	cr := &trackingReadCloser{blocking: true, ch: make(chan struct{})}
+	a := session.NewStdinApprover(cr, nil)
+
+	// when
+	approved, err := a.RequestApproval(ctx, "msg")
+
+	// then
+	if approved {
+		t.Error("expected denial on timeout")
+	}
+	if err == nil {
+		t.Error("expected error on timeout")
+	}
+}
+
+func TestStdinApprover_ShowsMessage(t *testing.T) {
+	// given
+	input := strings.NewReader("y\n")
+	out := new(bytes.Buffer)
+	a := session.NewStdinApprover(input, out)
+
+	// when
+	a.RequestApproval(context.Background(), "Continue check?")
+
+	// then
+	if !strings.Contains(out.String(), "Approve? (y/N)") {
+		t.Errorf("prompt not shown, got: %q", out.String())
+	}
+}
+
+func TestCmdApprover_FactoryDI(t *testing.T) {
+	// given: inject a factory that records the expanded command
+	var capturedArgs []string
+	a := session.NewCmdApproverForTest("echo {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			capturedArgs = args
+			return exec.Command("true")
+		},
+	)
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "hello world")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approval for exit code 0")
+	}
+	if len(capturedArgs) == 0 {
+		t.Fatal("expected args to be captured by factory")
+	}
+	joined := strings.Join(capturedArgs, " ")
+	if !strings.Contains(joined, "'hello world'") {
+		t.Errorf("expected quoted message in command, got: %s", joined)
 	}
 }
