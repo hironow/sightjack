@@ -63,6 +63,8 @@ func NewRootCommand() *cobra.Command {
 				os.Setenv("NO_COLOR", "1")
 			}
 			logger := platform.NewLogger(cmd.ErrOrStderr(), verbose)
+			logger.Header("sightjack", Version)
+			logger.Section(cmd.Name())
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("sightjack", Version)
 			shutdownMeter = initMeter("sightjack", Version)
