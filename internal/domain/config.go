@@ -41,7 +41,15 @@ type LabelsConfig struct {
 // DefaultWaitTimeout is the default D-Mail waiting phase timeout.
 const DefaultWaitTimeout = 30 * time.Minute
 
+// ApproverConfig describes how approval behavior is configured.
+// Implemented by GateConfig. Used by session.BuildApprover.
+type ApproverConfig interface {
+	IsAutoApprove() bool
+	ApproveCmdString() string
+}
+
 // GateConfig holds convergence gate notification and approval settings.
+// GateConfig implements ApproverConfig.
 type GateConfig struct {
 	NotifyCmd    string        `yaml:"notify_cmd"`
 	ApproveCmd   string        `yaml:"approve_cmd"`

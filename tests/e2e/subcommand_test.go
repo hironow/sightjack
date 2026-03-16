@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -36,6 +37,20 @@ func runCmd(t *testing.T, args ...string) (string, error) {
 	return string(out), err
 }
 
+// runCmdStdout executes sightjack with args and returns stdout only.
+// Use for commands whose stdout must be machine-parseable (e.g. --json).
+func runCmdStdout(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	cmd := exec.Command(sightjackBin(), args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil && stderr.Len() > 0 {
+		t.Logf("stderr: %s", stderr.String())
+	}
+	return string(out), err
+}
+
 func TestE2E_Version(t *testing.T) {
 	// when
 	out, err := runCmd(t, "version")
@@ -51,7 +66,7 @@ func TestE2E_Version(t *testing.T) {
 
 func TestE2E_VersionJSON(t *testing.T) {
 	// when
-	out, err := runCmd(t, "version", "--json")
+	out, err := runCmdStdout(t, "version", "--json")
 
 	// then
 	if err != nil {

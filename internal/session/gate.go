@@ -3,7 +3,6 @@ package session
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -46,7 +45,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Noti
 	for _, m := range convergence {
 		names = append(names, m.Name)
 	}
-	summary := fmt.Sprintf("Convergence signal received: %s", strings.Join(names, ", "))
+	summary := fmt.Sprintf("[CONVERGENCE] Convergence signal received: %s", strings.Join(names, ", "))
 
 	// Notify (fire-and-forget — non-blocking with 30s timeout).
 	// Use a detached context for the notification span so it is not tied to
@@ -129,14 +128,3 @@ func BuildNotifier(gate domain.GateConfig) port.Notifier {
 	return &LocalNotifier{}
 }
 
-// BuildApprover creates the appropriate Approver based on config.
-// Priority: AutoApprove → CmdApprover → StdinApprover.
-func BuildApprover(gate domain.GateConfig, input io.Reader, out io.Writer) port.Approver {
-	if gate.IsAutoApprove() {
-		return &port.AutoApprover{}
-	}
-	if gate.HasApproveCmd() {
-		return NewCmdApprover(gate.ApproveCmdString())
-	}
-	return NewStdinApprover(input, out)
-}

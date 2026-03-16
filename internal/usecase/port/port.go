@@ -24,7 +24,9 @@ type EventDispatcher interface {
 	Dispatch(ctx context.Context, event domain.Event) error
 }
 
-// Approver requests user approval for a convergence gate.
+// Approver determines whether an action should proceed.
+// Implementations include StdinApprover (human prompt),
+// CmdApprover (external command), and AutoApprover (always yes).
 type Approver interface {
 	RequestApproval(ctx context.Context, message string) (approved bool, err error)
 }
@@ -32,7 +34,7 @@ type Approver interface {
 // AutoApprover always approves without human interaction.
 type AutoApprover struct{}
 
-func (AutoApprover) RequestApproval(context.Context, string) (bool, error) { return true, nil }
+func (*AutoApprover) RequestApproval(_ context.Context, _ string) (bool, error) { return true, nil }
 
 // Notifier sends a notification to the user.
 type Notifier interface {

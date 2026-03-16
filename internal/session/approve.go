@@ -7,7 +7,23 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+
+	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
+
+// BuildApprover creates the appropriate Approver based on config.
+// Priority: AutoApprove → CmdApprover → StdinApprover.
+func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writer) port.Approver {
+	switch {
+	case cfg.IsAutoApprove():
+		return &port.AutoApprover{}
+	case cfg.ApproveCmdString() != "":
+		return NewCmdApprover(cfg.ApproveCmdString())
+	default:
+		return NewStdinApprover(input, promptOut)
+	}
+}
 
 // StdinApprover prompts the user on a terminal and reads y/n.
 // Uses goroutine + channel for context cancellation support.
@@ -33,9 +49,7 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 	default:
 	}
 
-	if a.writer != nil {
-		fmt.Fprintf(a.writer, "[CONVERGENCE] %s\nApprove? (y/N): ", message)
-	}
+	fmt.Fprintf(a.writer, "%s\nContinue? [y/N]: ", message)
 
 	// Read in a goroutine so we can select on ctx.Done().
 	// We intentionally do NOT close the reader on cancel — it may be

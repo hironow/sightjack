@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -32,7 +34,7 @@ func TestAutoApprover_AlwaysApproves(t *testing.T) {
 func TestStdinApprover_Yes(t *testing.T) {
 	// given: input reader with "y\n"
 	input := strings.NewReader("y\n")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -49,7 +51,7 @@ func TestStdinApprover_Yes(t *testing.T) {
 func TestStdinApprover_YesUppercase(t *testing.T) {
 	// given: input reader with "Y\n"
 	input := strings.NewReader("Y\n")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -66,7 +68,7 @@ func TestStdinApprover_YesUppercase(t *testing.T) {
 func TestStdinApprover_No(t *testing.T) {
 	// given: input reader with "n\n"
 	input := strings.NewReader("n\n")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -83,7 +85,7 @@ func TestStdinApprover_No(t *testing.T) {
 func TestStdinApprover_EmptyInput(t *testing.T) {
 	// given: empty input (safe default = deny)
 	input := strings.NewReader("\n")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -101,7 +103,7 @@ func TestStdinApprover_EOFTerminatedYes(t *testing.T) {
 	// given: piped input "y" without trailing newline (echo -n "y" | sightjack run).
 	// readLine returns ("y", io.EOF). Should still approve.
 	input := strings.NewReader("y")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -118,7 +120,7 @@ func TestStdinApprover_EOFTerminatedYes(t *testing.T) {
 func TestStdinApprover_EOFTerminatedNo(t *testing.T) {
 	// given: piped "n" without trailing newline — should still deny (not error)
 	input := strings.NewReader("n")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -138,7 +140,7 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 	cancel()
 	// Use a reader that never returns data (pipe, but we close it)
 	input := strings.NewReader("")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(ctx, "proceed?")
@@ -157,7 +159,7 @@ func TestStdinApprover_ContextCancelDoesNotCloseReader(t *testing.T) {
 	// Context cancel should NOT close the reader (it may be os.Stdin).
 	cr := &trackingReadCloser{blocking: true, ch: make(chan struct{})}
 	ctx, cancel := context.WithCancel(context.Background())
-	a := session.NewStdinApprover(cr, nil)
+	a := session.NewStdinApprover(cr, io.Discard)
 
 	// when: cancel context after a short delay
 	go func() {
@@ -237,7 +239,7 @@ func TestStdinApprover_SharedReader(t *testing.T) {
 	// After RequestApproval consumes "y\n", the remaining "next-line\n"
 	// must still be readable from the same reader.
 	input := strings.NewReader("y\nnext-line\n")
-	a := session.NewStdinApprover(input, nil)
+	a := session.NewStdinApprover(input, io.Discard)
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "proceed?")
@@ -309,5 +311,114 @@ func TestCmdApprover_EmptyTemplate(t *testing.T) {
 	// then
 	if err == nil {
 		t.Error("expected error for empty template")
+	}
+}
+
+func TestBuildApprover_AutoApprove(t *testing.T) {
+	// given
+	cfg := domain.GateConfig{AutoApprove: true}
+
+	// when
+	approver := session.BuildApprover(cfg, nil, nil)
+
+	// then
+	if _, ok := approver.(*port.AutoApprover); !ok {
+		t.Errorf("expected AutoApprover, got %T", approver)
+	}
+}
+
+func TestBuildApprover_CmdApprover(t *testing.T) {
+	// given
+	cfg := domain.GateConfig{ApproveCmd: "echo approve"}
+
+	// when
+	approver := session.BuildApprover(cfg, nil, nil)
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected CmdApprover, got AutoApprover")
+	}
+}
+
+func TestBuildApprover_StdinApprover(t *testing.T) {
+	// given
+	cfg := domain.GateConfig{}
+	input := strings.NewReader("")
+
+	// when
+	approver := session.BuildApprover(cfg, input, io.Discard)
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected StdinApprover, got AutoApprover")
+	}
+}
+
+func TestStdinApprover_Timeout(t *testing.T) {
+	// given
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	cr := &trackingReadCloser{blocking: true, ch: make(chan struct{})}
+	a := session.NewStdinApprover(cr, io.Discard)
+
+	// when
+	approved, err := a.RequestApproval(ctx, "msg")
+
+	// then
+	if approved {
+		t.Error("expected denial on timeout")
+	}
+	if err == nil {
+		t.Error("expected error on timeout")
+	}
+}
+
+func TestStdinApprover_ShowsMessage(t *testing.T) {
+	// given
+	input := strings.NewReader("y\n")
+	out := new(bytes.Buffer)
+	a := session.NewStdinApprover(input, out)
+
+	// when
+	a.RequestApproval(context.Background(), "Continue check?")
+
+	// then
+	if !strings.Contains(out.String(), "Continue? [y/N]") {
+		t.Errorf("prompt not shown, got: %q", out.String())
+	}
+}
+
+func TestCmdApprover_FactoryDI(t *testing.T) {
+	// given: inject a factory that records the expanded command
+	var capturedArgs []string
+	a := session.NewCmdApproverForTest("echo {message}",
+		func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			capturedArgs = args
+			return exec.Command("true")
+		},
+	)
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "hello world")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approval for exit code 0")
+	}
+	if len(capturedArgs) == 0 {
+		t.Fatal("expected args to be captured by factory")
+	}
+	joined := strings.Join(capturedArgs, " ")
+	if !strings.Contains(joined, "'hello world'") {
+		t.Errorf("expected quoted message in command, got: %s", joined)
 	}
 }

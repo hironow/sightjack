@@ -4,15 +4,6 @@
 /dist/
 # test
 coverage.out
-# sightjack runtime state — ignore contents individually
-# git-tracked: insights/, archive/, config.yaml (per S0030)
-.siren/.run/
-.siren/events/
-.siren/inbox/
-.siren/outbox/
-.siren/skills/
-.siren/.otel.env
-.siren/.gitignore
 # environment-specific local files (must not contain full paths)
 *.local.*
 # claude local settings
