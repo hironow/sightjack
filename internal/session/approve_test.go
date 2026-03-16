@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -309,5 +310,51 @@ func TestCmdApprover_EmptyTemplate(t *testing.T) {
 	// then
 	if err == nil {
 		t.Error("expected error for empty template")
+	}
+}
+
+func TestBuildApprover_AutoApprove(t *testing.T) {
+	// given
+	cfg := domain.GateConfig{AutoApprove: true}
+
+	// when
+	approver := session.BuildApprover(cfg, nil, nil)
+
+	// then
+	if _, ok := approver.(*port.AutoApprover); !ok {
+		t.Errorf("expected AutoApprover, got %T", approver)
+	}
+}
+
+func TestBuildApprover_CmdApprover(t *testing.T) {
+	// given
+	cfg := domain.GateConfig{ApproveCmd: "echo approve"}
+
+	// when
+	approver := session.BuildApprover(cfg, nil, nil)
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected CmdApprover, got AutoApprover")
+	}
+}
+
+func TestBuildApprover_StdinApprover(t *testing.T) {
+	// given
+	cfg := domain.GateConfig{}
+	input := strings.NewReader("")
+
+	// when
+	approver := session.BuildApprover(cfg, input, io.Discard)
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected StdinApprover, got AutoApprover")
 	}
 }
