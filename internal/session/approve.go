@@ -49,9 +49,7 @@ func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bo
 	default:
 	}
 
-	if a.writer != nil {
-		fmt.Fprintf(a.writer, "[CONVERGENCE] %s\nApprove? (y/N): ", message)
-	}
+	fmt.Fprintf(a.writer, "%s\nContinue? [y/N]: ", message)
 
 	// Read in a goroutine so we can select on ctx.Done().
 	// We intentionally do NOT close the reader on cancel — it may be

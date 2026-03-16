@@ -45,7 +45,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Noti
 	for _, m := range convergence {
 		names = append(names, m.Name)
 	}
-	summary := fmt.Sprintf("Convergence signal received: %s", strings.Join(names, ", "))
+	summary := fmt.Sprintf("[CONVERGENCE] Convergence signal received: %s", strings.Join(names, ", "))
 
 	// Notify (fire-and-forget — non-blocking with 30s timeout).
 	// Use a detached context for the notification span so it is not tied to
