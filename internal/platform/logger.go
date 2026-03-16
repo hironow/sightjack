@@ -32,6 +32,8 @@ const (
 
 	ansiInvertGreen = "\033[7;32m" // SEND banner — CVD-safe green inversion
 	ansiInvertCyan  = "\033[7;36m" // RECV banner — CVD-safe cyan inversion
+	ansiInvertWhite = "\033[7;1m"  // Header — bold inverted (white on black)
+	ansiInvertBlue  = "\033[7;34m" // Section — blue axis inverted
 )
 
 // Logger provides structured, timestamped log output.
@@ -190,6 +192,38 @@ func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description stri
 	}
 	if l.extraWriter != nil {
 		fmt.Fprintf(l.extraWriter, "[%s] %s\n", ts, plainContent)
+	}
+}
+
+// Header prints a single-line startup header with tool name and version.
+// Uses bold inverted text for maximum visibility.
+func (l *Logger) Header(toolName, version string) {
+	content := fmt.Sprintf(" %s %s ", toolName, version)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.noColor {
+		fmt.Fprintf(l.out, "=== %s ===\n", content)
+	} else {
+		fmt.Fprintf(l.out, "%s%s%s\n", ansiInvertWhite, content, ansiReset)
+	}
+	if l.extraWriter != nil {
+		fmt.Fprintf(l.extraWriter, "=== %s ===\n", content)
+	}
+}
+
+// Section prints a single-line section separator for phase transitions.
+// Uses blue inverted text.
+func (l *Logger) Section(title string) {
+	content := fmt.Sprintf(" %s ", title)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.noColor {
+		fmt.Fprintf(l.out, "--- %s ---\n", content)
+	} else {
+		fmt.Fprintf(l.out, "%s%s%s\n", ansiInvertBlue, content, ansiReset)
+	}
+	if l.extraWriter != nil {
+		fmt.Fprintf(l.extraWriter, "--- %s ---\n", content)
 	}
 }
 
