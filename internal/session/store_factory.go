@@ -2,6 +2,8 @@ package session
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -11,6 +13,16 @@ import (
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
+
+// EnsureRunDir creates the .run/ directory under stateDir if it does not exist.
+// Call once before opening stores that write to .run/ (idempotent).
+func EnsureRunDir(sd string) error {
+	runDir := filepath.Join(sd, ".run")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return fmt.Errorf("ensure run dir: %w", err)
+	}
+	return nil
+}
 
 // stateDir converts a repo-root baseDir to the tool's state directory.
 func stateDir(baseDir string) string {
