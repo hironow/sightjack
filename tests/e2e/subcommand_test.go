@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -28,11 +29,17 @@ func sightjackBin() string {
 	return p
 }
 
-// runCmd executes sightjack with args and returns stdout+stderr combined.
+// runCmd executes sightjack with args and returns stdout only.
+// stderr is captured separately and logged on failure.
 func runCmd(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.Command(sightjackBin(), args...)
-	out, err := cmd.CombinedOutput()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil && stderr.Len() > 0 {
+		t.Logf("stderr: %s", stderr.String())
+	}
 	return string(out), err
 }
 
