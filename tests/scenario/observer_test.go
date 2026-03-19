@@ -224,3 +224,45 @@ func (o *Observer) AssertEventExists(eventType string) {
 	}
 	o.t.Errorf("event %q not found in .siren/events/*.jsonl", eventType)
 }
+
+// --- Waiting mode and Label helpers (proposals 033, 034) ---
+
+// AssertWaitingModeNotActive verifies that the current scenario is NOT in
+// waiting mode (the default when --wait-timeout -1s is passed). This documents
+// the structural blind spot: all scenario tests disable waiting mode.
+func (o *Observer) AssertWaitingModeNotActive() {
+	o.t.Helper()
+	// In waiting mode, .siren/run/watch.pid would exist.
+	// When disabled (--wait-timeout -1s), no watch.pid should be present.
+	pidPath := filepath.Join(o.ws.RepoPath, ".siren", "run", "watch.pid")
+	if _, err := os.Stat(pidPath); err == nil {
+		o.t.Error("watch.pid exists — waiting mode should not be active in scenario tests (--wait-timeout -1s)")
+	}
+}
+
+// AssertLabelsDisabled verifies that Labels.Enabled is false in the siren
+// config. Documents that all scenario tests run with labels disabled.
+func (o *Observer) AssertLabelsDisabled() {
+	o.t.Helper()
+	cfgPath := filepath.Join(o.ws.RepoPath, ".siren", "config.yaml")
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		o.t.Fatalf("read siren config: %v", err)
+	}
+
+	var cfg map[string]any
+	if yamlErr := yaml.Unmarshal(data, &cfg); yamlErr != nil {
+		o.t.Fatalf("parse siren config: %v", yamlErr)
+	}
+
+	labels, ok := cfg["labels"].(map[string]any)
+	if !ok {
+		// No labels section means disabled (default)
+		return
+	}
+
+	enabled, _ := labels["enabled"].(bool)
+	if enabled {
+		o.t.Error("labels.enabled is true — expected false in default scenario config")
+	}
+}
