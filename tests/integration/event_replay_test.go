@@ -153,3 +153,35 @@ func TestEventReplay_LoadLatestState(t *testing.T) {
 		t.Errorf("StrictnessLevel: got %q, want %q", state.StrictnessLevel, "lockdown")
 	}
 }
+
+// TestEventReplay_StrictnessPreserved verifies that StrictnessLevel set in
+// session_started is preserved through event replay. This is the integration-
+// level complement to the unit-level ResolveStrictness tests.
+func TestEventReplay_StrictnessPreserved(t *testing.T) {
+	levels := []string{"fog", "alert", "lockdown"}
+
+	for _, level := range levels {
+		t.Run(level, func(t *testing.T) {
+			// given
+			dir := t.TempDir()
+			store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
+
+			e, _ := domain.NewEvent(domain.EventSessionStarted, &domain.SessionStartedPayload{
+				Project:         "strictness-test",
+				StrictnessLevel: level,
+			}, time.Now())
+			store.Append(e)
+
+			// when
+			state, err := eventsource.LoadState(store)
+
+			// then
+			if err != nil {
+				t.Fatalf("LoadState: %v", err)
+			}
+			if state.StrictnessLevel != level {
+				t.Errorf("StrictnessLevel: got %q, want %q", state.StrictnessLevel, level)
+			}
+		})
+	}
+}
