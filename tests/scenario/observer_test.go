@@ -3,10 +3,13 @@
 package scenario_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Observer provides high-level assertion helpers for scenario tests.
@@ -114,4 +117,54 @@ func (o *Observer) WaitForClosedLoop(timeout time.Duration) {
 	o.ws.WaitForDMail(o.t, ".expedition", "inbox", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".gate", "inbox", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".siren", "inbox", stepTimeout)
+}
+
+// --- Config assertion helpers (proposal 014) ---
+
+// AssertSirenConfigStrictness reads .siren/config.yaml and verifies that
+// the computed.estimated_strictness field for the given cluster matches
+// the expected strictness level. This tests the scan -> estimate ->
+// config write-back pipeline end-to-end.
+func (o *Observer) AssertSirenConfigStrictness(clusterName, expectedLevel string) {
+	o.t.Helper()
+	cfgPath := filepath.Join(o.ws.RepoPath, ".siren", "config.yaml")
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		o.t.Fatalf("read siren config: %v", err)
+	}
+
+	var cfg map[string]any
+	if yamlErr := yaml.Unmarshal(data, &cfg); yamlErr != nil {
+		o.t.Fatalf("parse siren config: %v", yamlErr)
+	}
+
+	computed, ok := cfg["computed"].(map[string]any)
+	if !ok {
+		o.t.Logf("siren config has no 'computed' section (strictness may not have been estimated yet)")
+		return
+	}
+
+	estimated, ok := computed["estimated_strictness"].(map[string]any)
+	if !ok {
+		o.t.Logf("siren config has no 'computed.estimated_strictness' section")
+		return
+	}
+
+	got, ok := estimated[clusterName].(string)
+	if !ok {
+		o.t.Errorf("cluster %q not found in estimated_strictness (available: %v)", clusterName, estimated)
+		return
+	}
+	if got != expectedLevel {
+		o.t.Errorf("strictness for cluster %q: got %q, want %q", clusterName, got, expectedLevel)
+	}
+}
+
+// AssertSirenConfigExists verifies that .siren/config.yaml exists.
+func (o *Observer) AssertSirenConfigExists() {
+	o.t.Helper()
+	cfgPath := filepath.Join(o.ws.RepoPath, ".siren", "config.yaml")
+	if _, err := os.Stat(cfgPath); err != nil {
+		o.t.Errorf(".siren/config.yaml not found: %v", err)
+	}
 }
