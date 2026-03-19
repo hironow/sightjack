@@ -266,3 +266,41 @@ func (o *Observer) AssertLabelsDisabled() {
 		o.t.Error("labels.enabled is true — expected false in default scenario config")
 	}
 }
+
+// --- Scan error recovery and session resume helpers (proposals 039, 042) ---
+
+// AssertScanWarningsExist checks if the scan result contains warnings
+// by reading .siren/events/*.jsonl for scan_completed events with non-empty
+// warnings data.
+func (o *Observer) AssertScanWarningsExist() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".siren", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		content := string(data)
+		if strings.Contains(content, `"scan_completed"`) && strings.Contains(content, `"warnings"`) {
+			return
+		}
+	}
+	o.t.Error("no scan_completed event with warnings found")
+}
+
+// AssertSessionResumed checks for a session_resumed event in JSONL.
+func (o *Observer) AssertSessionResumed() {
+	o.t.Helper()
+	o.AssertEventExists("session_resumed")
+}
+
+// AssertSessionRescanned checks for a session_rescanned event in JSONL.
+func (o *Observer) AssertSessionRescanned() {
+	o.t.Helper()
+	o.AssertEventExists("session_rescanned")
+}
