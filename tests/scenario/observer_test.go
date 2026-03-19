@@ -3,6 +3,7 @@
 package scenario_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -444,4 +445,53 @@ func (o *Observer) AssertWaveApplyFailed() {
 		}
 	}
 	o.t.Error("no wave apply failure event found in .siren/events/*.jsonl")
+}
+
+// --- Feedback consumption + config set helpers (proposals 068, 071) ---
+
+// AssertPromptContains reads prompt logs from PromptLogDir and verifies
+// at least one contains the given substring. Sightjack equivalent of
+// paintress AssertPromptContainsLumina.
+func (o *Observer) AssertPromptContains(substring string) {
+	o.t.Helper()
+	dir := o.ws.PromptLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if strings.Contains(string(data), substring) {
+			return
+		}
+	}
+	o.t.Errorf("no prompt log contains %q (checked %d files)", substring, len(entries))
+}
+
+// AssertConfigValue reads .siren/config.yaml and verifies a top-level
+// field has the expected string value. For nested fields, use dot notation
+// (not yet supported — this checks top-level only).
+func (o *Observer) AssertConfigValue(key, wantValue string) {
+	o.t.Helper()
+	cfgPath := filepath.Join(o.ws.RepoPath, ".siren", "config.yaml")
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		o.t.Fatalf("read siren config: %v", err)
+	}
+	var cfg map[string]any
+	if yamlErr := yaml.Unmarshal(data, &cfg); yamlErr != nil {
+		o.t.Fatalf("parse config: %v", yamlErr)
+	}
+	got, ok := cfg[key]
+	if !ok {
+		o.t.Errorf("config key %q not found", key)
+		return
+	}
+	gotStr := fmt.Sprintf("%v", got)
+	if gotStr != wantValue {
+		o.t.Errorf("config %s: got %q, want %q", key, gotStr, wantValue)
+	}
 }
