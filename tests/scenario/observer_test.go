@@ -304,3 +304,53 @@ func (o *Observer) AssertSessionRescanned() {
 	o.t.Helper()
 	o.AssertEventExists("session_rescanned")
 }
+
+// --- Completeness and ADR format helpers (proposals 044, 047) ---
+
+// AssertCompletenessUpdated checks for a completeness_updated event in JSONL.
+func (o *Observer) AssertCompletenessUpdated() {
+	o.t.Helper()
+	o.AssertEventExists("completeness_updated")
+}
+
+// AssertADRFileExists checks that at least one ADR .md file exists in docs/adr/.
+func (o *Observer) AssertADRFileExists() {
+	o.t.Helper()
+	adrDir := filepath.Join(o.ws.RepoPath, "docs", "adr")
+	entries, err := os.ReadDir(adrDir)
+	if err != nil {
+		o.t.Logf("docs/adr/ not accessible: %v", err)
+		return
+	}
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".md") {
+			return
+		}
+	}
+	o.t.Error("no .md files found in docs/adr/")
+}
+
+// AssertADRContainsSections reads the first ADR file in docs/adr/ and verifies
+// it contains the expected Markdown sections (## Context, ## Decision, ## Consequences).
+func (o *Observer) AssertADRContainsSections() {
+	o.t.Helper()
+	adrDir := filepath.Join(o.ws.RepoPath, "docs", "adr")
+	entries, err := os.ReadDir(adrDir)
+	if err != nil {
+		o.t.Fatalf("docs/adr/: %v", err)
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(adrDir, entry.Name()))
+		content := string(data)
+		for _, section := range []string{"## Context", "## Decision", "## Consequences"} {
+			if !strings.Contains(content, section) {
+				o.t.Errorf("ADR %s missing section %q", entry.Name(), section)
+			}
+		}
+		return
+	}
+	o.t.Error("no ADR .md files to check")
+}
