@@ -168,3 +168,59 @@ func (o *Observer) AssertSirenConfigExists() {
 		o.t.Errorf(".siren/config.yaml not found: %v", err)
 	}
 }
+
+// --- NextGen and Doctor assertion helpers (proposals 027, 028) ---
+
+// AssertEventCount scans .siren/events/*.jsonl for events of the given type
+// and verifies the count matches.
+func (o *Observer) AssertEventCount(eventType string, wantCount int) {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".siren", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+
+	count := 0
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if readErr != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.Contains(line, `"type":"`+eventType+`"`) {
+				count++
+			}
+		}
+	}
+	if count != wantCount {
+		o.t.Errorf("event %q: got %d occurrences, want %d", eventType, count, wantCount)
+	}
+}
+
+// AssertEventExists scans .siren/events/*.jsonl for at least one event of the given type.
+func (o *Observer) AssertEventExists(eventType string) {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".siren", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if readErr != nil {
+			continue
+		}
+		if strings.Contains(string(data), `"type":"`+eventType+`"`) {
+			return
+		}
+	}
+	o.t.Errorf("event %q not found in .siren/events/*.jsonl", eventType)
+}
