@@ -396,3 +396,52 @@ func (o *Observer) AssertArchitectNotCalled() {
 	// via interactive "d" input, which go-expect could provide.
 	o.t.Logf("NOTE: architect discuss is structurally bypassed by --auto-approve in all scenario tests")
 }
+
+// --- Report output + wave apply failure helpers (proposals 062, 065) ---
+
+// AssertReportFields reads report D-Mails and verifies key fields.
+func (o *Observer) AssertReportFields(toolDir, mailbox string) {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, toolDir, mailbox)
+	files := o.ws.ListFiles(o.t, dir)
+	for _, f := range files {
+		if !strings.HasSuffix(f, ".md") {
+			continue
+		}
+		path := filepath.Join(dir, f)
+		fm, _ := o.ws.ReadDMail(o.t, path)
+		kind, _ := fm["kind"].(string)
+		if kind != "report" {
+			continue
+		}
+		if _, ok := fm["description"].(string); !ok {
+			o.t.Errorf("report D-Mail %s: missing description", f)
+		}
+		if _, ok := fm["dmail-schema-version"].(string); !ok {
+			o.t.Errorf("report D-Mail %s: missing dmail-schema-version", f)
+		}
+		return
+	}
+}
+
+// AssertWaveApplyFailed checks for a wave_apply_failed or error event
+// in JSONL after a failed wave apply attempt.
+func (o *Observer) AssertWaveApplyFailed() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".siren", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		content := string(data)
+		if strings.Contains(content, `"wave_apply_failed"`) || strings.Contains(content, `"apply_error"`) {
+			return
+		}
+	}
+	o.t.Error("no wave apply failure event found in .siren/events/*.jsonl")
+}
