@@ -354,3 +354,32 @@ func (o *Observer) AssertADRContainsSections() {
 	}
 	o.t.Error("no ADR .md files to check")
 }
+
+// --- Specification D-Mail output helpers (proposal 050) ---
+
+// AssertSpecificationFields reads specification D-Mails from .siren/outbox/
+// or .expedition/inbox/ and verifies key fields are present.
+func (o *Observer) AssertSpecificationFields(toolDir, mailbox string) {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, toolDir, mailbox)
+	files := o.ws.ListFiles(o.t, dir)
+	for _, f := range files {
+		if !strings.HasSuffix(f, ".md") {
+			continue
+		}
+		path := filepath.Join(dir, f)
+		fm, _ := o.ws.ReadDMail(o.t, path)
+		kind, _ := fm["kind"].(string)
+		if kind != "specification" {
+			continue
+		}
+		// Verify required fields
+		if _, ok := fm["description"].(string); !ok {
+			o.t.Errorf("specification D-Mail %s: missing description field", f)
+		}
+		if _, ok := fm["dmail-schema-version"].(string); !ok {
+			o.t.Errorf("specification D-Mail %s: missing dmail-schema-version", f)
+		}
+		return
+	}
+}
