@@ -383,3 +383,16 @@ func (o *Observer) AssertSpecificationFields(toolDir, mailbox string) {
 		return
 	}
 }
+
+// --- Architect discussion helpers (proposal 058) ---
+
+// AssertArchitectNotCalled documents that --auto-approve bypasses the
+// architect discuss flow entirely. sj_architect.json fixtures exist in
+// all 4 sets but are never reached in scenario tests.
+func (o *Observer) AssertArchitectNotCalled() {
+	o.t.Helper()
+	// With --auto-approve, architect is skipped. This helper documents
+	// the structural blind spot: RunArchitectDiscuss is only reachable
+	// via interactive "d" input, which go-expect could provide.
+	o.t.Logf("NOTE: architect discuss is structurally bypassed by --auto-approve in all scenario tests")
+}

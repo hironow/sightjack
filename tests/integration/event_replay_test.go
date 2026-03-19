@@ -185,3 +185,63 @@ func TestEventReplay_StrictnessPreserved(t *testing.T) {
 		})
 	}
 }
+
+// TestEventReplay_ClusterIssueCountPreserved verifies that per-cluster
+// IssueCount set in scan_completed events is preserved through JSONL
+// round-trip. 7 test locations set IssueCount but none assert it after replay.
+func TestEventReplay_ClusterIssueCountPreserved(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
+
+	base := time.Date(2025, 9, 1, 10, 0, 0, 0, time.UTC)
+
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, &domain.SessionStartedPayload{
+		Project: "issue-count-test", StrictnessLevel: "fog",
+	}, base)
+	e2, _ := domain.NewEvent(domain.EventScanCompleted, &domain.ScanCompletedPayload{
+		Clusters: []domain.ClusterState{
+			{Name: "auth", IssueCount: 12},
+			{Name: "api", IssueCount: 7},
+			{Name: "ui", IssueCount: 3},
+		},
+		Completeness: 0.45,
+		ShibitoCount: 1,
+	}, base.Add(5*time.Minute))
+
+	store.Append(e1, e2)
+
+	// when
+	state, err := eventsource.LoadState(store)
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	if len(state.Clusters) != 3 {
+		t.Fatalf("Clusters: got %d, want 3", len(state.Clusters))
+	}
+	// KEY ASSERTIONS: IssueCount must survive JSONL round-trip
+	for _, want := range []struct {
+		name  string
+		count int
+	}{
+		{"auth", 12},
+		{"api", 7},
+		{"ui", 3},
+	} {
+		found := false
+		for _, c := range state.Clusters {
+			if c.Name == want.name {
+				found = true
+				if c.IssueCount != want.count {
+					t.Errorf("Cluster %s IssueCount: got %d, want %d", want.name, c.IssueCount, want.count)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Cluster %q not found in replayed state", want.name)
+		}
+	}
+}
