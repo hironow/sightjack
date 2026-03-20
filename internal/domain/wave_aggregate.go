@@ -93,6 +93,13 @@ func (a *WaveAggregate) Complete(waveID, clusterName string, applied, totalCount
 	}
 	waveKey := clusterName + ":" + waveID
 	a.completed[waveKey] = true
+	// Sync the Status field on the wave struct so BuildWaveStates persists it
+	for i := range a.waves {
+		if a.waves[i].ID == waveID && a.waves[i].ClusterName == clusterName {
+			a.waves[i].Status = "completed"
+			break
+		}
+	}
 	return NewEvent(EventWaveCompleted, WaveCompletedPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,

@@ -102,6 +102,46 @@ func TestWaveAggregate_Complete(t *testing.T) {
 	}
 }
 
+func TestWaveAggregate_Complete_SyncsStatusField(t *testing.T) {
+	// given
+	agg := domain.NewWaveAggregate()
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "available"},
+	})
+
+	// when
+	_, err := agg.Complete("w1", "auth", 1, 1, time.Now().UTC())
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The wave's Status field should be "completed"
+	waves := agg.Waves()
+	if waves[0].Status != "completed" {
+		t.Errorf("wave status = %q, want %q", waves[0].Status, "completed")
+	}
+}
+
+func TestWaveAggregate_Complete_StatusPersistsViaRoundTrip(t *testing.T) {
+	// given
+	agg := domain.NewWaveAggregate()
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "available"},
+	})
+
+	// when: complete then persist/restore
+	_, _ = agg.Complete("w1", "auth", 1, 1, time.Now().UTC())
+	states := domain.BuildWaveStates(agg.Waves())
+	restored := domain.RestoreWaves(states)
+	completed := domain.BuildCompletedWaveMap(restored)
+
+	// then: restored wave should be in completed map
+	if !completed["auth:w1"] {
+		t.Error("expected auth:w1 in completed map after round-trip")
+	}
+}
+
 func TestWaveAggregate_Complete_RejectsUnknownWave(t *testing.T) {
 	// given
 	agg := domain.NewWaveAggregate()
