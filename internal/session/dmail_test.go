@@ -2537,3 +2537,48 @@ func TestMarshalDMail_NilContextOmitted(t *testing.T) {
 		t.Error("nil Context should be omitted from marshalled output")
 	}
 }
+
+func TestReceiveDMailIfNew_AcceptsImplFeedback(t *testing.T) {
+	t.Parallel()
+	// given: an implementation-feedback d-mail in the inbox
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	mail := &session.DMail{
+		Name:          "impl-fb-001",
+		Kind:          session.DMailImplFeedback,
+		Description:   "Implementation feedback on auth wave",
+		SchemaVersion: "1",
+		Body:          "# Impl Feedback\n\nAuth module needs retry logic.\n",
+	}
+	data, err := session.MarshalDMail(mail)
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+	inboxPath := filepath.Join(domain.MailDir(dir, "inbox"), mail.Filename())
+	if err := os.WriteFile(inboxPath, data, 0644); err != nil {
+		t.Fatalf("write inbox file: %v", err)
+	}
+
+	// when
+	received := session.ReceiveDMailIfNewForTest(dir, mail.Filename(), &domain.NopLogger{})
+
+	// then: implementation-feedback is accepted (not nil)
+	if received == nil {
+		t.Fatal("expected implementation-feedback d-mail to be accepted, got nil")
+	}
+	if received.Kind != session.DMailImplFeedback {
+		t.Errorf("kind: got %s, want %s", received.Kind, session.DMailImplFeedback)
+	}
+	if received.Name != "impl-fb-001" {
+		t.Errorf("name: got %s, want impl-fb-001", received.Name)
+	}
+
+	// verify it was archived (inbox file removed, archive file exists)
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Error("inbox file should be removed after receive")
+	}
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), mail.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
