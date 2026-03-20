@@ -243,6 +243,16 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	if err != nil {
 		return fmt.Errorf("resume: %w", err)
 	}
+
+	// Validate and repair wave state after restore.
+	waves, danglingCount := domain.ValidateWavePrerequisites(waves)
+	if danglingCount > 0 {
+		logger.Warn("Removed %d dangling wave prerequisites", danglingCount)
+	}
+	waves, repairedCount := domain.RepairLockedWaves(waves, completed)
+	if repairedCount > 0 {
+		logger.Info("Repaired %d locked waves with met prerequisites", repairedCount)
+	}
 	scanDir := ResumeScanDir(state, baseDir)
 	if err := os.MkdirAll(scanDir, 0755); err != nil {
 		return fmt.Errorf("ensure scan dir: %w", err)
