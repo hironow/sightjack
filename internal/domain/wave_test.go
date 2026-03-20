@@ -1,6 +1,8 @@
 package domain_test
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -91,9 +93,20 @@ func TestMergeWaveResults(t *testing.T) {
 	if len(merged) != 2 {
 		t.Fatalf("merged len = %d, want 2", len(merged))
 	}
-	// prerequisite normalized
-	if merged[0].Prerequisites[0] != "auth:w0" {
-		t.Errorf("prerequisite = %q, want %q", merged[0].Prerequisites[0], "auth:w0")
+	// Results are sorted by complexity: billing:w1 (score=0) comes before auth:w1 (score=0.5).
+	// Find auth:w1 by key and verify its prerequisite was normalized.
+	var authWave *domain.Wave
+	for i := range merged {
+		if domain.WaveKey(merged[i]) == "auth:w1" {
+			authWave = &merged[i]
+			break
+		}
+	}
+	if authWave == nil {
+		t.Fatal("auth:w1 not found in merged results")
+	}
+	if len(authWave.Prerequisites) == 0 || authWave.Prerequisites[0] != "auth:w0" {
+		t.Errorf("prerequisite = %v, want [auth:w0]", authWave.Prerequisites)
 	}
 }
 
@@ -1336,6 +1349,153 @@ func TestLastCompletedWaveForCluster(t *testing.T) {
 		// then
 		if ok {
 			t.Error("expected ok=false for unknown cluster")
+		}
+	})
+}
+
+func TestSortWavesByComplexity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty_list_is_no_op", func(t *testing.T) {
+		t.Parallel()
+		// given
+		var waves []domain.Wave
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then
+		if len(result) != 0 {
+			t.Errorf("expected empty result, got %d waves", len(result))
+		}
+	})
+
+	t.Run("single_wave_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "i1"}}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then
+		if len(result) != 1 {
+			t.Fatalf("expected 1 wave, got %d", len(result))
+		}
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("wave key = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+	})
+
+	t.Run("sorts_by_action_count_ascending", func(t *testing.T) {
+		t.Parallel()
+		// given: w2 has more actions than w1
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+				{Type: "add_label", IssueID: "i2"},
+				{Type: "cancel", IssueID: "i3"},
+			}},
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+			}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — simpler wave (fewer actions) comes first
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("first wave = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+		if domain.WaveKey(result[1]) != "auth:w2" {
+			t.Errorf("second wave = %q, want %q", domain.WaveKey(result[1]), "auth:w2")
+		}
+	})
+
+	t.Run("prereq_count_adds_weight", func(t *testing.T) {
+		t.Parallel()
+		// given: w1 and w2 have same actions but w2 has prerequisites (adds weight)
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+			}, Prerequisites: []string{"auth:w0", "auth:w1"}},
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+			}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — wave with no prereqs comes first (lower complexity)
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("first wave = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+		if domain.WaveKey(result[1]) != "auth:w2" {
+			t.Errorf("second wave = %q, want %q", domain.WaveKey(result[1]), "auth:w2")
+		}
+	})
+
+	t.Run("multi_cluster_stable_sort_preserves_relative_order", func(t *testing.T) {
+		t.Parallel()
+		// given: two waves with equal complexity from different clusters
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "i1"}}},
+			{ClusterName: "billing", ID: "w1", Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "i2"}}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — stable: original order preserved for equal complexity
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("first wave = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+		if domain.WaveKey(result[1]) != "billing:w1" {
+			t.Errorf("second wave = %q, want %q", domain.WaveKey(result[1]), "billing:w1")
+		}
+	})
+
+	t.Run("complexity_score_set_on_wave", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+				{Type: "add_label", IssueID: "i2"},
+			}, Prerequisites: []string{"auth:w0"}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — ComplexityScore is populated (actions + prereq weighting)
+		if result[0].ComplexityScore == 0 {
+			t.Errorf("expected ComplexityScore > 0, got %v", result[0].ComplexityScore)
+		}
+	})
+}
+
+func TestComplexityScoreJSONOmitempty(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero_score_omitted_from_json", func(t *testing.T) {
+		t.Parallel()
+		// given
+		w := domain.Wave{ClusterName: "auth", ID: "w1"}
+
+		// when: marshal to JSON
+		data, err := json.Marshal(w)
+		if err != nil {
+			t.Fatalf("marshal error: %v", err)
+		}
+
+		// then: complexity_score key absent when zero
+		if strings.Contains(string(data), "complexity_score") {
+			t.Errorf("expected complexity_score to be omitted when zero, got: %s", data)
 		}
 	})
 }

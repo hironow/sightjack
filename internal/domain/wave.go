@@ -11,6 +11,29 @@ func WaveKey(w Wave) string {
 	return w.ClusterName + ":" + w.ID
 }
 
+// calcComplexityScore computes a complexity score for a wave based on action
+// count and prerequisite count weighting. Each action contributes 1.0 and
+// each prerequisite contributes 0.5.
+func calcComplexityScore(w Wave) float64 {
+	return float64(len(w.Actions)) + float64(len(w.Prerequisites))*0.5
+}
+
+// SortWavesByComplexity returns a new slice of waves sorted by ascending
+// ComplexityScore (actions + 0.5*prereqs). The sort is stable so that
+// waves with equal complexity retain their original relative order.
+// ComplexityScore is populated on each returned wave.
+func SortWavesByComplexity(waves []Wave) []Wave {
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	for i := range result {
+		result[i].ComplexityScore = calcComplexityScore(result[i])
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].ComplexityScore < result[j].ComplexityScore
+	})
+	return result
+}
+
 // NormalizeWavePrerequisites prefixes bare prerequisite IDs with the wave's own
 // cluster name so that all keys in the completed map use the composite format.
 // Prerequisites that already contain ":" are left unchanged.
@@ -56,7 +79,7 @@ func RemoveSelfReferences(waves []Wave) ([]Wave, int) {
 
 // MergeWaveResults flattens multiple per-cluster wave results into a single wave list,
 // normalizing prerequisite IDs to the composite "ClusterName:ID" format and removing
-// self-referencing prerequisites.
+// self-referencing prerequisites. Results are sorted by complexity score ascending.
 func MergeWaveResults(results []WaveGenerateResult) []Wave {
 	var all []Wave
 	for _, r := range results {
@@ -67,10 +90,11 @@ func MergeWaveResults(results []WaveGenerateResult) []Wave {
 	for i := range cleaned {
 		cleaned[i].Delta = ClampDelta(cleaned[i].Delta)
 	}
-	return cleaned
+	return SortWavesByComplexity(cleaned)
 }
 
-// AvailableWaves returns waves that have "available" status and are not completed.
+// AvailableWaves returns waves that have "available" status and are not completed,
+// sorted by ascending complexity score.
 // The completed map is keyed by WaveKey (ClusterName:ID).
 func AvailableWaves(waves []Wave, completed map[string]bool) []Wave {
 	var available []Wave
@@ -79,7 +103,7 @@ func AvailableWaves(waves []Wave, completed map[string]bool) []Wave {
 			available = append(available, w)
 		}
 	}
-	return available
+	return SortWavesByComplexity(available)
 }
 
 // EvaluateUnlocks checks locked waves and unlocks them if all prerequisites are met.
