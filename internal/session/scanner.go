@@ -137,6 +137,12 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 		return nil, err
 	}
 	logger.OK("Found %d clusters with %d total issues", len(classify.Clusters), classify.TotalIssues)
+
+	var emptyCount int
+	classify.Clusters, emptyCount = domain.FilterEmptyClassifications(classify.Clusters)
+	if emptyCount > 0 {
+		logger.Warn("Filtered %d empty cluster(s) from classification", emptyCount)
+	}
 	classifySpan.End()
 
 	scanSpan.SetAttributes(
