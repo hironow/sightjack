@@ -117,12 +117,8 @@ func RenderMatrixNavigator(result *domain.ScanResult, projectName string, waves 
 	// Data rows
 	for _, cluster := range result.Clusters {
 		pct := int(cluster.Completeness * 100)
-		name := Truncate(cluster.Name, matrixClusterCol-2)
 		issueCount := cluster.NumIssues()
-		label := fmt.Sprintf("%s (%d)", name, issueCount)
-		if DisplayWidth(label) > matrixClusterCol-2 {
-			label = Truncate(label, matrixClusterCol-2)
-		}
+		label := ClusterLabel(cluster.Name, issueCount, cluster.Completeness, matrixClusterCol-2)
 		b.WriteString("| " + PadRight(label, matrixClusterCol-2) + " ")
 
 		clusterWaves := wavesByCluster[cluster.Name]
@@ -197,6 +193,24 @@ func waveStatusSymbol3(status string) string {
 	default:
 		return "[?]"
 	}
+}
+
+// ClusterLabel builds the display label for a cluster row in the matrix navigator.
+// Shows "[ok]" for complete clusters (completeness >= 0.99 and zero issues).
+func ClusterLabel(name string, issueCount int, completeness float64, maxWidth int) string {
+	truncName := Truncate(name, maxWidth-2)
+	if issueCount == 0 && completeness >= 0.99 {
+		label := fmt.Sprintf("%s [ok]", truncName)
+		if DisplayWidth(label) > maxWidth {
+			label = Truncate(label, maxWidth)
+		}
+		return label
+	}
+	label := fmt.Sprintf("%s (%d)", truncName, issueCount)
+	if DisplayWidth(label) > maxWidth {
+		label = Truncate(label, maxWidth)
+	}
+	return label
 }
 
 // RenderProgressBar produces an ASCII progress bar: [====....] NN%

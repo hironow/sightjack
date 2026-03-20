@@ -378,6 +378,46 @@ func TestRenderMatrixNavigator_ShibitoCount(t *testing.T) {
 	}
 }
 
+func TestClusterLabel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("normal_cluster", func(t *testing.T) {
+		t.Parallel()
+		// when
+		label := session.ClusterLabel("Auth", 5, 0.5, 30)
+
+		// then
+		if !strings.Contains(label, "Auth") {
+			t.Errorf("expected 'Auth' in label, got %q", label)
+		}
+		if !strings.Contains(label, "(5)") {
+			t.Errorf("expected '(5)' in label, got %q", label)
+		}
+	})
+
+	t.Run("complete_cluster_zero_issues_shows_ok", func(t *testing.T) {
+		t.Parallel()
+		// when
+		label := session.ClusterLabel("Auth", 0, 1.0, 30)
+
+		// then
+		if !strings.Contains(label, "[ok]") {
+			t.Errorf("expected '[ok]' in label for complete cluster, got %q", label)
+		}
+	})
+
+	t.Run("incomplete_cluster_zero_issues_no_ok", func(t *testing.T) {
+		t.Parallel()
+		// when
+		label := session.ClusterLabel("Auth", 0, 0.5, 30)
+
+		// then
+		if strings.Contains(label, "[ok]") {
+			t.Errorf("should not show '[ok]' for incomplete cluster, got %q", label)
+		}
+	})
+}
+
 func TestRenderProgressBar_Half(t *testing.T) {
 	// given
 	current := 0.50
