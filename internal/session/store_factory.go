@@ -86,10 +86,16 @@ func LoadAllEvents(ctx context.Context, baseDir string) ([]domain.Event, error) 
 	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_all_events")
 	defer span.End()
 	_ = ctx
-	events, err := eventsource.LoadAllEventsAcrossSessions(stateDir(baseDir))
+	events, loadResult, err := eventsource.LoadAllEventsAcrossSessions(stateDir(baseDir))
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all_events"))
+	}
+	if loadResult.SessionsFailed > 0 {
+		span.SetAttributes(
+			attribute.Int("sessions.loaded", loadResult.SessionsLoaded),
+			attribute.Int("sessions.failed", loadResult.SessionsFailed),
+		)
 	}
 	return events, err
 }

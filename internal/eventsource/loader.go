@@ -85,28 +85,37 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 	return candidates, nil
 }
 
+// LoadAllResult holds statistics from loading events across sessions.
+type LoadAllResult struct {
+	SessionsLoaded int
+	SessionsFailed int
+}
+
 // LoadAllEventsAcrossSessions aggregates events from all session stores under
 // events/. stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
-// Returns nil, nil when the events directory does not exist.
-func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, error) {
+// Returns nil, LoadAllResult{}, nil when the events directory does not exist.
+func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, LoadAllResult, error) {
 	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil, nil
+			return nil, LoadAllResult{}, nil
 		}
-		return nil, fmt.Errorf("load all events: %w", err)
+		return nil, LoadAllResult{}, fmt.Errorf("load all events: %w", err)
 	}
 	var all []domain.Event
+	var result LoadAllResult
 	for _, c := range candidates {
 		store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
 		events, _, loadErr := store.LoadAll()
-		if loadErr != nil {
+		if loadErr != nil || len(events) == 0 {
+			result.SessionsFailed++
 			continue
 		}
+		result.SessionsLoaded++
 		all = append(all, events...)
 	}
-	return all, nil
+	return all, result, nil
 }
 
 // loadLatestStateMatching iterates event stores by modtime descending and
