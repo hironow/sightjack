@@ -134,6 +134,56 @@ func TestChunkSlice(t *testing.T) {
 	}
 }
 
+func TestClampCompleteness(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   float64
+		want float64
+	}{
+		{name: "valid", in: 0.5, want: 0.5},
+		{name: "negative", in: -0.1, want: 0.0},
+		{name: "above_one", in: 1.5, want: 1.0},
+		{name: "zero", in: 0.0, want: 0.0},
+		{name: "one", in: 1.0, want: 1.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// when
+			got := domain.ClampCompleteness(tt.in)
+
+			// then
+			if got != tt.want {
+				t.Errorf("ClampCompleteness(%f) = %f, want %f", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMergeClusterChunks_ClampsCompleteness(t *testing.T) {
+	t.Parallel()
+	// given: issues with out-of-bounds completeness
+	chunks := []domain.ClusterScanResult{
+		{
+			Name:   "auth",
+			Issues: []domain.IssueDetail{{ID: "1", Completeness: 1.5}},
+		},
+		{
+			Name:   "auth",
+			Issues: []domain.IssueDetail{{ID: "2", Completeness: 0.5}},
+		},
+	}
+
+	// when
+	merged := domain.MergeClusterChunks("auth", chunks)
+
+	// then: clamped 1.5->1.0, avg of 1.0 and 0.5 = 0.75
+	if merged.Completeness != 0.75 {
+		t.Errorf("completeness = %f, want 0.75", merged.Completeness)
+	}
+}
+
 func TestMergeClusterChunks(t *testing.T) {
 	t.Parallel()
 

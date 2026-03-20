@@ -60,8 +60,20 @@ func ChunkSlice(items []string, size int) [][]string {
 	return chunks
 }
 
+// ClampCompleteness bounds a completeness value to [0, 1].
+func ClampCompleteness(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
 // MergeClusterChunks combines multiple chunk results from the same cluster
 // into a single ClusterScanResult, recalculating completeness from individual issues.
+// Individual issue completeness values are clamped to [0, 1] before averaging.
 func MergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResult {
 	merged := ClusterScanResult{Name: name}
 	for _, c := range chunks {
@@ -70,10 +82,19 @@ func MergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResu
 	}
 	if len(merged.Issues) > 0 {
 		total := 0.0
-		for _, issue := range merged.Issues {
-			total += issue.Completeness
+		for i, issue := range merged.Issues {
+			clamped := ClampCompleteness(issue.Completeness)
+			merged.Issues[i].Completeness = clamped
+			total += clamped
 		}
 		merged.Completeness = total / float64(len(merged.Issues))
+	} else {
+		// Preserve max completeness from source chunks when no issues remain.
+		for _, c := range chunks {
+			if c.Completeness > merged.Completeness {
+				merged.Completeness = ClampCompleteness(c.Completeness)
+			}
+		}
 	}
 	return merged
 }
