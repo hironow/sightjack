@@ -92,6 +92,16 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	// rescanWarnings are already logged by RunParallel; just propagate.
 	_ = rescanWarnings
 
+	// Prune stale waves from old state before restoring — removes waves
+	// whose clusters no longer exist in the fresh scan results.
+	validClusters := make([]domain.ClusterState, len(scanResult.Clusters))
+	for i, c := range scanResult.Clusters {
+		validClusters[i] = domain.ClusterState{Name: c.Name, Completeness: c.Completeness, IssueCount: len(c.Issues)}
+	}
+	if pruned := domain.PruneStaleWaves(oldState, validClusters); pruned > 0 {
+		logger.Warn("Pruned %d stale waves from previous session", pruned)
+	}
+
 	// Carry forward old waves whose clusters failed regeneration so that
 	// completed progress is never lost on transient partial failures.
 	// Only carry forward clusters still present in the current scan;
