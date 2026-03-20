@@ -1066,6 +1066,33 @@ func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 	}
 }
 
+func TestFeedbackCollector_FeedbackOnly_IncludesImplFeedback(t *testing.T) {
+	// given: collector with design-feedback and implementation-feedback
+	initial := []*session.DMail{
+		{Name: "fb-001", Kind: session.DMailDesignFeedback, Description: "Architecture drift"},
+		{Name: "impl-001", Kind: session.DMailImplFeedback, Description: "Code quality issue"},
+		{Name: "conv-001", Kind: session.DMailConvergence, Description: "Convergence signal"},
+	}
+	c := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+
+	// when
+	feedbackOnly := c.FeedbackOnly()
+
+	// then: both design and implementation feedback included
+	if len(feedbackOnly) != 2 {
+		t.Fatalf("expected 2 feedback d-mails (design + impl), got %d", len(feedbackOnly))
+	}
+	hasImpl := false
+	for _, m := range feedbackOnly {
+		if m.Kind == session.DMailImplFeedback {
+			hasImpl = true
+		}
+	}
+	if !hasImpl {
+		t.Error("FeedbackOnly should include implementation-feedback d-mails")
+	}
+}
+
 // --- Receiving test group ---
 
 func TestReceiveDMail_MalformedContent(t *testing.T) {
