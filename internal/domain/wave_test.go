@@ -876,6 +876,98 @@ func TestRemoveSelfReferences(t *testing.T) {
 	})
 }
 
+func TestValidateWavePrerequisites(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_dangling_prerequisites", func(t *testing.T) {
+		t.Parallel()
+		// given: w2 references w99 which doesn't exist
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Status: "completed"},
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1", "auth:w99"}},
+		}
+
+		// when
+		result, removed := domain.ValidateWavePrerequisites(waves)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(result[1].Prerequisites) != 1 {
+			t.Fatalf("prerequisites len = %d, want 1", len(result[1].Prerequisites))
+		}
+		if result[1].Prerequisites[0] != "auth:w1" {
+			t.Errorf("prerequisite = %q, want %q", result[1].Prerequisites[0], "auth:w1")
+		}
+	})
+
+	t.Run("no_dangling_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Status: "completed"},
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		result, removed := domain.ValidateWavePrerequisites(waves)
+
+		// then
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+		if len(result[1].Prerequisites) != 1 {
+			t.Errorf("prerequisites len = %d, want 1", len(result[1].Prerequisites))
+		}
+	})
+}
+
+func TestRepairLockedWaves(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unlocks_wave_with_all_prerequisites_completed", func(t *testing.T) {
+		t.Parallel()
+		// given: w2 is locked but all prereqs are met
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Status: "completed"},
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
+		}
+		completed := map[string]bool{"auth:w1": true}
+
+		// when
+		result, repaired := domain.RepairLockedWaves(waves, completed)
+
+		// then
+		if repaired != 1 {
+			t.Errorf("repaired = %d, want 1", repaired)
+		}
+		if result[1].Status != "available" {
+			t.Errorf("status = %q, want %q", result[1].Status, "available")
+		}
+	})
+
+	t.Run("keeps_locked_when_prerequisites_unmet", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
+		}
+		completed := map[string]bool{}
+
+		// when
+		result, repaired := domain.RepairLockedWaves(waves, completed)
+
+		// then
+		if repaired != 0 {
+			t.Errorf("repaired = %d, want 0", repaired)
+		}
+		if result[0].Status != "locked" {
+			t.Errorf("status = %q, want %q", result[0].Status, "locked")
+		}
+	})
+}
+
 func TestValidateWaveApplyResult(t *testing.T) {
 	t.Parallel()
 

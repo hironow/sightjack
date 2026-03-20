@@ -223,6 +223,55 @@ func PropagateWaveUpdate(waves []Wave, updated Wave) {
 	}
 }
 
+// ValidateWavePrerequisites removes prerequisites referencing waves not in the wave set.
+// Returns the cleaned wave list and the count of removed dangling prerequisites.
+func ValidateWavePrerequisites(waves []Wave) ([]Wave, int) {
+	allKeys := make(map[string]bool, len(waves))
+	for _, w := range waves {
+		allKeys[WaveKey(w)] = true
+	}
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	var removed int
+	for i, w := range result {
+		var clean []string
+		for _, p := range w.Prerequisites {
+			if allKeys[p] {
+				clean = append(clean, p)
+			} else {
+				removed++
+			}
+		}
+		result[i].Prerequisites = clean
+	}
+	return result, removed
+}
+
+// RepairLockedWaves unlocks waves whose prerequisites are all met but status is still "locked".
+// Returns the repaired wave list and the count of repaired waves.
+func RepairLockedWaves(waves []Wave, completed map[string]bool) ([]Wave, int) {
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	var repaired int
+	for i, w := range result {
+		if w.Status != "locked" {
+			continue
+		}
+		allMet := true
+		for _, prereq := range w.Prerequisites {
+			if !completed[prereq] {
+				allMet = false
+				break
+			}
+		}
+		if allMet {
+			result[i].Status = "available"
+			repaired++
+		}
+	}
+	return result, repaired
+}
+
 // BuildCompletedWaveMap returns a set of completed waves keyed by WaveKey (ClusterName:ID).
 func BuildCompletedWaveMap(waves []Wave) map[string]bool {
 	completed := make(map[string]bool)
