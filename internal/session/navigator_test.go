@@ -418,6 +418,46 @@ func TestClusterLabel(t *testing.T) {
 	})
 }
 
+func TestDisplayScribeResponse_EmptyContent(t *testing.T) {
+	t.Parallel()
+	// given
+	resp := &domain.ScribeResponse{
+		ADRID:   "0001",
+		Title:   "Test ADR",
+		Content: "",
+	}
+	var buf strings.Builder
+
+	// when
+	session.DisplayScribeResponse(&buf, resp)
+
+	// then: should show warning about empty content
+	output := buf.String()
+	if !strings.Contains(output, "empty") {
+		t.Errorf("expected empty content warning, got %q", output)
+	}
+}
+
+func TestDisplayScribeResponse_WithContent(t *testing.T) {
+	t.Parallel()
+	// given
+	resp := &domain.ScribeResponse{
+		ADRID:   "0001",
+		Title:   "Test ADR",
+		Content: "some content",
+	}
+	var buf strings.Builder
+
+	// when
+	session.DisplayScribeResponse(&buf, resp)
+
+	// then: should show saved message
+	output := buf.String()
+	if !strings.Contains(output, "Saved to") {
+		t.Errorf("expected 'Saved to' message, got %q", output)
+	}
+}
+
 func TestRenderProgressBar_Half(t *testing.T) {
 	// given
 	current := 0.50

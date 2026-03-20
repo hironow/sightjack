@@ -388,5 +388,9 @@ func DisplayWaveCompletion(w io.Writer, wave domain.Wave, ripples []domain.Rippl
 // DisplayScribeResponse shows the scribe's ADR generation result.
 func DisplayScribeResponse(w io.Writer, resp *domain.ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
+	if resp.Content == "" {
+		fmt.Fprintf(w, "  Warning: ADR content is empty, skipping save\n")
+		return
+	}
 	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", ADRSubdir, resp.ADRID, SanitizeADRTitle(resp.Title))
 }
