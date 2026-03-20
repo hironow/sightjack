@@ -31,6 +31,40 @@ func ValidateStore(stateDir string) StoreHealth {
 	}
 
 	var sessions, totalEvents int
+
+	// Process legacy flat .jsonl files at the events root
+	for _, sessionEntry := range sessionEntries {
+		if sessionEntry.IsDir() || !isEventFile(sessionEntry.Name()) {
+			continue
+		}
+		data, fErr := os.ReadFile(filepath.Join(eventsDir, sessionEntry.Name()))
+		if fErr != nil {
+			return StoreHealth{
+				Err:     fmt.Errorf("read error: %w", fErr),
+				ErrHint: "check file permissions on legacy flat JSONL files in events/",
+			}
+		}
+		hasEvent := false
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			if !json.Valid([]byte(line)) {
+				return StoreHealth{
+					Err:     fmt.Errorf("corrupt JSON in legacy file %s", sessionEntry.Name()),
+					ErrHint: "check legacy flat JSONL files for corruption in events/",
+				}
+			}
+			totalEvents++
+			hasEvent = true
+		}
+		if hasEvent {
+			sessions++
+		}
+	}
+
+	// Process session directories
 	for _, sessionEntry := range sessionEntries {
 		if !sessionEntry.IsDir() {
 			continue
