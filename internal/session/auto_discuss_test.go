@@ -139,6 +139,45 @@ func TestBuildSummaryFromRounds_Empty(t *testing.T) {
 	}
 }
 
+func TestBuildSummaryFromRounds_EmptyContentRoundsIncluded(t *testing.T) {
+	// given: rounds with empty content should still produce output
+	rounds := []domain.AutoDiscussRound{
+		{Round: 0, Speaker: "architect", Content: "Good design."},
+		{Round: 1, Speaker: "devils_advocate", Content: ""},
+	}
+
+	// when
+	summary := buildSummaryFromRounds(rounds)
+
+	// then: should include both rounds (empty content produces "[devils_advocate]: ")
+	if !strings.Contains(summary, "architect") {
+		t.Error("expected architect in summary")
+	}
+	if !strings.Contains(summary, "devils_advocate") {
+		t.Error("expected devils_advocate in summary even with empty content")
+	}
+}
+
+func TestReadRoundContent_EmptyContent(t *testing.T) {
+	// given: JSON with empty content field
+	dir := t.TempDir()
+	outputFile := filepath.Join(dir, "test_output.json")
+	if err := os.WriteFile(outputFile, []byte(`{"content":""}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	content, err := readRoundContent(outputFile)
+
+	// then: returns empty string without error
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if content != "" {
+		t.Errorf("expected empty content, got: %q", content)
+	}
+}
+
 func TestParseFinalRound_WithOpenIssues(t *testing.T) {
 	dir := t.TempDir()
 	wave := domain.Wave{ClusterName: "auth", ID: "w1"}

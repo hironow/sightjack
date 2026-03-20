@@ -112,6 +112,17 @@ func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 			break
 		}
 
+		if content == "" {
+			logger.Warn("Auto-discuss round %d (%s): empty content, stopping debate", r, speaker)
+			span.AddEvent("auto_discuss.empty_content",
+				trace.WithAttributes(
+					attribute.Int("round.index", r),
+					attribute.String("round.speaker", platform.SanitizeUTF8(speaker)),
+				),
+			)
+			break
+		}
+
 		allRounds = append(allRounds, domain.AutoDiscussRound{
 			Round:   r,
 			Speaker: speaker,
