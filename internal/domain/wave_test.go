@@ -923,6 +923,88 @@ func TestValidateWavePrerequisites(t *testing.T) {
 	})
 }
 
+func TestDetectWaveCycles(t *testing.T) {
+	t.Parallel()
+
+	t.Run("detects_simple_cycle", func(t *testing.T) {
+		t.Parallel()
+		// given: w1 -> w2 -> w1
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w2"}},
+			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err == nil {
+			t.Error("expected cycle error")
+		}
+	})
+
+	t.Run("no_cycle_returns_nil", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1"},
+			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("detects_cross_cluster_cycle", func(t *testing.T) {
+		t.Parallel()
+		// given: auth:w1 -> billing:w1 -> auth:w1
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"billing:w1"}},
+			{ClusterName: "billing", ID: "w1", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err == nil {
+			t.Error("expected cycle error for cross-cluster cycle")
+		}
+	})
+
+	t.Run("empty_waves_no_error", func(t *testing.T) {
+		t.Parallel()
+		// when
+		err := domain.DetectWaveCycles(nil)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("self_cycle_detected", func(t *testing.T) {
+		t.Parallel()
+		// given: w1 depends on itself
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err == nil {
+			t.Error("expected cycle error for self-cycle")
+		}
+	})
+}
+
 func TestPruneStaleWaves(t *testing.T) {
 	t.Parallel()
 

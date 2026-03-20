@@ -223,6 +223,64 @@ func PropagateWaveUpdate(waves []Wave, updated Wave) {
 	}
 }
 
+// DetectWaveCycles performs DFS-based cycle detection on the wave prerequisite graph.
+// Returns an error describing the cycle if one is found, nil otherwise.
+func DetectWaveCycles(waves []Wave) error {
+	if len(waves) == 0 {
+		return nil
+	}
+	// Build adjacency map: waveKey -> prerequisites
+	adj := make(map[string][]string, len(waves))
+	for _, w := range waves {
+		key := WaveKey(w)
+		adj[key] = w.Prerequisites
+	}
+
+	const (
+		white = 0 // unvisited
+		gray  = 1 // in current DFS path
+		black = 2 // fully processed
+	)
+	color := make(map[string]int, len(waves))
+	parent := make(map[string]string, len(waves))
+
+	var dfs func(node string) error
+	dfs = func(node string) error {
+		color[node] = gray
+		for _, dep := range adj[node] {
+			switch color[dep] {
+			case gray:
+				// Back edge: cycle found. Reconstruct path.
+				var path []string
+				path = append(path, dep, node)
+				cur := node
+				for i := 0; i < len(waves) && cur != dep; i++ {
+					cur = parent[cur]
+					path = append(path, cur)
+				}
+				return fmt.Errorf("dependency cycle detected: %s", strings.Join(path, " -> "))
+			case white:
+				parent[dep] = node
+				if err := dfs(dep); err != nil {
+					return err
+				}
+			}
+		}
+		color[node] = black
+		return nil
+	}
+
+	for _, w := range waves {
+		key := WaveKey(w)
+		if color[key] == white {
+			if err := dfs(key); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // PruneStaleWaves removes waves whose cluster is no longer in the valid cluster set.
 // Completed waves are preserved regardless. Modifies state.Waves in place.
 // Returns the count of pruned waves.
