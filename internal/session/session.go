@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -243,6 +244,9 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 		return fmt.Errorf("resume: %w", err)
 	}
 	scanDir := ResumeScanDir(state, baseDir)
+	if err := os.MkdirAll(scanDir, 0755); err != nil {
+		return fmt.Errorf("ensure scan dir: %w", err)
+	}
 	scanResultPath := filepath.Join(scanDir, "scan_result.json")
 	scanner := bufio.NewScanner(input)
 	adrDir := ADRDir(baseDir)
