@@ -923,6 +923,80 @@ func TestValidateWavePrerequisites(t *testing.T) {
 	})
 }
 
+func TestPruneStaleWaves(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_orphaned_cluster_waves", func(t *testing.T) {
+		t.Parallel()
+		// given: "billing" waves exist but cluster is no longer in scan
+		state := &domain.SessionState{
+			Waves: []domain.WaveState{
+				{ID: "w1", ClusterName: "auth", Status: "available"},
+				{ID: "w2", ClusterName: "billing", Status: "available"},
+			},
+			Clusters: []domain.ClusterState{
+				{Name: "auth"},
+			},
+		}
+
+		// when
+		removed := domain.PruneStaleWaves(state, state.Clusters)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(state.Waves) != 1 {
+			t.Fatalf("waves len = %d, want 1", len(state.Waves))
+		}
+		if state.Waves[0].ClusterName != "auth" {
+			t.Errorf("remaining wave cluster = %q, want %q", state.Waves[0].ClusterName, "auth")
+		}
+	})
+
+	t.Run("keeps_completed_waves_even_if_cluster_removed", func(t *testing.T) {
+		t.Parallel()
+		// given
+		state := &domain.SessionState{
+			Waves: []domain.WaveState{
+				{ID: "w1", ClusterName: "billing", Status: "completed"},
+			},
+			Clusters: []domain.ClusterState{
+				{Name: "auth"},
+			},
+		}
+
+		// when
+		removed := domain.PruneStaleWaves(state, state.Clusters)
+
+		// then: completed waves are preserved
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+
+	t.Run("no_pruning_when_all_valid", func(t *testing.T) {
+		t.Parallel()
+		// given
+		state := &domain.SessionState{
+			Waves: []domain.WaveState{
+				{ID: "w1", ClusterName: "auth", Status: "available"},
+			},
+			Clusters: []domain.ClusterState{
+				{Name: "auth"},
+			},
+		}
+
+		// when
+		removed := domain.PruneStaleWaves(state, state.Clusters)
+
+		// then
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+}
+
 func TestRepairLockedWaves(t *testing.T) {
 	t.Parallel()
 

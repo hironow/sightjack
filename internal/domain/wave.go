@@ -223,6 +223,27 @@ func PropagateWaveUpdate(waves []Wave, updated Wave) {
 	}
 }
 
+// PruneStaleWaves removes waves whose cluster is no longer in the valid cluster set.
+// Completed waves are preserved regardless. Modifies state.Waves in place.
+// Returns the count of pruned waves.
+func PruneStaleWaves(state *SessionState, validClusters []ClusterState) int {
+	validNames := make(map[string]bool, len(validClusters))
+	for _, c := range validClusters {
+		validNames[c.Name] = true
+	}
+	var kept []WaveState
+	var removed int
+	for _, w := range state.Waves {
+		if w.Status == "completed" || validNames[w.ClusterName] {
+			kept = append(kept, w)
+		} else {
+			removed++
+		}
+	}
+	state.Waves = kept
+	return removed
+}
+
 // ValidateWavePrerequisites removes prerequisites referencing waves not in the wave set.
 // Returns the cleaned wave list and the count of removed dangling prerequisites.
 func ValidateWavePrerequisites(waves []Wave) ([]Wave, int) {
