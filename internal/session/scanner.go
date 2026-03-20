@@ -250,7 +250,12 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 		return nil, warnings, failedNames, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
 	}
 
-	return domain.MergeWaveResults(successResults), warnings, failedNames, nil
+	merged := domain.MergeWaveResults(successResults)
+	merged, emptyCount := domain.FilterEmptyWaves(merged)
+	if emptyCount > 0 {
+		logger.Warn("Wave generation: filtered %d empty wave(s)", emptyCount)
+	}
+	return merged, warnings, failedNames, nil
 }
 
 // waveFileBase returns the base name for wave-related files (prompt, log, output).

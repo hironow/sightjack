@@ -101,6 +101,10 @@ func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, 
 	}
 
 	newWaves := domain.NormalizeWavePrerequisites(result.Waves)
+	newWaves, emptyCount := domain.FilterEmptyWaves(newWaves)
+	if emptyCount > 0 {
+		logger.Warn("Nextgen: filtered %d empty wave(s) for %s", emptyCount, completedWave.ClusterName)
+	}
 	if len(newWaves) > 0 {
 		logger.OK("Generated %d new wave(s) for %s: %s", len(newWaves), completedWave.ClusterName, result.Reasoning)
 	}

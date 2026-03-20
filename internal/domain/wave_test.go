@@ -876,6 +876,72 @@ func TestRemoveSelfReferences(t *testing.T) {
 	})
 }
 
+func TestFilterEmptyWaves(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_zero_action_waves", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ID: "w1", ClusterName: "auth", Actions: []domain.WaveAction{{Type: "fix", IssueID: "1"}}},
+			{ID: "w2", ClusterName: "auth", Actions: nil},
+			{ID: "w3", ClusterName: "auth", Actions: []domain.WaveAction{}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyWaves(waves)
+
+		// then
+		if len(filtered) != 1 {
+			t.Fatalf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 2 {
+			t.Errorf("removed = %d, want 2", removed)
+		}
+		if filtered[0].ID != "w1" {
+			t.Errorf("filtered[0].ID = %q, want %q", filtered[0].ID, "w1")
+		}
+	})
+
+	t.Run("all_valid_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ID: "w1", Actions: []domain.WaveAction{{Type: "fix"}}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyWaves(waves)
+
+		// then
+		if len(filtered) != 1 {
+			t.Errorf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+
+	t.Run("all_empty_returns_nil", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ID: "w1", Actions: nil},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyWaves(waves)
+
+		// then
+		if len(filtered) != 0 {
+			t.Errorf("filtered len = %d, want 0", len(filtered))
+		}
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+	})
+}
+
 func TestLastCompletedWaveForCluster(t *testing.T) {
 	t.Parallel()
 

@@ -339,6 +339,21 @@ func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
 	}
 }
 
+// FilterEmptyWaves removes waves that have zero actions (nil or empty slice).
+// Returns the filtered list and the count of removed waves.
+func FilterEmptyWaves(waves []Wave) ([]Wave, int) {
+	var filtered []Wave
+	var removed int
+	for _, w := range waves {
+		if len(w.Actions) == 0 {
+			removed++
+		} else {
+			filtered = append(filtered, w)
+		}
+	}
+	return filtered, removed
+}
+
 // AutoSelectWave selects the first available wave for auto-approve mode.
 // Returns the selected wave and true if one is available, or zero Wave and false if none.
 func AutoSelectWave(available []Wave) (Wave, bool) {
