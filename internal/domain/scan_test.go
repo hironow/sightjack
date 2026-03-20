@@ -134,6 +134,72 @@ func TestChunkSlice(t *testing.T) {
 	}
 }
 
+func TestFilterEmptyClassifications(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_zero_issue_clusters", func(t *testing.T) {
+		t.Parallel()
+		// given
+		clusters := []domain.ClusterClassification{
+			{Name: "auth", IssueIDs: []string{"ENG-1"}},
+			{Name: "empty", IssueIDs: nil},
+			{Name: "also_empty", IssueIDs: []string{}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyClassifications(clusters)
+
+		// then
+		if len(filtered) != 1 {
+			t.Fatalf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 2 {
+			t.Errorf("removed = %d, want 2", removed)
+		}
+		if filtered[0].Name != "auth" {
+			t.Errorf("filtered[0].Name = %q, want %q", filtered[0].Name, "auth")
+		}
+	})
+
+	t.Run("all_have_issues_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		clusters := []domain.ClusterClassification{
+			{Name: "auth", IssueIDs: []string{"ENG-1"}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyClassifications(clusters)
+
+		// then
+		if len(filtered) != 1 {
+			t.Errorf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+
+	t.Run("all_empty_returns_nil", func(t *testing.T) {
+		t.Parallel()
+		// given
+		clusters := []domain.ClusterClassification{
+			{Name: "empty", IssueIDs: nil},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyClassifications(clusters)
+
+		// then
+		if len(filtered) != 0 {
+			t.Errorf("filtered len = %d, want 0", len(filtered))
+		}
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+	})
+}
+
 func TestClampCompleteness(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

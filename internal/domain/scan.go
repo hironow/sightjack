@@ -60,6 +60,21 @@ func ChunkSlice(items []string, size int) [][]string {
 	return chunks
 }
 
+// FilterEmptyClassifications removes clusters with zero issue IDs from the classification result.
+// Returns the filtered list and the count of removed clusters.
+func FilterEmptyClassifications(clusters []ClusterClassification) ([]ClusterClassification, int) {
+	var filtered []ClusterClassification
+	var removed int
+	for _, c := range clusters {
+		if len(c.IssueIDs) > 0 {
+			filtered = append(filtered, c)
+		} else {
+			removed++
+		}
+	}
+	return filtered, removed
+}
+
 // ClampCompleteness bounds a completeness value to [0, 1].
 func ClampCompleteness(v float64) float64 {
 	if v < 0 {
