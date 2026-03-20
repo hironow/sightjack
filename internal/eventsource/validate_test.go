@@ -58,3 +58,63 @@ NOT_JSON
 		t.Fatal("expected error for corrupt JSON in legacy file")
 	}
 }
+
+func TestValidateStore_CorruptLineInSessionDir_CountsAndContinues(t *testing.T) {
+	// given: session dir with valid + corrupt lines
+	stateDir := t.TempDir()
+	sessionDir := filepath.Join(stateDir, ".siren", "events", "session-1")
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	content := `{"type":"session_started"}
+CORRUPT_LINE
+{"type":"scan_completed"}`
+	if err := os.WriteFile(filepath.Join(sessionDir, "events.jsonl"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	health := eventsource.ValidateStore(filepath.Join(stateDir, ".siren"))
+
+	// then: corrupt line counted but valid events also counted
+	if health.CorruptLines != 1 {
+		t.Errorf("CorruptLines = %d, want 1", health.CorruptLines)
+	}
+	if health.Events != 2 {
+		t.Errorf("Events = %d, want 2", health.Events)
+	}
+	if health.Sessions != 1 {
+		t.Errorf("Sessions = %d, want 1", health.Sessions)
+	}
+	if health.Err == nil {
+		t.Error("expected non-nil Err when corrupt lines exist")
+	}
+}
+
+func TestValidateStore_AllValid_NoCorruption(t *testing.T) {
+	// given: clean session
+	stateDir := t.TempDir()
+	sessionDir := filepath.Join(stateDir, ".siren", "events", "session-1")
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	content := `{"type":"session_started"}
+{"type":"scan_completed"}`
+	if err := os.WriteFile(filepath.Join(sessionDir, "events.jsonl"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	health := eventsource.ValidateStore(filepath.Join(stateDir, ".siren"))
+
+	// then
+	if health.CorruptLines != 0 {
+		t.Errorf("CorruptLines = %d, want 0", health.CorruptLines)
+	}
+	if health.Err != nil {
+		t.Errorf("unexpected error: %v", health.Err)
+	}
+	if health.Events != 2 {
+		t.Errorf("Events = %d, want 2", health.Events)
+	}
+}

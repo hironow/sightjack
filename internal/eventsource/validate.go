@@ -10,11 +10,12 @@ import (
 
 // StoreHealth summarises the validation result of the event store.
 type StoreHealth struct {
-	Sessions int    // number of session directories containing event files
-	Events   int    // total number of valid JSON lines
-	NotFound bool   // true when the events directory does not exist
-	Err      error  // first error encountered (nil = healthy)
-	ErrHint  string // human-readable remediation hint
+	Sessions     int    // number of session directories containing event files
+	Events       int    // total number of valid JSON lines
+	CorruptLines int    // number of corrupt JSON lines encountered
+	NotFound     bool   // true when the events directory does not exist
+	Err          error  // first error encountered (nil = healthy)
+	ErrHint      string // human-readable remediation hint
 }
 
 // ValidateStore walks the event store directory tree rooted at stateDir
@@ -30,7 +31,7 @@ func ValidateStore(stateDir string) StoreHealth {
 		return StoreHealth{NotFound: true} // directory absent — no data yet
 	}
 
-	var sessions, totalEvents int
+	var sessions, totalEvents, corruptLines int
 
 	// Process legacy flat .jsonl files at the events root
 	for _, sessionEntry := range sessionEntries {
@@ -95,10 +96,8 @@ func ValidateStore(stateDir string) StoreHealth {
 					continue
 				}
 				if !json.Valid([]byte(line)) {
-					return StoreHealth{
-						Err:     fmt.Errorf("corrupt JSON in %s/%s", sessionEntry.Name(), f.Name()),
-						ErrHint: "check event files for corruption in the events/ directory",
-					}
+					corruptLines++
+					continue
 				}
 				totalEvents++
 			}
@@ -109,7 +108,12 @@ func ValidateStore(stateDir string) StoreHealth {
 		}
 	}
 
-	return StoreHealth{Sessions: sessions, Events: totalEvents}
+	health := StoreHealth{Sessions: sessions, Events: totalEvents, CorruptLines: corruptLines}
+	if corruptLines > 0 {
+		health.Err = fmt.Errorf("%d corrupt JSON line(s) found across event store", corruptLines)
+		health.ErrHint = "run 'sightjack doctor' to inspect and repair corrupt event lines"
+	}
+	return health
 }
 
 // isEventFile reports whether a filename has the event-file suffix.
