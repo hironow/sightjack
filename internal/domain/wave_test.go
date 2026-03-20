@@ -876,6 +876,37 @@ func TestRemoveSelfReferences(t *testing.T) {
 	})
 }
 
+func TestClampDelta(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		delta      domain.WaveDelta
+		wantBefore float64
+		wantAfter  float64
+	}{
+		{name: "valid_unchanged", delta: domain.WaveDelta{Before: 0.3, After: 0.7}, wantBefore: 0.3, wantAfter: 0.7},
+		{name: "negative_clamped", delta: domain.WaveDelta{Before: -0.1, After: 0.5}, wantBefore: 0.0, wantAfter: 0.5},
+		{name: "above_one_clamped", delta: domain.WaveDelta{Before: 0.5, After: 1.5}, wantBefore: 0.5, wantAfter: 1.0},
+		{name: "both_out_of_bounds", delta: domain.WaveDelta{Before: -0.5, After: 2.0}, wantBefore: 0.0, wantAfter: 1.0},
+		{name: "regression_swapped", delta: domain.WaveDelta{Before: 0.8, After: 0.3}, wantBefore: 0.3, wantAfter: 0.8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// when
+			got := domain.ClampDelta(tt.delta)
+
+			// then
+			if got.Before != tt.wantBefore {
+				t.Errorf("Before = %f, want %f", got.Before, tt.wantBefore)
+			}
+			if got.After != tt.wantAfter {
+				t.Errorf("After = %f, want %f", got.After, tt.wantAfter)
+			}
+		})
+	}
+}
+
 func TestFilterEmptyWaves(t *testing.T) {
 	t.Parallel()
 

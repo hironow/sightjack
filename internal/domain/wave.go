@@ -63,6 +63,9 @@ func MergeWaveResults(results []WaveGenerateResult) []Wave {
 	}
 	normalized := NormalizeWavePrerequisites(all)
 	cleaned, _ := RemoveSelfReferences(normalized)
+	for i := range cleaned {
+		cleaned[i].Delta = ClampDelta(cleaned[i].Delta)
+	}
 	return cleaned
 }
 
@@ -112,6 +115,27 @@ func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
 		return 0
 	}
 	return newCount
+}
+
+// ClampDelta ensures Before and After are within [0, 1] and Before <= After.
+// If Before > After (regression), they are swapped.
+func ClampDelta(d WaveDelta) WaveDelta {
+	if d.Before < 0 {
+		d.Before = 0
+	}
+	if d.Before > 1 {
+		d.Before = 1
+	}
+	if d.After < 0 {
+		d.After = 0
+	}
+	if d.After > 1 {
+		d.After = 1
+	}
+	if d.Before > d.After {
+		d.Before, d.After = d.After, d.Before
+	}
+	return d
 }
 
 // PartialApplyDelta computes the adjusted delta for a partially applied wave.
