@@ -88,6 +88,9 @@ func (a *WaveAggregate) RecordApplied(payload WaveAppliedPayload, now time.Time)
 
 // Complete produces a wave_completed event and marks the wave as completed.
 func (a *WaveAggregate) Complete(waveID, clusterName string, applied, totalCount int, now time.Time) (Event, error) {
+	if _, ok := a.findWave(waveID, clusterName); !ok {
+		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
+	}
 	waveKey := clusterName + ":" + waveID
 	a.completed[waveKey] = true
 	return NewEvent(EventWaveCompleted, WaveCompletedPayload{

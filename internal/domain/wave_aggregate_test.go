@@ -102,6 +102,25 @@ func TestWaveAggregate_Complete(t *testing.T) {
 	}
 }
 
+func TestWaveAggregate_Complete_RejectsUnknownWave(t *testing.T) {
+	// given
+	agg := domain.NewWaveAggregate()
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "available"},
+	})
+
+	// when
+	_, err := agg.Complete("w999", "auth", 3, 3, time.Now().UTC())
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nonexistent wave")
+	}
+	if agg.IsCompleted("auth:w999") {
+		t.Error("phantom wave should not be in completed map")
+	}
+}
+
 func TestWaveAggregate_EvaluateUnlocks(t *testing.T) {
 	// given: w2 depends on w1
 	agg := domain.NewWaveAggregate()
