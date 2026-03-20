@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -149,6 +150,22 @@ func PartialApplyDelta(result *WaveApplyResult, delta WaveDelta) float64 {
 	}
 	successRate := float64(result.Applied) / float64(result.TotalCount)
 	return delta.Before + (delta.After-delta.Before)*successRate
+}
+
+// ValidateWaveApplyResult checks the apply result for degenerate or invalid states.
+// Returns an error if the result is nil, empty when actions were expected,
+// or reports more applied actions than expected.
+func ValidateWaveApplyResult(result *WaveApplyResult, expectedActions int) error {
+	if result == nil {
+		return fmt.Errorf("wave apply result is nil")
+	}
+	if expectedActions > 0 && result.Applied == 0 && result.TotalCount == 0 && len(result.Errors) == 0 {
+		return fmt.Errorf("wave apply result is empty (expected %d actions)", expectedActions)
+	}
+	if result.Applied > expectedActions {
+		return fmt.Errorf("wave apply result reports %d applied but only %d actions expected", result.Applied, expectedActions)
+	}
+	return nil
 }
 
 // IsWaveApplyComplete returns true when the apply result has no errors,

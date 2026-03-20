@@ -876,6 +876,91 @@ func TestRemoveSelfReferences(t *testing.T) {
 	})
 }
 
+func TestValidateWaveApplyResult(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil_result_returns_error", func(t *testing.T) {
+		t.Parallel()
+		// when
+		err := domain.ValidateWaveApplyResult(nil, 3)
+
+		// then
+		if err == nil {
+			t.Error("expected error for nil result")
+		}
+	})
+
+	t.Run("degenerate_empty_result_returns_error", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 0, TotalCount: 0}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err == nil {
+			t.Error("expected error for degenerate empty result with expected actions")
+		}
+	})
+
+	t.Run("applied_exceeds_expected_returns_error", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 5, TotalCount: 5}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err == nil {
+			t.Error("expected error when applied > expected actions")
+		}
+	})
+
+	t.Run("valid_result_no_error", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 3, TotalCount: 3}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("partial_apply_valid", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 2, TotalCount: 3, Errors: []string{"fail"}}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("zero_expected_zero_result_valid", func(t *testing.T) {
+		t.Parallel()
+		// given: edge case where wave has 0 expected actions
+		result := &domain.WaveApplyResult{Applied: 0, TotalCount: 0}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 0)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
+
 func TestClampDelta(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
