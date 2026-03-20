@@ -30,14 +30,40 @@ func NormalizeWavePrerequisites(waves []Wave) []Wave {
 	return result
 }
 
+// RemoveSelfReferences removes prerequisite entries where a wave references itself.
+// Returns the cleaned wave list and the count of removed self-references.
+// Must be called after NormalizeWavePrerequisites (self-references are only
+// detectable once bare IDs have been expanded to composite format).
+func RemoveSelfReferences(waves []Wave) ([]Wave, int) {
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	var removed int
+	for i, w := range result {
+		key := WaveKey(w)
+		var clean []string
+		for _, p := range w.Prerequisites {
+			if p == key {
+				removed++
+			} else {
+				clean = append(clean, p)
+			}
+		}
+		result[i].Prerequisites = clean
+	}
+	return result, removed
+}
+
 // MergeWaveResults flattens multiple per-cluster wave results into a single wave list,
-// normalizing prerequisite IDs to the composite "ClusterName:ID" format.
+// normalizing prerequisite IDs to the composite "ClusterName:ID" format and removing
+// self-referencing prerequisites.
 func MergeWaveResults(results []WaveGenerateResult) []Wave {
 	var all []Wave
 	for _, r := range results {
 		all = append(all, r.Waves...)
 	}
-	return NormalizeWavePrerequisites(all)
+	normalized := NormalizeWavePrerequisites(all)
+	cleaned, _ := RemoveSelfReferences(normalized)
+	return cleaned
 }
 
 // AvailableWaves returns waves that have "available" status and are not completed.

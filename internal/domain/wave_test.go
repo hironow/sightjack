@@ -812,6 +812,70 @@ func TestClustersForIssueIDs(t *testing.T) {
 	})
 }
 
+func TestRemoveSelfReferences(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_self_referencing_prerequisite", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w1", "auth:w0"}},
+		}
+
+		// when
+		result, removed := domain.RemoveSelfReferences(waves)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(result[0].Prerequisites) != 1 {
+			t.Fatalf("prerequisites len = %d, want 1", len(result[0].Prerequisites))
+		}
+		if result[0].Prerequisites[0] != "auth:w0" {
+			t.Errorf("prerequisite = %q, want %q", result[0].Prerequisites[0], "auth:w0")
+		}
+	})
+
+	t.Run("no_self_references_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		result, removed := domain.RemoveSelfReferences(waves)
+
+		// then
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+		if len(result[0].Prerequisites) != 1 {
+			t.Errorf("prerequisites len = %d, want 1", len(result[0].Prerequisites))
+		}
+	})
+
+	t.Run("only_self_reference_results_in_empty_prerequisites", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		result, removed := domain.RemoveSelfReferences(waves)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(result[0].Prerequisites) != 0 {
+			t.Errorf("prerequisites len = %d, want 0", len(result[0].Prerequisites))
+		}
+	})
+}
+
 func TestLastCompletedWaveForCluster(t *testing.T) {
 	t.Parallel()
 
