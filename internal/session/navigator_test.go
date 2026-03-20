@@ -416,6 +416,25 @@ func TestClusterLabel(t *testing.T) {
 			t.Errorf("should not show '[ok]' for incomplete cluster, got %q", label)
 		}
 	})
+
+	t.Run("long_cluster_name_truncated", func(t *testing.T) {
+		t.Parallel()
+		// given
+		longName := "VeryLongClusterNameThatExceedsMaxWidth"
+
+		// when
+		label := session.ClusterLabel(longName, 3, 0.5, 20)
+
+		// then: label must fit within maxWidth
+		width := session.DisplayWidth(label)
+		if width > 20 {
+			t.Errorf("expected label width <= 20, got %d for %q", width, label)
+		}
+		// should contain truncation marker
+		if !strings.Contains(label, "~") {
+			t.Errorf("expected truncation marker '~' in label, got %q", label)
+		}
+	})
 }
 
 func TestDisplayScribeResponse_EmptyContent(t *testing.T) {
