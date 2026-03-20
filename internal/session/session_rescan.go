@@ -25,6 +25,9 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	if input == nil {
 		return fmt.Errorf("input reader is required for interactive session")
 	}
+	if oldState == nil {
+		return fmt.Errorf("rescan requires previous session state (oldState is nil)")
+	}
 
 	// Ensure D-Mail directories exist before any mail operations
 	if err := EnsureMailDirs(baseDir); err != nil {
