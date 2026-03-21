@@ -165,10 +165,10 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: dmail-schema-version is required")
 	}
 	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult:
+	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult, DMailStallEscalation:
 		// valid
 	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result)", mail.Kind)
+		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result, stall-escalation)", mail.Kind)
 	}
 	if mail.Action != "" && !validActions[mail.Action] {
 		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", mail.Action)
