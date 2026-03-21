@@ -149,3 +149,28 @@ func (a *WaveAggregate) AddNextGen(clusterName string, waves []WaveState, now ti
 		Waves:       waves,
 	}, now)
 }
+
+// WaveStatusCounts returns a map of wave status to count across all waves.
+// Possible keys are the status strings present in the wave list (e.g. "available",
+// "locked", "completed").
+func (a *WaveAggregate) WaveStatusCounts() map[string]int {
+	counts := make(map[string]int)
+	for _, w := range a.waves {
+		counts[w.Status]++
+	}
+	return counts
+}
+
+// AllWavesCompleted reports whether every wave in the aggregate has been completed.
+// Returns false for an empty wave list.
+func (a *WaveAggregate) AllWavesCompleted() bool {
+	if len(a.waves) == 0 {
+		return false
+	}
+	for _, w := range a.waves {
+		if w.Status != "completed" {
+			return false
+		}
+	}
+	return true
+}

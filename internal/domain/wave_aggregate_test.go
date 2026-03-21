@@ -222,3 +222,70 @@ func TestWaveAggregate_AddNextGen(t *testing.T) {
 		t.Fatalf("expected nextgen_waves_added, got %s", ev.Type)
 	}
 }
+
+func TestWaveAggregate_WaveStatusCounts(t *testing.T) {
+	t.Parallel()
+	// given
+	agg := domain.NewWaveAggregate()
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "completed"},
+		{ID: "w2", ClusterName: "auth", Status: "available"},
+		{ID: "w3", ClusterName: "auth", Status: "available"},
+		{ID: "w4", ClusterName: "auth", Status: "locked"},
+	})
+
+	// when
+	counts := agg.WaveStatusCounts()
+
+	// then
+	if counts["completed"] != 1 {
+		t.Errorf("completed = %d, want 1", counts["completed"])
+	}
+	if counts["available"] != 2 {
+		t.Errorf("available = %d, want 2", counts["available"])
+	}
+	if counts["locked"] != 1 {
+		t.Errorf("locked = %d, want 1", counts["locked"])
+	}
+}
+
+func TestWaveAggregate_AllWavesCompleted_AllDone(t *testing.T) {
+	t.Parallel()
+	// given
+	agg := domain.NewWaveAggregate()
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "completed"},
+		{ID: "w2", ClusterName: "auth", Status: "completed"},
+	})
+
+	// when / then
+	if !agg.AllWavesCompleted() {
+		t.Error("AllWavesCompleted() = false, want true when all waves are completed")
+	}
+}
+
+func TestWaveAggregate_AllWavesCompleted_NotAllDone(t *testing.T) {
+	t.Parallel()
+	// given
+	agg := domain.NewWaveAggregate()
+	agg.SetWaves([]domain.Wave{
+		{ID: "w1", ClusterName: "auth", Status: "completed"},
+		{ID: "w2", ClusterName: "auth", Status: "available"},
+	})
+
+	// when / then
+	if agg.AllWavesCompleted() {
+		t.Error("AllWavesCompleted() = true, want false when some waves are not completed")
+	}
+}
+
+func TestWaveAggregate_AllWavesCompleted_EmptyReturnsFalse(t *testing.T) {
+	t.Parallel()
+	// given: no waves
+	agg := domain.NewWaveAggregate()
+
+	// when / then
+	if agg.AllWavesCompleted() {
+		t.Error("AllWavesCompleted() = true, want false for empty wave list")
+	}
+}
