@@ -10,7 +10,7 @@ import (
 
 // StoreHealth summarises the validation result of the event store.
 type StoreHealth struct {
-	Sessions     int    // number of session directories containing event files
+	Sessions     int    // number of session directories (or legacy flat files) containing events
 	Events       int    // total number of valid JSON lines
 	CorruptLines int    // number of corrupt JSON lines encountered
 	NotFound     bool   // true when the events directory does not exist
