@@ -1,5 +1,3 @@
-//go:build integration
-
 package integration_test
 
 import (
@@ -77,21 +75,29 @@ func TestEventReplay_RoundTrip(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	base := time.Now()
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, &domain.SessionStartedPayload{
+	e1, err := domain.NewEvent(domain.EventSessionStarted, &domain.SessionStartedPayload{
 		Project:         "round-trip",
 		StrictnessLevel: "alert",
 	}, base)
-	e2, _ := domain.NewEvent(domain.EventScanCompleted, &domain.ScanCompletedPayload{
+	if err != nil {
+		t.Fatalf("create session_started: %v", err)
+	}
+	e2, err := domain.NewEvent(domain.EventScanCompleted, &domain.ScanCompletedPayload{
 		Clusters:     []domain.ClusterState{{Name: "core", IssueCount: 10}},
 		Completeness: 0.80,
 		ShibitoCount: 1,
 	}, base.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("create scan_completed: %v", err)
+	}
 
 	// in-memory projection
 	directState := domain.ProjectState([]domain.Event{e1, e2})
 
 	// persist + reload
-	store.Append(e1, e2)
+	if _, appendErr := store.Append(e1, e2); appendErr != nil {
+		t.Fatalf("append: %v", appendErr)
+	}
 	replayedState, err := eventsource.LoadState(store)
 	if err != nil {
 		t.Fatalf("LoadState: %v", err)
@@ -124,8 +130,6 @@ func TestEventReplay_LoadLatestState(t *testing.T) {
 	}, base)
 	store1.Append(e1)
 
-	time.Sleep(10 * time.Millisecond)
-
 	// Newer session
 	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-new"), &domain.NopLogger{})
 	e2, _ := domain.NewEvent(domain.EventSessionStarted, &domain.SessionStartedPayload{
@@ -135,6 +139,12 @@ func TestEventReplay_LoadLatestState(t *testing.T) {
 		Clusters: []domain.ClusterState{{Name: "core", IssueCount: 30}},
 	}, base.Add(time.Hour+time.Minute))
 	store2.Append(e2, e3)
+
+	// Set modtimes explicitly to guarantee ordering without time.Sleep.
+	oldTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	newTime := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	os.Chtimes(eventsource.EventStorePath(stateDir, "session-old"), oldTime, oldTime)
+	os.Chtimes(eventsource.EventStorePath(stateDir, "session-new"), newTime, newTime)
 
 	// when
 	state, sessionID, err := eventsource.LoadLatestState(stateDir)
