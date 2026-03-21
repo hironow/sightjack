@@ -101,6 +101,10 @@ func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, 
 	}
 
 	newWaves := domain.NormalizeWavePrerequisites(result.Waves)
+	newWaves, selfRefCount := domain.RemoveSelfReferences(newWaves)
+	if selfRefCount > 0 {
+		logger.Warn("Nextgen: removed %d self-referencing prerequisite(s) for %s", selfRefCount, completedWave.ClusterName)
+	}
 	newWaves, emptyCount := domain.FilterEmptyWaves(newWaves)
 	if emptyCount > 0 {
 		logger.Warn("Nextgen: filtered %d empty wave(s) for %s", emptyCount, completedWave.ClusterName)
