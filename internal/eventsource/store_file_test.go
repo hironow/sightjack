@@ -317,10 +317,22 @@ func TestFileEventStore_CorruptLineCount(t *testing.T) {
 	// given: a daily JSONL file with 3 corrupt lines among 2 valid events
 	dir := t.TempDir()
 
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
-	data1, _ := domain.MarshalEvent(e1)
-	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
-	data2, _ := domain.MarshalEvent(e2)
+	e1, err := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	if err != nil {
+		t.Fatalf("create session_started: %v", err)
+	}
+	data1, err := domain.MarshalEvent(e1)
+	if err != nil {
+		t.Fatalf("marshal session_started: %v", err)
+	}
+	e2, err := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
+	if err != nil {
+		t.Fatalf("create scan_completed: %v", err)
+	}
+	data2, err := domain.MarshalEvent(e2)
+	if err != nil {
+		t.Fatalf("marshal scan_completed: %v", err)
+	}
 
 	content := string(data1) + "\n" +
 		"NOT JSON 1\n" +
@@ -328,7 +340,9 @@ func TestFileEventStore_CorruptLineCount(t *testing.T) {
 		string(data2) + "\n" +
 		"NOT JSON 3\n"
 	filename := time.Now().Format("2006-01-02") + ".jsonl"
-	os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644)
+	if writeErr := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644); writeErr != nil {
+		t.Fatalf("write test file: %v", writeErr)
+	}
 
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
