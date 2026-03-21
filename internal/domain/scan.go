@@ -113,3 +113,67 @@ func MergeClusterChunks(name string, chunks []ClusterScanResult) ClusterScanResu
 	}
 	return merged
 }
+
+// ClusterScanOutcome records whether wave generation succeeded for a single cluster.
+type ClusterScanOutcome struct {
+	ClusterName string
+	Succeeded   bool
+}
+
+// ScanRecoveryReport summarises which clusters succeeded and which failed
+// during wave generation so that callers can present partial results and
+// decide on recovery actions.
+type ScanRecoveryReport struct {
+	// Outcomes contains one entry per cluster in the original scan order.
+	Outcomes       []ClusterScanOutcome
+	SucceededCount int
+	FailedCount    int
+}
+
+// BuildScanRecoveryReport constructs a ScanRecoveryReport by comparing the
+// full cluster list from the scan against the wave generation successes.
+// It delegates failure detection to DetectFailedClusterNames so duplicate
+// cluster names with partial failures are handled correctly.
+func BuildScanRecoveryReport(clusters []ClusterScanResult, successes []WaveGenerateResult) ScanRecoveryReport {
+	failed := DetectFailedClusterNames(clusters, successes)
+
+	// Count how many of the input clusters actually succeeded.
+	// For duplicate names we track how many successes remain to allocate.
+	successCount := make(map[string]int, len(successes))
+	for _, r := range successes {
+		successCount[r.ClusterName]++
+	}
+
+	outcomes := make([]ClusterScanOutcome, 0, len(clusters))
+	allocated := make(map[string]int, len(clusters))
+	succeededTotal := 0
+	failedTotal := 0
+
+	for _, c := range clusters {
+		ok := false
+		if failed[c.Name] {
+			// partial failure case: allocate successes first
+			if allocated[c.Name] < successCount[c.Name] {
+				ok = true
+			}
+		} else {
+			ok = true
+		}
+		allocated[c.Name]++
+		outcomes = append(outcomes, ClusterScanOutcome{
+			ClusterName: c.Name,
+			Succeeded:   ok,
+		})
+		if ok {
+			succeededTotal++
+		} else {
+			failedTotal++
+		}
+	}
+
+	return ScanRecoveryReport{
+		Outcomes:       outcomes,
+		SucceededCount: succeededTotal,
+		FailedCount:    failedTotal,
+	}
+}

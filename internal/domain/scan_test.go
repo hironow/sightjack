@@ -304,3 +304,91 @@ func TestMergeClusterChunks(t *testing.T) {
 		}
 	})
 }
+
+func TestBuildScanRecoveryReport_AllSucceeded(t *testing.T) {
+	t.Parallel()
+	// given
+	clusters := []domain.ClusterScanResult{
+		{Name: "auth"},
+		{Name: "billing"},
+	}
+	successes := []domain.WaveGenerateResult{
+		{ClusterName: "auth"},
+		{ClusterName: "billing"},
+	}
+
+	// when
+	report := domain.BuildScanRecoveryReport(clusters, successes)
+
+	// then
+	if len(report.Outcomes) != 2 {
+		t.Fatalf("Outcomes len = %d, want 2", len(report.Outcomes))
+	}
+	if report.FailedCount != 0 {
+		t.Errorf("FailedCount = %d, want 0", report.FailedCount)
+	}
+	if report.SucceededCount != 2 {
+		t.Errorf("SucceededCount = %d, want 2", report.SucceededCount)
+	}
+}
+
+func TestBuildScanRecoveryReport_OneFailure(t *testing.T) {
+	t.Parallel()
+	// given
+	clusters := []domain.ClusterScanResult{
+		{Name: "auth"},
+		{Name: "billing"},
+	}
+	successes := []domain.WaveGenerateResult{
+		{ClusterName: "auth"},
+	}
+
+	// when
+	report := domain.BuildScanRecoveryReport(clusters, successes)
+
+	// then
+	if report.FailedCount != 1 {
+		t.Errorf("FailedCount = %d, want 1", report.FailedCount)
+	}
+	if report.SucceededCount != 1 {
+		t.Errorf("SucceededCount = %d, want 1", report.SucceededCount)
+	}
+
+	// find billing outcome
+	var billingOutcome *domain.ClusterScanOutcome
+	for i := range report.Outcomes {
+		if report.Outcomes[i].ClusterName == "billing" {
+			billingOutcome = &report.Outcomes[i]
+			break
+		}
+	}
+	if billingOutcome == nil {
+		t.Fatal("billing outcome not found")
+	}
+	if billingOutcome.Succeeded {
+		t.Error("billing outcome.Succeeded = true, want false")
+	}
+}
+
+func TestBuildScanRecoveryReport_DetectFailedIntegration(t *testing.T) {
+	t.Parallel()
+	// given — DetectFailedClusterNames integration: duplicate cluster partial failure
+	clusters := []domain.ClusterScanResult{
+		{Name: "auth"},
+		{Name: "auth"},
+	}
+	successes := []domain.WaveGenerateResult{
+		{ClusterName: "auth"},
+	}
+
+	// when
+	report := domain.BuildScanRecoveryReport(clusters, successes)
+
+	// then — one instance failed
+	if report.FailedCount != 1 {
+		t.Errorf("FailedCount = %d, want 1", report.FailedCount)
+	}
+	if report.SucceededCount != 1 {
+		t.Errorf("SucceededCount = %d, want 1", report.SucceededCount)
+	}
+}
