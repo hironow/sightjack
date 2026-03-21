@@ -261,6 +261,9 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 	if emptyCount > 0 {
 		logger.Warn("Wave generation: filtered %d empty wave(s)", emptyCount)
 	}
+	if cycleErr := domain.DetectWaveCycles(merged); cycleErr != nil {
+		return nil, warnings, failedNames, fmt.Errorf("wave prerequisite cycle detected: %w", cycleErr)
+	}
 	return merged, warnings, failedNames, nil
 }
 
