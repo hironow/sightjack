@@ -7,7 +7,7 @@
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
 - [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
-- [testing.md](testing.md) — Test strategy and conventions
+- [testing.md](testing.md) — Test strategy, conventions, scenario test observers, wave lifecycle guards, and error fingerprinting
 
 ## CLI Reference
 

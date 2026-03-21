@@ -41,6 +41,54 @@
 
 Run: `just test-scenario` (L1+L2) or `just test-scenario-all`
 
+### Scenario Test Observers
+
+The `Observer` type (`tests/scenario/observer_test.go`) provides reusable assertion helpers for scenario tests. Observers wrap a `Workspace` and `testing.T` to verify post-run state without duplicating assertion logic across test functions.
+
+| Observer Helper | Purpose |
+|-----------------|---------|
+| `AssertMailboxState` | Verify file counts in mailbox directories |
+| `AssertAllOutboxEmpty` | Verify all tool outboxes are drained |
+| `AssertArchiveContains` | Verify D-Mail kinds in archive directories |
+| `AssertDMailKind` | Verify a specific D-Mail's kind field |
+| `WaitForClosedLoop` | Poll for specification/report/feedback delivery |
+| `AssertSirenConfigStrictness` | Verify estimated strictness in config |
+| `AssertEventCount` / `AssertEventExists` | Verify event store contents |
+| `AssertWaitingModeNotActive` | Document that scenario tests disable waiting mode |
+| `AssertLabelsDisabled` | Document that scenario tests disable labels |
+| `AssertScanWarningsExist` | Verify scan produced warnings |
+| `AssertSessionResumed` / `AssertSessionRescanned` | Verify session lifecycle events |
+| `AssertCompletenessUpdated` | Verify completeness tracking events |
+| `AssertADRFileExists` / `AssertADRContainsSections` | Verify ADR generation |
+| `AssertSpecificationFields` / `AssertReportFields` | Verify D-Mail field completeness |
+| `AssertWaveApplyFailed` | Verify wave apply failure events |
+| `AssertPromptContains` | Verify prompt log contents |
+| `AssertConfigValue` | Verify config key-value pairs |
+| `AssertArchitectNotCalled` | Document auto-approve architect bypass |
+
+### Wave Lifecycle Guards
+
+The scenario test infrastructure validates wave lifecycle integrity through guards wired into the session pipeline:
+
+- **ValidateWavePrerequisites** — removes dangling prerequisites referencing waves not in the wave set (wired into `RunResumeSession`)
+- **RepairLockedWaves** — unlocks waves whose prerequisites are all met but status is still "locked" (wired into `RunResumeSession`)
+- **PruneStaleWaves** — removes waves whose cluster is no longer in the valid cluster set (wired into `RunRescanSession`)
+- **ValidateWaveApplyResult** — rejects nil, empty, or over-counted apply results (wired into `RunWaveApply`)
+- **FilterEmptyClassifications** — removes clusters with zero issue IDs from classification (wired into `RunScan`)
+
+### Error Fingerprinting
+
+The `ErrorFingerprint` algorithm (`internal/domain/error_fingerprint.go`) provides stable error identity for detecting repeated failures:
+
+- `ErrorFingerprint(errMsg)` — SHA-256 based 16-character hash for stable error identity
+- `ClassifyError(errMsg)` — classifies errors as `structural` (persistent, requires intervention) or `transient` (may self-resolve)
+- `DetectRepeatedPattern(fingerprints, threshold)` — detects when the same error fingerprint appears at least `threshold` times
+- `MarkStalled(waveID, clusterName, reason)` — transitions a wave to "stalled" status and emits a `wave_stalled` event
+
+### Stall Escalation
+
+When repeated structural errors are detected on a wave, a `stall-escalation` D-Mail is composed via `ComposeStallEscalation` (`internal/session/dmail_stall.go`). The D-Mail includes the wave key, escalation reason, and the list of structural errors. Severity is set to "high" with action "escalate".
+
 ## E2E Tests
 
 - Located in `tests/e2e/`
