@@ -198,6 +198,9 @@ func waveStatusSymbol3(status string) string {
 // ClusterLabel builds the display label for a cluster row in the matrix navigator.
 // Shows "[ok]" for complete clusters (completeness >= 0.99 and zero issues).
 func ClusterLabel(name string, issueCount int, completeness float64, maxWidth int) string {
+	if maxWidth <= 2 {
+		return Truncate(name, maxWidth)
+	}
 	truncName := Truncate(name, maxWidth-2)
 	if issueCount == 0 && completeness >= 0.99 {
 		label := fmt.Sprintf("%s [ok]", truncName)
@@ -389,7 +392,7 @@ func DisplayWaveCompletion(w io.Writer, wave domain.Wave, ripples []domain.Rippl
 func DisplayScribeResponse(w io.Writer, resp *domain.ScribeResponse) {
 	fmt.Fprintf(w, "\n  [Scribe] ADR %s: %s\n", resp.ADRID, resp.Title)
 	if resp.Content == "" {
-		fmt.Fprintf(w, "  Warning: ADR content is empty, skipping save\n")
+		fmt.Fprintf(w, "  Warning: scribe returned empty ADR content\n")
 		return
 	}
 	fmt.Fprintf(w, "  Saved to %s/%s-%s.md\n", ADRSubdir, resp.ADRID, SanitizeADRTitle(resp.Title))
