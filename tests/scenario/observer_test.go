@@ -383,6 +383,7 @@ func (o *Observer) AssertSpecificationFields(toolDir, mailbox string) {
 		}
 		return
 	}
+	o.t.Error("no specification D-Mail found")
 }
 
 // --- Architect discussion helpers (proposal 058) ---
@@ -423,6 +424,7 @@ func (o *Observer) AssertReportFields(toolDir, mailbox string) {
 		}
 		return
 	}
+	o.t.Error("no report D-Mail found")
 }
 
 // AssertWaveApplyFailed checks for a wave_apply_failed or error event
