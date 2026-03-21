@@ -119,7 +119,7 @@ func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 	}
 
 	if vErr := domain.ValidateWaveApplyResult(result, len(wave.Actions)); vErr != nil {
-		logger.Warn("Wave %s apply validation: %v", wave.ID, vErr)
+		return nil, fmt.Errorf("wave %s apply validation: %w", wave.ID, vErr)
 	}
 
 	logger.OK("Wave %s applied: %d actions", wave.ID, result.Applied)
