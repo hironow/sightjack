@@ -358,3 +358,24 @@ func TestProjectState_FullLifecycle(t *testing.T) {
 		t.Errorf("ShibitoCount = %d, want 1", state.ShibitoCount)
 	}
 }
+
+func TestProjectState_FeedbackSent_IncrementsFeedbackCount(t *testing.T) {
+	t.Parallel()
+	// given
+	events := []domain.Event{
+		mustEvent(t, domain.EventSessionStarted, "sess-1", 1,
+			domain.SessionStartedPayload{Project: "proj"}),
+		mustEvent(t, domain.EventFeedbackSent, "sess-1", 2,
+			domain.WaveIdentityPayload{WaveID: "w1", ClusterName: "auth"}),
+		mustEvent(t, domain.EventFeedbackSent, "sess-1", 3,
+			domain.WaveIdentityPayload{WaveID: "w2", ClusterName: "auth"}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.FeedbackCount != 2 {
+		t.Errorf("FeedbackCount = %d, want 2", state.FeedbackCount)
+	}
+}

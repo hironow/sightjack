@@ -378,6 +378,105 @@ func TestRenderMatrixNavigator_ShibitoCount(t *testing.T) {
 	}
 }
 
+func TestClusterLabel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("normal_cluster", func(t *testing.T) {
+		t.Parallel()
+		// when
+		label := session.ClusterLabel("Auth", 5, 0.5, 30)
+
+		// then
+		if !strings.Contains(label, "Auth") {
+			t.Errorf("expected 'Auth' in label, got %q", label)
+		}
+		if !strings.Contains(label, "(5)") {
+			t.Errorf("expected '(5)' in label, got %q", label)
+		}
+	})
+
+	t.Run("complete_cluster_zero_issues_shows_ok", func(t *testing.T) {
+		t.Parallel()
+		// when
+		label := session.ClusterLabel("Auth", 0, 1.0, 30)
+
+		// then
+		if !strings.Contains(label, "[ok]") {
+			t.Errorf("expected '[ok]' in label for complete cluster, got %q", label)
+		}
+	})
+
+	t.Run("incomplete_cluster_zero_issues_no_ok", func(t *testing.T) {
+		t.Parallel()
+		// when
+		label := session.ClusterLabel("Auth", 0, 0.5, 30)
+
+		// then
+		if strings.Contains(label, "[ok]") {
+			t.Errorf("should not show '[ok]' for incomplete cluster, got %q", label)
+		}
+	})
+
+	t.Run("long_cluster_name_truncated", func(t *testing.T) {
+		t.Parallel()
+		// given
+		longName := "VeryLongClusterNameThatExceedsMaxWidth"
+
+		// when
+		label := session.ClusterLabel(longName, 3, 0.5, 20)
+
+		// then: label must fit within maxWidth
+		width := session.DisplayWidth(label)
+		if width > 20 {
+			t.Errorf("expected label width <= 20, got %d for %q", width, label)
+		}
+		// should contain truncation marker
+		if !strings.Contains(label, "~") {
+			t.Errorf("expected truncation marker '~' in label, got %q", label)
+		}
+	})
+}
+
+func TestDisplayScribeResponse_EmptyContent(t *testing.T) {
+	t.Parallel()
+	// given
+	resp := &domain.ScribeResponse{
+		ADRID:   "0001",
+		Title:   "Test ADR",
+		Content: "",
+	}
+	var buf strings.Builder
+
+	// when
+	session.DisplayScribeResponse(&buf, resp)
+
+	// then: should show warning about empty content
+	output := buf.String()
+	if !strings.Contains(output, "empty") {
+		t.Errorf("expected empty content warning, got %q", output)
+	}
+}
+
+func TestDisplayScribeResponse_WithContent(t *testing.T) {
+	t.Parallel()
+	// given
+	resp := &domain.ScribeResponse{
+		ADRID:   "0001",
+		Title:   "Test ADR",
+		Content: "some content",
+	}
+	var buf strings.Builder
+
+	// when
+	session.DisplayScribeResponse(&buf, resp)
+
+	// then: should show saved message
+	output := buf.String()
+	if !strings.Contains(output, "Saved to") {
+		t.Errorf("expected 'Saved to' message, got %q", output)
+	}
+}
+
 func TestRenderProgressBar_Half(t *testing.T) {
 	// given
 	current := 0.50

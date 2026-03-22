@@ -10,11 +10,12 @@ import (
 
 // StoreHealth summarises the validation result of the event store.
 type StoreHealth struct {
-	Sessions int    // number of session directories containing event files
-	Events   int    // total number of valid JSON lines
-	NotFound bool   // true when the events directory does not exist
-	Err      error  // first error encountered (nil = healthy)
-	ErrHint  string // human-readable remediation hint
+	Sessions     int    // number of session directories (or legacy flat files) containing events
+	Events       int    // total number of valid JSON lines
+	CorruptLines int    // number of corrupt JSON lines encountered
+	NotFound     bool   // true when the events directory does not exist
+	Err          error  // first error encountered (nil = healthy)
+	ErrHint      string // human-readable remediation hint
 }
 
 // ValidateStore walks the event store directory tree rooted at stateDir
@@ -30,7 +31,41 @@ func ValidateStore(stateDir string) StoreHealth {
 		return StoreHealth{NotFound: true} // directory absent — no data yet
 	}
 
-	var sessions, totalEvents int
+	var sessions, totalEvents, corruptLines int
+
+	// Process legacy flat .jsonl files at the events root
+	for _, sessionEntry := range sessionEntries {
+		if sessionEntry.IsDir() || !isEventFile(sessionEntry.Name()) {
+			continue
+		}
+		data, fErr := os.ReadFile(filepath.Join(eventsDir, sessionEntry.Name()))
+		if fErr != nil {
+			return StoreHealth{
+				Err:     fmt.Errorf("read error: %w", fErr),
+				ErrHint: "check file permissions on legacy flat JSONL files in events/",
+			}
+		}
+		hasEvent := false
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			if !json.Valid([]byte(line)) {
+				return StoreHealth{
+					Err:     fmt.Errorf("corrupt JSON in legacy file %s", sessionEntry.Name()),
+					ErrHint: "check legacy flat JSONL files for corruption in events/",
+				}
+			}
+			totalEvents++
+			hasEvent = true
+		}
+		if hasEvent {
+			sessions++
+		}
+	}
+
+	// Process session directories
 	for _, sessionEntry := range sessionEntries {
 		if !sessionEntry.IsDir() {
 			continue
@@ -61,10 +96,8 @@ func ValidateStore(stateDir string) StoreHealth {
 					continue
 				}
 				if !json.Valid([]byte(line)) {
-					return StoreHealth{
-						Err:     fmt.Errorf("corrupt JSON in %s/%s", sessionEntry.Name(), f.Name()),
-						ErrHint: "check event files for corruption in the events/ directory",
-					}
+					corruptLines++
+					continue
 				}
 				totalEvents++
 			}
@@ -75,7 +108,12 @@ func ValidateStore(stateDir string) StoreHealth {
 		}
 	}
 
-	return StoreHealth{Sessions: sessions, Events: totalEvents}
+	health := StoreHealth{Sessions: sessions, Events: totalEvents, CorruptLines: corruptLines}
+	if corruptLines > 0 {
+		health.Err = fmt.Errorf("%d corrupt JSON line(s) found across event store", corruptLines)
+		health.ErrHint = "run 'sightjack doctor' to inspect and repair corrupt event lines"
+	}
+	return health
 }
 
 // isEventFile reports whether a filename has the event-file suffix.

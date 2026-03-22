@@ -134,6 +134,122 @@ func TestChunkSlice(t *testing.T) {
 	}
 }
 
+func TestFilterEmptyClassifications(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_zero_issue_clusters", func(t *testing.T) {
+		t.Parallel()
+		// given
+		clusters := []domain.ClusterClassification{
+			{Name: "auth", IssueIDs: []string{"ENG-1"}},
+			{Name: "empty", IssueIDs: nil},
+			{Name: "also_empty", IssueIDs: []string{}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyClassifications(clusters)
+
+		// then
+		if len(filtered) != 1 {
+			t.Fatalf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 2 {
+			t.Errorf("removed = %d, want 2", removed)
+		}
+		if filtered[0].Name != "auth" {
+			t.Errorf("filtered[0].Name = %q, want %q", filtered[0].Name, "auth")
+		}
+	})
+
+	t.Run("all_have_issues_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		clusters := []domain.ClusterClassification{
+			{Name: "auth", IssueIDs: []string{"ENG-1"}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyClassifications(clusters)
+
+		// then
+		if len(filtered) != 1 {
+			t.Errorf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+
+	t.Run("all_empty_returns_nil", func(t *testing.T) {
+		t.Parallel()
+		// given
+		clusters := []domain.ClusterClassification{
+			{Name: "empty", IssueIDs: nil},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyClassifications(clusters)
+
+		// then
+		if len(filtered) != 0 {
+			t.Errorf("filtered len = %d, want 0", len(filtered))
+		}
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+	})
+}
+
+func TestClampCompleteness(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   float64
+		want float64
+	}{
+		{name: "valid", in: 0.5, want: 0.5},
+		{name: "negative", in: -0.1, want: 0.0},
+		{name: "above_one", in: 1.5, want: 1.0},
+		{name: "zero", in: 0.0, want: 0.0},
+		{name: "one", in: 1.0, want: 1.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// when
+			got := domain.ClampCompleteness(tt.in)
+
+			// then
+			if got != tt.want {
+				t.Errorf("ClampCompleteness(%f) = %f, want %f", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMergeClusterChunks_ClampsCompleteness(t *testing.T) {
+	t.Parallel()
+	// given: issues with out-of-bounds completeness
+	chunks := []domain.ClusterScanResult{
+		{
+			Name:   "auth",
+			Issues: []domain.IssueDetail{{ID: "1", Completeness: 1.5}},
+		},
+		{
+			Name:   "auth",
+			Issues: []domain.IssueDetail{{ID: "2", Completeness: 0.5}},
+		},
+	}
+
+	// when
+	merged := domain.MergeClusterChunks("auth", chunks)
+
+	// then: clamped 1.5->1.0, avg of 1.0 and 0.5 = 0.75
+	if merged.Completeness != 0.75 {
+		t.Errorf("completeness = %f, want 0.75", merged.Completeness)
+	}
+}
+
 func TestMergeClusterChunks(t *testing.T) {
 	t.Parallel()
 
@@ -187,4 +303,92 @@ func TestMergeClusterChunks(t *testing.T) {
 			t.Errorf("completeness = %f, want 0", merged.Completeness)
 		}
 	})
+}
+
+func TestBuildScanRecoveryReport_AllSucceeded(t *testing.T) {
+	t.Parallel()
+	// given
+	clusters := []domain.ClusterScanResult{
+		{Name: "auth"},
+		{Name: "billing"},
+	}
+	successes := []domain.WaveGenerateResult{
+		{ClusterName: "auth"},
+		{ClusterName: "billing"},
+	}
+
+	// when
+	report := domain.BuildScanRecoveryReport(clusters, successes)
+
+	// then
+	if len(report.Outcomes) != 2 {
+		t.Fatalf("Outcomes len = %d, want 2", len(report.Outcomes))
+	}
+	if report.FailedCount != 0 {
+		t.Errorf("FailedCount = %d, want 0", report.FailedCount)
+	}
+	if report.SucceededCount != 2 {
+		t.Errorf("SucceededCount = %d, want 2", report.SucceededCount)
+	}
+}
+
+func TestBuildScanRecoveryReport_OneFailure(t *testing.T) {
+	t.Parallel()
+	// given
+	clusters := []domain.ClusterScanResult{
+		{Name: "auth"},
+		{Name: "billing"},
+	}
+	successes := []domain.WaveGenerateResult{
+		{ClusterName: "auth"},
+	}
+
+	// when
+	report := domain.BuildScanRecoveryReport(clusters, successes)
+
+	// then
+	if report.FailedCount != 1 {
+		t.Errorf("FailedCount = %d, want 1", report.FailedCount)
+	}
+	if report.SucceededCount != 1 {
+		t.Errorf("SucceededCount = %d, want 1", report.SucceededCount)
+	}
+
+	// find billing outcome
+	var billingOutcome *domain.ClusterScanOutcome
+	for i := range report.Outcomes {
+		if report.Outcomes[i].ClusterName == "billing" {
+			billingOutcome = &report.Outcomes[i]
+			break
+		}
+	}
+	if billingOutcome == nil {
+		t.Fatal("billing outcome not found")
+	}
+	if billingOutcome.Succeeded {
+		t.Error("billing outcome.Succeeded = true, want false")
+	}
+}
+
+func TestBuildScanRecoveryReport_DetectFailedIntegration(t *testing.T) {
+	t.Parallel()
+	// given — DetectFailedClusterNames integration: duplicate cluster partial failure
+	clusters := []domain.ClusterScanResult{
+		{Name: "auth"},
+		{Name: "auth"},
+	}
+	successes := []domain.WaveGenerateResult{
+		{ClusterName: "auth"},
+	}
+
+	// when
+	report := domain.BuildScanRecoveryReport(clusters, successes)
+
+	// then — one instance failed
+	if report.FailedCount != 1 {
+		t.Errorf("FailedCount = %d, want 1", report.FailedCount)
+	}
+	if report.SucceededCount != 1 {
+		t.Errorf("SucceededCount = %d, want 1", report.SucceededCount)
+	}
 }

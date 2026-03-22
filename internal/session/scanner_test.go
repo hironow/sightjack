@@ -866,8 +866,8 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 	// given: 3 clusters where the second one fails (claude exits non-zero)
 	scanDir := t.TempDir()
 
-	authResult := `{"cluster_name":"Auth","waves":[{"id":"auth-w1","cluster_name":"Auth","title":"Login","actions":[],"prerequisites":[],"delta":{"before":0.25,"after":0.40},"status":"available"}]}`
-	apiResult := `{"cluster_name":"API","waves":[{"id":"api-w1","cluster_name":"API","title":"Endpoints","actions":[],"prerequisites":[],"delta":{"before":0.30,"after":0.50},"status":"available"}]}`
+	authResult := `{"cluster_name":"Auth","waves":[{"id":"auth-w1","cluster_name":"Auth","title":"Login","actions":[{"type":"add_dod","issue_id":"T-1","description":"add dod"}],"prerequisites":[],"delta":{"before":0.25,"after":0.40},"status":"available"}]}`
+	apiResult := `{"cluster_name":"API","waves":[{"id":"api-w1","cluster_name":"API","title":"Endpoints","actions":[{"type":"add_label","issue_id":"T-3","description":"label"}],"prerequisites":[],"delta":{"before":0.30,"after":0.50},"status":"available"}]}`
 
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		prompt := ""

@@ -124,6 +124,7 @@ type SessionState struct {
 	Waves           []WaveState    `json:"waves,omitempty"`
 	ADRCount        int            `json:"adr_count,omitempty"`
 	ShibitoCount    int            `json:"shibito_count,omitempty"`
+	FeedbackCount   int            `json:"feedback_count,omitempty"`
 	StrictnessLevel string         `json:"strictness_level,omitempty"`
 	ScanResultPath  string         `json:"scan_result_path,omitempty"`
 }
@@ -151,15 +152,16 @@ type WaveState struct {
 // Wave is a unit of work proposed by AI for a cluster.
 // Wire format: input to `discuss` and `apply` subcommands.
 type Wave struct {
-	ID             string             `json:"id"`
-	ClusterName    string             `json:"cluster_name"`
-	Title          string             `json:"title"`
-	Description    string             `json:"description"`
-	Actions        []WaveAction       `json:"actions"`
-	Prerequisites  []string           `json:"prerequisites"`
-	Delta          WaveDelta          `json:"delta"`
-	Status         string             `json:"status"`
-	ClusterContext *ClusterScanResult `json:"cluster_context,omitempty"`
+	ID              string             `json:"id"`
+	ClusterName     string             `json:"cluster_name"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Actions         []WaveAction       `json:"actions"`
+	Prerequisites   []string           `json:"prerequisites"`
+	Delta           WaveDelta          `json:"delta"`
+	Status          string             `json:"status"`
+	ClusterContext  *ClusterScanResult `json:"cluster_context,omitempty"`
+	ComplexityScore float64            `json:"complexity_score,omitempty"`
 }
 
 // WaveAction is a single change proposed within a Wave.

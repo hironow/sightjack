@@ -94,6 +94,35 @@ After each wave completion, the AI generates follow-up waves based on what was l
   -> API W2 prerequisites updated (now depends on Auth W2)
 ```
 
+### Wave Complexity Sorting
+
+Waves are sorted by ascending complexity score before presentation. The score is computed as `len(Actions) + 0.5 * len(Prerequisites)`. Simpler waves surface first, encouraging incremental progress. The sort is stable so waves with equal complexity retain their original order.
+
+### Dependency Cycle Detection
+
+`DetectWaveCycles` performs DFS-based cycle detection on the wave prerequisite graph. If a cycle is found, wave generation fails with a descriptive error showing the cycle path. Self-referencing prerequisites are stripped by `RemoveSelfReferences` before cycle detection runs.
+
+### Error Fingerprinting and Stall Escalation
+
+Errors during wave apply are fingerprinted (`ErrorFingerprint`) and classified as structural or transient (`ClassifyError`). When the same structural error repeats above a threshold (`DetectRepeatedPattern`), the wave is marked "stalled" and a `stall-escalation` D-Mail is sent with severity "high".
+
+### Error Budget (Circuit Breaker)
+
+`ApplyErrorBudget` implements a circuit-breaker for wave apply operations. It tracks consecutive failures and trips the circuit when the configured threshold is reached. A single success resets the counter. When tripped, the session skips further apply attempts for graceful degradation.
+
+### DoD Coverage Report
+
+`BuildDoDCoverageReport` matches each cluster against configured DoD templates and reports which clusters are uncovered. This surfaces clusters that lack structured Definition of Done templates, prompting the user to add coverage.
+
+### Scan Recovery Report
+
+`BuildScanRecoveryReport` compares the full cluster list against wave generation successes to produce a `ScanRecoveryReport` with per-cluster outcomes, succeeded count, and failed count. This enables partial-result presentation when some clusters fail wave generation.
+
+### ADR Lifecycle
+
+- `SupersedeADR` patches an existing ADR file's `**Status:**` line to "Superseded by [new-id]"
+- `FormatADRConflictSection` appends a `## Conflicts` section to scribe output when the generated ADR conflicts with existing ADRs
+
 ## D-Mail & Convergence Gate
 
 Sightjack communicates with downstream tools (amadeus, paintress) via D-Mail, a file-based message protocol. D-Mail kinds:
@@ -102,7 +131,9 @@ Sightjack communicates with downstream tools (amadeus, paintress) via D-Mail, a 
 |------|-----------|-------------|
 | `specification` | outbound | Wave specification sent to downstream tools |
 | `report` | outbound | Wave completion report |
+| `stall-escalation` | outbound | Wave stalled due to repeated structural errors (severity: high) |
 | `design-feedback` | inbound | Design feedback from downstream tools (injected into nextgen prompts) |
+| `implementation-feedback` | inbound | Implementation feedback from paintress (injected into nextgen prompts) |
 | `convergence` | inbound | Convergence signal — requires user approval before session proceeds |
 
 When a `convergence` D-Mail is detected at session startup, the **convergence gate** activates:

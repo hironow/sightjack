@@ -6,6 +6,8 @@ import (
 	"context"
 	"database/sql"
 	"os/exec"
+
+	"github.com/hironow/sightjack/internal/domain"
 )
 
 // SetNewCmd replaces the command constructor for testing and returns a cleanup function.
@@ -34,3 +36,8 @@ func NewCmdApproverForTest(cmdTemplate string, factory func(ctx context.Context,
 // DBForTest returns the underlying database connection for testing.
 // Only available in test builds.
 func (s *SQLiteOutboxStore) DBForTest() *sql.DB { return s.db }
+
+// ReceiveDMailIfNewForTest exposes receiveDMailIfNew for external test packages.
+func ReceiveDMailIfNewForTest(baseDir, filename string, logger domain.Logger) *DMail {
+	return receiveDMailIfNew(baseDir, filename, logger)
+}

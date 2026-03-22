@@ -88,8 +88,18 @@ func (a *WaveAggregate) RecordApplied(payload WaveAppliedPayload, now time.Time)
 
 // Complete produces a wave_completed event and marks the wave as completed.
 func (a *WaveAggregate) Complete(waveID, clusterName string, applied, totalCount int, now time.Time) (Event, error) {
+	if _, ok := a.findWave(waveID, clusterName); !ok {
+		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
+	}
 	waveKey := clusterName + ":" + waveID
 	a.completed[waveKey] = true
+	// Sync the Status field on the wave struct so BuildWaveStates persists it
+	for i := range a.waves {
+		if a.waves[i].ID == waveID && a.waves[i].ClusterName == clusterName {
+			a.waves[i].Status = "completed"
+			break
+		}
+	}
 	return NewEvent(EventWaveCompleted, WaveCompletedPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
@@ -138,4 +148,29 @@ func (a *WaveAggregate) AddNextGen(clusterName string, waves []WaveState, now ti
 		ClusterName: clusterName,
 		Waves:       waves,
 	}, now)
+}
+
+// WaveStatusCounts returns a map of wave status to count across all waves.
+// Possible keys are the status strings present in the wave list (e.g. "available",
+// "locked", "completed").
+func (a *WaveAggregate) WaveStatusCounts() map[string]int {
+	counts := make(map[string]int)
+	for _, w := range a.waves {
+		counts[w.Status]++
+	}
+	return counts
+}
+
+// AllWavesCompleted reports whether every wave in the aggregate has been completed.
+// Returns false for an empty wave list.
+func (a *WaveAggregate) AllWavesCompleted() bool {
+	if len(a.waves) == 0 {
+		return false
+	}
+	for _, w := range a.waves {
+		if w.Status != "completed" {
+			return false
+		}
+	}
+	return true
 }

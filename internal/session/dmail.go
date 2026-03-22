@@ -165,10 +165,10 @@ func ValidateDMail(mail *DMail) error {
 		return fmt.Errorf("dmail: dmail-schema-version is required")
 	}
 	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult:
+	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult, DMailStallEscalation:
 		// valid
 	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result)", mail.Kind)
+		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result, stall-escalation)", mail.Kind)
 	}
 	if mail.Action != "" && !validActions[mail.Action] {
 		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", mail.Action)
@@ -214,7 +214,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != DMailDesignFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
+	if mail.Kind != DMailDesignFeedback && mail.Kind != DMailImplFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
 		return nil
 	}
 	return mail
@@ -493,7 +493,7 @@ func (c *FeedbackCollector) FeedbackOnly() []*DMail {
 	defer c.mu.Unlock()
 	var result []*DMail
 	for _, m := range c.items {
-		if m.Kind == DMailDesignFeedback {
+		if m.Kind == DMailDesignFeedback || m.Kind == DMailImplFeedback {
 			result = append(result, m)
 		}
 	}

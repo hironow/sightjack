@@ -23,12 +23,19 @@ type AutoDiscussResult struct {
 // so it can be passed to RunScribeADR unchanged.
 func (r AutoDiscussResult) ToArchitectResponse() *ArchitectResponse {
 	var analysis strings.Builder
+	if len(r.Rounds) == 0 {
+		analysis.WriteString("Auto-discuss completed with no debate rounds.")
+	}
 	for _, round := range r.Rounds {
 		fmt.Fprintf(&analysis, "[%s round %d]: %s\n\n", round.Speaker, round.Round, round.Content)
 	}
 
 	var reasoning strings.Builder
-	reasoning.WriteString(r.Summary)
+	if r.Summary == "" {
+		reasoning.WriteString("Auto-discuss completed with no summary.")
+	} else {
+		reasoning.WriteString(r.Summary)
+	}
 	if len(r.OpenIssues) > 0 {
 		reasoning.WriteString("\n\nOpen issues:\n")
 		for _, issue := range r.OpenIssues {

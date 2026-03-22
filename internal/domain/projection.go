@@ -128,6 +128,9 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
+	case EventFeedbackSent:
+		state.FeedbackCount++
+
 	case EventWaveApproved, EventWaveRejected, EventWaveApplied,
 		EventSpecificationSent, EventReportSent,
 		EventReadyLabelsApplied, EventSessionResumed, EventSessionRescanned:

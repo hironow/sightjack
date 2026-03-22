@@ -45,8 +45,33 @@ func TestAutoDiscussResult_ToArchitectResponse_Empty(t *testing.T) {
 	if resp.Decision == "" {
 		t.Error("expected fallback Decision for empty result")
 	}
+	if resp.Analysis == "" {
+		t.Error("expected non-empty Analysis fallback for empty rounds")
+	}
 	if resp.ModifiedWave != nil {
 		t.Error("expected nil ModifiedWave")
+	}
+}
+
+func TestAutoDiscussResult_ToArchitectResponse_EmptyRoundsAndSummary(t *testing.T) {
+	// given: fully degenerate input
+	result := AutoDiscussResult{
+		Rounds:  nil,
+		Summary: "",
+	}
+
+	// when
+	resp := result.ToArchitectResponse()
+
+	// then: all output fields non-empty
+	if resp.Analysis == "" {
+		t.Error("expected non-empty Analysis")
+	}
+	if resp.Reasoning == "" {
+		t.Error("expected non-empty Reasoning")
+	}
+	if resp.Decision == "" {
+		t.Error("expected non-empty Decision")
 	}
 }
 

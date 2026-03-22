@@ -1,10 +1,13 @@
 package eventsource
 
 import (
+	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -47,8 +50,9 @@ func LoadLatestResumableState(stateDir string, match func(*domain.SessionState) 
 }
 
 type eventCandidate struct {
-	name    string
-	modTime int64
+	name     string
+	modTime  int64
+	isLegacy bool // true for flat .jsonl files at events/ root
 }
 
 // sortedEventCandidates returns session directories (or legacy .jsonl files)
@@ -76,7 +80,7 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 				continue
 			}
 			name := strings.TrimSuffix(e.Name(), ".jsonl")
-			candidates = append(candidates, eventCandidate{name: name, modTime: info.ModTime().UnixNano()})
+			candidates = append(candidates, eventCandidate{name: name, modTime: info.ModTime().UnixNano(), isLegacy: true})
 		}
 	}
 	sort.Slice(candidates, func(i, j int) bool {
@@ -85,28 +89,44 @@ func sortedEventCandidates(eventsDir string) ([]eventCandidate, error) {
 	return candidates, nil
 }
 
+// LoadAllResult holds statistics from loading events across sessions.
+type LoadAllResult struct {
+	SessionsLoaded int
+	SessionsFailed int
+}
+
 // LoadAllEventsAcrossSessions aggregates events from all session stores under
 // events/. stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
-// Returns nil, nil when the events directory does not exist.
-func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, error) {
+// Returns nil, LoadAllResult{}, nil when the events directory does not exist.
+func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, LoadAllResult, error) {
 	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil, nil
+			return nil, LoadAllResult{}, nil
 		}
-		return nil, fmt.Errorf("load all events: %w", err)
+		return nil, LoadAllResult{}, fmt.Errorf("load all events: %w", err)
 	}
 	var all []domain.Event
+	var result LoadAllResult
 	for _, c := range candidates {
-		store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
-		events, _, loadErr := store.LoadAll()
-		if loadErr != nil {
+		var events []domain.Event
+		var loadErr error
+		if c.isLegacy {
+			// Legacy flat JSONL: read single file at events/<name>.jsonl
+			events, loadErr = loadLegacyJSONLFile(filepath.Join(eventsDir, c.name+".jsonl"))
+		} else {
+			store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
+			events, _, loadErr = store.LoadAll()
+		}
+		if loadErr != nil || len(events) == 0 {
+			result.SessionsFailed++
 			continue
 		}
+		result.SessionsLoaded++
 		all = append(all, events...)
 	}
-	return all, nil
+	return all, result, nil
 }
 
 // loadLatestStateMatching iterates event stores by modtime descending and
@@ -133,4 +153,30 @@ func loadLatestStateMatching(stateDir string, match func(*domain.SessionState) b
 		}
 	}
 	return nil, "", fmt.Errorf("load latest state: no valid event data in %s", eventsDir)
+}
+
+// loadLegacyJSONLFile reads events from a single legacy flat JSONL file.
+func loadLegacyJSONLFile(path string) ([]domain.Event, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open legacy JSONL %s: %w", filepath.Base(path), err)
+	}
+	defer f.Close()
+	var events []domain.Event
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var ev domain.Event
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue // skip corrupt lines (same as FileEventStore behavior)
+		}
+		events = append(events, ev)
+	}
+	if err := scanner.Err(); err != nil {
+		return events, fmt.Errorf("scan legacy JSONL %s: %w", filepath.Base(path), err)
+	}
+	return events, nil
 }

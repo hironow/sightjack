@@ -137,6 +137,12 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 		return nil, err
 	}
 	logger.OK("Found %d clusters with %d total issues", len(classify.Clusters), classify.TotalIssues)
+
+	var emptyCount int
+	classify.Clusters, emptyCount = domain.FilterEmptyClassifications(classify.Clusters)
+	if emptyCount > 0 {
+		logger.Warn("Filtered %d empty cluster(s) from classification", emptyCount)
+	}
 	classifySpan.End()
 
 	scanSpan.SetAttributes(
@@ -250,7 +256,15 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 		return nil, warnings, failedNames, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
 	}
 
-	return domain.MergeWaveResults(successResults), warnings, failedNames, nil
+	merged := domain.MergeWaveResults(successResults)
+	merged, emptyCount := domain.FilterEmptyWaves(merged)
+	if emptyCount > 0 {
+		logger.Warn("Wave generation: filtered %d empty wave(s)", emptyCount)
+	}
+	if cycleErr := domain.DetectWaveCycles(merged); cycleErr != nil {
+		return nil, warnings, failedNames, fmt.Errorf("wave prerequisite cycle detected: %w", cycleErr)
+	}
+	return merged, warnings, failedNames, nil
 }
 
 // waveFileBase returns the base name for wave-related files (prompt, log, output).

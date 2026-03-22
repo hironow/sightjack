@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -8,6 +9,29 @@ import (
 // WaveKey returns a globally unique key for a wave: "ClusterName:ID".
 func WaveKey(w Wave) string {
 	return w.ClusterName + ":" + w.ID
+}
+
+// calcComplexityScore computes a complexity score for a wave based on action
+// count and prerequisite count weighting. Each action contributes 1.0 and
+// each prerequisite contributes 0.5.
+func calcComplexityScore(w Wave) float64 {
+	return float64(len(w.Actions)) + float64(len(w.Prerequisites))*0.5
+}
+
+// SortWavesByComplexity returns a new slice of waves sorted by ascending
+// ComplexityScore (actions + 0.5*prereqs). The sort is stable so that
+// waves with equal complexity retain their original relative order.
+// ComplexityScore is populated on each returned wave.
+func SortWavesByComplexity(waves []Wave) []Wave {
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	for i := range result {
+		result[i].ComplexityScore = calcComplexityScore(result[i])
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].ComplexityScore < result[j].ComplexityScore
+	})
+	return result
 }
 
 // NormalizeWavePrerequisites prefixes bare prerequisite IDs with the wave's own
@@ -30,17 +54,47 @@ func NormalizeWavePrerequisites(waves []Wave) []Wave {
 	return result
 }
 
+// RemoveSelfReferences removes prerequisite entries where a wave references itself.
+// Returns the cleaned wave list and the count of removed self-references.
+// Must be called after NormalizeWavePrerequisites (self-references are only
+// detectable once bare IDs have been expanded to composite format).
+func RemoveSelfReferences(waves []Wave) ([]Wave, int) {
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	var removed int
+	for i, w := range result {
+		key := WaveKey(w)
+		var clean []string
+		for _, p := range w.Prerequisites {
+			if p == key {
+				removed++
+			} else {
+				clean = append(clean, p)
+			}
+		}
+		result[i].Prerequisites = clean
+	}
+	return result, removed
+}
+
 // MergeWaveResults flattens multiple per-cluster wave results into a single wave list,
-// normalizing prerequisite IDs to the composite "ClusterName:ID" format.
+// normalizing prerequisite IDs to the composite "ClusterName:ID" format and removing
+// self-referencing prerequisites. Results are sorted by complexity score ascending.
 func MergeWaveResults(results []WaveGenerateResult) []Wave {
 	var all []Wave
 	for _, r := range results {
 		all = append(all, r.Waves...)
 	}
-	return NormalizeWavePrerequisites(all)
+	normalized := NormalizeWavePrerequisites(all)
+	cleaned, _ := RemoveSelfReferences(normalized)
+	for i := range cleaned {
+		cleaned[i].Delta = ClampDelta(cleaned[i].Delta)
+	}
+	return SortWavesByComplexity(cleaned)
 }
 
-// AvailableWaves returns waves that have "available" status and are not completed.
+// AvailableWaves returns waves that have "available" status and are not completed,
+// sorted by ascending complexity score.
 // The completed map is keyed by WaveKey (ClusterName:ID).
 func AvailableWaves(waves []Wave, completed map[string]bool) []Wave {
 	var available []Wave
@@ -49,7 +103,7 @@ func AvailableWaves(waves []Wave, completed map[string]bool) []Wave {
 			available = append(available, w)
 		}
 	}
-	return available
+	return SortWavesByComplexity(available)
 }
 
 // EvaluateUnlocks checks locked waves and unlocks them if all prerequisites are met.
@@ -88,6 +142,27 @@ func CalcNewlyUnlocked(oldAvailable, newAvailable int) int {
 	return newCount
 }
 
+// ClampDelta ensures Before and After are within [0, 1] and Before <= After.
+// If Before > After (regression), they are swapped.
+func ClampDelta(d WaveDelta) WaveDelta {
+	if d.Before < 0 {
+		d.Before = 0
+	}
+	if d.Before > 1 {
+		d.Before = 1
+	}
+	if d.After < 0 {
+		d.After = 0
+	}
+	if d.After > 1 {
+		d.After = 1
+	}
+	if d.Before > d.After {
+		d.Before, d.After = d.After, d.Before
+	}
+	return d
+}
+
 // PartialApplyDelta computes the adjusted delta for a partially applied wave.
 // When TotalCount is 0, the original delta.After is returned.
 func PartialApplyDelta(result *WaveApplyResult, delta WaveDelta) float64 {
@@ -99,6 +174,22 @@ func PartialApplyDelta(result *WaveApplyResult, delta WaveDelta) float64 {
 	}
 	successRate := float64(result.Applied) / float64(result.TotalCount)
 	return delta.Before + (delta.After-delta.Before)*successRate
+}
+
+// ValidateWaveApplyResult checks the apply result for degenerate or invalid states.
+// Returns an error if the result is nil, empty when actions were expected,
+// or reports more applied actions than expected.
+func ValidateWaveApplyResult(result *WaveApplyResult, expectedActions int) error {
+	if result == nil {
+		return fmt.Errorf("wave apply result is nil")
+	}
+	if expectedActions > 0 && result.Applied == 0 && result.TotalCount == 0 && len(result.Errors) == 0 {
+		return fmt.Errorf("wave apply result is empty (expected %d actions)", expectedActions)
+	}
+	if result.Applied > expectedActions {
+		return fmt.Errorf("wave apply result reports %d applied but only %d actions expected", result.Applied, expectedActions)
+	}
+	return nil
 }
 
 // IsWaveApplyComplete returns true when the apply result has no errors,
@@ -154,6 +245,134 @@ func PropagateWaveUpdate(waves []Wave, updated Wave) {
 			return
 		}
 	}
+}
+
+// DetectWaveCycles performs DFS-based cycle detection on the wave prerequisite graph.
+// Returns an error describing the cycle if one is found, nil otherwise.
+func DetectWaveCycles(waves []Wave) error {
+	if len(waves) == 0 {
+		return nil
+	}
+	// Build adjacency map: waveKey -> prerequisites
+	adj := make(map[string][]string, len(waves))
+	for _, w := range waves {
+		key := WaveKey(w)
+		adj[key] = w.Prerequisites
+	}
+
+	const (
+		white = 0 // unvisited
+		gray  = 1 // in current DFS path
+		black = 2 // fully processed
+	)
+	color := make(map[string]int, len(waves))
+	parent := make(map[string]string, len(waves))
+
+	var dfs func(node string) error
+	dfs = func(node string) error {
+		color[node] = gray
+		for _, dep := range adj[node] {
+			switch color[dep] {
+			case gray:
+				// Back edge: cycle found. Reconstruct path.
+				var path []string
+				path = append(path, dep, node)
+				cur := node
+				for i := 0; i < len(waves) && cur != dep; i++ {
+					cur = parent[cur]
+					path = append(path, cur)
+				}
+				return fmt.Errorf("dependency cycle detected: %s", strings.Join(path, " -> "))
+			case white:
+				parent[dep] = node
+				if err := dfs(dep); err != nil {
+					return err
+				}
+			}
+		}
+		color[node] = black
+		return nil
+	}
+
+	for _, w := range waves {
+		key := WaveKey(w)
+		if color[key] == white {
+			if err := dfs(key); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// PruneStaleWaves removes waves whose cluster is no longer in the valid cluster set.
+// Completed waves are preserved regardless. Modifies state.Waves in place.
+// Returns the count of pruned waves.
+func PruneStaleWaves(state *SessionState, validClusters []ClusterState) int {
+	validNames := make(map[string]bool, len(validClusters))
+	for _, c := range validClusters {
+		validNames[c.Name] = true
+	}
+	var kept []WaveState
+	var removed int
+	for _, w := range state.Waves {
+		if w.Status == "completed" || validNames[w.ClusterName] {
+			kept = append(kept, w)
+		} else {
+			removed++
+		}
+	}
+	state.Waves = kept
+	return removed
+}
+
+// ValidateWavePrerequisites removes prerequisites referencing waves not in the wave set.
+// Returns the cleaned wave list and the count of removed dangling prerequisites.
+func ValidateWavePrerequisites(waves []Wave) ([]Wave, int) {
+	allKeys := make(map[string]bool, len(waves))
+	for _, w := range waves {
+		allKeys[WaveKey(w)] = true
+	}
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	var removed int
+	for i, w := range result {
+		var clean []string
+		for _, p := range w.Prerequisites {
+			if allKeys[p] {
+				clean = append(clean, p)
+			} else {
+				removed++
+			}
+		}
+		result[i].Prerequisites = clean
+	}
+	return result, removed
+}
+
+// RepairLockedWaves unlocks waves whose prerequisites are all met but status is still "locked".
+// Returns the repaired wave list and the count of repaired waves.
+func RepairLockedWaves(waves []Wave, completed map[string]bool) ([]Wave, int) {
+	result := make([]Wave, len(waves))
+	copy(result, waves)
+	var repaired int
+	for i, w := range result {
+		if w.Status != "locked" {
+			continue
+		}
+		allMet := true
+		for _, prereq := range w.Prerequisites {
+			if !completed[prereq] {
+				allMet = false
+				break
+			}
+		}
+		if allMet {
+			result[i].Status = "available"
+			repaired++
+		}
+	}
+	return result, repaired
 }
 
 // BuildCompletedWaveMap returns a set of completed waves keyed by WaveKey (ClusterName:ID).
@@ -311,6 +530,21 @@ func ToApplyResult(wave Wave, internal *WaveApplyResult) ApplyResult {
 		NewCompleteness: completeness,
 		CompletedWave:   &wave,
 	}
+}
+
+// FilterEmptyWaves removes waves that have zero actions (nil or empty slice).
+// Returns the filtered list and the count of removed waves.
+func FilterEmptyWaves(waves []Wave) ([]Wave, int) {
+	var filtered []Wave
+	var removed int
+	for _, w := range waves {
+		if len(w.Actions) == 0 {
+			removed++
+		} else {
+			filtered = append(filtered, w)
+		}
+	}
+	return filtered, removed
 }
 
 // AutoSelectWave selects the first available wave for auto-approve mode.

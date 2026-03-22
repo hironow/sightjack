@@ -313,6 +313,93 @@ func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 	}
 }
 
+func TestFileEventStore_CorruptLineCount(t *testing.T) {
+	// given: a daily JSONL file with 3 corrupt lines among 2 valid events
+	dir := t.TempDir()
+
+	e1, err := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	if err != nil {
+		t.Fatalf("create session_started: %v", err)
+	}
+	data1, err := domain.MarshalEvent(e1)
+	if err != nil {
+		t.Fatalf("marshal session_started: %v", err)
+	}
+	e2, err := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
+	if err != nil {
+		t.Fatalf("create scan_completed: %v", err)
+	}
+	data2, err := domain.MarshalEvent(e2)
+	if err != nil {
+		t.Fatalf("marshal scan_completed: %v", err)
+	}
+
+	content := string(data1) + "\n" +
+		"NOT JSON 1\n" +
+		"{invalid json\n" +
+		string(data2) + "\n" +
+		"NOT JSON 3\n"
+	filename := time.Now().Format("2006-01-02") + ".jsonl"
+	if writeErr := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644); writeErr != nil {
+		t.Fatalf("write test file: %v", writeErr)
+	}
+
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
+
+	// when
+	events, result, err := store.LoadAll()
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 valid events, got %d", len(events))
+	}
+	if result.CorruptLineCount != 3 {
+		t.Errorf("CorruptLineCount: got %d, want 3", result.CorruptLineCount)
+	}
+	if result.FileCount != 1 {
+		t.Errorf("FileCount: got %d, want 1", result.FileCount)
+	}
+}
+
+func TestFileEventStore_CorruptLineCount_MultiFile(t *testing.T) {
+	// given: corrupt lines spread across two daily files
+	dir := t.TempDir()
+
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC))
+	data1, _ := domain.MarshalEvent(e1)
+	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Date(2025, 3, 2, 10, 0, 0, 0, time.UTC))
+	data2, _ := domain.MarshalEvent(e2)
+
+	// day 1: 1 valid + 1 corrupt
+	os.WriteFile(filepath.Join(dir, "2025-03-01.jsonl"),
+		[]byte(string(data1)+"\nCORRUPT\n"), 0o644)
+	// day 2: 1 valid + 2 corrupt
+	os.WriteFile(filepath.Join(dir, "2025-03-02.jsonl"),
+		[]byte("BAD1\n"+string(data2)+"\nBAD2\n"), 0o644)
+
+	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
+
+	// when
+	events, result, err := store.LoadAll()
+
+	// then
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 valid events, got %d", len(events))
+	}
+	if result.CorruptLineCount != 3 {
+		t.Errorf("CorruptLineCount: got %d, want 3 (1 from day1 + 2 from day2)", result.CorruptLineCount)
+	}
+	if result.FileCount != 2 {
+		t.Errorf("FileCount: got %d, want 2", result.FileCount)
+	}
+}
+
 func TestEventsDir(t *testing.T) {
 	got := eventsource.EventsDir("/project/.siren")
 	expected := filepath.Join("/project/.siren", "events")

@@ -1,6 +1,8 @@
 package domain_test
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -91,9 +93,20 @@ func TestMergeWaveResults(t *testing.T) {
 	if len(merged) != 2 {
 		t.Fatalf("merged len = %d, want 2", len(merged))
 	}
-	// prerequisite normalized
-	if merged[0].Prerequisites[0] != "auth:w0" {
-		t.Errorf("prerequisite = %q, want %q", merged[0].Prerequisites[0], "auth:w0")
+	// Results are sorted by complexity: billing:w1 (score=0) comes before auth:w1 (score=0.5).
+	// Find auth:w1 by key and verify its prerequisite was normalized.
+	var authWave *domain.Wave
+	for i := range merged {
+		if domain.WaveKey(merged[i]) == "auth:w1" {
+			authWave = &merged[i]
+			break
+		}
+	}
+	if authWave == nil {
+		t.Fatal("auth:w1 not found in merged results")
+	}
+	if len(authWave.Prerequisites) == 0 || authWave.Prerequisites[0] != "auth:w0" {
+		t.Errorf("prerequisite = %v, want [auth:w0]", authWave.Prerequisites)
 	}
 }
 
@@ -812,6 +825,500 @@ func TestClustersForIssueIDs(t *testing.T) {
 	})
 }
 
+func TestRemoveSelfReferences(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_self_referencing_prerequisite", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w1", "auth:w0"}},
+		}
+
+		// when
+		result, removed := domain.RemoveSelfReferences(waves)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(result[0].Prerequisites) != 1 {
+			t.Fatalf("prerequisites len = %d, want 1", len(result[0].Prerequisites))
+		}
+		if result[0].Prerequisites[0] != "auth:w0" {
+			t.Errorf("prerequisite = %q, want %q", result[0].Prerequisites[0], "auth:w0")
+		}
+	})
+
+	t.Run("no_self_references_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		result, removed := domain.RemoveSelfReferences(waves)
+
+		// then
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+		if len(result[0].Prerequisites) != 1 {
+			t.Errorf("prerequisites len = %d, want 1", len(result[0].Prerequisites))
+		}
+	})
+
+	t.Run("only_self_reference_results_in_empty_prerequisites", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		result, removed := domain.RemoveSelfReferences(waves)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(result[0].Prerequisites) != 0 {
+			t.Errorf("prerequisites len = %d, want 0", len(result[0].Prerequisites))
+		}
+	})
+}
+
+func TestValidateWavePrerequisites(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_dangling_prerequisites", func(t *testing.T) {
+		t.Parallel()
+		// given: w2 references w99 which doesn't exist
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Status: "completed"},
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1", "auth:w99"}},
+		}
+
+		// when
+		result, removed := domain.ValidateWavePrerequisites(waves)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(result[1].Prerequisites) != 1 {
+			t.Fatalf("prerequisites len = %d, want 1", len(result[1].Prerequisites))
+		}
+		if result[1].Prerequisites[0] != "auth:w1" {
+			t.Errorf("prerequisite = %q, want %q", result[1].Prerequisites[0], "auth:w1")
+		}
+	})
+
+	t.Run("no_dangling_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Status: "completed"},
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		result, removed := domain.ValidateWavePrerequisites(waves)
+
+		// then
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+		if len(result[1].Prerequisites) != 1 {
+			t.Errorf("prerequisites len = %d, want 1", len(result[1].Prerequisites))
+		}
+	})
+}
+
+func TestDetectWaveCycles(t *testing.T) {
+	t.Parallel()
+
+	t.Run("detects_simple_cycle", func(t *testing.T) {
+		t.Parallel()
+		// given: w1 -> w2 -> w1
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w2"}},
+			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err == nil {
+			t.Error("expected cycle error")
+		}
+	})
+
+	t.Run("no_cycle_returns_nil", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1"},
+			{ClusterName: "auth", ID: "w2", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("detects_cross_cluster_cycle", func(t *testing.T) {
+		t.Parallel()
+		// given: auth:w1 -> billing:w1 -> auth:w1
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"billing:w1"}},
+			{ClusterName: "billing", ID: "w1", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err == nil {
+			t.Error("expected cycle error for cross-cluster cycle")
+		}
+	})
+
+	t.Run("empty_waves_no_error", func(t *testing.T) {
+		t.Parallel()
+		// when
+		err := domain.DetectWaveCycles(nil)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("self_cycle_detected", func(t *testing.T) {
+		t.Parallel()
+		// given: w1 depends on itself
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Prerequisites: []string{"auth:w1"}},
+		}
+
+		// when
+		err := domain.DetectWaveCycles(waves)
+
+		// then
+		if err == nil {
+			t.Error("expected cycle error for self-cycle")
+		}
+	})
+}
+
+func TestPruneStaleWaves(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_orphaned_cluster_waves", func(t *testing.T) {
+		t.Parallel()
+		// given: "billing" waves exist but cluster is no longer in scan
+		state := &domain.SessionState{
+			Waves: []domain.WaveState{
+				{ID: "w1", ClusterName: "auth", Status: "available"},
+				{ID: "w2", ClusterName: "billing", Status: "available"},
+			},
+			Clusters: []domain.ClusterState{
+				{Name: "auth"},
+			},
+		}
+
+		// when
+		removed := domain.PruneStaleWaves(state, state.Clusters)
+
+		// then
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+		if len(state.Waves) != 1 {
+			t.Fatalf("waves len = %d, want 1", len(state.Waves))
+		}
+		if state.Waves[0].ClusterName != "auth" {
+			t.Errorf("remaining wave cluster = %q, want %q", state.Waves[0].ClusterName, "auth")
+		}
+	})
+
+	t.Run("keeps_completed_waves_even_if_cluster_removed", func(t *testing.T) {
+		t.Parallel()
+		// given
+		state := &domain.SessionState{
+			Waves: []domain.WaveState{
+				{ID: "w1", ClusterName: "billing", Status: "completed"},
+			},
+			Clusters: []domain.ClusterState{
+				{Name: "auth"},
+			},
+		}
+
+		// when
+		removed := domain.PruneStaleWaves(state, state.Clusters)
+
+		// then: completed waves are preserved
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+
+	t.Run("no_pruning_when_all_valid", func(t *testing.T) {
+		t.Parallel()
+		// given
+		state := &domain.SessionState{
+			Waves: []domain.WaveState{
+				{ID: "w1", ClusterName: "auth", Status: "available"},
+			},
+			Clusters: []domain.ClusterState{
+				{Name: "auth"},
+			},
+		}
+
+		// when
+		removed := domain.PruneStaleWaves(state, state.Clusters)
+
+		// then
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+}
+
+func TestRepairLockedWaves(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unlocks_wave_with_all_prerequisites_completed", func(t *testing.T) {
+		t.Parallel()
+		// given: w2 is locked but all prereqs are met
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Status: "completed"},
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
+		}
+		completed := map[string]bool{"auth:w1": true}
+
+		// when
+		result, repaired := domain.RepairLockedWaves(waves, completed)
+
+		// then
+		if repaired != 1 {
+			t.Errorf("repaired = %d, want 1", repaired)
+		}
+		if result[1].Status != "available" {
+			t.Errorf("status = %q, want %q", result[1].Status, "available")
+		}
+	})
+
+	t.Run("keeps_locked_when_prerequisites_unmet", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Status: "locked", Prerequisites: []string{"auth:w1"}},
+		}
+		completed := map[string]bool{}
+
+		// when
+		result, repaired := domain.RepairLockedWaves(waves, completed)
+
+		// then
+		if repaired != 0 {
+			t.Errorf("repaired = %d, want 0", repaired)
+		}
+		if result[0].Status != "locked" {
+			t.Errorf("status = %q, want %q", result[0].Status, "locked")
+		}
+	})
+}
+
+func TestValidateWaveApplyResult(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil_result_returns_error", func(t *testing.T) {
+		t.Parallel()
+		// when
+		err := domain.ValidateWaveApplyResult(nil, 3)
+
+		// then
+		if err == nil {
+			t.Error("expected error for nil result")
+		}
+	})
+
+	t.Run("degenerate_empty_result_returns_error", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 0, TotalCount: 0}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err == nil {
+			t.Error("expected error for degenerate empty result with expected actions")
+		}
+	})
+
+	t.Run("applied_exceeds_expected_returns_error", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 5, TotalCount: 5}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err == nil {
+			t.Error("expected error when applied > expected actions")
+		}
+	})
+
+	t.Run("valid_result_no_error", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 3, TotalCount: 3}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("partial_apply_valid", func(t *testing.T) {
+		t.Parallel()
+		// given
+		result := &domain.WaveApplyResult{Applied: 2, TotalCount: 3, Errors: []string{"fail"}}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 3)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("zero_expected_zero_result_valid", func(t *testing.T) {
+		t.Parallel()
+		// given: edge case where wave has 0 expected actions
+		result := &domain.WaveApplyResult{Applied: 0, TotalCount: 0}
+
+		// when
+		err := domain.ValidateWaveApplyResult(result, 0)
+
+		// then
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestClampDelta(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		delta      domain.WaveDelta
+		wantBefore float64
+		wantAfter  float64
+	}{
+		{name: "valid_unchanged", delta: domain.WaveDelta{Before: 0.3, After: 0.7}, wantBefore: 0.3, wantAfter: 0.7},
+		{name: "negative_clamped", delta: domain.WaveDelta{Before: -0.1, After: 0.5}, wantBefore: 0.0, wantAfter: 0.5},
+		{name: "above_one_clamped", delta: domain.WaveDelta{Before: 0.5, After: 1.5}, wantBefore: 0.5, wantAfter: 1.0},
+		{name: "both_out_of_bounds", delta: domain.WaveDelta{Before: -0.5, After: 2.0}, wantBefore: 0.0, wantAfter: 1.0},
+		{name: "regression_swapped", delta: domain.WaveDelta{Before: 0.8, After: 0.3}, wantBefore: 0.3, wantAfter: 0.8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// when
+			got := domain.ClampDelta(tt.delta)
+
+			// then
+			if got.Before != tt.wantBefore {
+				t.Errorf("Before = %f, want %f", got.Before, tt.wantBefore)
+			}
+			if got.After != tt.wantAfter {
+				t.Errorf("After = %f, want %f", got.After, tt.wantAfter)
+			}
+		})
+	}
+}
+
+func TestFilterEmptyWaves(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes_zero_action_waves", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ID: "w1", ClusterName: "auth", Actions: []domain.WaveAction{{Type: "fix", IssueID: "1"}}},
+			{ID: "w2", ClusterName: "auth", Actions: nil},
+			{ID: "w3", ClusterName: "auth", Actions: []domain.WaveAction{}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyWaves(waves)
+
+		// then
+		if len(filtered) != 1 {
+			t.Fatalf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 2 {
+			t.Errorf("removed = %d, want 2", removed)
+		}
+		if filtered[0].ID != "w1" {
+			t.Errorf("filtered[0].ID = %q, want %q", filtered[0].ID, "w1")
+		}
+	})
+
+	t.Run("all_valid_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ID: "w1", Actions: []domain.WaveAction{{Type: "fix"}}},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyWaves(waves)
+
+		// then
+		if len(filtered) != 1 {
+			t.Errorf("filtered len = %d, want 1", len(filtered))
+		}
+		if removed != 0 {
+			t.Errorf("removed = %d, want 0", removed)
+		}
+	})
+
+	t.Run("all_empty_returns_nil", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ID: "w1", Actions: nil},
+		}
+
+		// when
+		filtered, removed := domain.FilterEmptyWaves(waves)
+
+		// then
+		if len(filtered) != 0 {
+			t.Errorf("filtered len = %d, want 0", len(filtered))
+		}
+		if removed != 1 {
+			t.Errorf("removed = %d, want 1", removed)
+		}
+	})
+}
+
 func TestLastCompletedWaveForCluster(t *testing.T) {
 	t.Parallel()
 
@@ -842,6 +1349,153 @@ func TestLastCompletedWaveForCluster(t *testing.T) {
 		// then
 		if ok {
 			t.Error("expected ok=false for unknown cluster")
+		}
+	})
+}
+
+func TestSortWavesByComplexity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty_list_is_no_op", func(t *testing.T) {
+		t.Parallel()
+		// given
+		var waves []domain.Wave
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then
+		if len(result) != 0 {
+			t.Errorf("expected empty result, got %d waves", len(result))
+		}
+	})
+
+	t.Run("single_wave_unchanged", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "i1"}}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then
+		if len(result) != 1 {
+			t.Fatalf("expected 1 wave, got %d", len(result))
+		}
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("wave key = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+	})
+
+	t.Run("sorts_by_action_count_ascending", func(t *testing.T) {
+		t.Parallel()
+		// given: w2 has more actions than w1
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+				{Type: "add_label", IssueID: "i2"},
+				{Type: "cancel", IssueID: "i3"},
+			}},
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+			}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — simpler wave (fewer actions) comes first
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("first wave = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+		if domain.WaveKey(result[1]) != "auth:w2" {
+			t.Errorf("second wave = %q, want %q", domain.WaveKey(result[1]), "auth:w2")
+		}
+	})
+
+	t.Run("prereq_count_adds_weight", func(t *testing.T) {
+		t.Parallel()
+		// given: w1 and w2 have same actions but w2 has prerequisites (adds weight)
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w2", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+			}, Prerequisites: []string{"auth:w0", "auth:w1"}},
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+			}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — wave with no prereqs comes first (lower complexity)
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("first wave = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+		if domain.WaveKey(result[1]) != "auth:w2" {
+			t.Errorf("second wave = %q, want %q", domain.WaveKey(result[1]), "auth:w2")
+		}
+	})
+
+	t.Run("multi_cluster_stable_sort_preserves_relative_order", func(t *testing.T) {
+		t.Parallel()
+		// given: two waves with equal complexity from different clusters
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "i1"}}},
+			{ClusterName: "billing", ID: "w1", Actions: []domain.WaveAction{{Type: "add_dod", IssueID: "i2"}}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — stable: original order preserved for equal complexity
+		if domain.WaveKey(result[0]) != "auth:w1" {
+			t.Errorf("first wave = %q, want %q", domain.WaveKey(result[0]), "auth:w1")
+		}
+		if domain.WaveKey(result[1]) != "billing:w1" {
+			t.Errorf("second wave = %q, want %q", domain.WaveKey(result[1]), "billing:w1")
+		}
+	})
+
+	t.Run("complexity_score_set_on_wave", func(t *testing.T) {
+		t.Parallel()
+		// given
+		waves := []domain.Wave{
+			{ClusterName: "auth", ID: "w1", Actions: []domain.WaveAction{
+				{Type: "add_dod", IssueID: "i1"},
+				{Type: "add_label", IssueID: "i2"},
+			}, Prerequisites: []string{"auth:w0"}},
+		}
+
+		// when
+		result := domain.SortWavesByComplexity(waves)
+
+		// then — ComplexityScore is populated (actions + prereq weighting)
+		if result[0].ComplexityScore == 0 {
+			t.Errorf("expected ComplexityScore > 0, got %v", result[0].ComplexityScore)
+		}
+	})
+}
+
+func TestComplexityScoreJSONOmitempty(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero_score_omitted_from_json", func(t *testing.T) {
+		t.Parallel()
+		// given
+		w := domain.Wave{ClusterName: "auth", ID: "w1"}
+
+		// when: marshal to JSON
+		data, err := json.Marshal(w)
+		if err != nil {
+			t.Fatalf("marshal error: %v", err)
+		}
+
+		// then: complexity_score key absent when zero
+		if strings.Contains(string(data), "complexity_score") {
+			t.Errorf("expected complexity_score to be omitted when zero, got: %s", data)
 		}
 	})
 }

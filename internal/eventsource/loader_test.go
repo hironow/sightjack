@@ -564,6 +564,66 @@ func TestProjectState_ADRGenerated_Idempotent(t *testing.T) {
 	}
 }
 
+func TestLoadAllEventsAcrossSessions_ReportsFailedSessions(t *testing.T) {
+	// given: stateDir with one valid session and one empty (invalid) session dir
+	stateDir := t.TempDir()
+	eventsDir := filepath.Join(stateDir, "events")
+
+	// Valid session
+	validDir := filepath.Join(eventsDir, "valid-session")
+	if err := os.MkdirAll(validDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	event := mustNewEvent(t, domain.EventSessionStarted, "valid-session", 1,
+		domain.SessionStartedPayload{Project: "test"})
+	validStore := eventsource.NewFileEventStore(validDir, &domain.NopLogger{})
+	if _, err := validStore.Append(event); err != nil {
+		t.Fatal(err)
+	}
+
+	// Invalid session (empty directory, no events)
+	invalidDir := filepath.Join(eventsDir, "invalid-session")
+	if err := os.MkdirAll(invalidDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	events, result, err := eventsource.LoadAllEventsAcrossSessions(stateDir)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.SessionsLoaded != 1 {
+		t.Errorf("SessionsLoaded = %d, want 1", result.SessionsLoaded)
+	}
+	if result.SessionsFailed != 1 {
+		t.Errorf("SessionsFailed = %d, want 1", result.SessionsFailed)
+	}
+	if len(events) < 1 {
+		t.Errorf("events = %d, want >= 1", len(events))
+	}
+}
+
+func TestLoadAllEventsAcrossSessions_NoEventsDir_ReturnsEmpty(t *testing.T) {
+	// given
+	stateDir := t.TempDir()
+
+	// when
+	events, result, err := eventsource.LoadAllEventsAcrossSessions(stateDir)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(events) != 0 {
+		t.Errorf("events = %d, want 0", len(events))
+	}
+	if result.SessionsLoaded != 0 {
+		t.Errorf("SessionsLoaded = %d, want 0", result.SessionsLoaded)
+	}
+}
+
 // mustNewEvent is a test helper that creates an event and fails on error.
 // SessionID is set on the returned event. The seq parameter is ignored (kept for call-site compat).
 func mustNewEvent(t *testing.T, eventType domain.EventType, sessionID string, _ int64, payload any) domain.Event {
