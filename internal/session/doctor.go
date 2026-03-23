@@ -457,11 +457,24 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	return results
 }
 
+// skillsRefBinNames lists possible binary names for the skills-ref package.
+// "uv tool install skills-ref" installs as "agentskills", not "skills-ref".
+var skillsRefBinNames = []string{"skills-ref", "agentskills"}
+
+func findSkillsRefBin() (string, error) {
+	for _, name := range skillsRefBinNames {
+		if path, err := lookPath(name); err == nil {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("none of %v found on PATH", skillsRefBinNames)
+}
+
 func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
-	if _, err := lookPath("skills-ref"); err == nil {
+	if path, err := findSkillsRefBin(); err == nil {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckOK,
-			Message: "skills-ref found on PATH",
+			Message: fmt.Sprintf("skills-ref found on PATH (%s)", filepath.Base(path)),
 		}}
 	}
 	_, uvErr := lookPath("uv")
@@ -482,7 +495,7 @@ func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 			}}
 		}
 		// Verify that skills-ref is now actually on PATH after install.
-		if _, err := lookPath("skills-ref"); err != nil {
+		if _, err := findSkillsRefBin(); err != nil {
 			return []domain.DoctorCheck{{
 				Name: "skills-ref", Status: domain.CheckWarn,
 				Message: "uv tool install succeeded but skills-ref still not on PATH",
