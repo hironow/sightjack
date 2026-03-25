@@ -153,7 +153,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		}
 
 		domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
-		if err := ComposeSpecification(ctx, store, selected); err != nil {
+		if err := ComposeSpecification(ctx, store, selected, cfg.Mode); err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
 			emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -183,7 +183,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			)
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
 			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
-			if err := ComposeSpecification(ctx, store, selected); err != nil {
+			if err := ComposeSpecification(ctx, store, selected, cfg.Mode); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
@@ -280,7 +280,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			sessionRejected[domain.WaveKey(selected)] = rejected
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
 			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
-			if err := ComposeSpecification(ctx, store, selected); err != nil {
+			if err := ComposeSpecification(ctx, store, selected, cfg.Mode); err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())

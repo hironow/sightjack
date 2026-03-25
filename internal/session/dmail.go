@@ -676,7 +676,7 @@ func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wa
 }
 
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
-func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave domain.Wave) error {
+func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave domain.Wave, mode ...domain.TrackingMode) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),
@@ -686,5 +686,26 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 		Issues:        WaveIssueIDs(wave),
 		Body:          SpecificationBody(wave),
 	}
+
+	// Wave mode: attach WaveReference with actions as steps
+	if len(mode) > 0 && mode[0].IsWave() {
+		ref := &domain.WaveReference{ID: key}
+		for _, action := range wave.Actions {
+			ref.Steps = append(ref.Steps, domain.WaveStepDef{
+				ID:          action.IssueID,
+				Title:       action.Description,
+				Description: action.Detail,
+			})
+		}
+		// Single-action wave: use wave key as step ID if no actions
+		if len(ref.Steps) == 0 {
+			ref.Steps = append(ref.Steps, domain.WaveStepDef{
+				ID:    key,
+				Title: wave.Title,
+			})
+		}
+		mail.Wave = ref
+	}
+
 	return ComposeDMail(ctx, store, mail)
 }
