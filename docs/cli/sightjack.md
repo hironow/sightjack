@@ -17,6 +17,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
   -n, --dry-run         Generate prompts without executing Claude
   -h, --help            help for sightjack
   -l, --lang string     Language override (ja/en)
+      --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -q, --quiet           Suppress all stderr output
