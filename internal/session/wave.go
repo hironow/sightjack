@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -104,7 +103,7 @@ func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 		logger.Warn("create apply log: %v", applyLogErr)
 	}
 
-	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
+	linearTools := WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)
 	logger.Info("Applying wave: %s - %s", wave.ClusterName, wave.Title)
 	if _, err := RunClaudeOnce(ctx, cfg, prompt, applyOut, logger, linearTools); err != nil {
 		return nil, fmt.Errorf("wave apply %s: %w", wave.ID, err)

@@ -405,6 +405,10 @@ func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 		return
 	}
 	readyIssueStr := strings.Join(newlyReady, ", ")
+	if cfg.Mode.IsWave() {
+		logger.Info("Wave mode: skipping ready label (no Linear MCP)")
+		return
+	}
 	if err := RunReadyLabel(ctx, cfg, readyIssueStr, out, logger); err != nil {
 		logger.Warn("Ready label failed: %v", err)
 		return

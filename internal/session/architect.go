@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -167,7 +166,7 @@ func RunArchitectDiscuss(ctx context.Context, cfg *domain.Config, scanDir string
 	}
 
 	logger.Info("Architect discussing: %s - %s", wave.ClusterName, topic)
-	if _, err := RunClaude(ctx, cfg, prompt, discussOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, discussOut, logger, WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)); err != nil {
 		return nil, fmt.Errorf("architect discuss %s: %w", wave.ID, err)
 	}
 
