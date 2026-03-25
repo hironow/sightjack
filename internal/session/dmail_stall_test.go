@@ -33,7 +33,7 @@ func TestStallEscalationBody_ContainsWaveAndReason(t *testing.T) {
 	reason := "repeated structural errors detected"
 
 	// when
-	body := session.StallEscalationBody(wave, errs, reason)
+	body := domain.StallEscalationBody(wave, errs, reason)
 
 	// then
 	if !strings.Contains(body, wave.Title) {
@@ -57,7 +57,7 @@ func TestStructuralErrors_FiltersCorrectly(t *testing.T) {
 	}
 
 	// when
-	structural := session.StructuralErrors(allErrors)
+	structural := domain.StructuralErrors(allErrors)
 
 	// then
 	if len(structural) != 2 {
