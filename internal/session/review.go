@@ -11,17 +11,10 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-// ReviewResult holds the outcome of a code review execution.
-type ReviewResult struct {
-	Passed   bool   // true if no actionable comments were found
-	Output   string // raw review output
-	Comments string // extracted review comments (empty if passed)
-}
-
 // RunReview executes the review command and parses the output.
-func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult, error) {
+func RunReview(ctx context.Context, reviewCmd string, dir string) (*domain.ReviewResult, error) {
 	if strings.TrimSpace(reviewCmd) == "" {
-		return &ReviewResult{Passed: true}, nil
+		return &domain.ReviewResult{Passed: true}, nil
 	}
 
 	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd)
@@ -41,7 +34,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 			if domain.IsRateLimited(output) {
 				return nil, fmt.Errorf("review service rate/quota limited")
 			}
-			return &ReviewResult{
+			return &domain.ReviewResult{
 				Passed:   false,
 				Output:   output,
 				Comments: output,
@@ -50,7 +43,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, domain.SummarizeReview(output))
 	}
 
-	return &ReviewResult{
+	return &domain.ReviewResult{
 		Passed: true,
 		Output: output,
 	}, nil

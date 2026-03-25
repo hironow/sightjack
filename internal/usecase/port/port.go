@@ -12,6 +12,30 @@ import (
 // ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
 var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
+// ReviewExecutor runs a code review command and returns the result.
+// Implemented in session layer (exec.Command), injected into usecase by cmd.
+type ReviewExecutor interface {
+	RunReview(ctx context.Context, reviewCmd string, dir string) (*domain.ReviewResult, error)
+}
+
+// BranchResolver resolves the current git branch name.
+// Implemented in session layer (exec.Command), injected into usecase by cmd.
+type BranchResolver interface {
+	CurrentBranch(ctx context.Context, dir string) (string, error)
+}
+
+// ReviewFixRunner runs Claude to fix review comments.
+// Implemented in session layer, injected into usecase by cmd.
+type ReviewFixRunner interface {
+	RunReviewFix(ctx context.Context, dir, branch, comments string) error
+}
+
+// ReviewGateRunner runs the review-fix cycle.
+// Implemented in usecase layer, injected into session by cmd (composition root).
+type ReviewGateRunner interface {
+	RunReviewGate(ctx context.Context, gate domain.GateConfig, timeoutSec int) (bool, error)
+}
+
 // InitRunner handles project initialization I/O.
 // Returns warnings for non-fatal errors (e.g. skill install failures).
 type InitRunner interface {
@@ -176,6 +200,7 @@ type SessionRunner interface {
 	RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
 	RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
 	RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
+	SetReviewGateRunner(runner ReviewGateRunner)
 	BuildNotifier(gate domain.GateConfig) Notifier
 	NewDispatchingRecorder(inner Recorder, dispatcher EventDispatcher, logger domain.Logger) Recorder
 }
