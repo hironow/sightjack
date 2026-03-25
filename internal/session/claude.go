@@ -156,3 +156,16 @@ var LinearMCPAllowedTools = []string{
 	// "mcp__linear__extract_images",
 	"mcp__linear__search_documentation",
 }
+
+// AllowedToolsForMode returns the appropriate tool list based on tracking mode.
+// Wave mode: base + GitHub tools only (no Linear MCP).
+// Linear mode: base + GitHub + Linear MCP tools.
+func AllowedToolsForMode(mode domain.TrackingMode) []string {
+	tools := make([]string, 0, len(BaseAllowedTools)+len(GHAllowedTools)+len(LinearMCPAllowedTools))
+	tools = append(tools, BaseAllowedTools...)
+	tools = append(tools, GHAllowedTools...)
+	if mode.IsLinear() {
+		tools = append(tools, LinearMCPAllowedTools...)
+	}
+	return tools
+}
