@@ -31,6 +31,7 @@ type DMail struct {
 	Severity      string                 `yaml:"severity,omitempty"`
 	Action        string                 `yaml:"action,omitempty"`
 	Priority      int                    `yaml:"priority,omitempty"`
+	Wave          *domain.WaveReference  `yaml:"wave,omitempty"`
 	Metadata      map[string]string      `yaml:"metadata,omitempty"`
 	Context       *domain.InsightContext `yaml:"context,omitempty" json:"context,omitempty"`
 	Body          string                 `yaml:"-"`
