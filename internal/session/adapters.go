@@ -12,10 +12,22 @@ import (
 // --- SessionRunner adapter ---
 
 // SessionRunnerAdapter implements port.SessionRunner by delegating to session package functions.
-type SessionRunnerAdapter struct{}
+type SessionRunnerAdapter struct {
+	reviewGateRunner port.ReviewGateRunner
+}
 
 // NewSessionRunnerAdapter creates a new SessionRunnerAdapter.
 func NewSessionRunnerAdapter() *SessionRunnerAdapter { return &SessionRunnerAdapter{} }
+
+// SetReviewGateRunner injects the review gate runner (usecase-layer logic).
+func (a *SessionRunnerAdapter) SetReviewGateRunner(runner port.ReviewGateRunner) {
+	a.reviewGateRunner = runner
+}
+
+// ReviewGateRunner returns the injected ReviewGateRunner (nil if not set).
+func (a *SessionRunnerAdapter) ReviewGateRunner() port.ReviewGateRunner {
+	return a.reviewGateRunner
+}
 
 func (a *SessionRunnerAdapter) RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, emitter port.SessionEventEmitter, logger domain.Logger) error {
 	return RunSession(ctx, cfg, baseDir, sessionID, dryRun, input, out, emitter, logger)

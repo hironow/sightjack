@@ -3,9 +3,6 @@ package session
 import (
 	"context"
 	"fmt"
-	"io"
-	"os/exec"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -20,11 +17,10 @@ const (
 	minReviewTimeout    = 30 * time.Second
 )
 
-// RunReviewGate runs the review-fix cycle before ComposeReport.
-// Returns (true, nil) if review passes or is skipped (no ReviewCmd).
-// Returns (false, nil) if review fails after all cycles.
-// Returns (false, err) on infrastructure errors.
-func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Config, runner port.ClaudeRunner, dir string, logger domain.Logger) (bool, error) {
+// RunReviewGate runs the review-fix cycle with OTel spans.
+// When a ReviewGateRunner is provided (variadic), delegates cycle control to it.
+// Otherwise runs cycle control inline (backward compatibility for integration tests).
+func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Config, runner port.ClaudeRunner, dir string, logger domain.Logger, reviewGate ...port.ReviewGateRunner) (bool, error) {
 	ctx, span := platform.Tracer.Start(ctx, "sightjack.review")
 	defer span.End()
 
@@ -32,16 +28,38 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Conf
 		return true, nil
 	}
 
-	if logger == nil {
-		logger = &domain.NopLogger{}
-	}
-
-	budget := gate.EffectiveReviewBudget()
-
 	timeoutSec := cfg.TimeoutSec
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
+
+	// Prefer injected ReviewGateRunner (production path via cmd composition root)
+	if len(reviewGate) > 0 && reviewGate[0] != nil {
+		passed, err := reviewGate[0].RunReviewGate(ctx, gate, timeoutSec)
+		if err != nil {
+			span.RecordError(err)
+			span.SetAttributes(attribute.String("error.stage", "sightjack.review"))
+		}
+		return passed, err
+	}
+
+	// Fallback: construct adapters and run cycle control inline
+	if logger == nil {
+		logger = &domain.NopLogger{}
+	}
+	reviewer := NewReviewExecutor(dir)
+	branch := NewBranchResolver()
+	fixer := NewReviewFixRunner(runner, branch, dir, logger)
+	return runCycleControl(ctx, gate, timeoutSec, reviewer, fixer, logger, span)
+}
+
+// runCycleControl implements the review-fix cycle logic.
+// Used by the inline fallback path. Production path uses usecase.RunReviewGate.
+func runCycleControl(ctx context.Context, gate domain.GateConfig, timeoutSec int,
+	reviewer port.ReviewExecutor, fixer port.ReviewFixRunner, logger domain.Logger,
+	span interface{ SetAttributes(kv ...attribute.KeyValue) },
+) (bool, error) {
+	budget := gate.EffectiveReviewBudget()
 	reviewTimeout := max(
 		time.Duration(timeoutSec)*time.Second/time.Duration(budget),
 		minReviewTimeout,
@@ -53,17 +71,15 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Conf
 			return false, fmt.Errorf("review gate canceled: %w", ctx.Err())
 		}
 
-		span.SetAttributes(attribute.Int("review.cycle", cycle))
+		if span != nil {
+			span.SetAttributes(attribute.Int("review.cycle", cycle))
+		}
 		logger.Info("Review gate: cycle %d/%d", cycle, maxReviewGateCycles)
 
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		reviewStart := time.Now()
-		result, err := RunReview(reviewCtx, gate.ReviewCmdString(), dir)
+		result, err := reviewer.RunReview(reviewCtx, gate.ReviewCmdString(), "")
 		reviewCancel()
-		span.SetAttributes(attribute.Int64("review.exec_ms", time.Since(reviewStart).Milliseconds()))
 		if err != nil {
-			span.RecordError(err)
-			span.SetAttributes(attribute.String("error.stage", "sightjack.review"))
 			return false, fmt.Errorf("review gate cycle %d: %w", cycle, err)
 		}
 
@@ -75,13 +91,11 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Conf
 		lastComments = result.Comments
 		logger.Warn("Review gate: comments found (cycle %d/%d)", cycle, budget)
 
-		// Last cycle — no point running fix
 		if cycle == budget {
 			break
 		}
 
-		// Run Claude --continue to fix review comments
-		if err := runReviewFix(ctx, runner, dir, lastComments, logger); err != nil {
+		if err := fixer.RunReviewFix(ctx, "", "", lastComments); err != nil {
 			logger.Warn("Review fix failed: %v", err)
 			return false, nil
 		}
@@ -89,32 +103,4 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Conf
 
 	logger.Warn("Review gate: exhausted %d cycles, review not resolved", budget)
 	return false, nil
-}
-
-// runReviewFix runs Claude --continue to fix review comments.
-func runReviewFix(ctx context.Context, runner port.ClaudeRunner, dir, comments string, logger domain.Logger) error {
-	branch, err := currentBranch(ctx, dir)
-	if err != nil {
-		return fmt.Errorf("detect branch: %w", err)
-	}
-
-	prompt := BuildReviewFixPrompt(branch, comments)
-
-	logger.Info("Review fix: running claude --continue")
-	out, err := runner.Run(ctx, prompt, io.Discard, port.WithContinue(), port.WithWorkDir(dir))
-	if err != nil {
-		return fmt.Errorf("claude fix: %w\noutput: %s", err, domain.SummarizeReview(out))
-	}
-	return nil
-}
-
-// currentBranch returns the current git branch name.
-func currentBranch(ctx context.Context, dir string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
 }
