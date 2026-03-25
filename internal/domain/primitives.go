@@ -2,6 +2,37 @@ package domain
 
 import "fmt"
 
+// TrackingMode determines the issue tracking backend.
+// Wave mode (default) uses D-Mail archive as event source.
+// Linear mode uses Linear MCP for issue tracking (legacy).
+type TrackingMode string
+
+const (
+	// ModeWave is the default mode: waves and steps drive expedition targeting.
+	// D-Mail archive/ is the single source of truth for wave state.
+	ModeWave TrackingMode = "wave"
+
+	// ModeLinear uses Linear MCP for issue tracking (existing behavior).
+	ModeLinear TrackingMode = "linear"
+)
+
+// NewTrackingMode returns ModeLinear when linear is true, ModeWave otherwise.
+func NewTrackingMode(linear bool) TrackingMode {
+	if linear {
+		return ModeLinear
+	}
+	return ModeWave
+}
+
+// IsLinear returns true when operating in Linear MCP mode.
+func (m TrackingMode) IsLinear() bool { return m == ModeLinear }
+
+// IsWave returns true when operating in Wave-centric mode.
+func (m TrackingMode) IsWave() bool { return m == ModeWave }
+
+// String returns the mode name.
+func (m TrackingMode) String() string { return string(m) }
+
 // RepoPath is an always-valid, non-empty repository path.
 type RepoPath struct{ v string }
 
