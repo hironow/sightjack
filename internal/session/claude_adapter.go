@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -59,6 +60,12 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--disable-slash-commands")
+	// Enforce MCP allowlist when mcp-config.json exists
+	if mcpPath := MCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
+		if _, statErr := os.Stat(mcpPath); statErr == nil {
+			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
+		}
+	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, a.ClaudeCmd, args...)
 	cmd.Cancel = cancelFunc(cmd)
@@ -185,4 +192,12 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	}
 
 	return output.String(), nil
+}
+
+// effectiveWorkDir returns dir if non-empty, otherwise ".".
+func effectiveWorkDir(dir string) string {
+	if dir != "" {
+		return dir
+	}
+	return "."
 }
