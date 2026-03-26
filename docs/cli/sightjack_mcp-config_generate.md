@@ -39,4 +39,5 @@ sightjack mcp-config generate [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack mcp-config](sightjack_mcp-config.md)  - Manage MCP configuration for Claude subprocess isolation
+* [sightjack mcp-config](sightjack_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
+
