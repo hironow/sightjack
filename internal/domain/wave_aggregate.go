@@ -5,11 +5,15 @@ import (
 	"time"
 )
 
+// AggregateTypeWave is the aggregate type for wave lifecycle events.
+const AggregateTypeWave = "wave"
+
 // WaveAggregate owns wave lifecycle state and produces events for state transitions.
 // It wraps domain/ pure functions with event emission.
 type WaveAggregate struct {
 	waves     []Wave
 	completed map[string]bool // keyed by WaveKey (ClusterName:ID)
+	seqNr     uint64
 }
 
 // NewWaveAggregate creates an empty WaveAggregate.
@@ -49,6 +53,20 @@ func (a *WaveAggregate) IsCompleted(waveKey string) bool {
 	return a.completed[waveKey]
 }
 
+// nextEvent creates an event tagged with wave aggregate identity.
+// Uses the waveKey (cluster:id) from the last operation as AggregateID.
+func (a *WaveAggregate) nextEvent(eventType EventType, data any, now time.Time, waveKey string) (Event, error) {
+	a.seqNr++
+	ev, err := NewEvent(eventType, data, now)
+	if err != nil {
+		return ev, err
+	}
+	ev.AggregateID = waveKey
+	ev.AggregateType = AggregateTypeWave
+	ev.SeqNr = a.seqNr
+	return ev, nil
+}
+
 // findWave returns the wave matching the given ID and cluster.
 func (a *WaveAggregate) findWave(waveID, clusterName string) (Wave, bool) {
 	for _, w := range a.waves {
@@ -64,10 +82,10 @@ func (a *WaveAggregate) Approve(waveID, clusterName string, now time.Time) (Even
 	if _, ok := a.findWave(waveID, clusterName); !ok {
 		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
 	}
-	return NewEvent(EventWaveApproved, WaveIdentityPayload{
+	return a.nextEvent(EventWaveApproved, WaveIdentityPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
-	}, now)
+	}, now, clusterName+":"+waveID)
 }
 
 // Reject produces a wave_rejected event.
@@ -75,15 +93,15 @@ func (a *WaveAggregate) Reject(waveID, clusterName string, now time.Time) (Event
 	if _, ok := a.findWave(waveID, clusterName); !ok {
 		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
 	}
-	return NewEvent(EventWaveRejected, WaveIdentityPayload{
+	return a.nextEvent(EventWaveRejected, WaveIdentityPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
-	}, now)
+	}, now, clusterName+":"+waveID)
 }
 
 // RecordApplied produces a wave_applied event.
 func (a *WaveAggregate) RecordApplied(payload WaveAppliedPayload, now time.Time) (Event, error) {
-	return NewEvent(EventWaveApplied, payload, now)
+	return a.nextEvent(EventWaveApplied, payload, now, payload.ClusterName+":"+payload.WaveID)
 }
 
 // Complete produces a wave_completed event and marks the wave as completed.
@@ -93,19 +111,18 @@ func (a *WaveAggregate) Complete(waveID, clusterName string, applied, totalCount
 	}
 	waveKey := clusterName + ":" + waveID
 	a.completed[waveKey] = true
-	// Sync the Status field on the wave struct so BuildWaveStates persists it
 	for i := range a.waves {
 		if a.waves[i].ID == waveID && a.waves[i].ClusterName == clusterName {
 			a.waves[i].Status = "completed"
 			break
 		}
 	}
-	return NewEvent(EventWaveCompleted, WaveCompletedPayload{
+	return a.nextEvent(EventWaveCompleted, WaveCompletedPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
 		Applied:     applied,
 		TotalCount:  totalCount,
-	}, now)
+	}, now, waveKey)
 }
 
 // EvaluateUnlocks checks locked waves and produces a waves_unlocked event if any are unlocked.
@@ -133,9 +150,9 @@ func (a *WaveAggregate) EvaluateUnlocks(now time.Time) ([]Event, error) {
 		return nil, nil
 	}
 
-	ev, err := NewEvent(EventWavesUnlocked, WavesUnlockedPayload{
+	ev, err := a.nextEvent(EventWavesUnlocked, WavesUnlockedPayload{
 		UnlockedWaveIDs: unlockedIDs,
-	}, now)
+	}, now, "")
 	if err != nil {
 		return nil, err
 	}
@@ -144,10 +161,10 @@ func (a *WaveAggregate) EvaluateUnlocks(now time.Time) ([]Event, error) {
 
 // AddNextGen produces a nextgen_waves_added event.
 func (a *WaveAggregate) AddNextGen(clusterName string, waves []WaveState, now time.Time) (Event, error) {
-	return NewEvent(EventNextGenWavesAdded, NextGenWavesAddedPayload{
+	return a.nextEvent(EventNextGenWavesAdded, NextGenWavesAddedPayload{
 		ClusterName: clusterName,
 		Waves:       waves,
-	}, now)
+	}, now, "")
 }
 
 // WaveStatusCounts returns a map of wave status to count across all waves.
