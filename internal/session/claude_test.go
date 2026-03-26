@@ -337,3 +337,65 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 		t.Errorf("expected 2 calls, got %d", callCount)
 	}
 }
+
+func TestRunClaudeOnce_StrictMCPConfig_WhenFileExists(t *testing.T) {
+	// given: mcp-config.json exists in work dir
+	workDir := t.TempDir()
+	session.GenerateMCPConfig(workDir, domain.ModeWave, false)
+
+	var capturedArgs []string
+	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = args
+		return exec.CommandContext(ctx, "echo", "ok")
+	})
+	defer cleanup()
+
+	cfg := &domain.Config{
+		ClaudeCmd:  "claude",
+		Model:      "opus",
+		TimeoutSec: 10,
+		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	}
+
+	// when: run with WorkDir containing mcp-config.json
+	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
+		session.WithWorkDir(workDir))
+
+	// then: --strict-mcp-config and --mcp-config should be in args
+	argsStr := strings.Join(capturedArgs, " ")
+	if !strings.Contains(argsStr, "--strict-mcp-config") {
+		t.Errorf("expected --strict-mcp-config in args: %v", capturedArgs)
+	}
+	if !strings.Contains(argsStr, "--mcp-config") {
+		t.Errorf("expected --mcp-config in args: %v", capturedArgs)
+	}
+}
+
+func TestRunClaudeOnce_NoStrictMCPConfig_WhenFileAbsent(t *testing.T) {
+	// given: no mcp-config.json
+	workDir := t.TempDir()
+
+	var capturedArgs []string
+	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = args
+		return exec.CommandContext(ctx, "echo", "ok")
+	})
+	defer cleanup()
+
+	cfg := &domain.Config{
+		ClaudeCmd:  "claude",
+		Model:      "opus",
+		TimeoutSec: 10,
+		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
+	}
+
+	// when: run with empty WorkDir (no mcp-config.json)
+	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
+		session.WithWorkDir(workDir))
+
+	// then: --strict-mcp-config should NOT be in args
+	argsStr := strings.Join(capturedArgs, " ")
+	if strings.Contains(argsStr, "--strict-mcp-config") {
+		t.Errorf("--strict-mcp-config should not be present without mcp-config.json: %v", capturedArgs)
+	}
+}

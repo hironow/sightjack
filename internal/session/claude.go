@@ -44,6 +44,9 @@ type RunOption = port.RunOption
 // WithAllowedTools restricts the tools available to the Claude model.
 var WithAllowedTools = port.WithAllowedTools
 
+// WithWorkDir sets the working directory for the Claude subprocess.
+var WithWorkDir = port.WithWorkDir
+
 // NewClaudeAdapter creates a ClaudeAdapter implementing port.ClaudeRunner.
 func NewClaudeAdapter(cfg *domain.Config, logger domain.Logger) *ClaudeAdapter {
 	return &ClaudeAdapter{
