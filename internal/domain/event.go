@@ -49,6 +49,9 @@ type Event struct {
 	SessionID     string          `json:"session_id"`
 	CorrelationID string          `json:"correlation_id,omitempty"`
 	CausationID   string          `json:"causation_id,omitempty"`
+	AggregateID   string          `json:"aggregate_id,omitempty"`
+	AggregateType string          `json:"aggregate_type,omitempty"`
+	SeqNr         uint64          `json:"seq_nr,omitempty"`
 }
 
 // NewEvent creates an Event with a UUID, the given timestamp, and marshaled data payload.
