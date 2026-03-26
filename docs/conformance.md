@@ -50,6 +50,14 @@ Domain command types use the Parse-Don't-Validate pattern:
 
 Ref: `.semgrep/layers.yaml`, ADR S0029
 
+## Tracking Mode (Wave vs Linear)
+
+- **Wave mode** (default, `--linear` not set): D-Mail archive is the event source for wave state. `AllowedToolsForMode(cfg.Mode)` excludes Linear MCP tools from Claude prompts. `RunReadyLabel` is skipped. `ComposeSpecification` populates the `wave` field with steps derived from WaveActions.
+- **Linear mode** (`--linear`): Existing behavior preserved — Linear MCP tools included, labels applied, no wave field in D-Mails.
+- `Config.Mode` (runtime-only, `yaml:"-"`) carries the tracking mode through all session functions.
+
+Ref: ADR S0035, `internal/domain/primitives.go` (TrackingMode), `internal/session/claude.go` (AllowedToolsForMode)
+
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.
