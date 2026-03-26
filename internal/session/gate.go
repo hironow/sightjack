@@ -127,4 +127,3 @@ func BuildNotifier(gate domain.GateConfig) port.Notifier {
 	}
 	return &LocalNotifier{}
 }
-

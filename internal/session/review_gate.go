@@ -57,7 +57,9 @@ func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Conf
 // Used by the inline fallback path. Production path uses usecase.RunReviewGate.
 func runCycleControl(ctx context.Context, gate domain.GateConfig, timeoutSec int,
 	reviewer port.ReviewExecutor, fixer port.ReviewFixRunner, logger domain.Logger,
-	span interface{ SetAttributes(kv ...attribute.KeyValue) },
+	span interface {
+		SetAttributes(kv ...attribute.KeyValue)
+	},
 ) (bool, error) {
 	budget := gate.EffectiveReviewBudget()
 	reviewTimeout := max(
