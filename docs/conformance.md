@@ -52,6 +52,14 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 
 ## Tracking Mode (Wave vs Linear)
 
+### Claude Subprocess Isolation
+
+- `--disable-slash-commands` prevents user skills from inflating context
+- `mcp-config generate` creates `.run/mcp-config.json` (wave: empty, linear: Linear MCP)
+- `--strict-mcp-config --mcp-config` enforced when mcp-config.json exists
+- User can edit mcp-config.json to add custom MCP servers
+
+
 - **Wave mode** (default, `--linear` not set): D-Mail archive is the event source for wave state. `AllowedToolsForMode(cfg.Mode)` excludes Linear MCP tools from Claude prompts. `RunReadyLabel` is skipped. `ComposeSpecification` populates the `wave` field with steps derived from WaveActions.
 - **Linear mode** (`--linear`): Existing behavior preserved — Linear MCP tools included, labels applied, no wave field in D-Mails.
 - `Config.Mode` (runtime-only, `yaml:"-"`) carries the tracking mode through all session functions.
