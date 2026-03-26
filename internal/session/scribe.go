@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -294,7 +293,7 @@ func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 	}
 
 	logger.Info("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "sightjack.scribe.claude"))
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)

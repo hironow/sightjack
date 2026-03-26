@@ -172,6 +172,23 @@ type WaveAction struct {
 	Detail      string `json:"detail"`
 }
 
+// WaveStepDef defines a single step within a wave specification (D-Mail schema).
+type WaveStepDef struct {
+	ID            string   `yaml:"id" json:"id"`
+	Title         string   `yaml:"title" json:"title"`
+	Description   string   `yaml:"description,omitempty" json:"description,omitempty"`
+	Targets       []string `yaml:"targets,omitempty" json:"targets,omitempty"`
+	Acceptance    string   `yaml:"acceptance,omitempty" json:"acceptance,omitempty"`
+	Prerequisites []string `yaml:"prerequisites,omitempty" json:"prerequisites,omitempty"`
+}
+
+// WaveReference links a D-Mail to a wave and optionally a specific step.
+type WaveReference struct {
+	ID    string        `yaml:"id" json:"id"`
+	Step  string        `yaml:"step,omitempty" json:"step,omitempty"`
+	Steps []WaveStepDef `yaml:"steps,omitempty" json:"steps,omitempty"`
+}
+
 // WaveDelta holds expected completeness change.
 type WaveDelta struct {
 	Before float64 `json:"before"`

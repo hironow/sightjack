@@ -129,6 +129,9 @@ type Config struct {
 	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates"`
 	Lang         string                 `yaml:"lang"`
 	Computed     ComputedConfig         `yaml:"computed,omitempty"`
+
+	// Runtime-only: set from --linear flag, not persisted in config.yaml
+	Mode TrackingMode `yaml:"-"`
 }
 
 // ScribeConfig holds Scribe Agent settings.

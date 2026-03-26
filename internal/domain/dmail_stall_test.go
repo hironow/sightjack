@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests unexported StructuralErrors and StallEscalationBody pure functions
+
 import (
 	"strings"
 	"testing"

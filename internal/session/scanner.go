@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -115,7 +114,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
-	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
+	linearTools := WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)
 	if cfg.Labels.Enabled {
 		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
 			classifySpan.End()
@@ -235,7 +234,7 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 
 	logger.Info("Pass 3: Generating waves for %d clusters...", len(clusters))
 
-	linearTools := WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)
+	linearTools := WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)
 
 	successResults, warnings := RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
 		func(ctx context.Context, index int, cluster domain.ClusterScanResult) (domain.WaveGenerateResult, error) {

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -88,7 +87,7 @@ func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, 
 	}
 
 	logger.Info("Generating next waves: %s", completedWave.ClusterName)
-	if _, err := RunClaude(ctx, cfg, prompt, nextgenOut, logger, WithAllowedTools(slices.Concat(BaseAllowedTools, GHAllowedTools, LinearMCPAllowedTools)...)); err != nil {
+	if _, err := RunClaude(ctx, cfg, prompt, nextgenOut, logger, WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)); err != nil {
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}
 
