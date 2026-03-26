@@ -61,11 +61,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--disable-slash-commands")
 	// Enforce MCP allowlist when mcp-config.json exists
-	workDir := rc.WorkDir
-	if workDir == "" {
-		workDir = "."
-	}
-	if mcpPath := MCPConfigPath(workDir); mcpPath != "" {
+	if mcpPath := MCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
 		if _, statErr := os.Stat(mcpPath); statErr == nil {
 			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 		}
@@ -196,4 +192,12 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	}
 
 	return output.String(), nil
+}
+
+// effectiveWorkDir returns dir if non-empty, otherwise ".".
+func effectiveWorkDir(dir string) string {
+	if dir != "" {
+		return dir
+	}
+	return "."
 }
