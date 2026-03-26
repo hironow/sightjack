@@ -570,5 +570,3 @@ func DMailName(prefix, waveKey string) string {
 	}
 	return strings.TrimRight(b.String(), "_")
 }
-
-// WaveIssueIDs extracts unique, sorted issue IDs from wave actions.
