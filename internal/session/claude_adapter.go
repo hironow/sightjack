@@ -58,6 +58,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--continue")
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
+	args = append(args, "--disable-slash-commands")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, a.ClaudeCmd, args...)
 	cmd.Cancel = cancelFunc(cmd)
