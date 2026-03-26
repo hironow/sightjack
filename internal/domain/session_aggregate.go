@@ -30,6 +30,7 @@ func (a *SessionAggregate) nextEvent(eventType EventType, data any, now time.Tim
 	if err != nil {
 		return ev, err
 	}
+	ev.SessionID = a.sessionID // backward compat (legacy field)
 	ev.AggregateID = a.sessionID
 	ev.AggregateType = AggregateTypeSession
 	ev.SeqNr = a.seqNr
