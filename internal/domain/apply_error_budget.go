@@ -4,8 +4,8 @@ package domain
 // It tracks consecutive failures and trips the circuit when the threshold is reached.
 // A single success resets the circuit and the consecutive failure count.
 type ApplyErrorBudget struct {
-	threshold            int
-	consecutiveFailures  int
+	threshold           int
+	consecutiveFailures int
 }
 
 // NewApplyErrorBudget creates a new ApplyErrorBudget with the given failure threshold.

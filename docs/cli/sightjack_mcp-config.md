@@ -40,6 +40,5 @@ this allowlist when the file exists.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-* [sightjack mcp-config generate](sightjack_mcp-config_generate.md)	 - Generate mcp-config.json for --strict-mcp-config isolation
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack mcp-config generate](sightjack_mcp-config_generate.md)  - Generate mcp-config.json for --strict-mcp-config isolation
