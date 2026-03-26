@@ -162,6 +162,13 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 				logger.Warn("%s", warning)
 			}
 		}
+
+		// Phase 5: persist raw events to .run/claude-logs/
+		if raw := emitter.RawEvents(); len(raw) > 0 {
+			if logErr := WriteClaudeLog(effectiveWorkDir(rc.WorkDir), raw); logErr != nil && logger != nil {
+				logger.Warn("claude-log write: %v", logErr)
+			}
+		}
 	}()
 
 	<-done
