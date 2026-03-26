@@ -12,7 +12,7 @@ func TestSessionAggregate_SeqNrIncrements(t *testing.T) {
 	agg.SetSessionID("sess-1")
 	now := time.Now()
 
-	ev1, err := agg.Start("proj", "alert", now) // nosemgrep: adr0003-otel-span-without-defer-end — aggregate Start, not OTel
+	ev1, err := agg.Start("proj", "alert", now) // nosemgrep: adr0003-otel-span-without-defer-end — aggregate Start, not OTel [permanent]
 	if err != nil {
 		t.Fatal(err)
 	}
