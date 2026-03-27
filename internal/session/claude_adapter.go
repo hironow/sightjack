@@ -59,6 +59,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--continue")
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
+	args = append(args, "--bare") // Skip hooks, plugins, skills, CLAUDE.md auto-discovery
 	args = append(args, "--disable-slash-commands")
 	// Enforce MCP allowlist when mcp-config.json exists
 	if mcpPath := MCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
