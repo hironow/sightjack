@@ -65,8 +65,16 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
 
+	// Settings and MCP config live under the tool's stateDir (e.g. .siren/).
+	// ConfigBase is the repo root where stateDir was initialized.
+	// When ConfigBase is unset, fall back to WorkDir, then CWD.
+	configBase := rc.ConfigBase
+	if configBase == "" {
+		configBase = effectiveWorkDir(rc.WorkDir)
+	}
+
 	// Load tool-specific settings when available; warn if missing
-	if settingsPath := ClaudeSettingsPath(effectiveWorkDir(rc.WorkDir)); ClaudeSettingsExists(effectiveWorkDir(rc.WorkDir)) {
+	if settingsPath := ClaudeSettingsPath(configBase); ClaudeSettingsExists(configBase) {
 		args = append(args, "--settings", settingsPath)
 	} else if logger != nil {
 		logger.Warn("Claude subprocess settings not found at %s", settingsPath)
@@ -74,7 +82,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	}
 
 	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
-	if mcpPath := ResolveMCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
+	if mcpPath := ResolveMCPConfigPath(configBase); mcpPath != "" {
 		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
