@@ -13,7 +13,7 @@ func TestClassifyNewMails_Empty(t *testing.T) {
 	t.Parallel()
 
 	// when
-	hasSpec, hasReport, issueIDs := classifyNewMails(nil)
+	hasSpec, hasReport, hasDesignFeedback, issueIDs := classifyNewMails(nil)
 
 	// then
 	if hasSpec {
@@ -21,6 +21,9 @@ func TestClassifyNewMails_Empty(t *testing.T) {
 	}
 	if hasReport {
 		t.Error("expected hasReport=false for nil")
+	}
+	if hasDesignFeedback {
+		t.Error("expected hasDesignFeedback=false for nil")
 	}
 	if len(issueIDs) != 0 {
 		t.Errorf("expected empty issueIDs, got %v", issueIDs)
@@ -36,7 +39,7 @@ func TestClassifyNewMails_SpecificationOnly(t *testing.T) {
 	}
 
 	// when
-	hasSpec, hasReport, issueIDs := classifyNewMails(mails)
+	hasSpec, hasReport, hasDesignFeedback, issueIDs := classifyNewMails(mails)
 
 	// then
 	if !hasSpec {
@@ -44,6 +47,9 @@ func TestClassifyNewMails_SpecificationOnly(t *testing.T) {
 	}
 	if hasReport {
 		t.Error("expected hasReport=false")
+	}
+	if hasDesignFeedback {
+		t.Error("expected hasDesignFeedback=false for spec-only")
 	}
 	if len(issueIDs) != 0 {
 		t.Errorf("expected empty issueIDs, got %v", issueIDs)
@@ -59,7 +65,7 @@ func TestClassifyNewMails_ReportWithIssues(t *testing.T) {
 	}
 
 	// when
-	hasSpec, hasReport, issueIDs := classifyNewMails(mails)
+	hasSpec, hasReport, _, issueIDs := classifyNewMails(mails)
 
 	// then
 	if hasSpec {
@@ -85,7 +91,7 @@ func TestClassifyNewMails_ReportWithoutIssues(t *testing.T) {
 	}
 
 	// when
-	_, hasReport, issueIDs := classifyNewMails(mails)
+	_, hasReport, _, issueIDs := classifyNewMails(mails)
 
 	// then
 	if !hasReport {
@@ -106,7 +112,7 @@ func TestClassifyNewMails_MultipleReportsAggregateIssues(t *testing.T) {
 	}
 
 	// when
-	_, _, issueIDs := classifyNewMails(mails)
+	_, _, _, issueIDs := classifyNewMails(mails)
 
 	// then
 	if len(issueIDs) != 3 {
@@ -125,7 +131,7 @@ func TestClassifyNewMails_MixedKinds(t *testing.T) {
 	}
 
 	// when
-	hasSpec, hasReport, issueIDs := classifyNewMails(mails)
+	hasSpec, hasReport, hasDesignFeedback, issueIDs := classifyNewMails(mails)
 
 	// then
 	if !hasSpec {
@@ -133,6 +139,9 @@ func TestClassifyNewMails_MixedKinds(t *testing.T) {
 	}
 	if !hasReport {
 		t.Error("expected hasReport=true")
+	}
+	if !hasDesignFeedback {
+		t.Error("expected hasDesignFeedback=true")
 	}
 	if len(issueIDs) != 1 {
 		t.Fatalf("expected 1 issueID, got %d", len(issueIDs))
@@ -149,7 +158,7 @@ func TestClassifyNewMails_FeedbackOnly(t *testing.T) {
 	}
 
 	// when
-	hasSpec, hasReport, issueIDs := classifyNewMails(mails)
+	hasSpec, hasReport, hasDesignFeedback, issueIDs := classifyNewMails(mails)
 
 	// then
 	if hasSpec {
@@ -157,6 +166,9 @@ func TestClassifyNewMails_FeedbackOnly(t *testing.T) {
 	}
 	if hasReport {
 		t.Error("expected hasReport=false")
+	}
+	if !hasDesignFeedback {
+		t.Error("expected hasDesignFeedback=true")
 	}
 	if len(issueIDs) != 0 {
 		t.Errorf("expected empty issueIDs, got %v", issueIDs)
@@ -173,7 +185,7 @@ func TestClassifyNewMails_ConvergenceAndCIResult(t *testing.T) {
 	}
 
 	// when
-	hasSpec, hasReport, issueIDs := classifyNewMails(mails)
+	hasSpec, hasReport, hasDesignFeedback, issueIDs := classifyNewMails(mails)
 
 	// then: these kinds fall through to "feedback" path in waiting cycle
 	if hasSpec {
@@ -181,6 +193,9 @@ func TestClassifyNewMails_ConvergenceAndCIResult(t *testing.T) {
 	}
 	if hasReport {
 		t.Error("expected hasReport=false for convergence/ci-result")
+	}
+	if hasDesignFeedback {
+		t.Error("expected hasDesignFeedback=false for convergence/ci-result")
 	}
 	if len(issueIDs) != 0 {
 		t.Errorf("expected empty issueIDs, got %v", issueIDs)
@@ -220,7 +235,7 @@ func TestReportNextgenOrchestration_EndToEnd(t *testing.T) {
 	reportMails := []*DMail{
 		{Kind: DMailReport, Name: "paintress-report", Issues: []string{"AUTH-100", "BILL-200"}},
 	}
-	_, hasReport, reportIssueIDs := classifyNewMails(reportMails)
+	_, hasReport, _, reportIssueIDs := classifyNewMails(reportMails)
 
 	// then: classification correct
 	if !hasReport {
@@ -393,5 +408,35 @@ func TestReportNextgenOrchestration_WaveCapReached(t *testing.T) {
 	// then
 	if domain.NeedsMoreWaves(affected[0], waves) {
 		t.Error("expected NeedsMoreWaves=false when wave cap reached")
+	}
+}
+
+// TestClassifyNewMails_DesignFeedbackDetected verifies that design-feedback
+// D-Mails are classified separately from generic feedback.
+func TestClassifyNewMails_DesignFeedbackDetected(t *testing.T) {
+	t.Parallel()
+
+	// given: mix of design-feedback and implementation-feedback
+	mails := []*DMail{
+		{Kind: DMailDesignFeedback, Name: "fb-design-1"},
+		{Kind: DMailImplFeedback, Name: "fb-impl-1"},
+		{Kind: DMailDesignFeedback, Name: "fb-design-2"},
+	}
+
+	// when
+	hasSpec, hasReport, hasDesignFeedback, issueIDs := classifyNewMails(mails)
+
+	// then
+	if hasSpec {
+		t.Error("expected hasSpec=false")
+	}
+	if hasReport {
+		t.Error("expected hasReport=false")
+	}
+	if !hasDesignFeedback {
+		t.Error("expected hasDesignFeedback=true")
+	}
+	if len(issueIDs) != 0 {
+		t.Errorf("expected empty issueIDs, got %v", issueIDs)
 	}
 }

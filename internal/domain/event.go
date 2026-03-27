@@ -38,6 +38,7 @@ const (
 	EventSpecificationSent   EventType = "specification_sent"
 	EventReportSent          EventType = "report_sent"
 	EventFeedbackSent        EventType = "feedback_sent"
+	EventFeedbackReceived    EventType = "feedback_received"
 )
 
 // CurrentEventSchemaVersion is the schema version stamped on all new events.
@@ -207,4 +208,11 @@ type SessionResumedPayload struct {
 // SessionRescannedPayload is the payload for EventSessionRescanned.
 type SessionRescannedPayload struct {
 	OriginalSessionID string `json:"original_session_id"`
+}
+
+// FeedbackReceivedPayload is the payload for EventFeedbackReceived.
+type FeedbackReceivedPayload struct {
+	Kind  string `json:"kind"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
 }

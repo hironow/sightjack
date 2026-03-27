@@ -119,10 +119,28 @@ waitingCycle:
 
 		// Classify new D-Mails since snapshot
 		newMails := fbCollector.NewSinceSnapshot()
-		hasSpec, hasReport, reportIssueIDs := classifyNewMails(newMails)
+		hasSpec, hasReport, hasDesignFeedback, reportIssueIDs := classifyNewMails(newMails)
 
 		if hasSpec {
 			logger.Info("New specification received. Rescanning not yet supported in waiting mode.")
+		}
+
+		// Emit event when design-feedback D-Mails arrive (S02 Phase B)
+		if hasDesignFeedback {
+			fbCount := 0
+			for _, m := range newMails {
+				if m.Kind == DMailDesignFeedback {
+					fbCount++
+				}
+			}
+			logger.Info("Design-feedback received (%d D-Mail(s)); re-scan will incorporate feedback", fbCount)
+			if err := emitter.EmitReceiveFeedback(domain.FeedbackReceivedPayload{
+				Kind:  string(DMailDesignFeedback),
+				Name:  "design-feedback-batch",
+				Count: fbCount,
+			}, time.Now().UTC()); err != nil {
+				logger.Warn("Failed to emit feedback_received event: %v", err)
+			}
 		}
 
 		// Generate next waves for clusters affected by report D-Mails
@@ -148,7 +166,7 @@ waitingCycle:
 			}
 		}
 
-		if !hasSpec && !hasReport {
+		if !hasSpec && !hasReport && !hasDesignFeedback {
 			logger.Info("New feedback received. Resuming interactive loop...")
 		}
 
@@ -161,8 +179,8 @@ waitingCycle:
 }
 
 // classifyNewMails categorizes newly arrived D-Mails into specification,
-// report (with issue IDs), or other feedback kinds.
-func classifyNewMails(mails []*DMail) (hasSpec, hasReport bool, reportIssueIDs []string) {
+// report (with issue IDs), design-feedback, or other kinds.
+func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback bool, reportIssueIDs []string) {
 	for _, m := range mails {
 		switch m.Kind {
 		case DMailSpecification:
@@ -170,6 +188,8 @@ func classifyNewMails(mails []*DMail) (hasSpec, hasReport bool, reportIssueIDs [
 		case DMailReport:
 			hasReport = true
 			reportIssueIDs = append(reportIssueIDs, m.Issues...)
+		case DMailDesignFeedback:
+			hasDesignFeedback = true
 		}
 	}
 	return

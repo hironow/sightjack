@@ -284,6 +284,26 @@ func TestSessionAggregate_SendFeedback(t *testing.T) {
 	}
 }
 
+func TestSessionAggregate_ReceiveFeedback(t *testing.T) {
+	// given
+	agg := domain.NewSessionAggregate()
+
+	// when
+	ev, err := agg.ReceiveFeedback(domain.FeedbackReceivedPayload{
+		Kind:  "design-feedback",
+		Name:  "design-feedback-batch",
+		Count: 3,
+	}, time.Now().UTC())
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ev.Type != domain.EventFeedbackReceived {
+		t.Fatalf("expected feedback_received, got %s", ev.Type)
+	}
+}
+
 func TestSessionAggregate_GenerateADR(t *testing.T) {
 	// given
 	agg := domain.NewSessionAggregate()

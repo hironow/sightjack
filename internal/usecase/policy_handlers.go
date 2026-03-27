@@ -62,6 +62,15 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 		return nil
 	})
 
+	// POLICY: feedback.received → log + metrics (S02 Phase B).
+	// Design-feedback from downstream tools triggers awareness; re-scan
+	// integration is handled by the session waiting cycle.
+	engine.Register(domain.EventFeedbackReceived, func(ctx context.Context, event domain.Event) error {
+		logger.Info("policy: feedback received (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "feedback.received", "handled")
+		return nil
+	})
+
 	// POLICY: specification.sent → notify + metrics.
 	engine.Register(domain.EventSpecificationSent, func(ctx context.Context, event domain.Event) error {
 		logger.Info("policy: specification sent (type=%s)", event.Type)

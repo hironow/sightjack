@@ -184,6 +184,15 @@ func (e *sessionEventEmitter) EmitSendFeedback(waveID, clusterName string, now t
 	return nil
 }
 
+func (e *sessionEventEmitter) EmitReceiveFeedback(payload domain.FeedbackReceivedPayload, now time.Time) error {
+	evt, err := e.agg.ReceiveFeedback(payload, now)
+	if err != nil {
+		return err
+	}
+	e.record(evt)
+	return nil
+}
+
 func (e *sessionEventEmitter) EmitGenerateADR(payload domain.ADRGeneratedPayload, now time.Time) error {
 	evt, err := e.agg.GenerateADR(payload, now)
 	if err != nil {
