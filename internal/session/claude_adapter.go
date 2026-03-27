@@ -59,9 +59,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--continue")
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
-	args = append(args, "--bare") // Skip hooks, plugins, skills, CLAUDE.md auto-discovery
+	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
-	// Enforce MCP allowlist when mcp-config.json exists
+	// Enforce MCP allowlist when .mcp.json exists
 	if mcpPath := MCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
 		if _, statErr := os.Stat(mcpPath); statErr == nil {
 			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
