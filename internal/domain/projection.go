@@ -131,6 +131,10 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 	case EventFeedbackSent:
 		state.FeedbackCount++
 
+	case EventFeedbackReceived:
+		// Audit-only: feedback reception is logged but does not mutate state.
+		// The FeedbackCount tracks outbound (sent) feedback only.
+
 	case EventWaveApproved, EventWaveRejected, EventWaveApplied,
 		EventSpecificationSent, EventReportSent,
 		EventReadyLabelsApplied, EventSessionResumed, EventSessionRescanned:

@@ -379,3 +379,22 @@ func TestProjectState_FeedbackSent_IncrementsFeedbackCount(t *testing.T) {
 		t.Errorf("FeedbackCount = %d, want 2", state.FeedbackCount)
 	}
 }
+
+func TestProjectState_FeedbackReceived_DoesNotMutateFeedbackCount(t *testing.T) {
+	t.Parallel()
+	// given: feedback_received is audit-only; FeedbackCount tracks outbound only
+	events := []domain.Event{
+		mustEvent(t, domain.EventSessionStarted, "sess-1", 1,
+			domain.SessionStartedPayload{Project: "proj"}),
+		mustEvent(t, domain.EventFeedbackReceived, "sess-1", 2,
+			domain.FeedbackReceivedPayload{Kind: "design-feedback", Name: "batch", Count: 3}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then: FeedbackCount should remain 0 (only sent feedback increments it)
+	if state.FeedbackCount != 0 {
+		t.Errorf("FeedbackCount = %d, want 0 (feedback_received is audit-only)", state.FeedbackCount)
+	}
+}

@@ -148,6 +148,11 @@ func (a *SessionAggregate) GenerateADR(payload ADRGeneratedPayload, now time.Tim
 	return a.nextEvent(EventADRGenerated, payload, now)
 }
 
+// ReceiveFeedback produces a feedback_received event.
+func (a *SessionAggregate) ReceiveFeedback(payload FeedbackReceivedPayload, now time.Time) (Event, error) {
+	return a.nextEvent(EventFeedbackReceived, payload, now)
+}
+
 // UnlockWaves produces a waves_unlocked event.
 func (a *SessionAggregate) UnlockWaves(unlockedIDs []string, now time.Time) (Event, error) {
 	return a.nextEvent(EventWavesUnlocked, WavesUnlockedPayload{

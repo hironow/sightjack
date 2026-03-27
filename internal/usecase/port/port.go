@@ -152,6 +152,7 @@ type SessionEventEmitter interface {
 	EmitSendSpecification(waveID, clusterName string, now time.Time) error
 	EmitSendReport(waveID, clusterName string, now time.Time) error
 	EmitSendFeedback(waveID, clusterName string, now time.Time) error
+	EmitReceiveFeedback(payload domain.FeedbackReceivedPayload, now time.Time) error
 	EmitGenerateADR(payload domain.ADRGeneratedPayload, now time.Time) error
 }
 
@@ -190,7 +191,10 @@ func (*NopSessionEventEmitter) EmitApplyReadyLabels(domain.ReadyLabelsAppliedPay
 }
 func (*NopSessionEventEmitter) EmitSendSpecification(string, string, time.Time) error { return nil }
 func (*NopSessionEventEmitter) EmitSendReport(string, string, time.Time) error        { return nil }
-func (*NopSessionEventEmitter) EmitSendFeedback(string, string, time.Time) error      { return nil }
+func (*NopSessionEventEmitter) EmitSendFeedback(string, string, time.Time) error { return nil }
+func (*NopSessionEventEmitter) EmitReceiveFeedback(domain.FeedbackReceivedPayload, time.Time) error {
+	return nil
+}
 func (*NopSessionEventEmitter) EmitGenerateADR(domain.ADRGeneratedPayload, time.Time) error {
 	return nil
 }

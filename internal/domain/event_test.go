@@ -173,6 +173,38 @@ func TestEvent_TimestampPreservedInJSON(t *testing.T) {
 	}
 }
 
+func TestEvent_SchemaVersion_SetByNewEvent(t *testing.T) {
+	ev, err := domain.NewEvent("test.event", map[string]string{"k": "v"}, time.Now())
+	if err != nil {
+		t.Fatalf("NewEvent: %v", err)
+	}
+	if ev.SchemaVersion != domain.CurrentEventSchemaVersion {
+		t.Errorf("got %d, want %d", ev.SchemaVersion, domain.CurrentEventSchemaVersion)
+	}
+}
+
+func TestEvent_SchemaVersion_ZeroIsLegacy(t *testing.T) {
+	raw := `{"id":"abc","type":"test","timestamp":"2026-01-01T00:00:00Z","session_id":"s1","data":{}}`
+	var ev domain.Event
+	if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if ev.SchemaVersion != 0 {
+		t.Errorf("legacy event should have SchemaVersion 0, got %d", ev.SchemaVersion)
+	}
+}
+
+func TestValidateEvent_RejectsFutureSchema(t *testing.T) {
+	ev, err := domain.NewEvent("test.event", map[string]string{"k": "v"}, time.Now())
+	if err != nil {
+		t.Fatalf("NewEvent: %v", err)
+	}
+	ev.SchemaVersion = domain.CurrentEventSchemaVersion + 1
+	if err := domain.ValidateEvent(ev); err == nil {
+		t.Error("expected error for future schema version")
+	}
+}
+
 func TestValidateEvent_Valid(t *testing.T) {
 	// given
 	event, _ := domain.NewEvent(domain.EventSessionStarted, map[string]string{"k": "v"}, time.Now())
