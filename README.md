@@ -242,6 +242,9 @@ just install
 # Initialize project config (Linear team key, etc.)
 sightjack init
 
+# Generate Claude subprocess isolation settings
+sightjack mcp-config generate
+
 # Re-initialize (upgrade SKILL.md, regenerate config)
 sightjack init --force
 
@@ -271,6 +274,7 @@ Running `sightjack` without a subcommand defaults to `scan` (classify and deep-s
 | `status` | Show operational status |
 | `clean` | Remove state directory |
 | `archive-prune` | Remove expired scan archives |
+| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
 | `version` | Print version info |
 | `update` | Self-update to the latest release |
 
@@ -294,10 +298,11 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 ## Quick Start
 
 ```bash
-sightjack init          # set up .siren/
-sightjack scan          # classify issues
-sightjack run           # interactive loop
-sightjack scan -n       # dry run
+sightjack init                    # set up .siren/
+sightjack mcp-config generate     # Claude subprocess isolation settings
+sightjack scan                    # classify issues
+sightjack run                     # interactive loop
+sightjack scan -n                 # dry run
 ```
 
 ### Unix pipeline

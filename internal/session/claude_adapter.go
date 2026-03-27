@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -59,13 +58,32 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--continue")
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
-	args = append(args, "--bare") // Skip hooks, plugins, skills, CLAUDE.md auto-discovery
+	// NOTE: --setting-sources "" skips settings loading but does NOT suppress CLAUDE.md auto-discovery.
+	// --bare would suppress it but also disables OAuth. No individual flag exists to disable CLAUDE.md
+	// discovery without disabling OAuth. Acceptable tradeoff: CLAUDE.md adds context but doesn't
+	// cause context budget issues in practice.
+	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
-	// Enforce MCP allowlist when mcp-config.json exists
-	if mcpPath := MCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
-		if _, statErr := os.Stat(mcpPath); statErr == nil {
-			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
-		}
+
+	// Settings and MCP config live under the tool's stateDir (e.g. .siren/).
+	// ConfigBase is the repo root where stateDir was initialized.
+	// When ConfigBase is unset, fall back to WorkDir, then CWD.
+	configBase := rc.ConfigBase
+	if configBase == "" {
+		configBase = effectiveWorkDir(rc.WorkDir)
+	}
+
+	// Load tool-specific settings when available; warn if missing
+	if settingsPath := ClaudeSettingsPath(configBase); ClaudeSettingsExists(configBase) {
+		args = append(args, "--settings", settingsPath)
+	} else if logger != nil {
+		logger.Warn("Claude subprocess settings not found at %s", settingsPath)
+		logger.Warn("Run 'sightjack mcp-config generate' to create settings.")
+	}
+
+	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
+	if mcpPath := ResolveMCPConfigPath(configBase); mcpPath != "" {
+		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, a.ClaudeCmd, args...)

@@ -1,1 +1,0 @@
-result:{"type":"result","subtype":"success","session_id":"fake","result":"{\"name\":\"Auth\",\"completeness\":0.8,\"issues\":[{\"id\":\"T-1\",\"title\":\"test\",\"completeness\":0.8}],\"observations\":[\"ok\"]}","usage":{"input_tokens":1,"output_tokens":1},"num_turns":1,"duration_ms":100,"stop_reason":"end_turn"}

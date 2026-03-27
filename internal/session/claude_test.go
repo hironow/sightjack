@@ -34,7 +34,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	session.RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
-	expected := []string{"--model", "opus", "--verbose", "--output-format", "stream-json", "--bare", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
+	expected := []string{"--model", "opus", "--verbose", "--output-format", "stream-json", "--setting-sources", "", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
 	if len(capturedArgs) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
 	}
@@ -65,7 +65,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	session.RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
-	expected := []string{"--verbose", "--output-format", "stream-json", "--bare", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "test prompt"}
+	expected := []string{"--verbose", "--output-format", "stream-json", "--setting-sources", "", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "test prompt"}
 	if len(capturedArgs) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
 	}
@@ -339,7 +339,7 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 }
 
 func TestRunClaudeOnce_StrictMCPConfig_WhenFileExists(t *testing.T) {
-	// given: mcp-config.json exists in work dir
+	// given: .mcp.json exists in work dir
 	workDir := t.TempDir()
 	session.GenerateMCPConfig(workDir, domain.ModeWave, false)
 
@@ -357,7 +357,7 @@ func TestRunClaudeOnce_StrictMCPConfig_WhenFileExists(t *testing.T) {
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
-	// when: run with WorkDir containing mcp-config.json
+	// when: run with WorkDir containing .mcp.json
 	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
 		session.WithWorkDir(workDir))
 
@@ -372,7 +372,7 @@ func TestRunClaudeOnce_StrictMCPConfig_WhenFileExists(t *testing.T) {
 }
 
 func TestRunClaudeOnce_NoStrictMCPConfig_WhenFileAbsent(t *testing.T) {
-	// given: no mcp-config.json
+	// given: no .mcp.json
 	workDir := t.TempDir()
 
 	var capturedArgs []string
@@ -389,13 +389,13 @@ func TestRunClaudeOnce_NoStrictMCPConfig_WhenFileAbsent(t *testing.T) {
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
 
-	// when: run with empty WorkDir (no mcp-config.json)
+	// when: run with empty WorkDir (no .mcp.json)
 	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
 		session.WithWorkDir(workDir))
 
 	// then: --strict-mcp-config should NOT be in args
 	argsStr := strings.Join(capturedArgs, " ")
 	if strings.Contains(argsStr, "--strict-mcp-config") {
-		t.Errorf("--strict-mcp-config should not be present without mcp-config.json: %v", capturedArgs)
+		t.Errorf("--strict-mcp-config should not be present without .mcp.json: %v", capturedArgs)
 	}
 }
