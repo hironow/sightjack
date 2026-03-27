@@ -26,14 +26,19 @@ type SessionRecorder struct {
 
 // NewSessionRecorder creates a SessionRecorder for the given session.
 func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, error) {
-	// Load existing events to resume CausationID chain.
+	// Load existing events to resume CausationID chain from the SAME session.
+	// Without this filter, a new session's first event would incorrectly
+	// point its CausationID at the previous session's last event.
 	events, _, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
 	}
 	var prevID string
-	if len(events) > 0 {
-		prevID = events[len(events)-1].ID
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].CorrelationID == sessionID {
+			prevID = events[i].ID
+			break
+		}
 	}
 	return &SessionRecorder{
 		store:     store,
