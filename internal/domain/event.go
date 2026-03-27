@@ -40,8 +40,13 @@ const (
 	EventFeedbackSent        EventType = "feedback_sent"
 )
 
+// CurrentEventSchemaVersion is the schema version stamped on all new events.
+// Legacy events (pre-Phase2) will have SchemaVersion 0 when deserialized.
+const CurrentEventSchemaVersion uint8 = 1
+
 // Event is the immutable event envelope persisted to the event store.
 type Event struct {
+	SchemaVersion uint8           `json:"schema_version,omitempty"`
 	ID            string          `json:"id"`
 	Type          EventType       `json:"type"`
 	Timestamp     time.Time       `json:"timestamp"`
@@ -61,16 +66,20 @@ func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error)
 		return Event{}, fmt.Errorf("marshal event data: %w", err)
 	}
 	return Event{
-		ID:        uuid.NewString(),
-		Type:      eventType,
-		Timestamp: timestamp,
-		Data:      raw,
+		SchemaVersion: CurrentEventSchemaVersion,
+		ID:            uuid.NewString(),
+		Type:          eventType,
+		Timestamp:     timestamp,
+		Data:          raw,
 	}, nil
 }
 
 // ValidateEvent checks structural validity of an Event before persistence.
 func ValidateEvent(e Event) error {
 	var errs []string
+	if e.SchemaVersion > CurrentEventSchemaVersion {
+		errs = append(errs, fmt.Sprintf("SchemaVersion %d exceeds current %d", e.SchemaVersion, CurrentEventSchemaVersion))
+	}
 	if e.ID == "" {
 		errs = append(errs, "ID is required")
 	}
