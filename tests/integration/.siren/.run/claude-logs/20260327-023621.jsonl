@@ -1,0 +1,2 @@
+assistant:{"type":"assistant","session_id":"mock","message":{"content":[{"type":"text","text":"[mock-stream-xyzzy]"}]}}
+result:{"type":"result","subtype":"success","session_id":"mock","result":"[mock-stream-xyzzy]","usage":{"input_tokens":10,"output_tokens":5}}

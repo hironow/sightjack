@@ -17,6 +17,8 @@ var sirenGitignoreEntries = []string{
 	"inbox/",
 	"outbox/",
 	".otel.env",
+	".mcp.json",
+	".claude/",
 }
 
 // EnsureMailDirs creates inbox/, outbox/, archive/ under .siren/.

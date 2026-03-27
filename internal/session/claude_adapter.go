@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -59,6 +58,10 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--continue")
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
+	// NOTE: --setting-sources "" skips settings loading but does NOT suppress CLAUDE.md auto-discovery.
+	// --bare would suppress it but also disables OAuth. No individual flag exists to disable CLAUDE.md
+	// discovery without disabling OAuth. Acceptable tradeoff: CLAUDE.md adds context but doesn't
+	// cause context budget issues in practice.
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
 
@@ -70,11 +73,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		logger.Warn("Run 'sightjack mcp-config generate' to create settings.")
 	}
 
-	// Enforce MCP allowlist when .mcp.json exists
-	if mcpPath := MCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
-		if _, statErr := os.Stat(mcpPath); statErr == nil {
-			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
-		}
+	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
+	if mcpPath := ResolveMCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
+		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 	cmd := newCmd(ctx, a.ClaudeCmd, args...)
