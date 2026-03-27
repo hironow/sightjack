@@ -62,9 +62,11 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
 
-	// Warn when Claude subprocess settings are missing
-	if !ClaudeSettingsExists(effectiveWorkDir(rc.WorkDir)) && logger != nil {
-		logger.Warn("Claude subprocess settings not found at %s", ClaudeSettingsPath(effectiveWorkDir(rc.WorkDir)))
+	// Load tool-specific settings when available; warn if missing
+	if settingsPath := ClaudeSettingsPath(effectiveWorkDir(rc.WorkDir)); ClaudeSettingsExists(effectiveWorkDir(rc.WorkDir)) {
+		args = append(args, "--settings", settingsPath)
+	} else if logger != nil {
+		logger.Warn("Claude subprocess settings not found at %s", settingsPath)
 		logger.Warn("Run 'sightjack mcp-config generate' to create settings.")
 	}
 
