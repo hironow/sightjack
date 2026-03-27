@@ -34,7 +34,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	session.RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
-	expected := []string{"--model", "opus", "--verbose", "--output-format", "stream-json", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
+	expected := []string{"--model", "opus", "--verbose", "--output-format", "stream-json", "--bare", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "Analyze these issues"}
 	if len(capturedArgs) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
 	}
@@ -65,7 +65,7 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 	session.RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
-	expected := []string{"--verbose", "--output-format", "stream-json", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "test prompt"}
+	expected := []string{"--verbose", "--output-format", "stream-json", "--bare", "--disable-slash-commands", "--dangerously-skip-permissions", "--print", "-p", "test prompt"}
 	if len(capturedArgs) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
 	}

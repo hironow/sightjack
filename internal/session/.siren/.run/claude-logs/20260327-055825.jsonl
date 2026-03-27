@@ -1,0 +1,1 @@
+result:{"type":"result","subtype":"success","session_id":"fake","result":"success","usage":{"input_tokens":1,"output_tokens":1},"num_turns":1,"duration_ms":100,"stop_reason":"end_turn"}
