@@ -105,6 +105,12 @@ waitingCycle:
 			break waitingCycle
 		}
 
+		// Process any design-feedback D-Mails that arrived during scanning
+		// (before entering waiting phase). Without this, feedback collected
+		// during scan/apply/review would be missed by NewSinceSnapshot.
+		preFeedback := fbCollector.NewSinceSnapshot()
+		emitDesignFeedback(preFeedback, emitter, logger)
+
 		// Snapshot before entering waiting phase
 		fbCollector.Snapshot()
 
@@ -125,22 +131,9 @@ waitingCycle:
 			logger.Info("New specification received. Rescanning not yet supported in waiting mode.")
 		}
 
-		// Emit event when design-feedback D-Mails arrive (S02 Phase B)
+		// Emit event for each design-feedback D-Mail (preserves individual names for traceability)
 		if hasDesignFeedback {
-			fbCount := 0
-			for _, m := range newMails {
-				if m.Kind == DMailDesignFeedback {
-					fbCount++
-				}
-			}
-			logger.Info("Design-feedback received (%d D-Mail(s)); re-scan will incorporate feedback", fbCount)
-			if err := emitter.EmitReceiveFeedback(domain.FeedbackReceivedPayload{
-				Kind:  string(DMailDesignFeedback),
-				Name:  "design-feedback-batch",
-				Count: fbCount,
-			}, time.Now().UTC()); err != nil {
-				logger.Warn("Failed to emit feedback_received event: %v", err)
-			}
+			emitDesignFeedback(newMails, emitter, logger)
 		}
 
 		// Generate next waves for clusters affected by report D-Mails
@@ -193,4 +186,28 @@ func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback boo
 		}
 	}
 	return
+}
+
+// emitDesignFeedback emits feedback_received events for any design-feedback D-Mails
+// in the batch. Each D-Mail's actual name is preserved for traceability (P3 fix).
+func emitDesignFeedback(mails []*DMail, emitter port.SessionEventEmitter, logger domain.Logger) {
+	var names []string
+	for _, m := range mails {
+		if m.Kind == DMailDesignFeedback {
+			names = append(names, m.Name)
+		}
+	}
+	if len(names) == 0 {
+		return
+	}
+	logger.Info("Design-feedback received (%d D-Mail(s)); re-scan will incorporate feedback", len(names))
+	for _, name := range names {
+		if err := emitter.EmitReceiveFeedback(domain.FeedbackReceivedPayload{
+			Kind:  string(DMailDesignFeedback),
+			Name:  name,
+			Count: 1,
+		}, time.Now().UTC()); err != nil {
+			logger.Warn("Failed to emit feedback_received event for %s: %v", name, err)
+		}
+	}
 }
