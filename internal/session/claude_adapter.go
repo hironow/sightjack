@@ -61,6 +61,13 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
+
+	// Warn when Claude subprocess settings are missing
+	if !ClaudeSettingsExists(effectiveWorkDir(rc.WorkDir)) && logger != nil {
+		logger.Warn("Claude subprocess settings not found at %s", ClaudeSettingsPath(effectiveWorkDir(rc.WorkDir)))
+		logger.Warn("Run 'sightjack mcp-config generate' to create settings.")
+	}
+
 	// Enforce MCP allowlist when .mcp.json exists
 	if mcpPath := MCPConfigPath(effectiveWorkDir(rc.WorkDir)); mcpPath != "" {
 		if _, statErr := os.Stat(mcpPath); statErr == nil {
