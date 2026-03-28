@@ -165,16 +165,15 @@ func TestE2E_DMail_SpecAndReport(t *testing.T) {
 	archiveDir := filepath.Join(dir, ".siren", "archive")
 
 	t.Run("Specification", func(t *testing.T) {
-		specFile := "spec-auth-auth-w1.md"
-		assertFileExists(t, filepath.Join(outboxDir, specFile))
-		assertFileExists(t, filepath.Join(archiveDir, specFile))
+		specPath := findDMailByPrefix(t, outboxDir, "sj-spec-auth-")
+		findDMailByPrefix(t, archiveDir, "sj-spec-auth-") // archive copy exists
 
-		dm := parseDMailFile(t, filepath.Join(outboxDir, specFile))
+		dm := parseDMailFile(t, specPath)
 		if dm.Kind != "specification" {
 			t.Errorf("expected kind=specification, got %q", dm.Kind)
 		}
-		if dm.Name != "spec-auth-auth-w1" {
-			t.Errorf("expected name=spec-auth-auth-w1, got %q", dm.Name)
+		if !strings.HasPrefix(dm.Name, "sj-spec-auth-") {
+			t.Errorf("expected name prefix sj-spec-auth-, got %q", dm.Name)
 		}
 		if len(dm.Issues) == 0 {
 			t.Error("expected non-empty issues list")
@@ -182,16 +181,15 @@ func TestE2E_DMail_SpecAndReport(t *testing.T) {
 	})
 
 	t.Run("Report", func(t *testing.T) {
-		reportFile := "report-auth-auth-w1.md"
-		assertFileExists(t, filepath.Join(outboxDir, reportFile))
-		assertFileExists(t, filepath.Join(archiveDir, reportFile))
+		reportPath := findDMailByPrefix(t, outboxDir, "sj-report-auth-")
+		findDMailByPrefix(t, archiveDir, "sj-report-auth-") // archive copy exists
 
-		dm := parseDMailFile(t, filepath.Join(outboxDir, reportFile))
+		dm := parseDMailFile(t, reportPath)
 		if dm.Kind != "report" {
 			t.Errorf("expected kind=report, got %q", dm.Kind)
 		}
-		if dm.Name != "report-auth-auth-w1" {
-			t.Errorf("expected name=report-auth-auth-w1, got %q", dm.Name)
+		if !strings.HasPrefix(dm.Name, "sj-report-auth-") {
+			t.Errorf("expected name prefix sj-report-auth-, got %q", dm.Name)
 		}
 		if dm.Body == "" {
 			t.Error("expected non-empty body in report d-mail")
@@ -199,27 +197,27 @@ func TestE2E_DMail_SpecAndReport(t *testing.T) {
 	})
 
 	t.Run("Format", func(t *testing.T) {
-		for _, file := range []string{"spec-auth-auth-w1.md", "report-auth-auth-w1.md"} {
-			path := filepath.Join(outboxDir, file)
+		for _, prefix := range []string{"sj-spec-auth-", "sj-report-auth-"} {
+			path := findDMailByPrefix(t, outboxDir, prefix)
 			data, err := os.ReadFile(path)
 			if err != nil {
-				t.Fatalf("read %s: %v", file, err)
+				t.Fatalf("read %s: %v", prefix, err)
 			}
 			content := string(data)
 			if !strings.HasPrefix(content, "---\n") {
-				t.Errorf("%s: missing opening delimiter", file)
+				t.Errorf("%s: missing opening delimiter", prefix)
 			}
 			// Verify YAML frontmatter is parseable
 			dm := parseDMailBytes(t, data)
 			if dm.Description == "" {
-				t.Errorf("%s: expected non-empty description", file)
+				t.Errorf("%s: expected non-empty description", prefix)
 			}
 			if dm.Body == "" {
-				t.Errorf("%s: expected non-empty body", file)
+				t.Errorf("%s: expected non-empty body", prefix)
 			}
 			// Body should contain Markdown heading
 			if !strings.Contains(dm.Body, "#") {
-				t.Errorf("%s: expected Markdown heading in body, got: %s", file, dm.Body)
+				t.Errorf("%s: expected Markdown heading in body, got: %s", prefix, dm.Body)
 			}
 		}
 	})
