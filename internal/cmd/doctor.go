@@ -51,7 +51,9 @@ hint recommends adjusting .claude/settings.json.`,
 
 			logger := loggerFrom(cmd)
 			repair, _ := cmd.Flags().GetBool("repair")
-			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger, repair)
+			linearFlag, _ := cmd.Flags().GetBool("linear")
+			mode := domain.NewTrackingMode(linearFlag)
+			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger, repair, mode)
 
 			if jsonOut {
 				return printDoctorJSON(cmd.OutOrStdout(), results)

@@ -1,6 +1,11 @@
 You are a Scanner Agent.
+{{- if .IsWaveMode}}
+Use the `gh` CLI to fetch GitHub Issues from the current repository
+and classify them into logical clusters (functional groups).
+{{- else}}
 Use the Linear MCP Server to fetch Issues from the specified project
 and classify them into logical clusters (functional groups).
+{{- end}}
 
 ## Strictness Level: {{.StrictnessLevel}}
 
@@ -19,10 +24,18 @@ DoD checking: ALWAYS full-depth regardless of Strictness level.
 {{- end}}
 
 ## Steps
+{{- if .IsWaveMode}}
+1. Fetch OPEN issues using `gh issue list --state open --json number,title,labels,body,state --limit 500`. Paginate if needed. Ensure `gh` targets the correct repository by running from the project directory
+2. Classify open Issues into logical clusters based on title, labels, and description
+3. Create a list of cluster names with their associated Issue IDs (use GitHub issue numbers as IDs)
+4. For each cluster, collect the union of all GitHub labels from its issues into the "labels" array
+5. For the Shibito check below, also fetch closed issues: `gh issue list --state closed --json number,title,labels,body,state --limit 200`
+{{- else}}
 1. Fetch the Issue list via Linear MCP
 2. Classify Issues into logical clusters based on title, labels, and description
 3. Create a list of cluster names with their associated Issue IDs
 4. For each cluster, collect the union of all Linear labels from its issues into the "labels" array
+{{- end}}
 
 ## Shibito Resurrection Check
 Also examine closed/cancelled issues in this project for patterns that
@@ -46,8 +59,12 @@ Write the following JSON to **{{.OutputPath}}**:
 
 Each cluster must have both a "name" (display name, can be any language) and a "key" (lowercase English slug with hyphens, stable across scans).
 
-{{if .LabelsEnabled}}
+{{- if .LabelsEnabled}}
+{{- if .IsWaveMode}}
+After classification, ensure the label "{{.LabelPrefix}}:analyzed" exists (create with `gh label create "{{.LabelPrefix}}:analyzed" --force` if needed), then apply it to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`.
+{{- else}}
 After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using Linear MCP.
-{{end}}
+{{- end}}
+{{- end}}
 Important: Write output directly to the file path above. Do not write to stdout.
 Use raw UTF-8 for non-ASCII characters in JSON string values (do not use \uXXXX escape sequences).

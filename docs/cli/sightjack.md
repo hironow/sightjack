@@ -27,7 +27,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
 ### SEE ALSO
 
 * [sightjack adr](sightjack_adr.md)	 - Generate ADR Markdown from stdin DiscussResult
-* [sightjack apply](sightjack_apply.md)	 - Apply a wave to Linear from stdin Wave JSON
+* [sightjack apply](sightjack_apply.md)	 - Apply a wave from stdin Wave JSON
 * [sightjack archive-prune](sightjack_archive-prune.md)	 - Prune expired d-mails and event files
 * [sightjack clean](sightjack_clean.md)	 - Remove state directory (.siren/)
 * [sightjack config](sightjack_config.md)	 - View or update sightjack configuration
@@ -37,7 +37,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
 * [sightjack mcp-config](sightjack_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
 * [sightjack nextgen](sightjack_nextgen.md)	 - Generate follow-up waves from stdin ApplyResult
 * [sightjack run](sightjack_run.md)	 - Interactive wave approval and apply loop
-* [sightjack scan](sightjack_scan.md)	 - Classify and deep-scan Linear issues
+* [sightjack scan](sightjack_scan.md)	 - Classify and deep-scan issues
 * [sightjack select](sightjack_select.md)	 - Interactively pick a wave from stdin WavePlan
 * [sightjack show](sightjack_show.md)	 - Display last scan results
 * [sightjack status](sightjack_status.md)	 - Show sightjack operational status

@@ -199,6 +199,8 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	if lang != "" {
 		cfg.Lang = lang
 	}
+	linearFlag, _ := cmd.Flags().GetBool("linear")
+	cfg.Mode = domain.NewTrackingMode(linearFlag)
 	return cfg, nil
 }
 

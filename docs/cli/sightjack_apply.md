@@ -1,15 +1,15 @@
 ## sightjack apply
 
-Apply a wave to Linear from stdin Wave JSON
+Apply a wave from stdin Wave JSON
 
 ### Synopsis
 
-Apply a wave to Linear issues from stdin Wave JSON.
+Apply a wave to issues from stdin Wave JSON.
 
 Reads a Wave JSON (from 'select') and executes the wave plan against
-Linear via Claude MCP tools. Outputs an ApplyResult JSON with updated
-completeness, suitable for piping into 'nextgen' for follow-up wave
-generation.
+issues (via gh CLI in wave mode, Linear MCP in linear mode). Outputs
+an ApplyResult JSON with updated completeness, suitable for piping
+into 'nextgen' for follow-up wave generation.
 
 ```
 sightjack apply [path] [flags]
