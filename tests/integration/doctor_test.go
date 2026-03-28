@@ -414,7 +414,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeLinear)
 
 	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, skills-ref, success-rate)
 	if len(results) != 12 {
