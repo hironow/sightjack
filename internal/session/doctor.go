@@ -276,7 +276,17 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	// --- Binaries ---
 	results = append(results, CheckTool(ctx, "git"))
 	if mode.IsWave() {
-		results = append(results, CheckTool(ctx, "gh"))
+		ghCheck := CheckTool(ctx, "gh")
+		results = append(results, ghCheck)
+		if ghCheck.Status == domain.CheckOK {
+			results = append(results, checkGHAuth(ctx))
+		} else {
+			results = append(results, domain.DoctorCheck{
+				Name:    "gh-auth",
+				Status:  domain.CheckSkip,
+				Message: "skipped (gh not available)",
+			})
+		}
 	}
 
 	// Load config early to get claudeCmd

@@ -17,8 +17,20 @@ Strictness defines change tolerance for existing implementations:
 DoD checking: ALWAYS full-depth regardless of Strictness level.
 
 ## Filter Criteria
+{{- if .IsWaveMode}}
+{{- if or .TeamFilter .ProjectFilter}}
+- Note: Team/Project filters are informational in wave mode. Use GitHub labels to filter if needed.
+{{- if .TeamFilter}}
+- Team: {{.TeamFilter}}
+{{- end}}
+{{- if .ProjectFilter}}
+- Project: {{.ProjectFilter}}
+{{- end}}
+{{- end}}
+{{- else}}
 - Team: {{.TeamFilter}}
 - Project: {{.ProjectFilter}}
+{{- end}}
 {{- if .CycleFilter}}
 - Cycle: {{.CycleFilter}}
 {{- end}}

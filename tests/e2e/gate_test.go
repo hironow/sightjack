@@ -21,7 +21,7 @@ func TestE2E_Gate_AutoApproveWithConvergence(t *testing.T) {
 
 	// when: run with --auto-approve (fully non-interactive: gate, wave select, approval all auto)
 	// --wait-timeout=-1s disables D-Mail waiting mode to prevent blocking after nextgen.
-	cmd := exec.Command(sightjackBin(), "run", "--auto-approve", "--wait-timeout=-1s", dir)
+	cmd := exec.Command(sightjackBin(), "run", "--linear", "--auto-approve", "--wait-timeout=-1s", dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -74,7 +74,7 @@ func TestE2E_Gate_ApproveCmdDenies(t *testing.T) {
 	writeDMailToDir(t, dir, "inbox", "convergence-arch-review.md", convergenceContent)
 
 	// when: run with --approve-cmd "exit 1" (external command denies)
-	cmd := exec.Command(sightjackBin(), "run", "--approve-cmd", "exit 1", "--wait-timeout=-1s", dir)
+	cmd := exec.Command(sightjackBin(), "run", "--linear", "--approve-cmd", "exit 1", "--wait-timeout=-1s", dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -111,7 +111,7 @@ func TestE2E_Gate_NotifyCmdInvoked(t *testing.T) {
 	notifyCmd := "echo {title} {message} >> '" + notifyFile + "'"
 
 	// when: run with --auto-approve + --notify-cmd (fully non-interactive)
-	cmd := exec.Command(sightjackBin(), "run", "--auto-approve", "--wait-timeout=-1s", "--notify-cmd", notifyCmd, dir)
+	cmd := exec.Command(sightjackBin(), "run", "--linear", "--auto-approve", "--wait-timeout=-1s", "--notify-cmd", notifyCmd, dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

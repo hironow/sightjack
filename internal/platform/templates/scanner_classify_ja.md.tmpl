@@ -17,8 +17,20 @@ Strictnessは既存実装に対する変更許容度を定義します:
 DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 ## フィルター条件
+{{- if .IsWaveMode}}
+{{- if or .TeamFilter .ProjectFilter}}
+- 注意: wave modeではチーム/プロジェクトフィルターは参考情報です。必要に応じてGitHubラベルでフィルタしてください。
+{{- if .TeamFilter}}
+- チーム: {{.TeamFilter}}
+{{- end}}
+{{- if .ProjectFilter}}
+- プロジェクト: {{.ProjectFilter}}
+{{- end}}
+{{- end}}
+{{- else}}
 - チーム: {{.TeamFilter}}
 - プロジェクト: {{.ProjectFilter}}
+{{- end}}
 {{- if .CycleFilter}}
 - サイクル: {{.CycleFilter}}
 {{- end}}

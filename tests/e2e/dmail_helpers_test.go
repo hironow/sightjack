@@ -254,7 +254,7 @@ func runFullSession(t *testing.T, dir string, opts ...sessionOption) {
 	// Disable D-Mail waiting mode to prevent session from blocking after
 	// nextgen returns empty waves. Without this, the default 30m wait-timeout
 	// causes the session to enter inbox polling instead of exiting.
-	args := append([]string{"run", "--wait-timeout=-1s"}, so.flags...)
+	args := append([]string{"run", "--linear", "--wait-timeout=-1s"}, so.flags...)
 	args = append(args, dir)
 	cmd := exec.Command(sightjackBin(), args...)
 	cmd.Stdin = c.Tty()

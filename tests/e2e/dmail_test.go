@@ -17,7 +17,7 @@ func TestE2E_DMail_DirectoryLifecycle(t *testing.T) {
 	dir := initDir(t)
 
 	// when: run --dry-run (triggers EnsureMailDirs in RunSession)
-	cmd := exec.Command(sightjackBin(), "run", "--dry-run", dir)
+	cmd := exec.Command(sightjackBin(), "run", "--linear", "--dry-run", dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

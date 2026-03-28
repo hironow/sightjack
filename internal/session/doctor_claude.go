@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -113,5 +114,34 @@ func checkClaudeInference(output string, err error) domain.DoctorCheck {
 		Name:    "claude-inference",
 		Status:  domain.CheckOK,
 		Message: "inference OK",
+	}
+}
+
+// checkGHAuth verifies that the GitHub CLI is authenticated by running
+// `gh auth status`. Returns OK if authenticated, WARN if not.
+func checkGHAuth(ctx context.Context) domain.DoctorCheck {
+	cmd := newCmd(ctx, "gh", "auth", "status", "--active")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return domain.DoctorCheck{
+			Name:    "gh-auth",
+			Status:  domain.CheckWarn,
+			Message: "gh not authenticated",
+			Hint:    "run 'gh auth login' to authenticate",
+		}
+	}
+	output := string(out)
+	if strings.Contains(output, "Logged in") || strings.Contains(output, "✓") {
+		return domain.DoctorCheck{
+			Name:    "gh-auth",
+			Status:  domain.CheckOK,
+			Message: "gh authenticated",
+		}
+	}
+	return domain.DoctorCheck{
+		Name:    "gh-auth",
+		Status:  domain.CheckWarn,
+		Message: "gh auth status unclear: " + output,
+		Hint:    "run 'gh auth login' to authenticate",
 	}
 }
