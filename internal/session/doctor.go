@@ -275,6 +275,9 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 
 	// --- Binaries ---
 	results = append(results, CheckTool(ctx, "git"))
+	if mode.IsWave() {
+		results = append(results, CheckTool(ctx, "gh"))
+	}
 
 	// Load config early to get claudeCmd
 	var cfg *domain.Config

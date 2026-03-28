@@ -29,7 +29,7 @@ For each action:
 2. `add_dependency`: Record dependency relationship in the Issue body
 3. `add_label`: Add a label using `gh issue edit <number> --add-label`
 4. `update_description`: Update the Issue body using `gh issue edit <number> --body`
-5. `create`: Create a new sub-issue using `gh issue create --title ... --body ...`
+5. `create`: Create a new sub-issue using `gh issue create --title ... --body ...`. Include "Parent: #<parent-number>" in the body to preserve the parent-child relationship
 6. `cancel`: Close the Issue using `gh issue close <number>`. MUST:
    a. Verify issue is open (REJECT if already closed)
    b. Add a comment with the cancellation reason using `gh issue comment`

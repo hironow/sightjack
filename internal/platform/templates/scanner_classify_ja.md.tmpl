@@ -25,7 +25,7 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 ## 手順
 {{- if .IsWaveMode}}
-1. `gh issue list --json number,title,labels,body,state --limit 200` で Issue 一覧を取得してください
+1. `gh issue list --state all --json number,title,labels,body,state --limit 500` で全Issue（オープン・クローズ両方）を取得してください。リポジトリに500件以上ある場合はページネーションで全件取得すること
 2. Issue のタイトル・ラベル・説明から論理的なクラスタに分類してください
 3. 各クラスタの名前と所属する Issue ID（GitHub issue番号）のリストを作成してください
 4. 各クラスタについて、所属する全Issueの GitHub ラベルの和集合を "labels" 配列に含めてください

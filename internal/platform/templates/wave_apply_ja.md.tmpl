@@ -29,7 +29,7 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 2. `add_dependency`: Issue bodyに依存関係を記録する
 3. `add_label`: `gh issue edit <番号> --add-label` でラベルを付与する
 4. `update_description`: `gh issue edit <番号> --body` でIssueのbodyを更新する
-5. `create`: `gh issue create --title ... --body ...` で新しいサブIssueを作成する
+5. `create`: `gh issue create --title ... --body ...` で新しいサブIssueを作成する。bodyに "Parent: #<親Issue番号>" を含めて親子関係を保持すること
 6. `cancel`: `gh issue close <番号>` でIssueをクローズする。必須事項:
    a. Issueがオープンであることを確認（既にクローズ済みならREJECT）
    b. `gh issue comment` でキャンセル理由をコメント追記

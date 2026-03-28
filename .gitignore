@@ -17,3 +17,4 @@ docs/plans/
 # firebase local debug log
 firebase-debug.log
 sightjack
+.siren/
