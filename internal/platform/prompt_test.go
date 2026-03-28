@@ -1091,3 +1091,108 @@ func TestRenderNextGenPrompt_NoFeedback(t *testing.T) {
 		}
 	}
 }
+
+func TestClassifyPrompt_WaveMode_NoLinearReference(t *testing.T) {
+	for _, lang := range []string{"en", "ja"} {
+		// given
+		data := domain.ClassifyPromptData{
+			TeamFilter:    "MY-TEAM",
+			ProjectFilter: "My Project",
+			OutputPath:    "/tmp/classify.json",
+			IsWaveMode:    true,
+			LabelsEnabled: true,
+			LabelPrefix:   "sightjack",
+		}
+
+		// when
+		result, err := platform.RenderClassifyPrompt(lang, data)
+
+		// then
+		if err != nil {
+			t.Fatalf("lang=%s: unexpected error: %v", lang, err)
+		}
+		if strings.Contains(result, "Linear MCP") || strings.Contains(result, "Linear MCP Server") {
+			t.Errorf("lang=%s: wave mode prompt should not reference Linear MCP", lang)
+		}
+		if !strings.Contains(result, "gh") {
+			t.Errorf("lang=%s: wave mode prompt should reference gh CLI", lang)
+		}
+	}
+}
+
+func TestClassifyPrompt_LinearMode_HasLinearReference(t *testing.T) {
+	for _, lang := range []string{"en", "ja"} {
+		// given
+		data := domain.ClassifyPromptData{
+			TeamFilter:    "MY-TEAM",
+			ProjectFilter: "My Project",
+			OutputPath:    "/tmp/classify.json",
+			IsWaveMode:    false,
+		}
+
+		// when
+		result, err := platform.RenderClassifyPrompt(lang, data)
+
+		// then
+		if err != nil {
+			t.Fatalf("lang=%s: unexpected error: %v", lang, err)
+		}
+		if !strings.Contains(result, "Linear MCP") {
+			t.Errorf("lang=%s: linear mode prompt should reference Linear MCP", lang)
+		}
+	}
+}
+
+func TestDeepScanPrompt_WaveMode_NoLinearReference(t *testing.T) {
+	for _, lang := range []string{"en", "ja"} {
+		// given
+		data := domain.DeepScanPromptData{
+			ClusterName: "auth",
+			IssueIDs:    "1, 2, 3",
+			OutputPath:  "/tmp/deepscan.json",
+			IsWaveMode:  true,
+		}
+
+		// when
+		result, err := platform.RenderDeepScanPrompt(lang, data)
+
+		// then
+		if err != nil {
+			t.Fatalf("lang=%s: unexpected error: %v", lang, err)
+		}
+		if strings.Contains(result, "Linear") {
+			t.Errorf("lang=%s: wave mode deepscan should not reference Linear", lang)
+		}
+		if !strings.Contains(result, "GitHub") {
+			t.Errorf("lang=%s: wave mode deepscan should reference GitHub", lang)
+		}
+	}
+}
+
+func TestWaveApplyPrompt_WaveMode_NoLinearReference(t *testing.T) {
+	for _, lang := range []string{"en", "ja"} {
+		// given
+		data := domain.WaveApplyPromptData{
+			WaveID:      "w1",
+			ClusterName: "auth",
+			Title:       "Test Wave",
+			Actions:     "[]",
+			OutputPath:  "/tmp/apply.json",
+			IsWaveMode:  true,
+		}
+
+		// when
+		result, err := platform.RenderWaveApplyPrompt(lang, data)
+
+		// then
+		if err != nil {
+			t.Fatalf("lang=%s: unexpected error: %v", lang, err)
+		}
+		if strings.Contains(result, "Linear MCP") {
+			t.Errorf("lang=%s: wave mode apply should not reference Linear MCP", lang)
+		}
+		if !strings.Contains(result, "gh") {
+			t.Errorf("lang=%s: wave mode apply should reference gh CLI", lang)
+		}
+	}
+}
