@@ -90,7 +90,7 @@ func TestE2E_Pipe_ScanJSON(t *testing.T) {
 	dir := initDir(t)
 
 	// when: run scan --json (separate stdout from stderr)
-	cmd := exec.Command(sightjackBin(), "scan", "--json", dir)
+	cmd := exec.Command(sightjackBin(), "scan", "--linear", "--json", dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -143,7 +143,7 @@ func TestE2E_Pipe_ApplyDryRun(t *testing.T) {
 	fixture := fixtureBytes(t, "selected_wave.json")
 
 	// when: pipe Wave into apply --dry-run (separate stdout from stderr)
-	cmd := exec.Command(sightjackBin(), "apply", "--dry-run", dir)
+	cmd := exec.Command(sightjackBin(), "apply", "--linear", "--dry-run", dir)
 	cmd.Stdin = strings.NewReader(string(fixture))
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -662,7 +662,7 @@ func TestE2E_Pipe_SelectToApply(t *testing.T) {
 	}, "select")
 
 	// step 2: apply (non-interactive, stdin = select output)
-	applyCmd := exec.Command(sightjackBin(), "apply", dir)
+	applyCmd := exec.Command(sightjackBin(), "apply", "--linear", dir)
 	applyCmd.Stdin = strings.NewReader(selectOut)
 	var applyOut, applyErr bytes.Buffer
 	applyCmd.Stdout = &applyOut
@@ -731,7 +731,7 @@ func TestE2E_Pipe_FullChainWithSelect(t *testing.T) {
 	dir := initDir(t)
 
 	// step 1: scan --json
-	scanCmd := exec.Command(sightjackBin(), "scan", "--json", dir)
+	scanCmd := exec.Command(sightjackBin(), "scan", "--linear", "--json", dir)
 	var scanOut, scanErr bytes.Buffer
 	scanCmd.Stdout = &scanOut
 	scanCmd.Stderr = &scanErr
@@ -760,7 +760,7 @@ func TestE2E_Pipe_FullChainWithSelect(t *testing.T) {
 	}, "select")
 
 	// step 4: apply
-	applyCmd := exec.Command(sightjackBin(), "apply", dir)
+	applyCmd := exec.Command(sightjackBin(), "apply", "--linear", dir)
 	applyCmd.Stdin = strings.NewReader(selectOut)
 	var applyOut, applyErr bytes.Buffer
 	applyCmd.Stdout = &applyOut
