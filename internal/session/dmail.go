@@ -3,6 +3,7 @@ package session
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -550,23 +551,51 @@ func ReceiveDMail(baseDir, filename string) (*DMail, error) {
 	return mail, nil
 }
 
-// DMailName generates a sanitized d-mail name from a prefix and wave key.
-// Example: DMailName("spec", "auth:w1") → "spec-auth-w1"
+// uuidFunc is the UUID generator used by DMailName. Override in tests for determinism.
+var uuidFunc = shortUUID
+
+// DMailName generates a collision-safe d-mail name with tool prefix and UUID suffix.
+// Format: sj-{kind}-{sanitized-key}_{uuid8}
+// Example: DMailName("spec", "error-handling:w1") → "sj-spec-error-handling-w1_a3f2b7c4"
 func DMailName(prefix, waveKey string) string {
+	key := sanitizeDMailKey(waveKey)
+	if key == "" {
+		return "sj-" + prefix + "_" + uuidFunc()
+	}
+	return "sj-" + prefix + "-" + key + "_" + uuidFunc()
+}
+
+// sanitizeDMailKey normalizes a key for use in D-Mail filenames.
+// Keeps a-z, 0-9, -. Converts : and space to -. Compresses consecutive - or _.
+// Trims leading/trailing - and _.
+func sanitizeDMailKey(key string) string {
 	var b strings.Builder
-	b.WriteString(prefix)
-	b.WriteRune('-')
-	for _, r := range strings.ToLower(waveKey) {
+	prev := rune(0)
+	for _, r := range strings.ToLower(key) {
 		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
 			b.WriteRune(r)
-		case r == ':':
-			b.WriteRune('-')
-		case r == ' ':
-			b.WriteRune('_')
+			prev = r
+		case r == '-', r == ':', r == ' ', r == '_':
+			if prev != '-' {
+				b.WriteRune('-')
+				prev = '-'
+			}
 		default:
-			b.WriteRune('_')
+			// skip non-ascii (Japanese, emoji, etc.)
 		}
 	}
-	return strings.TrimRight(b.String(), "_")
+	return strings.Trim(b.String(), "-")
+}
+
+// shortUUID returns the first 8 hex characters of a UUID v4.
+func shortUUID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		// Fallback: use timestamp-based ID if crypto/rand fails
+		return fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
+	}
+	buf[6] = (buf[6] & 0x0f) | 0x40 // version 4
+	buf[8] = (buf[8] & 0x3f) | 0x80 // variant 2
+	return fmt.Sprintf("%08x", buf[:4])
 }

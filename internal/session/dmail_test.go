@@ -18,6 +18,11 @@ import (
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
+func init() {
+	// Fix UUID for deterministic D-Mail filenames in tests.
+	session.SetDMailUUID(func() string { return "00000000" })
+}
+
 func TestDMailKind_Valid(t *testing.T) {
 	kinds := []session.DMailKind{session.DMailSpecification, session.DMailReport, session.DMailDesignFeedback, session.DMailImplFeedback, session.DMailConvergence, session.DMailCIResult}
 	for _, k := range kinds {
@@ -112,7 +117,11 @@ func TestComposeSpecification_SetsSchemaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(domain.MailDir(dir, "outbox"), "spec-gate-w1.md"))
+	matches, _ := filepath.Glob(filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-gate-w1_*.md"))
+	if len(matches) == 0 {
+		t.Fatal("spec d-mail not found in outbox")
+	}
+	data, _ := os.ReadFile(matches[0])
 	mail, _ := session.ParseDMail(data)
 	if mail.SchemaVersion != "1" {
 		t.Errorf("SchemaVersion: got %q, want %q", mail.SchemaVersion, "1")
@@ -139,7 +148,7 @@ func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	data, _ := os.ReadFile(filepath.Join(domain.MailDir(dir, "outbox"), "report-gate-w1.md"))
+	data, _ := os.ReadFile(filepath.Join(domain.MailDir(dir, "outbox"), "sj-report-gate-w1_00000000.md"))
 	mail, _ := session.ParseDMail(data)
 	if mail.SchemaVersion != "1" {
 		t.Errorf("SchemaVersion: got %q, want %q", mail.SchemaVersion, "1")
@@ -236,9 +245,9 @@ func TestValidateDMail_Nil(t *testing.T) {
 }
 
 func TestDMail_Filename(t *testing.T) {
-	mail := &session.DMail{Name: "spec-my-42"}
-	if got := mail.Filename(); got != "spec-my-42.md" {
-		t.Errorf("got %s, want spec-my-42.md", got)
+	mail := &session.DMail{Name: "sj-spec-my-42_00000000"}
+	if got := mail.Filename(); got != "sj-spec-my-42_00000000.md" {
+		t.Errorf("got %s, want sj-spec-my-42_00000000.md", got)
 	}
 }
 
@@ -363,7 +372,7 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 	}
 	store := testOutboxStore(t, dir)
 	mail := &session.DMail{
-		Name:          "spec-my-42",
+		Name:          "sj-spec-my-42_00000000",
 		Kind:          session.DMailSpecification,
 		Description:   "Ready for impl",
 		SchemaVersion: "1",
@@ -374,13 +383,13 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 	}
 
 	// outbox file exists
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-my-42.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-my-42_00000000.md")
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("outbox file missing: %v", err)
 	}
 
 	// archive file exists
-	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "spec-my-42.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "sj-spec-my-42_00000000.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -391,7 +400,7 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse outbox: %v", err)
 	}
-	if parsed.Name != "spec-my-42" {
+	if parsed.Name != "sj-spec-my-42_00000000" {
 		t.Errorf("name: got %s", parsed.Name)
 	}
 }
@@ -482,15 +491,37 @@ func TestReceiveDMail_FileNotFound(t *testing.T) {
 
 func TestDMailName_SanitizesWaveKey(t *testing.T) {
 	got := session.DMailName("spec", "auth:w1")
-	if got != "spec-auth-w1" {
-		t.Errorf("got %s, want spec-auth-w1", got)
+	if !strings.HasPrefix(got, "sj-spec-auth-w1_") {
+		t.Errorf("got %s, want prefix sj-spec-auth-w1_", got)
+	}
+	if len(got) != len("sj-spec-auth-w1_")+8 {
+		t.Errorf("got length %d, want %d (prefix + 8 hex UUID)", len(got), len("sj-spec-auth-w1_")+8)
 	}
 }
 
 func TestDMailName_HandlesSpecialChars(t *testing.T) {
 	got := session.DMailName("report", "My Cluster:wave-2")
-	if got != "report-my_cluster-wave-2" {
-		t.Errorf("got %s, want report-my_cluster-wave-2", got)
+	if !strings.HasPrefix(got, "sj-report-my-cluster-wave-2_") {
+		t.Errorf("got %s, want prefix sj-report-my-cluster-wave-2_", got)
+	}
+}
+
+func TestDMailName_JapaneseClusterName(t *testing.T) {
+	got := session.DMailName("spec", "エラーハンドリング:w1")
+	if !strings.HasPrefix(got, "sj-spec-w1_") {
+		t.Errorf("got %s, want prefix sj-spec-w1_ (Japanese chars stripped)", got)
+	}
+}
+
+func TestDMailName_Uniqueness(t *testing.T) {
+	// Restore real UUID for this test
+	cleanup := session.SetDMailUUID(session.ShortUUIDForTest)
+	defer cleanup()
+
+	a := session.DMailName("spec", "auth:w1")
+	b := session.DMailName("spec", "auth:w1")
+	if a == b {
+		t.Errorf("two calls with same input should produce different names (UUID), got %s == %s", a, b)
 	}
 }
 
@@ -517,7 +548,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	}
 
 	// outbox file exists
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-auth-w1_00000000.md")
 	data, readErr := os.ReadFile(outboxPath)
 	if readErr != nil {
 		t.Fatalf("outbox file missing: %v", readErr)
@@ -531,7 +562,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	if mail.Kind != session.DMailSpecification {
 		t.Errorf("kind: got %s, want specification", mail.Kind)
 	}
-	if mail.Name != "spec-auth-w1" {
+	if mail.Name != "sj-spec-auth-w1_00000000" {
 		t.Errorf("name: got %s", mail.Name)
 	}
 	// issues should be unique and sorted
@@ -546,7 +577,7 @@ func TestComposeSpecification_CreatesFiles(t *testing.T) {
 	}
 
 	// archive file also exists
-	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "spec-auth-w1.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "sj-spec-auth-w1_00000000.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -579,7 +610,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 	}
 
 	// outbox file exists and is parseable
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-report-auth-w1_00000000.md")
 	data, readErr := os.ReadFile(outboxPath)
 	if readErr != nil {
 		t.Fatalf("outbox file missing: %v", readErr)
@@ -592,7 +623,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 	if mail.Kind != session.DMailReport {
 		t.Errorf("kind: got %s, want report", mail.Kind)
 	}
-	if mail.Name != "report-auth-w1" {
+	if mail.Name != "sj-report-auth-w1_00000000" {
 		t.Errorf("name: got %s", mail.Name)
 	}
 	if !strings.Contains(mail.Body, "Rate limiting affects API cluster") {
@@ -600,7 +631,7 @@ func TestComposeReport_CreatesFiles(t *testing.T) {
 	}
 
 	// archive file also exists
-	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "report-auth-w1.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "sj-report-auth-w1_00000000.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file missing: %v", err)
 	}
@@ -629,7 +660,7 @@ func TestComposeReport_NoRipples(t *testing.T) {
 		t.Fatalf("ComposeReport: %v", err)
 	}
 
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-db-w2.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-report-db-w2_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if mail.Body == "" {
@@ -1408,7 +1439,7 @@ func TestComposeReport_WithErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-api-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-report-api-w1_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "## Errors") {
@@ -1449,7 +1480,7 @@ func TestComposeReport_WithErrorsAndRipples(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-infra-w3.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-report-infra-w3_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "## Errors") {
@@ -1485,7 +1516,7 @@ func TestComposeSpecification_WaveWithDescription(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-db-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-db-w1_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "Critical migration wave") {
@@ -1515,7 +1546,7 @@ func TestComposeSpecification_EmptyActions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-misc-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-misc-w1_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if !strings.Contains(mail.Body, "## Actions") {
@@ -1546,7 +1577,7 @@ func TestComposeSpecification_IssueDedup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeSpecification: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "spec-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-auth-w1_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if len(mail.Issues) != 2 {
@@ -1578,7 +1609,7 @@ func TestComposeReport_IssuesSorted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeReport: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "report-sort-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-report-sort-w1_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if len(mail.Issues) != 3 {
@@ -1770,25 +1801,24 @@ func TestReportBody_NoErrorsNoRipples(t *testing.T) {
 
 func TestDMailName_EmptyWaveKey(t *testing.T) {
 	got := session.DMailName("spec", "")
-	if got != "spec-" {
-		t.Errorf("got %q, want %q", got, "spec-")
+	// Empty key → prefix + UUID (no extra dash before UUID)
+	if !strings.HasPrefix(got, "sj-spec_") {
+		t.Errorf("got %q, want prefix sj-spec_", got)
 	}
 }
 
 func TestDMailName_MultipleColons(t *testing.T) {
 	got := session.DMailName("report", "ns:cluster:w1")
-	if got != "report-ns-cluster-w1" {
-		t.Errorf("got %q, want %q", got, "report-ns-cluster-w1")
+	if !strings.HasPrefix(got, "sj-report-ns-cluster-w1_") {
+		t.Errorf("got %q, want prefix sj-report-ns-cluster-w1_", got)
 	}
 }
 
 func TestDMailName_TrailingSpecialChars(t *testing.T) {
-	// given: wave key ending with special characters
 	got := session.DMailName("spec", "auth:w1!!!")
-
-	// then: trailing underscores should be trimmed
-	if strings.HasSuffix(got, "_") {
-		t.Errorf("trailing underscores not trimmed: %q", got)
+	// Special chars stripped, no trailing -
+	if !strings.HasPrefix(got, "sj-spec-auth-w1_") {
+		t.Errorf("got %q, want prefix sj-spec-auth-w1_", got)
 	}
 }
 
@@ -2137,7 +2167,7 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 	}
 
 	// and: outbox file exists and is parseable
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-auth-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-feedback-auth-w1_00000000.md")
 	data, readErr := os.ReadFile(outboxPath)
 	if readErr != nil {
 		t.Fatalf("outbox file missing: %v", readErr)
@@ -2151,8 +2181,8 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 	if mail.Kind != session.DMailReport {
 		t.Errorf("kind: got %q, want %q", mail.Kind, session.DMailReport)
 	}
-	if mail.Name != "feedback-auth-w1" {
-		t.Errorf("name: got %q, want %q", mail.Name, "feedback-auth-w1")
+	if mail.Name != "sj-feedback-auth-w1_00000000" {
+		t.Errorf("name: got %q, want %q", mail.Name, "sj-feedback-auth-w1_00000000")
 	}
 	if mail.SchemaVersion != "1" {
 		t.Errorf("schema version: got %q, want %q", mail.SchemaVersion, "1")
@@ -2162,7 +2192,7 @@ func TestComposeFeedback_StagesInOutbox(t *testing.T) {
 	}
 
 	// and: archive file also exists
-	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "feedback-auth-w1.md")
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), "sj-feedback-auth-w1_00000000.md")
 	if _, err := os.Stat(archivePath); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected archive file to exist")
 	}
@@ -2198,7 +2228,7 @@ func TestComposeFeedback_BodyFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeFeedback: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-infra-w2.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-feedback-infra-w2_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 
@@ -2248,7 +2278,7 @@ func TestComposeFeedback_NoErrorsNoRipples(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeFeedback: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-db-w3.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-feedback-db-w3_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 
@@ -2341,7 +2371,7 @@ func TestComposeFeedback_IssuesSorted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeFeedback: %v", err)
 	}
-	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "feedback-sort-w1.md")
+	outboxPath := filepath.Join(domain.MailDir(dir, "outbox"), "sj-feedback-sort-w1_00000000.md")
 	data, _ := os.ReadFile(outboxPath)
 	mail, _ := session.ParseDMail(data)
 	if len(mail.Issues) != 3 {

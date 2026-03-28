@@ -41,3 +41,14 @@ func (s *SQLiteOutboxStore) DBForTest() *sql.DB { return s.db }
 func ReceiveDMailIfNewForTest(baseDir, filename string, logger domain.Logger) *DMail {
 	return receiveDMailIfNew(baseDir, filename, logger)
 }
+
+// SetDMailUUID overrides the UUID generator for deterministic test filenames.
+// Returns a cleanup function to restore the original generator.
+func SetDMailUUID(fn func() string) func() {
+	old := uuidFunc
+	uuidFunc = fn
+	return func() { uuidFunc = old }
+}
+
+// ShortUUIDForTest exposes shortUUID for tests that need real UUIDs.
+var ShortUUIDForTest = shortUUID

@@ -154,6 +154,7 @@ type WaveState struct {
 type Wave struct {
 	ID              string             `json:"id"`
 	ClusterName     string             `json:"cluster_name"`
+	ClusterKey      string             `json:"cluster_key,omitempty"`
 	Title           string             `json:"title"`
 	Description     string             `json:"description"`
 	Actions         []WaveAction       `json:"actions"`
