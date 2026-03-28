@@ -47,6 +47,9 @@ var WithAllowedTools = port.WithAllowedTools
 // WithWorkDir sets the working directory for the Claude subprocess.
 var WithWorkDir = port.WithWorkDir
 
+// WithConfigBase sets the base directory for resolving stateDir settings.
+var WithConfigBase = port.WithConfigBase
+
 // NewClaudeAdapter creates a ClaudeAdapter implementing port.ClaudeRunner.
 func NewClaudeAdapter(cfg *domain.Config, logger domain.Logger) *ClaudeAdapter {
 	return &ClaudeAdapter{

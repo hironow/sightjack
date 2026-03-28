@@ -116,13 +116,15 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 	// Use RunClaudeOnce when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
 	linearTools := WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)
+	workDir := WithWorkDir(baseDir)
+	configBase := WithConfigBase(baseDir)
 	if cfg.Labels.Enabled {
-		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
+		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools, workDir, configBase); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
-		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools); err != nil {
+		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools, workDir, configBase); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
@@ -189,7 +191,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 			chunkOut, closeChunkLog := savePromptAndCreateLog(scanDir, promptBase, prompt, logger)
 
 			logger.Info("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools)
+			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools, workDir, configBase)
 			closeChunkLog()
 			if runErr != nil {
 				return domain.ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
