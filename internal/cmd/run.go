@@ -55,7 +55,7 @@ if event data is found in .siren/events/.`,
 			if !dryRun {
 				bins = append(bins, cfg.ClaudeCmd)
 			}
-			if cfg.Mode.IsWave() {
+			if cfg.Mode.IsWave() && !dryRun {
 				bins = append(bins, "gh")
 			}
 			if err := session.PreflightCheck(bins...); err != nil {

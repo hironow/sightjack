@@ -120,7 +120,7 @@ func checkClaudeInference(output string, err error) domain.DoctorCheck {
 // checkGHAuth verifies that the GitHub CLI is authenticated by running
 // `gh auth status`. Returns OK if authenticated, WARN if not.
 func checkGHAuth(ctx context.Context) domain.DoctorCheck {
-	cmd := newCmd(ctx, "gh", "auth", "status")
+	cmd := newCmd(ctx, "gh", "auth", "status", "--active")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return domain.DoctorCheck{
