@@ -25,7 +25,7 @@ DoD checking: ALWAYS full-depth regardless of Strictness level.
 
 ## Steps
 {{- if .IsWaveMode}}
-1. Fetch ALL issues (open and closed) using `gh issue list --state all --json number,title,labels,body,state --limit 500`. If the repository has more issues, paginate with `--jq` or multiple calls to ensure completeness
+1. Fetch ALL issues (open and closed) using `gh issue list --state all --json number,title,labels,body,state --limit 500`. If the repository has more issues, paginate with `--jq` or multiple calls to ensure completeness. Note: ensure `gh` targets the correct repository by running from the project directory
 2. Classify Issues into logical clusters based on title, labels, and description
 3. Create a list of cluster names with their associated Issue IDs (use GitHub issue numbers as IDs)
 4. For each cluster, collect the union of all GitHub labels from its issues into the "labels" array
@@ -60,7 +60,7 @@ Each cluster must have both a "name" (display name, can be any language) and a "
 
 {{- if .LabelsEnabled}}
 {{- if .IsWaveMode}}
-After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`.
+After classification, ensure the label "{{.LabelPrefix}}:analyzed" exists (create with `gh label create "{{.LabelPrefix}}:analyzed" --force` if needed), then apply it to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`.
 {{- else}}
 After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using Linear MCP.
 {{- end}}

@@ -73,7 +73,7 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 {{- if .LabelsEnabled}}
 {{- if .IsWaveMode}}
-全アクション適用後、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:wave-done"` を使用して各対象Issueにラベルを付与してください。
+全アクション適用後、ラベル "{{.LabelPrefix}}:wave-done" が存在することを確認し（なければ `gh label create "{{.LabelPrefix}}:wave-done" --force` で作成）、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:wave-done"` を使用して各対象Issueにラベルを付与してください。
 {{- else}}
 全アクション適用後、Linear MCPを使用して各対象Issueに "{{.LabelPrefix}}:wave-done" ラベルを付与してください。
 {{- end}}
