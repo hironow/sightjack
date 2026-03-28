@@ -25,10 +25,11 @@ DoD checking: ALWAYS full-depth regardless of Strictness level.
 
 ## Steps
 {{- if .IsWaveMode}}
-1. Fetch ALL issues (open and closed) using `gh issue list --state all --json number,title,labels,body,state --limit 500`. If the repository has more issues, paginate with `--jq` or multiple calls to ensure completeness. Note: ensure `gh` targets the correct repository by running from the project directory
-2. Classify Issues into logical clusters based on title, labels, and description
+1. Fetch OPEN issues using `gh issue list --state open --json number,title,labels,body,state --limit 500`. Paginate if needed. Ensure `gh` targets the correct repository by running from the project directory
+2. Classify open Issues into logical clusters based on title, labels, and description
 3. Create a list of cluster names with their associated Issue IDs (use GitHub issue numbers as IDs)
 4. For each cluster, collect the union of all GitHub labels from its issues into the "labels" array
+5. For the Shibito check below, also fetch closed issues: `gh issue list --state closed --json number,title,labels,body,state --limit 200`
 {{- else}}
 1. Fetch the Issue list via Linear MCP
 2. Classify Issues into logical clusters based on title, labels, and description
