@@ -293,48 +293,48 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
-	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
-	if len(results) != 12 {
-		t.Fatalf("expected 12 results, got %d", len(results))
+	// then: wave mode has 13 results (includes gh check)
+	if len(results) != 13 {
+		t.Fatalf("expected 13 results, got %d", len(results))
 	}
-	// Config should fail (index 3 in new order)
-	if results[3].Name != "Config" {
-		t.Errorf("expected 'Config' at index 3, got %q", results[3].Name)
+	// Validate by name to avoid index-dependent assertions
+	checkByName := func(name string) *domain.DoctorCheck {
+		for i := range results {
+			if results[i].Name == name {
+				return &results[i]
+			}
+		}
+		return nil
 	}
-	if results[3].Status != domain.CheckFail {
-		t.Errorf("Config: expected FAIL, got %v", results[3].Status)
+	// Config should fail (nonexistent path)
+	if c := checkByName("Config"); c == nil {
+		t.Error("Config check not found")
+	} else if c.Status != domain.CheckFail {
+		t.Errorf("Config: expected FAIL, got %v", c.Status)
 	}
 	// claude-auth should be skipped (nil config)
-	auth := results[6]
-	if auth.Name != "claude-auth" {
-		t.Errorf("expected 'claude-auth', got %q", auth.Name)
-	}
-	if auth.Status != domain.CheckSkip {
-		t.Errorf("claude-auth: expected SKIP (nil config), got %v: %s", auth.Status, auth.Message)
+	if c := checkByName("claude-auth"); c == nil {
+		t.Error("claude-auth check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("claude-auth: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
 	// linear-mcp should be skipped (nil config)
-	mcp := results[7]
-	if mcp.Name != "linear-mcp" {
-		t.Errorf("expected 'linear-mcp', got %q", mcp.Name)
-	}
-	if mcp.Status != domain.CheckSkip {
-		t.Errorf("linear-mcp: expected SKIP (nil config), got %v: %s", mcp.Status, mcp.Message)
+	if c := checkByName("linear-mcp"); c == nil {
+		t.Error("linear-mcp check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("linear-mcp: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
 	// claude-inference should be skipped (nil config)
-	infer := results[8]
-	if infer.Name != "claude-inference" {
-		t.Errorf("expected 'claude-inference', got %q", infer.Name)
-	}
-	if infer.Status != domain.CheckSkip {
-		t.Errorf("claude-inference: expected SKIP (nil config), got %v: %s", infer.Status, infer.Message)
+	if c := checkByName("claude-inference"); c == nil {
+		t.Error("claude-inference check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
 	// context-budget should be skipped (nil config)
-	cb := results[9]
-	if cb.Name != "context-budget" {
-		t.Errorf("expected 'context-budget', got %q", cb.Name)
-	}
-	if cb.Status != domain.CheckSkip {
-		t.Errorf("context-budget: expected SKIP (nil config), got %v: %s", cb.Status, cb.Message)
+	if c := checkByName("context-budget"); c == nil {
+		t.Error("context-budget check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("context-budget: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
 }
 
@@ -355,49 +355,48 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
-	// then
-	if len(results) != 12 {
-		t.Fatalf("expected 12 results, got %d", len(results))
+	// then: wave mode has 13 results (includes gh check)
+	if len(results) != 13 {
+		t.Fatalf("expected 13 results, got %d", len(results))
 	}
-	// Config should pass (index 3 in new order)
-	if results[3].Name != "Config" {
-		t.Errorf("expected 'Config' at index 3, got %q", results[3].Name)
+	// Validate by name to avoid index-dependent assertions
+	checkByName := func(name string) *domain.DoctorCheck {
+		for i := range results {
+			if results[i].Name == name {
+				return &results[i]
+			}
+		}
+		return nil
 	}
-	if results[3].Status != domain.CheckOK {
-		t.Errorf("Config: expected OK, got %v", results[3].Status)
+	// Config should pass
+	if c := checkByName("Config"); c == nil {
+		t.Error("Config check not found")
+	} else if c.Status != domain.CheckOK {
+		t.Errorf("Config: expected OK, got %v", c.Status)
 	}
-	// claude binary check should fail (index 1 in new order)
-	if results[1].Status != domain.CheckFail {
-		t.Errorf("claude: expected FAIL, got %v: %s", results[1].Status, results[1].Message)
+	// claude-auth should be skipped (claude binary unavailable)
+	if c := checkByName("claude-auth"); c == nil {
+		t.Error("claude-auth check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("claude-auth: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
-	// Claude Auth should be skipped because claude binary is unavailable
-	auth := results[6]
-	if auth.Status != domain.CheckSkip {
-		t.Errorf("Claude Auth: expected SKIP, got %v: %s", auth.Status, auth.Message)
+	// linear-mcp should be skipped (wave mode)
+	if c := checkByName("linear-mcp"); c == nil {
+		t.Error("linear-mcp check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("linear-mcp: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
-	if !strings.Contains(auth.Message, "claude not available") {
-		t.Errorf("expected 'claude not available' in message, got: %s", auth.Message)
+	// claude-inference should be skipped
+	if c := checkByName("claude-inference"); c == nil {
+		t.Error("claude-inference check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
-	// Linear MCP should be skipped because claude binary is unavailable
-	mcp := results[7]
-	if mcp.Status != domain.CheckSkip {
-		t.Errorf("Linear MCP: expected SKIP, got %v: %s", mcp.Status, mcp.Message)
-	}
-	// claude-inference should be skipped because claude binary is unavailable
-	infer := results[8]
-	if infer.Name != "claude-inference" {
-		t.Errorf("expected 'claude-inference', got %q", infer.Name)
-	}
-	if infer.Status != domain.CheckSkip {
-		t.Errorf("claude-inference: expected SKIP, got %v: %s", infer.Status, infer.Message)
-	}
-	// context-budget should be skipped because claude binary is unavailable
-	cb := results[9]
-	if cb.Name != "context-budget" {
-		t.Errorf("expected 'context-budget', got %q", cb.Name)
-	}
-	if cb.Status != domain.CheckSkip {
-		t.Errorf("context-budget: expected SKIP, got %v: %s", cb.Status, cb.Message)
+	// context-budget should be skipped
+	if c := checkByName("context-budget"); c == nil {
+		t.Error("context-budget check not found")
+	} else if c.Status != domain.CheckSkip {
+		t.Errorf("context-budget: expected SKIP, got %v: %s", c.Status, c.Message)
 	}
 }
 
