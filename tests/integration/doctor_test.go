@@ -294,8 +294,8 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: wave mode has 13 results (includes gh check)
-	if len(results) != 13 {
-		t.Fatalf("expected 13 results, got %d", len(results))
+	if len(results) != 14 {
+		t.Fatalf("expected 14 results, got %d", len(results))
 	}
 	// Validate by name to avoid index-dependent assertions
 	checkByName := func(name string) *domain.DoctorCheck {
@@ -356,8 +356,8 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: wave mode has 13 results (includes gh check)
-	if len(results) != 13 {
-		t.Fatalf("expected 13 results, got %d", len(results))
+	if len(results) != 14 {
+		t.Fatalf("expected 14 results, got %d", len(results))
 	}
 	// Validate by name to avoid index-dependent assertions
 	checkByName := func(name string) *domain.DoctorCheck {
