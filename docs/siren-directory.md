@@ -192,7 +192,7 @@ entries: 2
 - **specification/report** -> **archive/** first, then **outbox/** (archive-first write order)
 - D-mail format: YAML frontmatter (`name`, `kind`, `description`, `dmail-schema-version`, `issues`, `severity`, `metadata`) + Markdown body
 - D-mail kinds: `specification`, `report`, `design-feedback`, `convergence`
-- Filename pattern: `{prefix}-{sanitized-wavekey}.md` (e.g., `spec-auth-w1.md`, `report-api-w2.md`)
+- Filename pattern: `{tool}-{kind}-{sanitized-key}_{uuid8}.md` (e.g., `sj-spec-auth-w1_a3f2b7c4.md`, `sj-report-api-w2_b7c4d8e9.md`)
 
 ## File Creators
 
