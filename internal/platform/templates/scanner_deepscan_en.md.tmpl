@@ -58,7 +58,11 @@ For estimated_strictness, evaluate:
 - Code coupling and dependency complexity (tight coupling → lockdown)
 - Implementation maturity (early stage → fog, production code → alert/lockdown)
 
+{{- if .IsWaveMode}}
+For each issue, include the current GitHub issue state in the "status" field.
+{{- else}}
 For each issue, include the current Linear status in the "status" field.
+{{- end}}
 
 Important: Write output directly to the file path above. Do not write to stdout.
 Use raw UTF-8 for non-ASCII characters in JSON string values (do not use \uXXXX escape sequences).

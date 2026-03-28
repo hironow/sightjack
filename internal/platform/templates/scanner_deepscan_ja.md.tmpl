@@ -57,7 +57,11 @@ estimated_strictnessの判断基準:
 - コード結合度と依存関係の複雑さ（密結合 → lockdown）
 - 実装の成熟度（初期段階 → fog、本番コード → alert/lockdown）
 
+{{- if .IsWaveMode}}
+各Issueについて、GitHubの現在のissue stateを "status" フィールドに含めてください。
+{{- else}}
 各Issueについて、Linearの現在のステータスを "status" フィールドに含めてください。
+{{- end}}
 
 重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
 JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。

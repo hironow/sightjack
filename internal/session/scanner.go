@@ -85,6 +85,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 		StrictnessLevel: string(cfg.Strictness.Default),
 		LabelsEnabled:   cfg.Labels.Enabled,
 		LabelPrefix:     cfg.Labels.Prefix,
+		IsWaveMode:      cfg.Mode.IsWave(),
 	})
 	if err != nil {
 		classifySpan.End()
@@ -178,6 +179,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 				IssueIDs:        strings.Join(chunk, ", "),
 				OutputPath:      chunkFile,
 				StrictnessLevel: string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, append([]string{cc.Name}, cc.Labels...))),
+				IsWaveMode:      cfg.Mode.IsWave(),
 			})
 			if renderErr != nil {
 				return domain.ClusterScanResult{}, fmt.Errorf("render deepscan prompt for %s chunk %d: %w", cc.Name, j, renderErr)

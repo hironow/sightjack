@@ -18,12 +18,15 @@ func newScanCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "scan [path]",
-		Short: "Classify and deep-scan Linear issues",
-		Long: `Classify and deep-scan Linear issues in the configured project.
+		Short: "Classify and deep-scan issues",
+		Long: `Classify and deep-scan issues in the configured project.
 
-Queries Linear issues via Claude MCP tools and produces a ScanResult
-with cluster classification, completeness scores, and shibito warnings.
-Use --json to output structured JSON for piping into downstream commands.`,
+In wave mode (default): queries GitHub Issues via gh CLI.
+In linear mode (--linear): queries Linear issues via Claude MCP tools.
+
+Produces a ScanResult with cluster classification, completeness scores,
+and shibito warnings. Use --json to output structured JSON for piping
+into downstream commands.`,
 		Example: `  # Interactive scan with navigator display
   sightjack scan
 

@@ -1,6 +1,11 @@
 あなたは Scanner Agent です。
+{{- if .IsWaveMode}}
+`gh` CLI を使って現在のリポジトリの GitHub Issues を取得し、
+論理的なクラスタ（機能グループ）に分類してください。
+{{- else}}
 Linear MCP Server を使って指定プロジェクトの Issue を取得し、
 論理的なクラスタ（機能グループ）に分類してください。
+{{- end}}
 
 ## Strictness Level: {{.StrictnessLevel}}
 
@@ -19,10 +24,17 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 {{- end}}
 
 ## 手順
+{{- if .IsWaveMode}}
+1. `gh issue list --json number,title,labels,body,state --limit 200` で Issue 一覧を取得してください
+2. Issue のタイトル・ラベル・説明から論理的なクラスタに分類してください
+3. 各クラスタの名前と所属する Issue ID（GitHub issue番号）のリストを作成してください
+4. 各クラスタについて、所属する全Issueの GitHub ラベルの和集合を "labels" 配列に含めてください
+{{- else}}
 1. Linear MCP で Issue 一覧を取得してください
 2. Issue のタイトル・ラベル・説明から論理的なクラスタに分類してください
 3. 各クラスタの名前と所属する Issue ID のリストを作成してください
 4. 各クラスタについて、所属する全Issueの Linear ラベルの和集合を "labels" 配列に含めてください
+{{- end}}
 
 ## 屍人（Shibito）復活チェック
 クローズ/キャンセル済みのIssueも確認し、現在のオープンIssueと類似するパターンを検出してください。
@@ -45,8 +57,12 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 各クラスタには "name"（表示名、任意の言語可）と "key"（小文字英語のスラグ、ハイフン区切り、スキャン間で安定）の両方が必要です。
 
-{{if .LabelsEnabled}}
+{{- if .LabelsEnabled}}
+{{- if .IsWaveMode}}
+分類完了後、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:analyzed"` を使用して各分析済みIssueにラベルを付与してください。
+{{- else}}
 分類完了後、Linear MCPを使用して各分析済みIssueに "{{.LabelPrefix}}:analyzed" ラベルを付与してください。
-{{end}}
+{{- end}}
+{{- end}}
 重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
 JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。

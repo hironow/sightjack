@@ -13,6 +13,7 @@ type ClassifyPromptData struct {
 	StrictnessLevel string
 	LabelsEnabled   bool
 	LabelPrefix     string
+	IsWaveMode      bool
 }
 
 // DeepScanPromptData holds template data for the deep scan prompt.
@@ -21,6 +22,7 @@ type DeepScanPromptData struct {
 	IssueIDs        string
 	OutputPath      string
 	StrictnessLevel string
+	IsWaveMode      bool
 }
 
 // WaveGeneratePromptData holds template data for the wave generation prompt.
@@ -45,6 +47,7 @@ type WaveApplyPromptData struct {
 	StrictnessLevel string
 	LabelsEnabled   bool
 	LabelPrefix     string
+	IsWaveMode      bool
 }
 
 // ReadyLabelPromptData holds template data for the ready label prompt.

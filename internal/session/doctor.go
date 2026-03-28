@@ -267,7 +267,7 @@ func CheckEventStore(baseDir string) domain.DoctorCheck {
 // The configPath is loaded to obtain tool configuration; if loading fails
 // the config check reports failure but other checks continue where possible.
 // baseDir is used to verify the .siren/ state directory is writable.
-func RunDoctor(ctx context.Context, configPath string, baseDir string, logger domain.Logger, repair bool) []domain.DoctorCheck {
+func RunDoctor(ctx context.Context, configPath string, baseDir string, logger domain.Logger, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -368,8 +368,14 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		authResult := checkClaudeAuth(mcpOutput, mcpErr, claudeName)
 		results = append(results, authResult)
 
-		// Linear MCP: skip if auth failed (mcp list output unreliable)
-		if authResult.Status != domain.CheckOK {
+		// Linear MCP: skip in wave mode (no Linear dependency)
+		if mode.IsWave() {
+			results = append(results, domain.DoctorCheck{
+				Name:    "linear-mcp",
+				Status:  domain.CheckSkip,
+				Message: "skipped (wave mode)",
+			})
+		} else if authResult.Status != domain.CheckOK {
 			results = append(results, domain.DoctorCheck{
 				Name:    "linear-mcp",
 				Status:  domain.CheckSkip,

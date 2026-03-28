@@ -291,7 +291,7 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false)
+	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: should have 11 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate)
 	if len(results) != 12 {
@@ -353,7 +353,7 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then
 	if len(results) != 12 {
@@ -414,7 +414,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, skills-ref, success-rate)
 	if len(results) != 12 {
@@ -593,7 +593,7 @@ func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false)
+	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: find success-rate result
 	var found bool
