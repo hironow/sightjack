@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -9,6 +10,10 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
+
+// ErrSpecNoImplementationSteps indicates that a wave had no implementation-oriented
+// actions after filtering issue-management types, so no spec D-Mail was generated.
+var ErrSpecNoImplementationSteps = errors.New("spec: no implementation steps after filtering")
 
 func WaveIssueIDs(wave domain.Wave) []string {
 	seen := make(map[string]bool)
@@ -152,9 +157,9 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 				Description: action.Detail,
 			})
 		}
-		// No implementation steps → skip spec D-Mail entirely
+		// No implementation steps → signal to caller (not a failure)
 		if len(ref.Steps) == 0 {
-			return nil
+			return ErrSpecNoImplementationSteps
 		}
 		mail.Wave = ref
 	}

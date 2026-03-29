@@ -2,6 +2,7 @@ package session_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -54,7 +55,7 @@ func TestComposeSpecification_LinearMode_NoWaveReference(t *testing.T) {
 	}
 }
 
-func TestComposeSpecification_WaveMode_EmptyActions_FallsBack(t *testing.T) {
+func TestComposeSpecification_WaveMode_EmptyActions_ReturnsSentinelError(t *testing.T) {
 	// given: wave with no actions
 	dir := t.TempDir()
 	store := testOutboxStore(t, dir)
@@ -67,8 +68,32 @@ func TestComposeSpecification_WaveMode_EmptyActions_FallsBack(t *testing.T) {
 	// when
 	err := session.ComposeSpecification(context.Background(), store, wave, domain.ModeWave)
 
-	// then: should not error (fallback to wave key as step)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// then: should return sentinel error (no implementation steps)
+	if !errors.Is(err, session.ErrSpecNoImplementationSteps) {
+		t.Fatalf("expected ErrSpecNoImplementationSteps, got: %v", err)
+	}
+}
+
+func TestComposeSpecification_IssueManagementOnly_ReturnsSentinelError(t *testing.T) {
+	// given: wave with ONLY issue management actions in wave mode
+	dir := t.TempDir()
+	store := testOutboxStore(t, dir)
+	wave := domain.Wave{
+		ID:          "w1",
+		ClusterName: "design",
+		Title:       "Design cleanup",
+		Actions: []domain.WaveAction{
+			{Type: "add_dod", IssueID: "MY-1", Description: "Add DoD to MY-1"},
+			{Type: "add_dependency", IssueID: "MY-2", Description: "Link MY-2"},
+			{Type: "cancel", IssueID: "MY-3", Description: "Cancel MY-3"},
+		},
+	}
+
+	// when
+	err := session.ComposeSpecification(context.Background(), store, wave, domain.ModeWave)
+
+	// then: should return sentinel error — no spec D-Mail generated
+	if !errors.Is(err, session.ErrSpecNoImplementationSteps) {
+		t.Fatalf("expected ErrSpecNoImplementationSteps, got: %v", err)
 	}
 }
