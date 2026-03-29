@@ -492,18 +492,18 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	}
 
 	// Compose report d-mail for the completed wave
-	domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
 	if err := ComposeReport(ctx, store, selected, applyResult); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
+		domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
 		emitter.EmitSendReport(selected.ID, selected.ClusterName, time.Now().UTC())
 	}
 
 	// O2: sightjack → amadeus feedback D-Mail
-	domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
 	if feedbackErr := ComposeFeedback(ctx, store, selected, applyResult); feedbackErr != nil {
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
+		domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
 		emitter.EmitSendFeedback(selected.ID, selected.ClusterName, time.Now().UTC())
 	}
 
