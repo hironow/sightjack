@@ -145,6 +145,20 @@ func writeDMailToDir(t *testing.T, dir, sub, filename string, content []byte) st
 	return p
 }
 
+// findDMailByPrefix finds a D-Mail file by glob prefix in a directory.
+// Returns the full path of the first match or fails the test.
+func findDMailByPrefix(t *testing.T, dir, prefix string) string {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(dir, prefix+"*.md"))
+	if err != nil {
+		t.Fatalf("glob %s: %v", prefix, err)
+	}
+	if len(matches) == 0 {
+		t.Fatalf("no D-Mail found matching %s*.md in %s", prefix, dir)
+	}
+	return matches[0]
+}
+
 // assertFileExists verifies a file exists at the given path.
 func assertFileExists(t *testing.T, path string) {
 	t.Helper()

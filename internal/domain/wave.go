@@ -6,9 +6,14 @@ import (
 	"strings"
 )
 
-// WaveKey returns a globally unique key for a wave: "ClusterName:ID".
+// WaveKey returns a globally unique key for a wave: "ClusterKey:ID".
+// Falls back to ClusterName if ClusterKey is not set (backward compat).
 func WaveKey(w Wave) string {
-	return w.ClusterName + ":" + w.ID
+	key := w.ClusterKey
+	if key == "" {
+		key = w.ClusterName
+	}
+	return key + ":" + w.ID
 }
 
 // calcComplexityScore computes a complexity score for a wave based on action
