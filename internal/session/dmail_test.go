@@ -2632,9 +2632,9 @@ func TestComposeSpecification_FiltersIssueManagementActions(t *testing.T) {
 	// when: compose in wave mode
 	err := session.ComposeSpecification(context.Background(), store, wave, domain.ModeWave)
 
-	// then: spec D-Mail should NOT be created (all actions are issue management)
-	if err != nil {
-		t.Fatalf("ComposeSpecification: %v", err)
+	// then: should return sentinel error (no implementation steps to forward)
+	if !errors.Is(err, session.ErrSpecNoImplementationSteps) {
+		t.Fatalf("expected ErrSpecNoImplementationSteps, got: %v", err)
 	}
 	matches, _ := filepath.Glob(filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-*.md"))
 	if len(matches) != 0 {
