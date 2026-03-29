@@ -3,7 +3,7 @@ package port_test
 import (
 	"testing"
 
-	"github.com/hironow/sightjack/internal/usecase/port"
+	"github.com/hironow/sightjack/internal/usecase/port" // nosemgrep: layer-port-no-import-upper — _test package importing its own public API [permanent]
 )
 
 func TestWithResume_SetsResumeSessionID(t *testing.T) {
