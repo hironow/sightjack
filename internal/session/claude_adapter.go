@@ -23,8 +23,15 @@ type ClaudeAdapter struct {
 	Logger     domain.Logger
 }
 
-// Run executes the Claude CLI once without retry.
+// Run executes the Claude CLI once without retry, returning only the result text.
 func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
+	result, err := a.RunDetailed(ctx, prompt, w, opts...)
+	return result.Text, err
+}
+
+// RunDetailed executes the Claude CLI once without retry, returning the result
+// text and provider session ID.
+func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (port.RunResult, error) {
 	logger := a.Logger
 
 	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
@@ -54,7 +61,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	if len(rc.AllowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
-	if rc.Continue {
+	if rc.ResumeSessionID != "" {
+		args = append(args, "--resume", rc.ResumeSessionID)
+	} else if rc.Continue {
 		args = append(args, "--continue")
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
@@ -95,17 +104,18 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", fmt.Errorf("stdout pipe: %w", err)
+		return port.RunResult{}, fmt.Errorf("stdout pipe: %w", err)
 	}
 	var stderrBuf strings.Builder
 	cmd.Stderr = &stderrBuf
 
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("claude start: %w", err)
+		return port.RunResult{}, fmt.Errorf("claude start: %w", err)
 	}
 
 	var output strings.Builder
 	var responseModel, responseID string
+	var providerSessionID string
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
 
@@ -160,6 +170,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 			span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(sanitized)))
 		}
 		if result != nil && result.SessionID != "" {
+			providerSessionID = result.SessionID
 			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
 		}
 
@@ -210,14 +221,14 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 				trace.WithAttributes(attribute.Int("claude.timeout_sec", a.TimeoutSec)),
 			)
 		}
-		return output.String(), fmt.Errorf("claude exit: %w", err)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("claude exit: %w", err)
 	}
 
 	if readError != nil {
-		return output.String(), fmt.Errorf("stream read: %w", readError)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("stream read: %w", readError)
 	}
 
-	return output.String(), nil
+	return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, nil
 }
 
 // effectiveWorkDir returns dir if non-empty, otherwise ".".
