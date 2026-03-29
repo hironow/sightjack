@@ -161,8 +161,22 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	adrDir := ADRDir(baseDir)
 	adrCount := CountADRFiles(adrDir)
 
-	return runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, emitter, out, logger)
+	for {
+		result, err := runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
+			scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, emitter, out, logger)
+		if err != nil {
+			return err
+		}
+		if result != loopResultRescanNeeded {
+			return nil
+		}
+		logger.Info("Auto-rescan: design-feedback triggered fresh scan")
+		scanDir, scanResultPath, scanResult, waves, completed, adrCount, scanTime, err =
+			RescanCore(ctx, cfg, baseDir, sessionID, waves, completed, emitter, out, logger)
+		if err != nil {
+			return fmt.Errorf("auto-rescan: %w", err)
+		}
+	}
 }
 
 // ResumeSession loads a previous session's state and cached scan result,
@@ -267,6 +281,22 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 
 	logger.OK("Resumed session: %d waves, %d completed", len(waves), len(completed))
 
-	return runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-		scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, emitter, out, logger)
+	for {
+		result, err := runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
+			scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, emitter, out, logger)
+		if err != nil {
+			return err
+		}
+		if result != loopResultRescanNeeded {
+			return nil
+		}
+		logger.Info("Auto-rescan: design-feedback triggered fresh scan")
+		var rescanTime time.Time
+		scanDir, scanResultPath, scanResult, waves, completed, adrCount, rescanTime, err =
+			RescanCore(ctx, cfg, baseDir, state.SessionID, waves, completed, emitter, out, logger)
+		if err != nil {
+			return fmt.Errorf("auto-rescan: %w", err)
+		}
+		lastScanned = rescanTime
+	}
 }
