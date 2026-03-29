@@ -688,3 +688,28 @@ var validWaveActionTypes = map[string]bool{
 func ValidWaveActionType(t string) bool {
 	return validWaveActionTypes[t]
 }
+
+// FilterPROpenActions removes implementation-oriented actions for issues that
+// already have a PR open (paintress:pr-open label). Issue-management actions
+// (add_dod, add_dependency, etc.) are preserved because sightjack handles them
+// directly. Waves with no remaining actions are removed entirely.
+func FilterPROpenActions(waves []Wave, prOpenIssues map[string]bool) []Wave {
+	if len(prOpenIssues) == 0 {
+		return waves
+	}
+	result := make([]Wave, 0, len(waves))
+	for _, w := range waves {
+		var kept []WaveAction
+		for _, a := range w.Actions {
+			if prOpenIssues[a.IssueID] && !validWaveActionTypes[a.Type] {
+				continue // implementation action for PR-open issue → skip
+			}
+			kept = append(kept, a)
+		}
+		if len(kept) > 0 {
+			w.Actions = kept
+			result = append(result, w)
+		}
+	}
+	return result
+}

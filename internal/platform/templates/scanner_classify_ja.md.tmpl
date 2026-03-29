@@ -72,7 +72,7 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 {{- if .LabelsEnabled}}
 {{- if .IsWaveMode}}
-分類完了後、ラベル "{{.LabelPrefix}}:analyzed" が存在することを確認し（なければ `gh label create "{{.LabelPrefix}}:analyzed" --force` で作成）、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:analyzed"` を使用して各分析済みIssueにラベルを付与してください。
+分類完了後、ラベル "{{.LabelPrefix}}:analyzed" が存在することを確認し（なければ `gh label create "{{.LabelPrefix}}:analyzed" --force` で作成）、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:analyzed"` を使用して各分析済みIssueにラベルを付与してください。ただし既に "{{.LabelPrefix}}:wave-done" ラベルがついているIssueにはanalyzedラベルをつけないでください（状態をダウングレードしない）。
 {{- else}}
 分類完了後、Linear MCPを使用して各分析済みIssueに "{{.LabelPrefix}}:analyzed" ラベルを付与してください。
 {{- end}}

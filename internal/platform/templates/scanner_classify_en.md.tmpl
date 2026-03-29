@@ -73,7 +73,7 @@ Each cluster must have both a "name" (display name, can be any language) and a "
 
 {{- if .LabelsEnabled}}
 {{- if .IsWaveMode}}
-After classification, ensure the label "{{.LabelPrefix}}:analyzed" exists (create with `gh label create "{{.LabelPrefix}}:analyzed" --force` if needed), then apply it to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`.
+After classification, ensure the label "{{.LabelPrefix}}:analyzed" exists (create with `gh label create "{{.LabelPrefix}}:analyzed" --force` if needed), then apply it to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`. Skip issues that already have the "{{.LabelPrefix}}:wave-done" label (do not downgrade their state).
 {{- else}}
 After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using Linear MCP.
 {{- end}}

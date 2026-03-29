@@ -80,7 +80,7 @@ Write the following JSON to **{{.OutputPath}}**:
 
 {{- if .LabelsEnabled}}
 {{- if .IsWaveMode}}
-After applying all actions, ensure the label "{{.LabelPrefix}}:wave-done" exists (create with `gh label create "{{.LabelPrefix}}:wave-done" --force` if needed), then apply it to each affected issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:wave-done"`.
+After applying all actions, ensure the label "{{.LabelPrefix}}:wave-done" exists (create with `gh label create "{{.LabelPrefix}}:wave-done" --force` if needed), then apply it to each affected issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:wave-done"`. Also remove the previous state label: `gh issue edit <number> --remove-label "{{.LabelPrefix}}:analyzed"` (ignore errors if the label was not present).
 {{- else}}
 After applying all actions, apply the label "{{.LabelPrefix}}:wave-done" to each affected issue using Linear MCP.
 {{- end}}
