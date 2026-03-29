@@ -32,7 +32,7 @@ const (
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, error) {
+	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, []domain.Wave, map[string]bool, error) {
 
 	parentSpan := trace.SpanFromContext(ctx)
 	parentSpan.SetAttributes(attribute.String("sightjack.session_id", platform.SanitizeUTF8(sessionID)))
@@ -127,7 +127,7 @@ waitingCycle:
 		// Wait for D-Mail arrival
 		arrived, waitErr := waitForDMail(ctx, fbCollector, cfg.Gate.WaitTimeout, logger)
 		if waitErr != nil {
-			return loopResultDone, waitErr
+			return loopResultDone, waves, completed, waitErr
 		}
 		if !arrived {
 			break waitingCycle
@@ -145,7 +145,7 @@ waitingCycle:
 		// scan+wavegen+merge and re-enter with fresh data (ADR-0024 flow).
 		if hasDesignFeedback {
 			emitDesignFeedback(newMails, emitter, logger)
-			return loopResultRescanNeeded, nil
+			return loopResultRescanNeeded, waves, completed, nil
 		}
 
 		// Generate next waves for clusters affected by report D-Mails
@@ -180,7 +180,7 @@ waitingCycle:
 	}
 
 	logger.OK("Session events saved to %s", filepath.Join(baseDir, domain.StateDir, "events"))
-	return loopResultDone, nil
+	return loopResultDone, waves, completed, nil
 }
 
 // classifyNewMails categorizes newly arrived D-Mails into specification,

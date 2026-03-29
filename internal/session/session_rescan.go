@@ -157,7 +157,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	adrDir := ADRDir(baseDir)
 
 	for {
-		result, err := runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
+		result, latestWaves, latestCompleted, err := runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
 			scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, emitter, out, logger)
 		if err != nil {
 			return err
@@ -167,7 +167,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 		}
 		logger.Info("Auto-rescan: design-feedback triggered fresh scan")
 		scanDir, scanResultPath, scanResult, waves, completed, adrCount, scanTime, err =
-			RescanCore(ctx, cfg, baseDir, sessionID, waves, completed, emitter, out, logger)
+			RescanCore(ctx, cfg, baseDir, sessionID, latestWaves, latestCompleted, emitter, out, logger)
 		if err != nil {
 			return fmt.Errorf("auto-rescan: %w", err)
 		}
