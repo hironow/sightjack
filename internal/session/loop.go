@@ -15,6 +15,16 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// loopResult signals how the interactive loop exited.
+type loopResult int
+
+const (
+	// loopResultDone indicates normal exit (user quit, timeout, or all waves completed).
+	loopResultDone loopResult = iota
+	// loopResultRescanNeeded indicates design-feedback arrived and a rescan is required.
+	loopResultRescanNeeded
+)
+
 // runInteractiveLoop runs the wave selection/approval/apply loop shared by
 // RunSession, RunResumeSession, and RunRescanSession.
 // resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
@@ -22,7 +32,7 @@ import (
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) error {
+	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, []domain.Wave, map[string]bool, error) {
 
 	parentSpan := trace.SpanFromContext(ctx)
 	parentSpan.SetAttributes(attribute.String("sightjack.session_id", platform.SanitizeUTF8(sessionID)))
@@ -117,7 +127,7 @@ waitingCycle:
 		// Wait for D-Mail arrival
 		arrived, waitErr := waitForDMail(ctx, fbCollector, cfg.Gate.WaitTimeout, logger)
 		if waitErr != nil {
-			return waitErr
+			return loopResultDone, waves, completed, waitErr
 		}
 		if !arrived {
 			break waitingCycle
@@ -131,9 +141,11 @@ waitingCycle:
 			logger.Info("New specification received. Rescanning not yet supported in waiting mode.")
 		}
 
-		// Emit event for each design-feedback D-Mail (preserves individual names for traceability)
+		// Design-feedback triggers rescan: exit loop so caller can perform
+		// scan+wavegen+merge and re-enter with fresh data (ADR-0024 flow).
 		if hasDesignFeedback {
 			emitDesignFeedback(newMails, emitter, logger)
+			return loopResultRescanNeeded, waves, completed, nil
 		}
 
 		// Generate next waves for clusters affected by report D-Mails
@@ -168,7 +180,7 @@ waitingCycle:
 	}
 
 	logger.OK("Session events saved to %s", filepath.Join(baseDir, domain.StateDir, "events"))
-	return nil
+	return loopResultDone, waves, completed, nil
 }
 
 // classifyNewMails categorizes newly arrived D-Mails into specification,
