@@ -46,6 +46,13 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
    c. Issueステータスを Cancelled に設定
 {{- end}}
 
+### 実装アクション（paintressが担当、sightjackは実行しない）
+以下のアクションタイプはpaintressに転送されてコード変更が行われます。
+sightjackのwave apply時にはスキップしてください（appliedとしてカウント、エラーなし）:
+- `implement`: コード実装タスク
+- `fix`: バグ修正タスク
+- `verify`: テスト検証タスク
+
 適用後、他のクラスタへの波及効果（ripples）があれば記録してください。
 {{- if .DoDSection}}
 

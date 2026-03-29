@@ -46,6 +46,13 @@ For each action:
    c. Set issue status to Cancelled
 {{- end}}
 
+### Implementation actions (handled by paintress, not sightjack)
+The following action types are forwarded to paintress for code changes.
+sightjack should skip them during wave apply (count as applied, no error):
+- `implement`: Code implementation task
+- `fix`: Bug fix task
+- `verify`: Test verification task
+
 After applying, record any ripple effects on other clusters.
 {{- if .DoDSection}}
 

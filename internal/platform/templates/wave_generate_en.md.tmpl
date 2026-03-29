@@ -27,12 +27,19 @@ DoD checking: ALWAYS full-depth regardless of Strictness level.
 - Each Wave must include concrete actions (add DoD, add dependencies, add labels, etc.)
 
 ## Action Types
+
+### Issue Management (executed by sightjack during wave apply)
 - `add_dod`: Append DoD items to the Issue description
 - `add_dependency`: Set dependencies between Issues
 - `add_label`: Add a label to an Issue
 - `update_description`: Update an Issue description
 - `create`: Create a new sub-issue under a parent Issue
 - `cancel`: Cancel an Issue (Backlog/Todo status only). Requires reason in detail field.
+
+### Implementation (forwarded to paintress for code changes)
+- `implement`: Code changes required to fulfill the Issue requirements. Detail should describe what to implement.
+- `fix`: Bug fix for an existing Issue. Detail should describe the bug and expected behavior.
+- `verify`: Add or update tests to verify Issue completion. Detail should describe what to test.
 
 {{if .DoDSection}}
 ## Definition of Done Guidelines
