@@ -2612,3 +2612,112 @@ func TestReceiveDMailIfNew_AcceptsImplFeedback(t *testing.T) {
 		t.Errorf("archive file missing: %v", err)
 	}
 }
+
+func TestComposeSpecification_FiltersIssueManagementActions(t *testing.T) {
+	// given: wave with ONLY issue management actions in wave mode
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := domain.Wave{
+		ID:          "w1",
+		ClusterName: "design",
+		Title:       "Design cleanup",
+		Actions: []domain.WaveAction{
+			{Type: "add_dod", IssueID: "MY-1", Description: "Add DoD to MY-1"},
+			{Type: "add_dependency", IssueID: "MY-2", Description: "Link MY-2"},
+			{Type: "update_description", IssueID: "MY-3", Description: "Update MY-3"},
+		},
+	}
+
+	// when: compose in wave mode
+	err := session.ComposeSpecification(context.Background(), store, wave, domain.ModeWave)
+
+	// then: spec D-Mail should NOT be created (all actions are issue management)
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+	matches, _ := filepath.Glob(filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-*.md"))
+	if len(matches) != 0 {
+		t.Errorf("expected no spec D-Mail for issue-management-only wave, got %d files", len(matches))
+	}
+}
+
+func TestComposeSpecification_IncludesImplementationActions(t *testing.T) {
+	// given: wave with implementation actions in wave mode
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := domain.Wave{
+		ID:          "w1",
+		ClusterName: "api",
+		Title:       "API implementation",
+		Actions: []domain.WaveAction{
+			{Type: "implement", IssueID: "MY-10", Description: "Implement endpoint", Detail: "POST /api/users"},
+			{Type: "fix", IssueID: "MY-11", Description: "Fix auth bug", Detail: "Token validation"},
+		},
+	}
+
+	// when
+	err := session.ComposeSpecification(context.Background(), store, wave, domain.ModeWave)
+
+	// then: spec D-Mail should be created with both steps
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+	matches, _ := filepath.Glob(filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-*.md"))
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 spec D-Mail, got %d", len(matches))
+	}
+	data, _ := os.ReadFile(matches[0])
+	mail, _ := session.ParseDMail(data)
+	if mail.Wave == nil {
+		t.Fatal("expected WaveReference in spec D-Mail")
+	}
+	if len(mail.Wave.Steps) != 2 {
+		t.Errorf("expected 2 steps, got %d", len(mail.Wave.Steps))
+	}
+}
+
+func TestComposeSpecification_MixedActions(t *testing.T) {
+	// given: wave with mixed issue management + implementation actions in wave mode
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := domain.Wave{
+		ID:          "w1",
+		ClusterName: "core",
+		Title:       "Core improvements",
+		Actions: []domain.WaveAction{
+			{Type: "add_dod", IssueID: "MY-1", Description: "Add DoD"},
+			{Type: "implement", IssueID: "MY-2", Description: "Implement feature", Detail: "New handler"},
+			{Type: "add_label", IssueID: "MY-3", Description: "Label it"},
+			{Type: "verify", IssueID: "MY-4", Description: "Add verification tests", Detail: "E2E tests"},
+		},
+	}
+
+	// when
+	err := session.ComposeSpecification(context.Background(), store, wave, domain.ModeWave)
+
+	// then: only implementation actions should be in steps
+	if err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+	matches, _ := filepath.Glob(filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-*.md"))
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 spec D-Mail, got %d", len(matches))
+	}
+	data, _ := os.ReadFile(matches[0])
+	mail, _ := session.ParseDMail(data)
+	if mail.Wave == nil {
+		t.Fatal("expected WaveReference")
+	}
+	if len(mail.Wave.Steps) != 2 {
+		t.Errorf("expected 2 implementation steps (implement + verify), got %d", len(mail.Wave.Steps))
+	}
+	// verify the filtered steps are the implementation ones
+	for _, step := range mail.Wave.Steps {
+		if step.Title != "Implement feature" && step.Title != "Add verification tests" {
+			t.Errorf("unexpected step title: %q", step.Title)
+		}
+	}
+}

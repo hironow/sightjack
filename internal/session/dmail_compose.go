@@ -113,7 +113,21 @@ func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wa
 	return ComposeDMail(ctx, store, mail)
 }
 
+// issueManagementTypes lists action types that are handled by sightjack
+// during wave apply. These must not be forwarded to paintress via spec D-Mail.
+var issueManagementTypes = map[string]bool{
+	"add_dod":            true,
+	"add_dependency":     true,
+	"add_label":          true,
+	"update_description": true,
+	"create":             true,
+	"cancel":             true,
+}
+
 // ComposeSpecification creates and sends a specification d-mail for an approved wave.
+// In wave mode, issue management actions are filtered out — only implementation-oriented
+// actions (implement, fix, verify, etc.) are included as steps. If no implementation
+// actions remain, the spec D-Mail is not generated.
 func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave domain.Wave, mode ...domain.TrackingMode) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
@@ -125,22 +139,22 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 		Body:          SpecificationBody(wave),
 	}
 
-	// Wave mode: attach WaveReference with actions as steps
+	// Wave mode: attach WaveReference with implementation actions as steps
 	if len(mode) > 0 && mode[0].IsWave() {
 		ref := &domain.WaveReference{ID: key}
 		for _, action := range wave.Actions {
+			if issueManagementTypes[action.Type] {
+				continue // already applied by sightjack
+			}
 			ref.Steps = append(ref.Steps, domain.WaveStepDef{
 				ID:          action.IssueID,
 				Title:       action.Description,
 				Description: action.Detail,
 			})
 		}
-		// Single-action wave: use wave key as step ID if no actions
+		// No implementation steps → skip spec D-Mail entirely
 		if len(ref.Steps) == 0 {
-			ref.Steps = append(ref.Steps, domain.WaveStepDef{
-				ID:    key,
-				Title: wave.Title,
-			})
+			return nil
 		}
 		mail.Wave = ref
 	}
