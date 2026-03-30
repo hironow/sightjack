@@ -46,6 +46,37 @@ func TestIssueDetail_HasStatus(t *testing.T) {
 	}
 }
 
+func TestSessionState_AllWavesCompleted_AllDone(t *testing.T) {
+	s := &domain.SessionState{
+		Waves: []domain.WaveState{
+			{ID: "w1", Status: "completed"},
+			{ID: "w2", Status: "completed"},
+		},
+	}
+	if !s.AllWavesCompleted() {
+		t.Error("expected true when all waves completed")
+	}
+}
+
+func TestSessionState_AllWavesCompleted_NotAllDone(t *testing.T) {
+	s := &domain.SessionState{
+		Waves: []domain.WaveState{
+			{ID: "w1", Status: "completed"},
+			{ID: "w2", Status: "available"},
+		},
+	}
+	if s.AllWavesCompleted() {
+		t.Error("expected false when not all waves completed")
+	}
+}
+
+func TestSessionState_AllWavesCompleted_Empty(t *testing.T) {
+	s := &domain.SessionState{}
+	if s.AllWavesCompleted() {
+		t.Error("expected false for empty waves")
+	}
+}
+
 func TestClusterScanResult_EstimatedStrictness(t *testing.T) {
 	c := domain.ClusterScanResult{
 		Name:                "Auth Module",
