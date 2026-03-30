@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -21,6 +22,8 @@ type ClaudeAdapter struct {
 	Model      string
 	TimeoutSec int
 	Logger     domain.Logger
+	ToolName   string                    // CLI tool name for stream events (e.g. "sightjack")
+	StreamBus  port.SessionStreamPublisher // optional: live session event streaming
 }
 
 // Run executes the Claude CLI once without retry, returning only the result text.
@@ -127,6 +130,18 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		}
 		emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
 		emitter.SetInput(prompt)
+
+		// Wire live stream event bus when available.
+		var normalizer *platform.StreamNormalizer
+		if a.StreamBus != nil && a.ToolName != "" {
+			normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
+				if ev := normalizer.Normalize(msg, raw); ev != nil {
+					a.StreamBus.Publish(ctx, *ev)
+				}
+			})
+		}
+
 		result, messages, readErr := emitter.CollectAll()
 		if readErr != nil {
 			streamErr <- readErr
