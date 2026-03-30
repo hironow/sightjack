@@ -124,6 +124,42 @@ func TestCollectPROpenIssues_ExtractsFromClusters(t *testing.T) {
 	}
 }
 
+func TestCollectSpecSentIssueIDs_FromCompletedWaves(t *testing.T) {
+	// given: 2 waves, one completed with implementation actions
+	waves := []Wave{
+		{
+			ID:          "w1",
+			ClusterName: "validation",
+			Actions: []WaveAction{
+				{Type: "implement", IssueID: "5", Description: "Implement"},
+				{Type: "add_dod", IssueID: "3", Description: "Add DoD"},
+			},
+		},
+		{
+			ID:          "w2",
+			ClusterName: "infra",
+			Actions: []WaveAction{
+				{Type: "fix", IssueID: "21", Description: "Fix"},
+			},
+		},
+	}
+	completed := map[string]bool{"validation:w1": true} // only w1 completed
+
+	// when
+	result := CollectSpecSentIssueIDs(completed, waves)
+
+	// then: only implementation actions from completed waves
+	if !result["5"] {
+		t.Error("expected issue 5 (implement in completed w1)")
+	}
+	if result["3"] {
+		t.Error("issue 3 has add_dod (issue-management), should not be in set")
+	}
+	if result["21"] {
+		t.Error("issue 21 is in uncompleted w2, should not be in set")
+	}
+}
+
 func TestIssueDetail_HasPROpen(t *testing.T) {
 	// given
 	issue := IssueDetail{

@@ -230,7 +230,10 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 // Failed clusters are skipped with warnings (partial success), matching the
 // fault-tolerance pattern of RunParallelDeepScan. Returns an error only when
 // ALL clusters fail.
-func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, clusters []domain.ClusterScanResult, dryRun bool, logger domain.Logger) ([]domain.Wave, []string, map[string]bool, error) {
+// RunWaveGenerate generates waves for all clusters. Optional extraPROpenIssues
+// provides session-level knowledge of issues with spec D-Mails already sent
+// (covers the race window before paintress applies the pr-open label).
+func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, clusters []domain.ClusterScanResult, dryRun bool, logger domain.Logger, extraPROpenIssues ...map[string]bool) ([]domain.Wave, []string, map[string]bool, error) {
 	ctx, waveGenSpan := platform.Tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
@@ -263,6 +266,11 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 
 	// Filter out implementation actions for issues that already have a PR open.
 	prOpenIssues := domain.CollectPROpenIssues(clusters)
+	for _, extra := range extraPROpenIssues {
+		for id := range extra {
+			prOpenIssues[id] = true
+		}
+	}
 	if len(prOpenIssues) > 0 {
 		before := len(merged)
 		merged = domain.FilterPROpenActions(merged, prOpenIssues)

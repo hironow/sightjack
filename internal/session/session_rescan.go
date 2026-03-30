@@ -42,8 +42,13 @@ func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID stri
 	// Cache ScanResult + record session start / scan completed events
 	scanResultPath = RecordScanState(baseDir, sessionID, scanResult, cfg, emitter, scanTime, logger)
 
+	// Collect issue IDs from previously completed waves as race condition guard:
+	// these issues have already received spec D-Mails but paintress may not have
+	// applied the pr-open label yet.
+	specSentIssues := domain.CollectSpecSentIssueIDs(oldCompleted, oldWaves)
+
 	var failedNames map[string]bool
-	waves, _, failedNames, err = RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, _, failedNames, err = RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger, specSentIssues)
 	if err != nil {
 		err = fmt.Errorf("wave generate: %w", err)
 		return

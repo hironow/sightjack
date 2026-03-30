@@ -689,6 +689,26 @@ func ValidWaveActionType(t string) bool {
 	return validWaveActionTypes[t]
 }
 
+// CollectSpecSentIssueIDs returns issue IDs from completed waves' actions.
+// Used as session-level race condition guard: issues that have already received
+// spec D-Mails should not get new implementation waves even if paintress hasn't
+// applied the pr-open label yet.
+func CollectSpecSentIssueIDs(completed map[string]bool, waves []Wave) map[string]bool {
+	result := make(map[string]bool)
+	for _, w := range waves {
+		key := WaveKey(w)
+		if !completed[key] {
+			continue
+		}
+		for _, a := range w.Actions {
+			if a.IssueID != "" && !validWaveActionTypes[a.Type] {
+				result[a.IssueID] = true
+			}
+		}
+	}
+	return result
+}
+
 // CollectPROpenIssues scans clusters for issues with the paintress:pr-open label
 // and returns a set of issue IDs.
 func CollectPROpenIssues(clusters []ClusterScanResult) map[string]bool {
