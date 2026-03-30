@@ -160,6 +160,124 @@ func TestCollectSpecSentIssueIDs_FromCompletedWaves(t *testing.T) {
 	}
 }
 
+// TestFilterPROpenActions_GoTaskboardScenario reproduces the duplicate PR problem
+// discovered during go-taskboard 4-tool parallel operation (2026-03-30).
+// Issue #5 had 3 PRs (#14, #17, #26) all implementing status validation.
+// Issues #2, #3 had 4 PRs (#16, #19, #24, #25) all implementing pagination validation.
+// Root cause: sightjack generated implementation waves for issues that already had open PRs.
+func TestFilterPROpenActions_GoTaskboardScenario(t *testing.T) {
+	// given: go-taskboard-like waves with mixed issue management + implementation
+	waves := []Wave{
+		{
+			ID:          "validation-w1",
+			ClusterName: "status-validation",
+			Actions: []WaveAction{
+				{Type: "add_dod", IssueID: "5", Description: "Add DoD to status validation"},
+				{Type: "implement", IssueID: "5", Description: "Add ErrInvalidStatus validation"},
+				{Type: "add_dod", IssueID: "10", Description: "Add DoD to error handling"},
+				{Type: "implement", IssueID: "10", Description: "Replace strings.Contains with errors.Is"},
+			},
+		},
+		{
+			ID:          "pagination-w1",
+			ClusterName: "pagination",
+			Actions: []WaveAction{
+				{Type: "implement", IssueID: "2", Description: "Add offset validation"},
+				{Type: "implement", IssueID: "3", Description: "Add limit validation"},
+				{Type: "fix", IssueID: "1", Description: "Fix off-by-one in pagination"},
+			},
+		},
+	}
+	// Issues #5, #2, #3 already have PRs from previous session
+	prOpenIssues := map[string]bool{"5": true, "2": true, "3": true}
+
+	// when
+	filtered := FilterPROpenActions(waves, prOpenIssues)
+
+	// then: validation-w1 should keep add_dod for #5, implement for #10
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 waves, got %d", len(filtered))
+	}
+
+	// validation-w1: add_dod(#5) + add_dod(#10) + implement(#10) = 3 actions
+	valWave := filtered[0]
+	if len(valWave.Actions) != 3 {
+		t.Errorf("validation-w1: expected 3 actions (add_dod #5, add_dod #10, implement #10), got %d", len(valWave.Actions))
+	}
+	for _, a := range valWave.Actions {
+		if a.IssueID == "5" && a.Type == "implement" {
+			t.Error("validation-w1: implement for issue #5 should be filtered (PR exists)")
+		}
+	}
+
+	// pagination-w1: only fix(#1) remains (#2, #3 have PRs)
+	pagWave := filtered[1]
+	if len(pagWave.Actions) != 1 {
+		t.Errorf("pagination-w1: expected 1 action (fix #1), got %d", len(pagWave.Actions))
+	}
+	if pagWave.Actions[0].IssueID != "1" {
+		t.Errorf("pagination-w1: expected action for issue #1, got %s", pagWave.Actions[0].IssueID)
+	}
+}
+
+// TestCollectSpecSentIssueIDs_PreventsRaceDuplication verifies that even without
+// paintress:pr-open labels, spec-sent issue tracking prevents duplicate waves
+// during rescan (covers the race window before paintress applies labels).
+func TestCollectSpecSentIssueIDs_PreventsRaceDuplication(t *testing.T) {
+	// given: session where wave-1 was completed (spec sent to paintress)
+	// but paintress hasn't applied pr-open label yet (race window)
+	waves := []Wave{
+		{
+			ID:          "w1",
+			ClusterName: "validation",
+			Actions: []WaveAction{
+				{Type: "implement", IssueID: "5", Description: "Status validation"},
+				{Type: "implement", IssueID: "2", Description: "Offset validation"},
+				{Type: "add_dod", IssueID: "3", Description: "Add DoD"},
+			},
+		},
+	}
+	completed := map[string]bool{"validation:w1": true}
+
+	// when: collect spec-sent issue IDs
+	specSent := CollectSpecSentIssueIDs(completed, waves)
+
+	// then: implementation issues are tracked, issue-management issues are not
+	if !specSent["5"] {
+		t.Error("issue 5 should be tracked (implement action)")
+	}
+	if !specSent["2"] {
+		t.Error("issue 2 should be tracked (implement action)")
+	}
+	if specSent["3"] {
+		t.Error("issue 3 should NOT be tracked (add_dod is issue-management)")
+	}
+
+	// when: use spec-sent as additional filter
+	newWaves := []Wave{
+		{
+			ID:          "w2",
+			ClusterName: "validation",
+			Actions: []WaveAction{
+				{Type: "implement", IssueID: "5", Description: "DUPLICATE: same status validation"},
+				{Type: "implement", IssueID: "9", Description: "New: IDGenerator interface"},
+			},
+		},
+	}
+	filtered := FilterPROpenActions(newWaves, specSent)
+
+	// then: issue #5 filtered (spec already sent), issue #9 kept (new)
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(filtered))
+	}
+	if len(filtered[0].Actions) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(filtered[0].Actions))
+	}
+	if filtered[0].Actions[0].IssueID != "9" {
+		t.Errorf("expected action for issue #9, got %s", filtered[0].Actions[0].IssueID)
+	}
+}
+
 func TestIssueDetail_HasPROpen(t *testing.T) {
 	// given
 	issue := IssueDetail{
