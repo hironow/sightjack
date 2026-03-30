@@ -76,7 +76,7 @@ Supported keys:
   gate.approve_cmd          Gate approval command
   gate.review_cmd           Gate review command
   gate.review_budget        Max review cycles (non-negative integer)
-  gate.wait_timeout         D-Mail waiting phase timeout (e.g. 30m, 1h)
+  gate.idle_timeout          idle timeout — exit after no D-Mail activity (e.g. 30m, 1h)
   labels.enabled            Enable Linear label assignment (true/false)
   labels.prefix             Linear label prefix
   labels.ready_label        Linear ready label`,

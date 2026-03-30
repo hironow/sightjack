@@ -76,15 +76,15 @@ func TestWaitingMode_DisabledConfig(t *testing.T) {
 	cfg := domain.DefaultConfig()
 
 	// then: default timeout should be 30 minutes
-	if cfg.Gate.WaitTimeout != domain.DefaultWaitTimeout {
-		t.Errorf("expected default %v, got %v", domain.DefaultWaitTimeout, cfg.Gate.WaitTimeout)
+	if cfg.Gate.IdleTimeout != domain.DefaultIdleTimeout {
+		t.Errorf("expected default %v, got %v", domain.DefaultIdleTimeout, cfg.Gate.IdleTimeout)
 	}
 
 	// when: set negative timeout to disable waiting
-	cfg.Gate.WaitTimeout = -1
+	cfg.Gate.IdleTimeout = -1
 
 	// then: negative timeout represents disabled waiting mode
-	if cfg.Gate.WaitTimeout >= 0 {
+	if cfg.Gate.IdleTimeout >= 0 {
 		t.Error("negative timeout should represent disabled waiting mode")
 	}
 }

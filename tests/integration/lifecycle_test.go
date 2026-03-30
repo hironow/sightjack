@@ -117,7 +117,7 @@ func testConfig() *domain.Config {
 		Strictness: domain.StrictnessConfig{Default: domain.StrictnessFog},
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 		Labels:     domain.LabelsConfig{Enabled: false},
-		Gate:       domain.GateConfig{WaitTimeout: -1}, // disable D-Mail waiting in tests
+		Gate:       domain.GateConfig{IdleTimeout: -1}, // disable D-Mail waiting in tests
 	}
 }
 

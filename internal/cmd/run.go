@@ -92,8 +92,8 @@ if event data is found in .siren/events/.`,
 				cfg.Strictness.Default = level
 				logger.Info("Strictness override: %s", s)
 			}
-			if cmd.Flags().Changed("wait-timeout") {
-				cfg.Gate.WaitTimeout, _ = cmd.Flags().GetDuration("wait-timeout")
+			if cmd.Flags().Changed("idle-timeout") {
+				cfg.Gate.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
 			}
 
 			// Parse base directory into domain primitive (used by all command constructions below)
@@ -197,7 +197,7 @@ if event data is found in .siren/events/.`,
 	cmd.Flags().String("review-cmd", "", "Review command (exit 0 = pass, non-zero = comments found)")
 	cmd.Flags().String("session-mode", "", "Session mode: resume, new, or rescan (skip interactive prompt)")
 	cmd.Flags().StringP("strictness", "s", "", "Override default strictness level (fog, alert, lockdown)")
-	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
+	cmd.Flags().Duration("idle-timeout", domain.DefaultIdleTimeout, "idle timeout — exit after no D-Mail activity (0 = 24h safety cap, negative = disable waiting)")
 
 	return cmd
 }

@@ -110,8 +110,8 @@ waitingCycle:
 			break waitingCycle
 		}
 
-		// Negative WaitTimeout disables waiting mode
-		if cfg.Gate.WaitTimeout < 0 {
+		// Negative IdleTimeout disables waiting mode
+		if cfg.Gate.IdleTimeout < 0 {
 			break waitingCycle
 		}
 
@@ -125,7 +125,7 @@ waitingCycle:
 		fbCollector.Snapshot()
 
 		// Wait for D-Mail arrival
-		arrived, waitErr := waitForDMail(ctx, fbCollector, cfg.Gate.WaitTimeout, logger)
+		arrived, waitErr := waitForDMail(ctx, fbCollector, cfg.Gate.IdleTimeout, logger)
 		if waitErr != nil {
 			return loopResultDone, waves, completed, waitErr
 		}
