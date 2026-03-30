@@ -142,7 +142,7 @@ When a `convergence` D-Mail is detected at session startup, the **convergence ga
 2. **Approve** — blocking prompt (stdin y/N, external command, or auto-approve)
 3. **Re-drain** — checks for late-arriving convergence and loops if found
 
-The gate runs before the interactive wave loop in the `run` command (which supports resuming or rescanning from previous sessions). Gate behavior is configurable via `gate:` config section or `--notify-cmd` / `--approve-cmd` / `--auto-approve` CLI flags.
+The gate runs before the interactive wave loop in the `run` command (which supports resuming or rescanning from previous sessions). Gate behavior is configurable via `gate:` config section or `--notify-cmd` / `--approve-cmd` / `--auto-approve` CLI flags. When `--auto-approve` resumes a fully completed session (all waves done), sightjack automatically falls back to rescan to avoid idle deadlock.
 
 After the convergence gate, a **D-Mail waiting phase** polls the inbox for design-feedback D-Mails. The idle timeout is configurable via `--idle-timeout` (default: 30 minutes, `0` = 24h safety cap, negative = disable).
 
