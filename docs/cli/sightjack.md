@@ -39,6 +39,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
 * [sightjack run](sightjack_run.md)	 - Interactive wave approval and apply loop
 * [sightjack scan](sightjack_scan.md)	 - Classify and deep-scan issues
 * [sightjack select](sightjack_select.md)	 - Interactively pick a wave from stdin WavePlan
+* [sightjack sessions](sightjack_sessions.md)	 - Manage AI coding sessions
 * [sightjack show](sightjack_show.md)	 - Display last scan results
 * [sightjack status](sightjack_status.md)	 - Show sightjack operational status
 * [sightjack update](sightjack_update.md)	 - Self-update sightjack to the latest release

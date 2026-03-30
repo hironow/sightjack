@@ -71,16 +71,47 @@ func NewRetryRunner(inner port.ClaudeRunner, cfg *domain.Config, logger domain.L
 }
 
 // RunClaudeOnce executes the Claude CLI as a subprocess once without retry.
-// Thin wrapper around ClaudeAdapter for call-site compatibility.
+// Sessions are tracked in SQLite when the state directory is accessible.
 func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...port.RunOption) (string, error) {
-	return NewClaudeAdapter(cfg, logger).Run(ctx, prompt, w, opts...)
+	adapter := NewClaudeAdapter(cfg, logger)
+	return runWithSessionTracking(ctx, adapter, cfg, prompt, w, logger, opts...)
 }
 
 // RunClaude executes the Claude CLI with exponential backoff retry.
-// Thin wrapper around RetryRunner{ClaudeAdapter} for call-site compatibility.
+// Sessions are tracked in SQLite when the state directory is accessible.
 func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...port.RunOption) (string, error) {
 	adapter := NewClaudeAdapter(cfg, logger)
-	return NewRetryRunner(adapter, cfg, logger).Run(ctx, prompt, w, opts...)
+	retrier := NewRetryRunner(adapter, cfg, logger)
+	return runWithSessionTracking(ctx, retrier, cfg, prompt, w, logger, opts...)
+}
+
+// runWithSessionTracking wraps a ClaudeRunner invocation with session persistence.
+// Best-effort: if the session store cannot be opened, falls back to plain execution.
+func runWithSessionTracking(ctx context.Context, runner port.ClaudeRunner, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...port.RunOption) (string, error) {
+	// ClaudeRunner also implements DetailedRunner (ClaudeAdapter, RetryRunner both do)
+	detailed, ok := runner.(port.DetailedRunner)
+	if !ok {
+		return runner.Run(ctx, prompt, w, opts...)
+	}
+
+	rc := port.ApplyOptions(opts...)
+	configBase := rc.ConfigBase
+	if configBase == "" {
+		configBase = effectiveWorkDir(rc.WorkDir)
+	}
+	dbPath := filepath.Join(configBase, domain.StateDir, ".run", "sessions.db")
+	store, err := NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		if logger != nil {
+			logger.Debug("session tracking unavailable: %v", err)
+		}
+		return runner.Run(ctx, prompt, w, opts...)
+	}
+	defer store.Close()
+
+	tracker := NewSessionTrackingAdapter(detailed, store, domain.ProviderClaudeCode)
+	_, text, runErr := tracker.RunSession(ctx, prompt, w, opts...)
+	return text, runErr
 }
 
 // RunClaudeDryRun saves the prompt to a file instead of executing Claude,
