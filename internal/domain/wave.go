@@ -689,6 +689,20 @@ func ValidWaveActionType(t string) bool {
 	return validWaveActionTypes[t]
 }
 
+// CollectPROpenIssues scans clusters for issues with the paintress:pr-open label
+// and returns a set of issue IDs.
+func CollectPROpenIssues(clusters []ClusterScanResult) map[string]bool {
+	result := make(map[string]bool)
+	for _, c := range clusters {
+		for _, issue := range c.Issues {
+			if issue.HasPROpen() {
+				result[issue.ID] = true
+			}
+		}
+	}
+	return result
+}
+
 // FilterPROpenActions removes implementation-oriented actions for issues that
 // already have a PR open (paintress:pr-open label). Issue-management actions
 // (add_dod, add_dependency, etc.) are preserved because sightjack handles them

@@ -260,6 +260,17 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 	}
 
 	merged := domain.MergeWaveResults(successResults)
+
+	// Filter out implementation actions for issues that already have a PR open.
+	prOpenIssues := domain.CollectPROpenIssues(clusters)
+	if len(prOpenIssues) > 0 {
+		before := len(merged)
+		merged = domain.FilterPROpenActions(merged, prOpenIssues)
+		if filtered := before - len(merged); filtered > 0 {
+			logger.Info("Filtered %d wave(s) targeting PR-open issues", filtered)
+		}
+	}
+
 	merged, emptyCount := domain.FilterEmptyWaves(merged)
 	if emptyCount > 0 {
 		logger.Warn("Wave generation: filtered %d empty wave(s)", emptyCount)

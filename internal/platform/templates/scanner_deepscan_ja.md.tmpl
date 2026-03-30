@@ -45,7 +45,8 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
       "title": "Issue Title",
       "status": "backlog|todo|in_progress|in_review|done|cancelled",
       "completeness": 0.4,
-      "gaps": ["DoD missing", "No dependency specified"]
+      "gaps": ["DoD missing", "No dependency specified"],
+      "labels": ["label1", "label2"]
     }
   ],
   "observations": ["クラスタ横断の発見事項"]
@@ -58,7 +59,7 @@ estimated_strictnessの判断基準:
 - 実装の成熟度（初期段階 → fog、本番コード → alert/lockdown）
 
 {{- if .IsWaveMode}}
-各Issueについて、GitHubの現在のissue stateを "status" フィールドに含めてください。
+各Issueについて、GitHubの現在のissue stateを "status" フィールドに、全てのGitHubラベルを "labels" 配列に含めてください。
 {{- else}}
 各Issueについて、Linearの現在のステータスを "status" フィールドに含めてください。
 {{- end}}

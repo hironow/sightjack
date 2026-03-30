@@ -91,6 +91,39 @@ func TestFilterPROpenActions_RemovesWaveWithNoRemainingActions(t *testing.T) {
 	}
 }
 
+func TestCollectPROpenIssues_ExtractsFromClusters(t *testing.T) {
+	// given
+	clusters := []ClusterScanResult{
+		{
+			Name: "validation",
+			Issues: []IssueDetail{
+				{ID: "5", Labels: []string{"paintress:pr-open"}},
+				{ID: "3", Labels: []string{"sightjack:analyzed"}},
+			},
+		},
+		{
+			Name: "infra",
+			Issues: []IssueDetail{
+				{ID: "21", Labels: []string{"paintress:pr-open", "sightjack:wave-done"}},
+			},
+		},
+	}
+
+	// when
+	result := CollectPROpenIssues(clusters)
+
+	// then
+	if len(result) != 2 {
+		t.Fatalf("expected 2 PR-open issues, got %d", len(result))
+	}
+	if !result["5"] || !result["21"] {
+		t.Errorf("expected issues 5 and 21, got %v", result)
+	}
+	if result["3"] {
+		t.Error("issue 3 should not be in PR-open set")
+	}
+}
+
 func TestIssueDetail_HasPROpen(t *testing.T) {
 	// given
 	issue := IssueDetail{
