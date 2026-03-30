@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -46,6 +47,14 @@ if event data is found in .siren/events/.`,
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
+			// Acquire daemon lock — prevents multiple instances on the same directory
+			runDir := filepath.Join(baseDir, domain.StateDir, ".run")
+			unlock, lockErr := session.TryLockDaemon(runDir)
+			if lockErr != nil {
+				return fmt.Errorf("daemon lock: %w", lockErr)
+			}
+			defer unlock()
+
 			cfg, err := loadConfig(cmd, baseDir)
 			if err != nil {
 				return err
