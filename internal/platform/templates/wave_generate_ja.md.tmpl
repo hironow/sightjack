@@ -41,6 +41,8 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 - `fix`: 既存Issueのバグ修正。detailにバグの内容と期待される動作を記述。
 - `verify`: Issue完了を検証するテストの追加・更新。detailにテスト内容を記述。
 
+**重要:** `paintress:pr-open`ラベルがついたIssueにはpaintressが作成したPRが既に存在します。これらのIssueに対してimplement/fix/verifyアクションを生成しないでください。issue管理アクション（add_dod, add_dependency等）のみ許可されます。既存PRはamadeusパイプラインを通じてレビューフィードバックを受けます。
+
 {{if .DoDSection}}
 ## 完成基準（DoD）ガイドライン
 

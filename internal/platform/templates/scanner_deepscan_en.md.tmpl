@@ -46,7 +46,8 @@ Write the following JSON to **{{.OutputPath}}**:
       "title": "Issue Title",
       "status": "backlog|todo|in_progress|in_review|done|cancelled",
       "completeness": 0.4,
-      "gaps": ["DoD missing", "No dependency specified"]
+      "gaps": ["DoD missing", "No dependency specified"],
+      "labels": ["label1", "label2"]
     }
   ],
   "observations": ["Cross-cluster findings"]
@@ -59,7 +60,7 @@ For estimated_strictness, evaluate:
 - Implementation maturity (early stage → fog, production code → alert/lockdown)
 
 {{- if .IsWaveMode}}
-For each issue, include the current GitHub issue state in the "status" field.
+For each issue, include the current GitHub issue state in the "status" field and all GitHub labels in the "labels" array.
 {{- else}}
 For each issue, include the current Linear status in the "status" field.
 {{- end}}
