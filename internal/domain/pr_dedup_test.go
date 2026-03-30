@@ -1,14 +1,18 @@
-package domain
+package domain_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hironow/sightjack/internal/domain"
+)
 
 func TestFilterPROpenActions_RemovesImplementationForPROpenIssues(t *testing.T) {
 	// given: wave with mixed actions — some issues have PR open, some don't
-	waves := []Wave{
+	waves := []domain.Wave{
 		{
 			ID:          "w1",
 			ClusterName: "validation",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "5", Description: "Add validation"},
 				{Type: "add_dod", IssueID: "5", Description: "Add DoD to #5"},
 				{Type: "implement", IssueID: "3", Description: "Fix pagination"},
@@ -18,7 +22,7 @@ func TestFilterPROpenActions_RemovesImplementationForPROpenIssues(t *testing.T) 
 	prOpenIssues := map[string]bool{"5": true}
 
 	// when
-	filtered := FilterPROpenActions(waves, prOpenIssues)
+	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: issue #5's implementation removed, but add_dod kept; issue #3 unchanged
 	if len(filtered) != 1 {
@@ -37,11 +41,11 @@ func TestFilterPROpenActions_RemovesImplementationForPROpenIssues(t *testing.T) 
 
 func TestFilterPROpenActions_KeepsAllWhenNoPROpen(t *testing.T) {
 	// given: no issues have PR open
-	waves := []Wave{
+	waves := []domain.Wave{
 		{
 			ID:          "w1",
 			ClusterName: "core",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "1", Description: "Implement feature"},
 				{Type: "fix", IssueID: "2", Description: "Fix bug"},
 			},
@@ -50,7 +54,7 @@ func TestFilterPROpenActions_KeepsAllWhenNoPROpen(t *testing.T) {
 	prOpenIssues := map[string]bool{}
 
 	// when
-	filtered := FilterPROpenActions(waves, prOpenIssues)
+	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: all actions preserved
 	if len(filtered[0].Actions) != 2 {
@@ -60,11 +64,11 @@ func TestFilterPROpenActions_KeepsAllWhenNoPROpen(t *testing.T) {
 
 func TestFilterPROpenActions_RemovesWaveWithNoRemainingActions(t *testing.T) {
 	// given: wave where ALL actions are implementation for PR-open issues
-	waves := []Wave{
+	waves := []domain.Wave{
 		{
 			ID:          "w1",
 			ClusterName: "design",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "5", Description: "Implement"},
 				{Type: "fix", IssueID: "5", Description: "Fix"},
 			},
@@ -72,7 +76,7 @@ func TestFilterPROpenActions_RemovesWaveWithNoRemainingActions(t *testing.T) {
 		{
 			ID:          "w2",
 			ClusterName: "core",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "3", Description: "Implement"},
 			},
 		},
@@ -80,7 +84,7 @@ func TestFilterPROpenActions_RemovesWaveWithNoRemainingActions(t *testing.T) {
 	prOpenIssues := map[string]bool{"5": true}
 
 	// when
-	filtered := FilterPROpenActions(waves, prOpenIssues)
+	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: w1 removed entirely (no remaining actions), w2 kept
 	if len(filtered) != 1 {
@@ -93,24 +97,24 @@ func TestFilterPROpenActions_RemovesWaveWithNoRemainingActions(t *testing.T) {
 
 func TestCollectPROpenIssues_ExtractsFromClusters(t *testing.T) {
 	// given
-	clusters := []ClusterScanResult{
+	clusters := []domain.ClusterScanResult{
 		{
 			Name: "validation",
-			Issues: []IssueDetail{
+			Issues: []domain.IssueDetail{
 				{ID: "5", Labels: []string{"paintress:pr-open"}},
 				{ID: "3", Labels: []string{"sightjack:analyzed"}},
 			},
 		},
 		{
 			Name: "infra",
-			Issues: []IssueDetail{
+			Issues: []domain.IssueDetail{
 				{ID: "21", Labels: []string{"paintress:pr-open", "sightjack:wave-done"}},
 			},
 		},
 	}
 
 	// when
-	result := CollectPROpenIssues(clusters)
+	result := domain.CollectPROpenIssues(clusters)
 
 	// then
 	if len(result) != 2 {
@@ -126,11 +130,11 @@ func TestCollectPROpenIssues_ExtractsFromClusters(t *testing.T) {
 
 func TestCollectSpecSentIssueIDs_FromCompletedWaves(t *testing.T) {
 	// given: 2 waves, one completed with implementation actions
-	waves := []Wave{
+	waves := []domain.Wave{
 		{
 			ID:          "w1",
 			ClusterName: "validation",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "5", Description: "Implement"},
 				{Type: "add_dod", IssueID: "3", Description: "Add DoD"},
 			},
@@ -138,7 +142,7 @@ func TestCollectSpecSentIssueIDs_FromCompletedWaves(t *testing.T) {
 		{
 			ID:          "w2",
 			ClusterName: "infra",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "fix", IssueID: "21", Description: "Fix"},
 			},
 		},
@@ -146,7 +150,7 @@ func TestCollectSpecSentIssueIDs_FromCompletedWaves(t *testing.T) {
 	completed := map[string]bool{"validation:w1": true} // only w1 completed
 
 	// when
-	result := CollectSpecSentIssueIDs(completed, waves)
+	result := domain.CollectSpecSentIssueIDs(completed, waves)
 
 	// then: only implementation actions from completed waves
 	if !result["5"] {
@@ -167,11 +171,11 @@ func TestCollectSpecSentIssueIDs_FromCompletedWaves(t *testing.T) {
 // Root cause: sightjack generated implementation waves for issues that already had open PRs.
 func TestFilterPROpenActions_GoTaskboardScenario(t *testing.T) {
 	// given: go-taskboard-like waves with mixed issue management + implementation
-	waves := []Wave{
+	waves := []domain.Wave{
 		{
 			ID:          "validation-w1",
 			ClusterName: "status-validation",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "add_dod", IssueID: "5", Description: "Add DoD to status validation"},
 				{Type: "implement", IssueID: "5", Description: "Add ErrInvalidStatus validation"},
 				{Type: "add_dod", IssueID: "10", Description: "Add DoD to error handling"},
@@ -181,7 +185,7 @@ func TestFilterPROpenActions_GoTaskboardScenario(t *testing.T) {
 		{
 			ID:          "pagination-w1",
 			ClusterName: "pagination",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "2", Description: "Add offset validation"},
 				{Type: "implement", IssueID: "3", Description: "Add limit validation"},
 				{Type: "fix", IssueID: "1", Description: "Fix off-by-one in pagination"},
@@ -192,7 +196,7 @@ func TestFilterPROpenActions_GoTaskboardScenario(t *testing.T) {
 	prOpenIssues := map[string]bool{"5": true, "2": true, "3": true}
 
 	// when
-	filtered := FilterPROpenActions(waves, prOpenIssues)
+	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: validation-w1 should keep add_dod for #5, implement for #10
 	if len(filtered) != 2 {
@@ -226,11 +230,11 @@ func TestFilterPROpenActions_GoTaskboardScenario(t *testing.T) {
 func TestCollectSpecSentIssueIDs_PreventsRaceDuplication(t *testing.T) {
 	// given: session where wave-1 was completed (spec sent to paintress)
 	// but paintress hasn't applied pr-open label yet (race window)
-	waves := []Wave{
+	waves := []domain.Wave{
 		{
 			ID:          "w1",
 			ClusterName: "validation",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "5", Description: "Status validation"},
 				{Type: "implement", IssueID: "2", Description: "Offset validation"},
 				{Type: "add_dod", IssueID: "3", Description: "Add DoD"},
@@ -240,7 +244,7 @@ func TestCollectSpecSentIssueIDs_PreventsRaceDuplication(t *testing.T) {
 	completed := map[string]bool{"validation:w1": true}
 
 	// when: collect spec-sent issue IDs
-	specSent := CollectSpecSentIssueIDs(completed, waves)
+	specSent := domain.CollectSpecSentIssueIDs(completed, waves)
 
 	// then: implementation issues are tracked, issue-management issues are not
 	if !specSent["5"] {
@@ -254,17 +258,17 @@ func TestCollectSpecSentIssueIDs_PreventsRaceDuplication(t *testing.T) {
 	}
 
 	// when: use spec-sent as additional filter
-	newWaves := []Wave{
+	newWaves := []domain.Wave{
 		{
 			ID:          "w2",
 			ClusterName: "validation",
-			Actions: []WaveAction{
+			Actions: []domain.WaveAction{
 				{Type: "implement", IssueID: "5", Description: "DUPLICATE: same status validation"},
 				{Type: "implement", IssueID: "9", Description: "New: IDGenerator interface"},
 			},
 		},
 	}
-	filtered := FilterPROpenActions(newWaves, specSent)
+	filtered := domain.FilterPROpenActions(newWaves, specSent)
 
 	// then: issue #5 filtered (spec already sent), issue #9 kept (new)
 	if len(filtered) != 1 {
@@ -280,7 +284,7 @@ func TestCollectSpecSentIssueIDs_PreventsRaceDuplication(t *testing.T) {
 
 func TestIssueDetail_HasPROpen(t *testing.T) {
 	// given
-	issue := IssueDetail{
+	issue := domain.IssueDetail{
 		ID:     "5",
 		Labels: []string{"sightjack:analyzed", "paintress:pr-open"},
 	}
@@ -290,7 +294,7 @@ func TestIssueDetail_HasPROpen(t *testing.T) {
 		t.Error("expected HasPROpen=true for issue with paintress:pr-open label")
 	}
 
-	issueWithout := IssueDetail{
+	issueWithout := domain.IssueDetail{
 		ID:     "3",
 		Labels: []string{"sightjack:analyzed"},
 	}
