@@ -119,8 +119,19 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	var output strings.Builder
 	var responseModel, responseID string
 	var providerSessionID string
+	var runResultErr error // captured by deferred closure
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
+
+	// Create normalizer at RunDetailed scope so defer can emit session_end.
+	var normalizer *platform.StreamNormalizer
+	if a.StreamBus != nil && a.ToolName != "" {
+		normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		defer func() {
+			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
+			a.StreamBus.Publish(ctx, endEvent)
+		}()
+	}
 
 	go func() {
 		defer close(done)
@@ -132,9 +143,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		emitter.SetInput(prompt)
 
 		// Wire live stream event bus when available.
-		var normalizer *platform.StreamNormalizer
-		if a.StreamBus != nil && a.ToolName != "" {
-			normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		if normalizer != nil {
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := normalizer.Normalize(msg, raw); ev != nil {
 					a.StreamBus.Publish(ctx, *ev)
@@ -236,11 +245,13 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 				trace.WithAttributes(attribute.Int("claude.timeout_sec", a.TimeoutSec)),
 			)
 		}
-		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("claude exit: %w", err)
+		runResultErr = fmt.Errorf("claude exit: %w", err)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 	}
 
 	if readError != nil {
-		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("stream read: %w", readError)
+		runResultErr = fmt.Errorf("stream read: %w", readError)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 	}
 
 	return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, nil
