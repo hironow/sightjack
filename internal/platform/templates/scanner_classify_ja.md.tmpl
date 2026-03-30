@@ -42,6 +42,7 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 3. 各クラスタの名前と所属する Issue ID（GitHub issue番号）のリストを作成してください
 4. 各クラスタについて、所属する全Issueの GitHub ラベルの和集合を "labels" 配列に含めてください
 5. 下記の屍人チェック用に、クローズ済みIssueも取得: `gh issue list --state closed --json number,title,labels,body,state --limit 200`
+6. **古いラベルの清掃**: `paintress:pr-open` ラベルがついたIssueについて、まだオープンなPRが存在するか確認してください（`gh pr list --state open --search "issue番号" --limit 5`）。オープンPRがなければ古いラベルを除去: `gh issue edit <番号> --remove-label "paintress:pr-open"`（PRがマージまたはクローズされた場合）
 {{- else}}
 1. Linear MCP で Issue 一覧を取得してください
 2. Issue のタイトル・ラベル・説明から論理的なクラスタに分類してください
@@ -72,7 +73,7 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 {{- if .LabelsEnabled}}
 {{- if .IsWaveMode}}
-分類完了後、ラベル "{{.LabelPrefix}}:analyzed" が存在することを確認し（なければ `gh label create "{{.LabelPrefix}}:analyzed" --force` で作成）、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:analyzed"` を使用して各分析済みIssueにラベルを付与してください。
+分類完了後、ラベル "{{.LabelPrefix}}:analyzed" が存在することを確認し（なければ `gh label create "{{.LabelPrefix}}:analyzed" --force` で作成）、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:analyzed"` を使用して各分析済みIssueにラベルを付与してください。ただし既に "{{.LabelPrefix}}:wave-done" ラベルがついているIssueにはanalyzedラベルをつけないでください（状態をダウングレードしない）。
 {{- else}}
 分類完了後、Linear MCPを使用して各分析済みIssueに "{{.LabelPrefix}}:analyzed" ラベルを付与してください。
 {{- end}}

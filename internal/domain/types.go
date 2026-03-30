@@ -53,6 +53,20 @@ type IssueDetail struct {
 	Status       string   `json:"status"`
 	Completeness float64  `json:"completeness"`
 	Gaps         []string `json:"gaps"`
+	Labels       []string `json:"labels,omitempty"`
+}
+
+// PROpenLabel is the label indicating that paintress has created a PR for this issue.
+const PROpenLabel = "paintress:pr-open"
+
+// HasPROpen reports whether this issue has the paintress:pr-open label.
+func (d IssueDetail) HasPROpen() bool {
+	for _, l := range d.Labels {
+		if l == PROpenLabel {
+			return true
+		}
+	}
+	return false
 }
 
 // ShibitoWarning represents a detected resurrection risk — a previously

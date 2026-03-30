@@ -42,6 +42,7 @@ DoD checking: ALWAYS full-depth regardless of Strictness level.
 3. Create a list of cluster names with their associated Issue IDs (use GitHub issue numbers as IDs)
 4. For each cluster, collect the union of all GitHub labels from its issues into the "labels" array
 5. For the Shibito check below, also fetch closed issues: `gh issue list --state closed --json number,title,labels,body,state --limit 200`
+6. **Stale label cleanup**: For issues with the `paintress:pr-open` label, check if they still have an OPEN pull request (use `gh pr list --state open --search "issue_number" --limit 5`). If no open PR references the issue, remove the stale label: `gh issue edit <number> --remove-label "paintress:pr-open"` (the PR was merged or closed)
 {{- else}}
 1. Fetch the Issue list via Linear MCP
 2. Classify Issues into logical clusters based on title, labels, and description
@@ -73,7 +74,7 @@ Each cluster must have both a "name" (display name, can be any language) and a "
 
 {{- if .LabelsEnabled}}
 {{- if .IsWaveMode}}
-After classification, ensure the label "{{.LabelPrefix}}:analyzed" exists (create with `gh label create "{{.LabelPrefix}}:analyzed" --force` if needed), then apply it to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`.
+After classification, ensure the label "{{.LabelPrefix}}:analyzed" exists (create with `gh label create "{{.LabelPrefix}}:analyzed" --force` if needed), then apply it to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`. Skip issues that already have the "{{.LabelPrefix}}:wave-done" label (do not downgrade their state).
 {{- else}}
 After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using Linear MCP.
 {{- end}}

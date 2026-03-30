@@ -688,3 +688,62 @@ var validWaveActionTypes = map[string]bool{
 func ValidWaveActionType(t string) bool {
 	return validWaveActionTypes[t]
 }
+
+// CollectSpecSentIssueIDs returns issue IDs from completed waves' actions.
+// Used as session-level race condition guard: issues that have already received
+// spec D-Mails should not get new implementation waves even if paintress hasn't
+// applied the pr-open label yet.
+func CollectSpecSentIssueIDs(completed map[string]bool, waves []Wave) map[string]bool {
+	result := make(map[string]bool)
+	for _, w := range waves {
+		key := WaveKey(w)
+		if !completed[key] {
+			continue
+		}
+		for _, a := range w.Actions {
+			if a.IssueID != "" && !validWaveActionTypes[a.Type] {
+				result[a.IssueID] = true
+			}
+		}
+	}
+	return result
+}
+
+// CollectPROpenIssues scans clusters for issues with the paintress:pr-open label
+// and returns a set of issue IDs.
+func CollectPROpenIssues(clusters []ClusterScanResult) map[string]bool {
+	result := make(map[string]bool)
+	for _, c := range clusters {
+		for _, issue := range c.Issues {
+			if issue.HasPROpen() {
+				result[issue.ID] = true
+			}
+		}
+	}
+	return result
+}
+
+// FilterPROpenActions removes implementation-oriented actions for issues that
+// already have a PR open (paintress:pr-open label). Issue-management actions
+// (add_dod, add_dependency, etc.) are preserved because sightjack handles them
+// directly. Waves with no remaining actions are removed entirely.
+func FilterPROpenActions(waves []Wave, prOpenIssues map[string]bool) []Wave {
+	if len(prOpenIssues) == 0 {
+		return waves
+	}
+	result := make([]Wave, 0, len(waves))
+	for _, w := range waves {
+		var kept []WaveAction
+		for _, a := range w.Actions {
+			if prOpenIssues[a.IssueID] && !validWaveActionTypes[a.Type] {
+				continue // implementation action for PR-open issue → skip
+			}
+			kept = append(kept, a)
+		}
+		if len(kept) > 0 {
+			w.Actions = kept
+			result = append(result, w)
+		}
+	}
+	return result
+}

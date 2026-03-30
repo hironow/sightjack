@@ -41,6 +41,8 @@ DoD checking: ALWAYS full-depth regardless of Strictness level.
 - `fix`: Bug fix for an existing Issue. Detail should describe the bug and expected behavior.
 - `verify`: Add or update tests to verify Issue completion. Detail should describe what to test.
 
+**Important:** Issues with the `paintress:pr-open` label already have a PR created by paintress. Do NOT generate implementation/fix/verify actions for these issues — only issue-management actions (add_dod, add_dependency, etc.) are allowed. The existing PR will receive review feedback through the amadeus pipeline.
+
 {{if .DoDSection}}
 ## Definition of Done Guidelines
 
