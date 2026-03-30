@@ -39,11 +39,11 @@ sightjack run [path] [flags]
       --approve-cmd string      Approval command ({message} placeholder, exit 0 = approve)
       --auto-approve            Skip all interactive prompts (resume session + convergence gate)
   -h, --help                    help for run
+      --idle-timeout duration   idle timeout — exit after no D-Mail activity (0 = 24h safety cap, negative = disable waiting) (default 30m0s)
       --notify-cmd string       Notification command ({title}, {message} placeholders)
       --review-cmd string       Review command (exit 0 = pass, non-zero = comments found)
       --session-mode string     Session mode: resume, new, or rescan (skip interactive prompt)
   -s, --strictness string       Override default strictness level (fog, alert, lockdown)
-      --wait-timeout duration   D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting) (default 30m0s)
 ```
 
 ### Options inherited from parent commands

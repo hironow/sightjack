@@ -134,8 +134,8 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 	if cfg.Gate.ReviewBudget != 0 {
 		t.Errorf("Gate.ReviewBudget: expected 0, got %d", cfg.Gate.ReviewBudget)
 	}
-	if cfg.Gate.WaitTimeout != 30*time.Minute {
-		t.Errorf("Gate.WaitTimeout: expected 30m, got %v", cfg.Gate.WaitTimeout)
+	if cfg.Gate.IdleTimeout != 30*time.Minute {
+		t.Errorf("Gate.IdleTimeout: expected 30m, got %v", cfg.Gate.IdleTimeout)
 	}
 
 	// then: Tracker defaults (all zero values)
@@ -375,19 +375,19 @@ func TestValidLang_RejectsInvalid(t *testing.T) {
 	}
 }
 
-func TestDefaultWaitTimeout(t *testing.T) {
-	if domain.DefaultWaitTimeout != 30*time.Minute {
-		t.Errorf("got %v, want 30m", domain.DefaultWaitTimeout)
+func TestDefaultIdleTimeout(t *testing.T) {
+	if domain.DefaultIdleTimeout != 30*time.Minute {
+		t.Errorf("got %v, want 30m", domain.DefaultIdleTimeout)
 	}
 }
 
-func TestDefaultConfig_WaitTimeout(t *testing.T) {
+func TestDefaultConfig_IdleTimeout(t *testing.T) {
 	// given/when
 	cfg := domain.DefaultConfig()
 
 	// then
-	if cfg.Gate.WaitTimeout != 30*time.Minute {
-		t.Errorf("Gate.WaitTimeout: expected 30m, got %v", cfg.Gate.WaitTimeout)
+	if cfg.Gate.IdleTimeout != 30*time.Minute {
+		t.Errorf("Gate.IdleTimeout: expected 30m, got %v", cfg.Gate.IdleTimeout)
 	}
 }
 

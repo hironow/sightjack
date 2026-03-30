@@ -135,12 +135,12 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 			return fmt.Errorf("invalid gate.review_budget %q: must be non-negative integer", value)
 		}
 		cfg.Gate.SetReviewBudget(n)
-	case "gate.wait_timeout":
+	case "gate.idle_timeout":
 		d, err := time.ParseDuration(value)
 		if err != nil {
-			return fmt.Errorf("invalid gate.wait_timeout %q: must be duration (e.g. 30m, 1h)", value)
+			return fmt.Errorf("invalid gate.idle_timeout %q: must be duration (e.g. 30m, 1h)", value)
 		}
-		cfg.Gate.SetWaitTimeout(d)
+		cfg.Gate.SetIdleTimeout(d)
 	case "strictness.estimated", "computed.estimated_strictness":
 		return fmt.Errorf("key %q is computed (read-only): cannot be set manually", key)
 	default:

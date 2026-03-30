@@ -854,7 +854,7 @@ lang: "ja"
 	}
 }
 
-func TestUpdateConfig_SetGateWaitTimeout(t *testing.T) {
+func TestUpdateConfig_SetGateIdleTimeout(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
@@ -865,15 +865,15 @@ lang: "ja"
 `), 0644)
 
 	// when
-	err := session.UpdateConfig(cfgPath, "gate.wait_timeout", "1h30m")
+	err := session.UpdateConfig(cfgPath, "gate.idle_timeout", "1h30m")
 
 	// then
 	if err != nil {
 		t.Fatalf("UpdateConfig: %v", err)
 	}
 	cfg, _ := session.LoadConfig(cfgPath)
-	if cfg.Gate.WaitTimeout.String() != "1h30m0s" {
-		t.Errorf("expected 1h30m0s, got %s", cfg.Gate.WaitTimeout)
+	if cfg.Gate.IdleTimeout.String() != "1h30m0s" {
+		t.Errorf("expected 1h30m0s, got %s", cfg.Gate.IdleTimeout)
 	}
 }
 
@@ -930,18 +930,18 @@ func TestUpdateConfig_InvalidRetryMaxAttempts_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestUpdateConfig_InvalidGateWaitTimeout_ReturnsError(t *testing.T) {
+func TestUpdateConfig_InvalidGateIdleTimeout_ReturnsError(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
 	os.WriteFile(cfgPath, []byte(`tracker: {team: "MY"}`), 0644)
 
 	// when
-	err := session.UpdateConfig(cfgPath, "gate.wait_timeout", "notaduration")
+	err := session.UpdateConfig(cfgPath, "gate.idle_timeout", "notaduration")
 
 	// then
 	if err == nil {
-		t.Error("expected error for invalid gate.wait_timeout")
+		t.Error("expected error for invalid gate.idle_timeout")
 	}
 }
 

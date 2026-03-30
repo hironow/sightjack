@@ -38,8 +38,8 @@ type LabelsConfig struct {
 	ReadyLabel string `yaml:"ready_label"`
 }
 
-// DefaultWaitTimeout is the default D-Mail waiting phase timeout.
-const DefaultWaitTimeout = 30 * time.Minute
+// DefaultIdleTimeout is the default idle timeout for exiting after no D-Mail activity.
+const DefaultIdleTimeout = 30 * time.Minute
 
 // ApproverConfig describes how approval behavior is configured.
 // Implemented by GateConfig. Used by session.BuildApprover.
@@ -56,7 +56,7 @@ type GateConfig struct {
 	AutoApprove  bool          `yaml:"auto_approve"`
 	ReviewCmd    string        `yaml:"review_cmd"`
 	ReviewBudget int           `yaml:"review_budget"` // max review cycles (0 = default 3)
-	WaitTimeout  time.Duration `yaml:"wait_timeout"`  // D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable waiting)
+	IdleTimeout  time.Duration `yaml:"idle_timeout"`   // idle timeout — exit after no D-Mail activity (0 = 24h safety cap, <0 = disable waiting)
 }
 
 // IsAutoApprove reports whether the gate is configured to auto-approve.
@@ -103,8 +103,8 @@ func (g *GateConfig) SetReviewCmd(cmd string) { g.ReviewCmd = cmd }
 // SetReviewBudget sets the max review cycles.
 func (g *GateConfig) SetReviewBudget(n int) { g.ReviewBudget = n }
 
-// SetWaitTimeout sets the D-Mail waiting phase timeout.
-func (g *GateConfig) SetWaitTimeout(d time.Duration) { g.WaitTimeout = d }
+// SetIdleTimeout sets the idle timeout for exiting after no D-Mail activity.
+func (g *GateConfig) SetIdleTimeout(d time.Duration) { g.IdleTimeout = d }
 
 // Default values for Config fields. Used by DefaultConfig and post-load
 // validation to avoid hardcoded strings throughout the codebase.
@@ -234,7 +234,7 @@ func DefaultConfig() Config {
 			ReadyLabel: "sightjack:ready",
 		},
 		Gate: GateConfig{
-			WaitTimeout: DefaultWaitTimeout,
+			IdleTimeout: DefaultIdleTimeout,
 		},
 		Lang: "ja",
 	}

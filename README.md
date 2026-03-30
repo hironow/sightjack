@@ -144,7 +144,7 @@ When a `convergence` D-Mail is detected at session startup, the **convergence ga
 
 The gate runs before the interactive wave loop in the `run` command (which supports resuming or rescanning from previous sessions). Gate behavior is configurable via `gate:` config section or `--notify-cmd` / `--approve-cmd` / `--auto-approve` CLI flags.
 
-After the convergence gate, a **D-Mail waiting phase** polls the inbox for design-feedback D-Mails. The waiting timeout is configurable via `--wait-timeout` (default: 30 minutes, `0` = 24h safety cap, negative = disable).
+After the convergence gate, a **D-Mail waiting phase** polls the inbox for design-feedback D-Mails. The idle timeout is configurable via `--idle-timeout` (default: 30 minutes, `0` = 24h safety cap, negative = disable).
 
 SKILL.md files in `.siren/skills/` declare produces/consumes routing for phonewave discovery using Agent Skills spec format with `dmail-schema-version: "1"`.
 
@@ -356,7 +356,7 @@ gate:
   notify_cmd: ""         # Custom notification command ({title}, {message} placeholders)
   approve_cmd: ""        # Custom approval command ({message} placeholder, exit 0 = approve)
   auto_approve: false    # Skip approval gate for convergence D-Mail
-  wait_timeout: 30m      # D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable)
+  idle_timeout: 30m      # idle timeout — exit after no D-Mail activity (0 = 24h safety cap, <0 = disable)
 
 dod_templates:           # Custom DoD templates by issue type
   api_endpoint:

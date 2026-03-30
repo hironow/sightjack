@@ -190,7 +190,7 @@ func TestConfigCmd_SetAllKeys(t *testing.T) {
 		{"gate.approve_cmd", "approve-it", "approve_cmd: approve-it"},
 		{"gate.review_cmd", "pnpm lint", "review_cmd: pnpm lint"},
 		{"gate.review_budget", "3", "review_budget: 3"},
-		{"gate.wait_timeout", "45m0s", "wait_timeout: 45m0s"},
+		{"gate.idle_timeout", "45m0s", "idle_timeout: 45m0s"},
 		// labels
 		{"labels.enabled", "true", "enabled: true"},
 		{"labels.prefix", "sj-", "prefix: sj-"},

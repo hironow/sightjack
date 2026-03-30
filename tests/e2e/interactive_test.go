@@ -91,8 +91,8 @@ func TestE2E_Run_NewSession(t *testing.T) {
 	}
 	defer c.Close()
 
-	// --wait-timeout=-1s disables D-Mail waiting mode to prevent blocking after nextgen.
-	cmd := exec.Command(sightjackBin(), "run", "--linear", "--wait-timeout=-1s", dir)
+	// --idle-timeout=-1s disables D-Mail waiting mode to prevent blocking after nextgen.
+	cmd := exec.Command(sightjackBin(), "run", "--linear", "--idle-timeout=-1s", dir)
 	cmd.Stdin = c.Tty()
 	cmd.Stdout = c.Tty()
 	cmd.Stderr = c.Tty()
@@ -168,7 +168,7 @@ func TestE2E_Run_QuitImmediately(t *testing.T) {
 	}
 	defer c.Close()
 
-	cmd := exec.Command(sightjackBin(), "run", "--linear", "--wait-timeout=-1s", dir)
+	cmd := exec.Command(sightjackBin(), "run", "--linear", "--idle-timeout=-1s", dir)
 	cmd.Stdin = c.Tty()
 	cmd.Stdout = c.Tty()
 	cmd.Stderr = c.Tty()

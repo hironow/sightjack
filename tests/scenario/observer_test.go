@@ -229,15 +229,15 @@ func (o *Observer) AssertEventExists(eventType string) {
 // --- Waiting mode and Label helpers (proposals 033, 034) ---
 
 // AssertWaitingModeNotActive verifies that the current scenario is NOT in
-// waiting mode (the default when --wait-timeout -1s is passed). This documents
+// waiting mode (the default when --idle-timeout -1s is passed). This documents
 // the structural blind spot: all scenario tests disable waiting mode.
 func (o *Observer) AssertWaitingModeNotActive() {
 	o.t.Helper()
 	// In waiting mode, .siren/run/watch.pid would exist.
-	// When disabled (--wait-timeout -1s), no watch.pid should be present.
+	// When disabled (--idle-timeout -1s), no watch.pid should be present.
 	pidPath := filepath.Join(o.ws.RepoPath, ".siren", "run", "watch.pid")
 	if _, err := os.Stat(pidPath); err == nil {
-		o.t.Error("watch.pid exists — waiting mode should not be active in scenario tests (--wait-timeout -1s)")
+		o.t.Error("watch.pid exists — waiting mode should not be active in scenario tests (--idle-timeout -1s)")
 	}
 }
 
