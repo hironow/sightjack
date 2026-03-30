@@ -143,6 +143,20 @@ type SessionState struct {
 	ScanResultPath  string         `json:"scan_result_path,omitempty"`
 }
 
+// AllWavesCompleted returns true if all waves in the session have status "completed".
+// Returns false for an empty wave list.
+func (s *SessionState) AllWavesCompleted() bool {
+	if len(s.Waves) == 0 {
+		return false
+	}
+	for _, w := range s.Waves {
+		if w.Status != "completed" {
+			return false
+		}
+	}
+	return true
+}
+
 // ClusterState is the per-cluster state within SessionState.
 type ClusterState struct {
 	Name         string  `json:"name"`

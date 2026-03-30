@@ -132,8 +132,13 @@ if event data is found in .siren/events/.`,
 						}
 						choice = parsed
 					} else if cfg.Gate.AutoApprove {
-						choice = domain.ResumeChoiceResume
-						logger.Info("Auto-approve: resuming previous session")
+						if resumableState != nil && resumableState.AllWavesCompleted() {
+							choice = domain.ResumeChoiceRescan
+							logger.Info("Auto-approve: previous session fully completed, rescanning")
+						} else {
+							choice = domain.ResumeChoiceResume
+							logger.Info("Auto-approve: resuming previous session")
+						}
 					} else {
 						scanner := bufio.NewScanner(cmd.InOrStdin())
 						for {
