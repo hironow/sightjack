@@ -108,15 +108,14 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	}
 }
 
-func TestSQLiteOutboxStore_StageIdempotent(t *testing.T) {
-	// given
+func TestSQLiteOutboxStore_StageUpsert_LatestDataWins(t *testing.T) {
+	// given: same name staged twice before flush
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
 
 	ctx := context.Background()
 
-	// when: stage the same name twice with different data
 	if err := store.Stage(ctx, "dup.md", []byte("first")); err != nil {
 		t.Fatalf("Stage 1: %v", err)
 	}
@@ -124,25 +123,65 @@ func TestSQLiteOutboxStore_StageIdempotent(t *testing.T) {
 		t.Fatalf("Stage 2: %v", err)
 	}
 
-	// when: flush
+	// when
 	n, err := store.Flush(ctx)
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
-
-	// then: only one item flushed (INSERT OR IGNORE keeps first)
 	if n != 1 {
 		t.Errorf("flushed count: got %d, want 1", n)
 	}
 
-	// then: content is the first version (INSERT OR IGNORE)
+	// then: latest data wins (upsert semantics)
 	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "dup.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
 	}
-	if string(data) != "first" {
-		t.Errorf("content: got %q, want %q", string(data), "first")
+	if string(data) != "second" {
+		t.Errorf("content: got %q, want %q", string(data), "second")
+	}
+}
+
+func TestSQLiteOutboxStore_RestageAfterFlush_EnablesRedelivery(t *testing.T) {
+	// given: a D-Mail that has been staged and flushed
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	ctx := context.Background()
+
+	if err := store.Stage(ctx, "conflict.md", []byte("first-attempt")); err != nil {
+		t.Fatalf("Stage 1: %v", err)
+	}
+	n, err := store.Flush(ctx)
+	if err != nil {
+		t.Fatalf("Flush 1: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("first flush count: got %d, want 1", n)
+	}
+
+	// when: re-stage the same name with updated data
+	if err := store.Stage(ctx, "conflict.md", []byte("second-attempt")); err != nil {
+		t.Fatalf("Stage 2: %v", err)
+	}
+
+	// then: second flush should deliver the updated D-Mail
+	n, err = store.Flush(ctx)
+	if err != nil {
+		t.Fatalf("Flush 2: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("second flush count: got %d, want 1 (re-delivery)", n)
+	}
+
+	outboxPath := filepath.Join(domain.MailDir(dir, domain.OutboxDir), "conflict.md")
+	data, err := os.ReadFile(outboxPath)
+	if err != nil {
+		t.Fatalf("read outbox: %v", err)
+	}
+	if string(data) != "second-attempt" {
+		t.Errorf("content: got %q, want %q", string(data), "second-attempt")
 	}
 }
 
