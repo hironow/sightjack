@@ -9,18 +9,15 @@ import (
 	"testing"
 )
 
-// stubRunner is a minimal ClaudeRunner for testing.
 type stubRunner struct {
 	calls   int
-	failN   int // fail the first N calls
+	failN   int
 	output  string
-	lastW   io.Writer
 	lastOpt RunConfig
 }
 
-func (s *stubRunner) Run(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (string, error) {
+func (s *stubRunner) Run(_ context.Context, _ string, _ io.Writer, opts ...RunOption) (string, error) {
 	s.calls++
-	s.lastW = w
 	s.lastOpt = ApplyOptions(opts...)
 	if s.calls <= s.failN {
 		return "", errors.New("claude exit: non-zero")
@@ -45,18 +42,42 @@ func TestClaudeRunner_InterfaceSatisfied(t *testing.T) {
 }
 
 func TestWithAllowedTools_SetsConfig(t *testing.T) {
-	// given
-	opt := WithAllowedTools("Read", "Write", "mcp__linear__get_issue")
-
-	// when
-	cfg := ApplyOptions(opt)
+	// given/when
+	cfg := ApplyOptions(WithAllowedTools("Read", "Write"))
 
 	// then
-	if len(cfg.AllowedTools) != 3 {
-		t.Fatalf("expected 3 tools, got %d", len(cfg.AllowedTools))
+	if len(cfg.AllowedTools) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(cfg.AllowedTools))
 	}
-	if cfg.AllowedTools[0] != "Read" {
-		t.Errorf("expected 'Read', got %q", cfg.AllowedTools[0])
+}
+
+func TestWithWorkDir_SetsConfig(t *testing.T) {
+	// given/when
+	cfg := ApplyOptions(WithWorkDir("/tmp/work"))
+
+	// then
+	if cfg.WorkDir != "/tmp/work" {
+		t.Errorf("expected '/tmp/work', got %q", cfg.WorkDir)
+	}
+}
+
+func TestWithContinue_SetsConfig(t *testing.T) {
+	// given/when
+	cfg := ApplyOptions(WithContinue())
+
+	// then
+	if !cfg.Continue {
+		t.Error("expected Continue=true")
+	}
+}
+
+func TestWithModel_SetsConfig(t *testing.T) {
+	// given/when
+	cfg := ApplyOptions(WithModel("sonnet"))
+
+	// then
+	if cfg.Model != "sonnet" {
+		t.Errorf("expected 'sonnet', got %q", cfg.Model)
 	}
 }
 
@@ -68,34 +89,24 @@ func TestApplyOptions_Empty(t *testing.T) {
 	if cfg.AllowedTools != nil {
 		t.Errorf("expected nil AllowedTools, got %v", cfg.AllowedTools)
 	}
-}
-
-func TestWithWorkDir_SetsConfig(t *testing.T) {
-	// when
-	cfg := ApplyOptions(WithWorkDir("/tmp/repo"))
-
-	// then
-	if cfg.WorkDir != "/tmp/repo" {
-		t.Errorf("expected WorkDir '/tmp/repo', got %q", cfg.WorkDir)
+	if cfg.WorkDir != "" {
+		t.Errorf("expected empty WorkDir, got %q", cfg.WorkDir)
 	}
-}
-
-func TestWithContinue_SetsConfig(t *testing.T) {
-	// when
-	cfg := ApplyOptions(WithContinue())
-
-	// then
-	if !cfg.Continue {
-		t.Error("expected Continue to be true")
+	if cfg.Continue {
+		t.Error("expected Continue=false")
+	}
+	if cfg.Model != "" {
+		t.Errorf("expected empty Model, got %q", cfg.Model)
 	}
 }
 
 func TestApplyOptions_Combined(t *testing.T) {
-	// when
+	// given/when
 	cfg := ApplyOptions(
 		WithAllowedTools("Read"),
 		WithWorkDir("/repo"),
 		WithContinue(),
+		WithModel("opus"),
 	)
 
 	// then
@@ -103,9 +114,12 @@ func TestApplyOptions_Combined(t *testing.T) {
 		t.Errorf("unexpected AllowedTools: %v", cfg.AllowedTools)
 	}
 	if cfg.WorkDir != "/repo" {
-		t.Errorf("expected WorkDir '/repo', got %q", cfg.WorkDir)
+		t.Errorf("expected '/repo', got %q", cfg.WorkDir)
 	}
 	if !cfg.Continue {
-		t.Error("expected Continue to be true")
+		t.Error("expected Continue=true")
+	}
+	if cfg.Model != "opus" {
+		t.Errorf("expected 'opus', got %q", cfg.Model)
 	}
 }

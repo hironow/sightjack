@@ -57,16 +57,19 @@ func NewClaudeAdapter(cfg *domain.Config, logger domain.Logger) *ClaudeAdapter {
 		Model:      cfg.Model,
 		TimeoutSec: cfg.TimeoutSec,
 		Logger:     logger,
+		NewCmd:     newCmd,
+		CancelFunc: cancelFunc,
 	}
 }
 
 // NewRetryRunner creates a RetryRunner wrapping the given ClaudeRunner.
 func NewRetryRunner(inner port.ClaudeRunner, cfg *domain.Config, logger domain.Logger) *RetryRunner {
 	return &RetryRunner{
-		Inner:   inner,
-		Retry:   cfg.Retry,
-		Timeout: time.Duration(cfg.TimeoutSec) * time.Second,
-		Logger:  logger,
+		Inner:       inner,
+		MaxAttempts: cfg.Retry.MaxAttempts,
+		BaseDelay:   time.Duration(cfg.Retry.BaseDelaySec) * time.Second,
+		Timeout:     time.Duration(cfg.TimeoutSec) * time.Second,
+		Logger:      logger,
 	}
 }
 
@@ -97,7 +100,7 @@ func runWithSessionTracking(ctx context.Context, runner port.ClaudeRunner, cfg *
 	rc := port.ApplyOptions(opts...)
 	configBase := rc.ConfigBase
 	if configBase == "" {
-		configBase = effectiveWorkDir(rc.WorkDir)
+		configBase = effectiveDir(rc.WorkDir)
 	}
 	dbPath := filepath.Join(configBase, domain.StateDir, ".run", "sessions.db")
 	store, err := NewSQLiteCodingSessionStore(dbPath)

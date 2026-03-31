@@ -134,16 +134,10 @@ func TestRunReviewGate_ReviewCommentsPropagatedToFix(t *testing.T) {
 	reviewScript := filepath.Join(dir, "review.sh")
 	os.WriteFile(reviewScript, []byte("#!/bin/bash\necho 'UNIQUE-SIGHTJACK-REVIEW-COMMENT-ABC-123'\nexit 1\n"), 0755)
 
-	// Fake claude captures -p argument to file
+	// Fake claude captures prompt from stdin to file
 	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
 	os.WriteFile(fakeClaudeScript, []byte(`#!/bin/bash
-while [ $# -gt 0 ]; do
-  if [ "$1" = "-p" ]; then
-    echo "$2" > `+promptCapture+`
-    break
-  fi
-  shift
-done
+cat > `+promptCapture+`
 exit 0
 `), 0755)
 

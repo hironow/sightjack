@@ -17,20 +17,28 @@ import (
 // Use the inner runner directly for non-idempotent operations.
 // Timeout bounds the entire retry loop (not per-attempt).
 type RetryRunner struct {
-	Inner   port.ClaudeRunner
-	Retry   domain.RetryConfig
-	Timeout time.Duration
-	Logger  domain.Logger
+	Inner       port.ClaudeRunner
+	MaxAttempts int
+	BaseDelay   time.Duration
+	Timeout     time.Duration
+	Logger      domain.Logger
+}
+
+// logger returns Logger if non-nil, otherwise a NopLogger.
+func (r *RetryRunner) logger() domain.Logger {
+	if r.Logger != nil {
+		return r.Logger
+	}
+	return &domain.NopLogger{}
 }
 
 // Run executes the inner runner with exponential backoff retry.
 // The entire retry loop is bounded by Timeout.
 func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
-	maxAttempts := r.Retry.MaxAttempts
+	maxAttempts := r.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
-	baseDelay := time.Duration(r.Retry.BaseDelaySec) * time.Second
 
 	// Wrap the entire retry loop in a single timeout so total wall time
 	// is bounded regardless of MaxAttempts.
@@ -50,8 +58,8 @@ func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts 
 			if shift > 30 {
 				shift = 30
 			}
-			delay := baseDelay * time.Duration(1<<shift)
-			r.Logger.Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
+			delay := r.BaseDelay * time.Duration(1<<shift)
+			r.logger().Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
 			select {
 			case <-ctx.Done():
 				return "", ctx.Err()
@@ -86,11 +94,10 @@ func (r *RetryRunner) RunDetailed(ctx context.Context, prompt string, w io.Write
 		return port.RunResult{Text: text}, err
 	}
 
-	maxAttempts := r.Retry.MaxAttempts
+	maxAttempts := r.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
-	baseDelay := time.Duration(r.Retry.BaseDelaySec) * time.Second
 
 	if r.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -109,8 +116,8 @@ func (r *RetryRunner) RunDetailed(ctx context.Context, prompt string, w io.Write
 			if shift > 30 {
 				shift = 30
 			}
-			delay := baseDelay * time.Duration(1<<shift)
-			r.Logger.Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
+			delay := r.BaseDelay * time.Duration(1<<shift)
+			r.logger().Info("Retrying (%d/%d) after %v...", attempt, maxAttempts, delay)
 			select {
 			case <-ctx.Done():
 				return lastResult, ctx.Err()
