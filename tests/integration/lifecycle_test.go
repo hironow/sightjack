@@ -161,8 +161,8 @@ func (d *claudeMockDispatcher) Install() func() {
 // CallLog returns filenames written by mock shell scripts (read from call log file).
 func (d *claudeMockDispatcher) CallLog() []string {
 	d.mu.Lock()
+	defer d.mu.Unlock()
 	logFile := d.callLogFile
-	d.mu.Unlock()
 	if logFile == "" {
 		return nil
 	}
@@ -188,6 +188,7 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 
 	// Prepare response file mappings for the shell script.
 	d.mu.Lock()
+	defer d.mu.Unlock()
 	var caseArms []string
 	for _, r := range d.responses {
 		escaped := strings.ReplaceAll(r.content, "'", "'\\''")
@@ -195,7 +196,6 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 			`  %s) mkdir -p "$(dirname "$OUT_PATH")" && printf '%%s' '%s' > "$OUT_PATH" && echo "%s" >> "$CALL_LOG" ;;`,
 			r.pattern, escaped, r.pattern))
 	}
-	d.mu.Unlock()
 
 	callLogFile := d.callLogFile
 
