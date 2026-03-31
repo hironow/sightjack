@@ -180,9 +180,9 @@ fi
 exit 0
 `), 0755)
 
-	// Fake claude: just succeed (noop fix)
+	// Fake claude: drain stdin, emit minimal stream-json result, then exit 0
 	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
-	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\nexit 0\n"), 0755)
+	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\ncat > /dev/null\necho '{\"type\":\"result\",\"subtype\":\"success\",\"session_id\":\"fake\",\"result\":\"fixed\",\"is_error\":false,\"num_turns\":1,\"duration_ms\":1,\"total_cost_usd\":0,\"usage\":{\"input_tokens\":1,\"output_tokens\":1},\"stop_reason\":\"end_turn\"}'\n"), 0755)
 
 	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 3}
 	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}

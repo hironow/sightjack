@@ -852,6 +852,7 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 		// NOTE: With stdin-based prompt passing, the prompt is NOT in args.
 		// Shell script reads stdin to detect cluster name and find JSON path.
 		sf := filepath.Join(t.TempDir(), fmt.Sprintf("wavegen_%d.sh", time.Now().UnixNano()))
+		okResult := `{"type":"result","subtype":"success","session_id":"fake","result":"ok","is_error":false,"num_turns":1,"duration_ms":1,"total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
 		script := fmt.Sprintf(`#!/bin/sh
 PROMPT=$(cat)
 # Cluster "Bad" → exit 1
@@ -859,7 +860,7 @@ echo "$PROMPT" | grep -q "Bad" && exit 1
 # Find output JSON path
 OUT_PATH=$(echo "$PROMPT" | grep -o '%s[^*"[:space:]]*\.json' | head -1)
 if [ -z "$OUT_PATH" ]; then
-  echo ok
+  echo '%s'
   exit 0
 fi
 mkdir -p "$(dirname "$OUT_PATH")"
@@ -868,7 +869,8 @@ if echo "$PROMPT" | grep -q "Auth"; then
 else
   printf '%%s' '%s' > "$OUT_PATH"
 fi
-`, scanDir, authResult, apiResult)
+echo '%s'
+`, scanDir, okResult, authResult, apiResult, okResult)
 		if err := os.WriteFile(sf, []byte(script), 0755); err != nil {
 			t.Fatalf("write wavegen script: %v", err)
 		}
