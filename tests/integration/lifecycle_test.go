@@ -139,7 +139,10 @@ type mockResponse struct {
 }
 
 func newMockDispatcher(t *testing.T) *claudeMockDispatcher {
-	return &claudeMockDispatcher{t: t}
+	return &claudeMockDispatcher{
+		t:           t,
+		callLogFile: filepath.Join(t.TempDir(), "dispatcher-call-log.txt"),
+	}
 }
 
 // Register adds a filename pattern → JSON response mapping.
@@ -194,7 +197,7 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 	}
 	d.mu.Unlock()
 
-	callLogFile := filepath.Join(d.t.TempDir(), "call-log.txt")
+	callLogFile := d.callLogFile
 
 	ndjson := `{"type":"assistant","session_id":"mock","message":{"content":[{"type":"text","text":"[mock-stream-xyzzy]"}]}}` + "\n" +
 		`{"type":"result","subtype":"success","session_id":"mock","result":"[mock-stream-xyzzy]","usage":{"input_tokens":10,"output_tokens":5}}`
@@ -216,11 +219,6 @@ func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args
 	if err := os.WriteFile(sf, []byte(script), 0755); err != nil {
 		d.t.Fatalf("write mock script: %v", err)
 	}
-
-	// Store callLogFile for later reading by CallLog().
-	d.mu.Lock()
-	d.callLogFile = callLogFile
-	d.mu.Unlock()
 
 	return exec.CommandContext(ctx, "sh", sf)
 }
