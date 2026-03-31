@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -16,53 +17,66 @@ import (
 )
 
 // ClaudeAdapter implements port.ClaudeRunner by executing the Claude CLI
-// as a subprocess. It does NOT retry; wrap with RetryRunner for that.
+// as a subprocess with streaming (--output-format stream-json).
+// It does NOT retry; wrap with RetryRunner for that.
 type ClaudeAdapter struct {
 	ClaudeCmd  string
 	Model      string
 	TimeoutSec int
 	Logger     domain.Logger
-	ToolName   string                    // CLI tool name for stream events (e.g. "sightjack")
-	StreamBus  port.SessionStreamPublisher // optional: live session event streaming
+	ToolName   string                       // CLI tool name for stream events (e.g. "sightjack")
+	StreamBus  port.SessionStreamPublisher   // optional: live session event streaming
+	// NewCmd overrides command creation. If nil, platform.NewShellCmd is used.
+	NewCmd     func(ctx context.Context, name string, args ...string) *exec.Cmd
+	// CancelFunc sets cmd.Cancel for graceful shutdown. If nil, default (process kill) is used.
+	CancelFunc func(cmd *exec.Cmd) func() error
 }
 
-// Run executes the Claude CLI once without retry, returning only the result text.
+// newCmd returns the command constructor, defaulting to platform.NewShellCmd.
+func (a *ClaudeAdapter) newCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
+	if a.NewCmd != nil {
+		return a.NewCmd(ctx, name, args...)
+	}
+	return platform.NewShellCmd(ctx, name, args...)
+}
+
+// Run executes the Claude CLI once with streaming, returning only the result text.
 func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
 	result, err := a.RunDetailed(ctx, prompt, w, opts...)
 	return result.Text, err
 }
 
-// RunDetailed executes the Claude CLI once without retry, returning the result
+// RunDetailed executes the Claude CLI once with streaming, returning the result
 // text and provider session ID.
 func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (port.RunResult, error) {
-	logger := a.Logger
+	rc := port.ApplyOptions(opts...)
 
-	ctx, span := platform.Tracer.Start(ctx, "claude.invoke",
+	model := a.Model
+	if rc.Model != "" {
+		model = rc.Model
+	}
+
+	_, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", platform.SanitizeUTF8(a.Model)),
+				attribute.String("claude.model", platform.SanitizeUTF8(model)),
 				attribute.Int("claude.timeout_sec", a.TimeoutSec),
-			}, platform.GenAISpanAttrs(a.Model)...)...,
+			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
 	defer span.End()
 
 	// Apply per-call timeout only when the caller has not already set a deadline.
-	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline && a.TimeoutSec > 0 {
 		timeout := time.Duration(a.TimeoutSec) * time.Second
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	rc := port.ApplyOptions(opts...)
-
 	var args []string
-	if a.Model != "" {
-		args = append(args, "--model", a.Model)
-	}
-	if len(rc.AllowedTools) > 0 {
-		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
+	if model != "" {
+		args = append(args, "--model", model)
 	}
 	if rc.ResumeSessionID != "" {
 		args = append(args, "--resume", rc.ResumeSessionID)
@@ -76,34 +90,43 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	// cause context budget issues in practice.
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
+	if len(rc.AllowedTools) > 0 {
+		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
+	}
 
-	// Settings and MCP config live under the tool's stateDir (e.g. .siren/).
-	// ConfigBase is the repo root where stateDir was initialized.
+	// Settings and MCP config live under the tool's stateDir.
+	// ConfigBase is the repo root (continent) where stateDir was initialized.
 	// When ConfigBase is unset, fall back to WorkDir, then CWD.
 	configBase := rc.ConfigBase
 	if configBase == "" {
-		configBase = effectiveWorkDir(rc.WorkDir)
+		configBase = effectiveDir(rc.WorkDir)
 	}
 
 	// Load tool-specific settings when available; warn if missing
 	if settingsPath := ClaudeSettingsPath(configBase); ClaudeSettingsExists(configBase) {
 		args = append(args, "--settings", settingsPath)
-	} else if logger != nil {
-		logger.Warn("Claude subprocess settings not found at %s", settingsPath)
-		logger.Warn("Run 'sightjack mcp-config generate' to create settings.")
+	} else if a.Logger != nil {
+		a.Logger.Warn("Claude subprocess settings not found at %s", settingsPath)
+		a.Logger.Warn("Run 'mcp-config generate' to create settings.")
 	}
 
 	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
 	if mcpPath := ResolveMCPConfigPath(configBase); mcpPath != "" {
 		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
-	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
-	cmd := newCmd(ctx, a.ClaudeCmd, args...)
-	cmd.Cancel = cancelFunc(cmd)
+	args = append(args, "--dangerously-skip-permissions", "--print")
+
+	cmd := a.newCmd(ctx, a.ClaudeCmd, args...)
+	if a.CancelFunc != nil {
+		cmd.Cancel = a.CancelFunc(cmd)
+	}
 	cmd.WaitDelay = 3 * time.Second
 	if rc.WorkDir != "" {
 		cmd.Dir = rc.WorkDir
 	}
+
+	// Pass prompt via stdin to avoid E2BIG for large prompts.
+	cmd.Stdin = strings.NewReader(prompt)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -119,7 +142,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	var output strings.Builder
 	var responseModel, responseID string
 	var providerSessionID string
-	var runResultErr error // captured by deferred closure
+	var runResultErr error
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
 
@@ -136,8 +159,8 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	go func() {
 		defer close(done)
 		sr := platform.NewStreamReader(stdout)
-		if logger != nil {
-			sr.SetLogger(logger)
+		if a.Logger != nil {
+			sr.SetLogger(a.Logger)
 		}
 		emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
 		emitter.SetInput(prompt)
@@ -156,19 +179,25 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			streamErr <- readErr
 			return
 		}
+		if result == nil {
+			streamErr <- fmt.Errorf("no result message in stream-json output")
+			return
+		}
 
 		for _, msg := range messages {
 			switch msg.Type {
 			case "assistant":
 				text, _ := msg.ExtractText()
 				if text != "" {
-					_, _ = w.Write([]byte(text))
+					if w != nil {
+						_, _ = w.Write([]byte(text))
+					}
 					output.WriteString(text)
 				}
 				tools, _ := msg.ExtractToolUse()
 				for _, t := range tools {
-					if logger != nil {
-						logger.Info("  tool: %s", t.Name)
+					if a.Logger != nil {
+						a.Logger.Info("  tool: %s", t.Name)
 					}
 				}
 				if am, _ := msg.ParseAssistantMessage(); am != nil {
@@ -187,11 +216,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		}
 
 		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
-			sanitized := make([]string, len(rawEvents))
-			for i, e := range rawEvents {
-				sanitized[i] = platform.SanitizeUTF8(e)
-			}
-			span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(sanitized)))
+			span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(rawEvents)))
 		}
 		if result != nil && result.SessionID != "" {
 			providerSessionID = result.SessionID
@@ -212,15 +237,15 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		budget := platform.CalculateContextBudget(messages)
 		span.SetAttributes(budget.Attrs()...)
 		if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
-			if logger != nil {
-				logger.Warn("%s", warning)
+			if a.Logger != nil {
+				a.Logger.Warn("%s", warning)
 			}
 		}
 
-		// Phase 5: persist raw events to .run/claude-logs/
+		// Persist raw events to .run/claude-logs/
 		if raw := emitter.RawEvents(); len(raw) > 0 {
-			if logErr := WriteClaudeLog(effectiveWorkDir(rc.WorkDir), raw); logErr != nil && logger != nil {
-				logger.Warn("claude-log write: %v", logErr)
+			if logErr := WriteClaudeLog(effectiveDir(rc.WorkDir), raw); logErr != nil && a.Logger != nil {
+				a.Logger.Warn("claude-log write: %v", logErr)
 			}
 		}
 	}()
@@ -234,18 +259,22 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	default:
 	}
 
-	// Log captured stderr at debug level for diagnostics.
-	if stderrBuf.Len() > 0 && logger != nil {
-		logger.Debug("claude stderr:\n%s", stderrBuf.String())
+	// Log captured stderr at debug level; suppress raw NDJSON from errors.
+	if stderrBuf.Len() > 0 && a.Logger != nil {
+		a.Logger.Debug("claude stderr:\n%s", stderrBuf.String())
 	}
 
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			span.AddEvent("claude.timeout",
-				trace.WithAttributes(attribute.Int("claude.timeout_sec", a.TimeoutSec)),
-			)
+	if waitErr := cmd.Wait(); waitErr != nil {
+		span.RecordError(waitErr)
+		diagnostic := stderrBuf.String()
+		if diagnostic != "" {
+			if platform.IsNDJSON(diagnostic) {
+				diagnostic = platform.SummarizeNDJSON(diagnostic)
+			}
+			runResultErr = fmt.Errorf("claude exit: %w\n%s", waitErr, diagnostic)
+			return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 		}
-		runResultErr = fmt.Errorf("claude exit: %w", err)
+		runResultErr = fmt.Errorf("claude exit: %w", waitErr)
 		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 	}
 
@@ -257,8 +286,8 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, nil
 }
 
-// effectiveWorkDir returns dir if non-empty, otherwise ".".
-func effectiveWorkDir(dir string) string {
+// effectiveDir returns dir if non-empty, otherwise ".".
+func effectiveDir(dir string) string {
 	if dir != "" {
 		return dir
 	}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
@@ -617,31 +618,11 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
-		// Extract the prompt from -p argument.
-		prompt := ""
-		for i, a := range args {
-			if a == "-p" && i+1 < len(args) {
-				prompt = args[i+1]
-				break
-			}
-		}
-
-		// Helper: find a .json path embedded in the prompt (inside **bold**).
-		findJSONPath := func(p string) string {
-			for _, line := range strings.Split(p, "\n") {
-				if idx := strings.Index(line, scanDir); idx >= 0 {
-					sub := line[idx:]
-					if end := strings.Index(sub, "**"); end > 0 {
-						return sub[:end]
-					}
-					return strings.TrimRight(strings.TrimSpace(sub), " *`\"")
-				}
-			}
-			return ""
-		}
+		// NOTE: With stdin-based prompt passing, the prompt is NOT in args.
+		// Shell scripts read stdin to get the prompt and extract JSON paths.
 
 		if callCount == 1 {
-			// Classify: stream assistant chunks with delays, then write classify.json.
+			// Classify: drain stdin, stream assistant chunks with delays, then write classify.json.
 			classifyJSON := filepath.Join(scanDir, "classify.json")
 			a1 := `{"type":"assistant","session_id":"fake","message":{"id":"m1","role":"assistant","content":[{"type":"text","text":"chunk1"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
 			a2 := `{"type":"assistant","session_id":"fake","message":{"id":"m2","role":"assistant","content":[{"type":"text","text":"chunk2"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
@@ -649,27 +630,35 @@ func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
 			crJSON, _ := json.Marshal(classifyResult)
 			rLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(crJSON))
 			sf := filepath.Join(t.TempDir(), "classify.sh")
-			body := fmt.Sprintf("#!/bin/sh\necho '%s'\nsleep 0.05\necho '%s'\nsleep 0.05\ncat > '%s' <<'EOF'\n%s\nEOF\necho '%s'\necho '%s'\n",
+			body := fmt.Sprintf("#!/bin/sh\ncat > /dev/null\necho '%s'\nsleep 0.05\necho '%s'\nsleep 0.05\ncat > '%s' <<'EOF'\n%s\nEOF\necho '%s'\necho '%s'\n",
 				a1, a2, classifyJSON, classifyResult, a3, rLine)
 			if err := os.WriteFile(sf, []byte(body), 0755); err != nil {
 				t.Fatalf("write script: %v", err)
 			}
-			_ = prompt
 			return exec.CommandContext(ctx, "sh", sf)
 		}
-		// Deep scan / wave: write result to the output path found in prompt.
-		if outPath := findJSONPath(prompt); outPath != "" {
-			drJSON, _ := json.Marshal(deepScanResult)
-			drLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(drJSON))
-			sf := filepath.Join(t.TempDir(), fmt.Sprintf("deepscan_%d.sh", callCount))
-			body := fmt.Sprintf("#!/bin/sh\ncat > '%s' <<'EOF'\n%s\nEOF\necho '%s'\n", outPath, deepScanResult, drLine)
-			if err := os.WriteFile(sf, []byte(body), 0755); err != nil {
-				t.Fatalf("write deepscan script: %v", err)
-			}
-			return exec.CommandContext(ctx, "sh", sf)
+		// Deep scan / wave: read stdin prompt, find embedded .json path, write result there.
+		drJSON, _ := json.Marshal(deepScanResult)
+		drLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(drJSON))
+		sf := filepath.Join(t.TempDir(), fmt.Sprintf("deepscan_%d.sh", callCount))
+		// Shell script: read stdin, grep for .json path under scanDir, write result there.
+		body := fmt.Sprintf(`#!/bin/sh
+PROMPT=$(cat)
+OUT_PATH=$(echo "$PROMPT" | grep -o '%s[^*"[:space:]]*\.json' | head -1)
+if [ -n "$OUT_PATH" ]; then
+  mkdir -p "$(dirname "$OUT_PATH")"
+  cat > "$OUT_PATH" <<'EOF'
+%s
+EOF
+  echo '%s'
+else
+  echo '%s'
+fi
+`, scanDir, deepScanResult, drLine, drLine)
+		if err := os.WriteFile(sf, []byte(body), 0755); err != nil {
+			t.Fatalf("write deepscan script: %v", err)
 		}
-		okLine := `{"type":"result","subtype":"success","session_id":"fake","result":"ok","is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
-		return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`echo '%s'`, okLine))
+		return exec.CommandContext(ctx, "sh", sf)
 	})
 	defer cleanup()
 
@@ -744,55 +733,45 @@ func TestRunScan_StreamsIncrementally(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
-		prompt := ""
-		for i, a := range args {
-			if a == "-p" && i+1 < len(args) {
-				prompt = args[i+1]
-				break
-			}
-		}
-		findJSONPath := func(p string) string {
-			for _, line := range strings.Split(p, "\n") {
-				if idx := strings.Index(line, scanDir); idx >= 0 {
-					sub := line[idx:]
-					if end := strings.Index(sub, "**"); end > 0 {
-						return sub[:end]
-					}
-					return strings.TrimRight(strings.TrimSpace(sub), " *`\"")
-				}
-			}
-			return ""
-		}
+		// NOTE: With stdin-based prompt passing, the prompt is NOT in args.
+		// Shell scripts read stdin to get the prompt and extract JSON paths.
+
 		if callCount == 1 {
-			// Classify: emit two stream-json assistant chunks separated by sleep
-			// to force separate Read calls on the pipe (incremental streaming).
-			// Write NDJSON lines to a temp script file to avoid shell quoting issues.
+			// Classify: drain stdin, emit two stream-json assistant chunks separated by sleep.
 			classifyJSON := filepath.Join(scanDir, "classify.json")
 			scriptFile := filepath.Join(t.TempDir(), "classify.sh")
 			assistantA := `{"type":"assistant","session_id":"fake","message":{"id":"m1","role":"assistant","content":[{"type":"text","text":"MARKER_A"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
 			assistantB := `{"type":"assistant","session_id":"fake","message":{"id":"m2","role":"assistant","content":[{"type":"text","text":"MARKER_B"}],"model":"fake","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}`
 			resultJSON, _ := json.Marshal(classifyResult)
 			resultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(resultJSON))
-			scriptBody := fmt.Sprintf("#!/bin/sh\necho '%s'\nsleep 0.1\necho '%s'\necho '%s'\ncat > '%s' <<'CLASSIFY_EOF'\n%s\nCLASSIFY_EOF\n",
+			scriptBody := fmt.Sprintf("#!/bin/sh\ncat > /dev/null\necho '%s'\nsleep 0.1\necho '%s'\necho '%s'\ncat > '%s' <<'CLASSIFY_EOF'\n%s\nCLASSIFY_EOF\n",
 				assistantA, assistantB, resultLine, classifyJSON, classifyResult)
 			if err := os.WriteFile(scriptFile, []byte(scriptBody), 0755); err != nil {
 				t.Fatalf("write script: %v", err)
 			}
-			_ = prompt
 			return exec.CommandContext(ctx, "sh", scriptFile)
 		}
-		if outPath := findJSONPath(prompt); outPath != "" {
-			deepResultJSON, _ := json.Marshal(deepScanResult)
-			deepResultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(deepResultJSON))
-			dsScript := fmt.Sprintf("#!/bin/sh\ncat > '%s' <<'DEEPSCAN_EOF'\n%s\nDEEPSCAN_EOF\necho '%s'\n", outPath, deepScanResult, deepResultLine)
-			dsFile := filepath.Join(t.TempDir(), fmt.Sprintf("deepscan_%d.sh", callCount))
-			if err := os.WriteFile(dsFile, []byte(dsScript), 0755); err != nil {
-				t.Fatalf("write deepscan script: %v", err)
-			}
-			return exec.CommandContext(ctx, "sh", dsFile)
+		// Deep scan / wave: read stdin prompt, find embedded .json path, write result there.
+		deepResultJSON, _ := json.Marshal(deepScanResult)
+		deepResultLine := fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(deepResultJSON))
+		dsFile := filepath.Join(t.TempDir(), fmt.Sprintf("deepscan_%d.sh", callCount))
+		dsScript := fmt.Sprintf(`#!/bin/sh
+PROMPT=$(cat)
+OUT_PATH=$(echo "$PROMPT" | grep -o '%s[^*"[:space:]]*\.json' | head -1)
+if [ -n "$OUT_PATH" ]; then
+  mkdir -p "$(dirname "$OUT_PATH")"
+  cat > "$OUT_PATH" <<'DEEPSCAN_EOF'
+%s
+DEEPSCAN_EOF
+  echo '%s'
+else
+  echo '%s'
+fi
+`, scanDir, deepScanResult, deepResultLine, deepResultLine)
+		if err := os.WriteFile(dsFile, []byte(dsScript), 0755); err != nil {
+			t.Fatalf("write deepscan script: %v", err)
 		}
-		okResult := `{"type":"result","subtype":"success","session_id":"fake","result":"ok","is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
-		return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`echo '%s'`, okResult))
+		return exec.CommandContext(ctx, "sh", dsFile)
 	})
 	defer cleanup()
 
@@ -870,44 +849,32 @@ func TestRunWaveGenerate_PartialFailure(t *testing.T) {
 	apiResult := `{"cluster_name":"API","waves":[{"id":"api-w1","cluster_name":"API","title":"Endpoints","actions":[{"type":"add_label","issue_id":"T-3","description":"label"}],"prerequisites":[],"delta":{"before":0.30,"after":0.50},"status":"available"}]}`
 
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		prompt := ""
-		for i, a := range args {
-			if a == "-p" && i+1 < len(args) {
-				prompt = args[i+1]
-				break
-			}
+		// NOTE: With stdin-based prompt passing, the prompt is NOT in args.
+		// Shell script reads stdin to detect cluster name and find JSON path.
+		sf := filepath.Join(t.TempDir(), fmt.Sprintf("wavegen_%d.sh", time.Now().UnixNano()))
+		okResult := `{"type":"result","subtype":"success","session_id":"fake","result":"ok","is_error":false,"num_turns":1,"duration_ms":1,"total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
+		script := fmt.Sprintf(`#!/bin/sh
+PROMPT=$(cat)
+# Cluster "Bad" → exit 1
+echo "$PROMPT" | grep -q "Bad" && exit 1
+# Find output JSON path
+OUT_PATH=$(echo "$PROMPT" | grep -o '%s[^*"[:space:]]*\.json' | head -1)
+if [ -z "$OUT_PATH" ]; then
+  echo '%s'
+  exit 0
+fi
+mkdir -p "$(dirname "$OUT_PATH")"
+if echo "$PROMPT" | grep -q "Auth"; then
+  printf '%%s' '%s' > "$OUT_PATH"
+else
+  printf '%%s' '%s' > "$OUT_PATH"
+fi
+echo '%s'
+`, scanDir, okResult, authResult, apiResult, okResult)
+		if err := os.WriteFile(sf, []byte(script), 0755); err != nil {
+			t.Fatalf("write wavegen script: %v", err)
 		}
-
-		// Find the output JSON path embedded in the prompt.
-		findJSONPath := func(p string) string {
-			for _, line := range strings.Split(p, "\n") {
-				if idx := strings.Index(line, scanDir); idx >= 0 {
-					sub := line[idx:]
-					if end := strings.Index(sub, "**"); end > 0 {
-						return sub[:end]
-					}
-					return strings.TrimRight(strings.TrimSpace(sub), " *`\"")
-				}
-			}
-			return ""
-		}
-
-		// Cluster "Bad" → exit 1 (simulate signal:killed / OOM).
-		if strings.Contains(prompt, "Bad") {
-			return exec.CommandContext(ctx, "false")
-		}
-		// Other clusters → write wave result.
-		outPath := findJSONPath(prompt)
-		if outPath != "" {
-			var content string
-			if strings.Contains(prompt, "Auth") {
-				content = authResult
-			} else {
-				content = apiResult
-			}
-			return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(`printf '%s' > '%s'`, content, outPath))
-		}
-		return exec.CommandContext(ctx, "echo", "ok")
+		return exec.CommandContext(ctx, "sh", sf)
 	})
 	defer cleanup()
 

@@ -59,12 +59,14 @@ func main() {
 		return
 	}
 
-	// Handle --print flag WITHOUT -p (used by doctor's inference check).
-	// When -p is also present, fall through to protocol detection (sightjack/paintress).
-	if hasFlag(os.Args[1:], "--print") && extractPrompt(os.Args[1:]) == "" {
+	// Handle doctor inference probe: --max-turns is unique to doctor checks.
+	// Doctor passes prompt as positional arg (not stdin), so handle before
+	// detectProtocol which reads stdin.
+	if hasFlag(os.Args[1:], "--max-turns") {
+		// Find the last positional arg (the prompt, e.g. "1+1=").
 		prompt := ""
 		for i := len(os.Args) - 1; i >= 1; i-- {
-			if !strings.HasPrefix(os.Args[i], "-") && os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" {
+			if !strings.HasPrefix(os.Args[i], "-") && (i == 1 || os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" && os.Args[i-1] != "--model" && os.Args[i-1] != "--settings") {
 				prompt = os.Args[i]
 				break
 			}
@@ -116,40 +118,54 @@ func main() {
 
 // detectProtocol determines which tool is calling us.
 //
-// The key discriminator is the -p flag:
-//   - amadeus does NOT pass -p; it pipes the prompt to stdin.
-//   - sightjack passes -p with a prompt containing an absolute .json file path.
-//   - paintress passes -p with a plain text prompt.
+// All tools now pass prompts via stdin. The key discriminator is the prompt content:
+//   - sightjack: prompt contains an absolute .json file path.
+//   - paintress: prompt is plain text (no JSON path) and output-format is stream-json.
+//   - amadeus: prompt is plain text and expects JSON structured response.
+//
+// Additionally, -p flag is supported for backward compatibility (doctor inference check).
 //
 // Detection order:
-//  1. If -p flag is present AND prompt contains an absolute .json path → sightjack.
-//  2. If -p flag is present (no JSON path) → paintress.
-//  3. If no -p flag → read stdin → amadeus.
+//  1. Read from -p flag (backward compat for doctor/inference).
+//  2. Read from stdin.
+//  3. If prompt contains an absolute .json path → sightjack.
+//  4. Otherwise → paintress (stream-json mode) or amadeus (json mode).
 func detectProtocol(args []string) (protocol, string) {
-	// Check -p flag first (sightjack and paintress both use it).
+	// Check -p flag first (backward compat for doctor inference check).
 	prompt := extractPrompt(args)
 	if prompt != "" {
-		// Check if the prompt contains an absolute .json file path → sightjack.
 		if jsonPathRe.MatchString(prompt) {
 			return protoSightjack, prompt
 		}
-		// -p present but no JSON path → paintress.
 		return protoPaintress, prompt
 	}
 
-	// No -p flag → amadeus mode (reads from stdin).
+	// All tools now pass prompts via stdin.
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fake-claude: read stdin: %v\n", err)
 		os.Exit(1)
 	}
 	text := strings.TrimSpace(string(data))
-	if text != "" {
-		return protoAmadeus, text
+
+	if text == "" {
+		// Empty stdin — treat as paintress with empty prompt.
+		return protoPaintress, ""
 	}
 
-	// No -p and empty stdin — treat as paintress with empty prompt.
-	return protoPaintress, ""
+	// Prompt content-based detection.
+	if jsonPathRe.MatchString(text) {
+		return protoSightjack, text
+	}
+
+	// Distinguish amadeus vs paintress/sightjack by output format.
+	// amadeus historically used plain JSON output; sightjack/paintress use stream-json.
+	// With unified adapter, all use stream-json, so default to paintress.
+	outputFormat := extractOutputFormat(args)
+	if outputFormat == "json" {
+		return protoAmadeus, text
+	}
+	return protoPaintress, text
 }
 
 // hasFlag returns true if the given flag appears anywhere in args.

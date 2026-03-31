@@ -1,11 +1,11 @@
 // fake-claude is a test double for the Claude Code CLI.
 //
 // It mimics the subset of Claude CLI behaviour that sightjack relies on:
-//   - Reads the prompt from the -p flag.
+//   - Reads the prompt from stdin (unified adapter convention).
 //   - Extracts the absolute JSON output path from the prompt text.
 //   - Pattern-matches the output filename against a built-in fixture table.
 //   - Writes the matching canned JSON to that path.
-//   - Produces no stdout output (avoids leaking into pipe JSON).
+//   - Emits minimal stream-json NDJSON result to stdout.
 //
 // Install as /usr/local/bin/claude inside the E2E Docker container so that
 // cfg.ClaudeCmd = "claude" resolves to this binary.
@@ -14,6 +14,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,28 +45,38 @@ func main() {
 		return
 	}
 
-	// Handle --print flag WITHOUT -p (used by doctor's inference check).
-	// When -p is also present, fall through to protocol detection (sightjack/paintress).
-	if hasFlag(os.Args[1:], "--print") && extractPrompt(os.Args[1:]) == "" {
+	// Handle doctor inference probe: --max-turns is unique to doctor checks.
+	// Doctor passes prompt as positional arg (not stdin).
+	if hasFlag(os.Args[1:], "--max-turns") {
 		prompt := ""
 		for i := len(os.Args) - 1; i >= 1; i-- {
-			if !strings.HasPrefix(os.Args[i], "-") && os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" {
+			if !strings.HasPrefix(os.Args[i], "-") && os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" && os.Args[i-1] != "--model" && os.Args[i-1] != "--settings" {
 				prompt = os.Args[i]
 				break
 			}
 		}
+		body := "unknown"
 		if strings.Contains(prompt, "1+1") {
-			fmt.Print("2")
+			body = "2"
+		}
+		if hasFlag(os.Args[1:], "stream-json") {
+			fmt.Print(wrapStreamJSON(body))
 		} else {
-			fmt.Print("unknown")
+			fmt.Print(body)
 		}
 		return
 	}
 
-	prompt := extractPrompt(os.Args[1:])
+	// Read prompt from stdin (unified adapter convention).
+	promptData, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fake-claude: read stdin: %v\n", err)
+		os.Exit(1)
+	}
+	prompt := strings.TrimSpace(string(promptData))
 	if prompt == "" {
-		// No stdout output — data exchange is file-based.
-		// Printing here would leak into sightjack's stdout via RunClaude streaming.
+		// Empty stdin — emit minimal stream-json result and exit.
+		fmt.Print(wrapStreamJSON(""))
 		return
 	}
 
@@ -113,6 +124,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "fake-claude: no fixture for %q\n", filename)
 		os.Exit(2)
 	}
+
+	// Emit minimal stream-json result to stdout (adapter expects result message).
+	fmt.Print(wrapStreamJSON("ok"))
 }
 
 // logPrompt appends the prompt text to a sequentially-named file in dir.
@@ -162,14 +176,10 @@ func hasFlag(args []string, flag string) bool {
 	return false
 }
 
-// extractPrompt finds the value of the -p flag.
-func extractPrompt(args []string) string {
-	for i, arg := range args {
-		if arg == "-p" && i+1 < len(args) {
-			return args[i+1]
-		}
-	}
-	return ""
+// wrapStreamJSON wraps a body string in a minimal stream-json result message.
+func wrapStreamJSON(body string) string {
+	escaped, _ := json.Marshal(body)
+	return fmt.Sprintf(`{"type":"result","subtype":"success","session_id":"fake","result":%s,"is_error":false,"num_turns":1,"duration_ms":1,"total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`, string(escaped))
 }
 
 // fixture is a filename pattern → canned JSON content pair.

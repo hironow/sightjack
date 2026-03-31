@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -126,10 +127,10 @@ func testConfig() *domain.Config {
 // claudeMockDispatcher provides a newCmd replacement that writes canned JSON
 // to the output path extracted from the Claude prompt.
 type claudeMockDispatcher struct {
-	t         *testing.T
-	mu        sync.Mutex
-	responses []mockResponse // ordered for deterministic matching
-	callLog   []string       // records filenames written
+	t           *testing.T
+	mu          sync.Mutex
+	responses   []mockResponse // ordered for deterministic matching
+	callLogFile string         // path to file-based call log (written by shell scripts)
 }
 
 type mockResponse struct {
@@ -138,7 +139,10 @@ type mockResponse struct {
 }
 
 func newMockDispatcher(t *testing.T) *claudeMockDispatcher {
-	return &claudeMockDispatcher{t: t}
+	return &claudeMockDispatcher{
+		t:           t,
+		callLogFile: filepath.Join(t.TempDir(), "dispatcher-call-log.txt"),
+	}
 }
 
 // Register adds a filename pattern → JSON response mapping.
@@ -154,51 +158,69 @@ func (d *claudeMockDispatcher) Install() func() {
 	return session.OverrideNewCmd(d.newCmdFunc)
 }
 
-// CallLog returns a copy of the filenames written by the mock.
+// CallLog returns filenames written by mock shell scripts (read from call log file).
 func (d *claudeMockDispatcher) CallLog() []string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	cp := make([]string, len(d.callLog))
-	copy(cp, d.callLog)
-	return cp
+	logFile := d.callLogFile
+	if logFile == "" {
+		return nil
+	}
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		return nil
+	}
+	var result []string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line != "" {
+			result = append(result, line)
+		}
+	}
+	return result
 }
 
 func (d *claudeMockDispatcher) newCmdFunc(ctx context.Context, name string, args ...string) *exec.Cmd {
-	prompt := extractPromptFromArgs(args)
-	outputPath := extractOutputPath(prompt)
+	// Prompt is passed via stdin (not -p flag). Build a shell script that:
+	// 1. Reads stdin to get prompt
+	// 2. Extracts JSON output path from prompt
+	// 3. Writes matching response to that path
+	// 4. Emits valid stream-json NDJSON to stdout
 
-	if outputPath != "" {
-		filename := filepath.Base(outputPath)
-		d.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- explicit Unlock after scoped block; defer would extend hold past return [permanent]
-		for _, r := range d.responses {
-			matched, _ := filepath.Match(r.pattern, filename)
-			if matched {
-				os.MkdirAll(filepath.Dir(outputPath), 0755)
-				os.WriteFile(outputPath, []byte(r.content), 0644)
-				d.callLog = append(d.callLog, filename)
-				break
-			}
-		}
-		d.mu.Unlock()
+	// Prepare response file mappings for the shell script.
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var caseArms []string
+	for _, r := range d.responses {
+		escaped := strings.ReplaceAll(r.content, "'", "'\\''")
+		caseArms = append(caseArms, fmt.Sprintf(
+			`  %s) mkdir -p "$(dirname "$OUT_PATH")" && printf '%%s' '%s' > "$OUT_PATH" && echo "%s" >> "$CALL_LOG" ;;`,
+			r.pattern, escaped, r.pattern))
 	}
 
-	// Output valid stream-json NDJSON so RunClaudeOnce's StreamReader can parse it.
-	// The assistant message provides streaming text for the `w` writer,
-	// and the result message provides the final output string.
-	// Use a unique marker unlikely to appear in scan result JSON.
+	callLogFile := d.callLogFile
+
 	ndjson := `{"type":"assistant","session_id":"mock","message":{"content":[{"type":"text","text":"[mock-stream-xyzzy]"}]}}` + "\n" +
 		`{"type":"result","subtype":"success","session_id":"mock","result":"[mock-stream-xyzzy]","usage":{"input_tokens":10,"output_tokens":5}}`
-	return exec.CommandContext(ctx, "printf", "%s", ndjson)
-}
 
-// extractPromptFromArgs finds the value of the -p flag in Claude CLI args.
-func extractPromptFromArgs(args []string) string {
-	for i, arg := range args {
-		if arg == "-p" && i+1 < len(args) {
-			return args[i+1]
-		}
+	script := "#!/bin/sh\nPROMPT=$(cat)\n"
+	script += fmt.Sprintf("CALL_LOG='%s'\n", callLogFile)
+	script += `OUT_PATH=$(echo "$PROMPT" | grep -oE '/[^ "]*\.json' | head -1)` + "\n"
+	script += `FILENAME=$(basename "$OUT_PATH" 2>/dev/null)` + "\n"
+	script += "if [ -n \"$OUT_PATH\" ]; then\n"
+	script += "  case \"$FILENAME\" in\n"
+	for _, arm := range caseArms {
+		script += arm + "\n"
 	}
-	return ""
+	script += "  esac\n"
+	script += "fi\n"
+	script += fmt.Sprintf("printf '%%s' '%s'\n", strings.ReplaceAll(ndjson, "'", "'\\''"))
+
+	sf := filepath.Join(d.t.TempDir(), fmt.Sprintf("mock_%d.sh", time.Now().UnixNano()))
+	if err := os.WriteFile(sf, []byte(script), 0755); err != nil {
+		d.t.Fatalf("write mock script: %v", err)
+	}
+
+	return exec.CommandContext(ctx, "sh", sf)
 }
 
 // extractOutputPath finds the first absolute JSON file path in the prompt text.
@@ -333,26 +355,6 @@ func nextgenEmpty() string {
 }
 
 // --- Tests for mock helpers ---
-
-func TestExtractPromptFromArgs(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{"with -p flag", []string{"--print", "--model", "opus", "-p", "my prompt"}, "my prompt"},
-		{"no -p flag", []string{"--print", "--model", "opus"}, ""},
-		{"-p at end without value", []string{"-p"}, ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractPromptFromArgs(tt.args)
-			if got != tt.want {
-				t.Errorf("expected %q, got %q", tt.want, got)
-			}
-		})
-	}
-}
 
 func TestExtractOutputPath(t *testing.T) {
 	tests := []struct {
@@ -942,9 +944,10 @@ func TestMockDispatcher_WritesFile(t *testing.T) {
 	cleanup := d.Install()
 	defer cleanup()
 
-	// when: simulate a Claude call with -p containing the output path
+	// when: simulate a Claude call — prompt via stdin (unified adapter convention)
 	prompt := "Write JSON to " + outputPath
-	cmd := d.newCmdFunc(context.Background(), "claude", "--dangerously-skip-permissions", "--print", "-p", prompt)
+	cmd := d.newCmdFunc(context.Background(), "claude", "--dangerously-skip-permissions", "--print")
+	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Run()
 
 	// then
