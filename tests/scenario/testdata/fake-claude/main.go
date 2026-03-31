@@ -59,6 +59,30 @@ func main() {
 		return
 	}
 
+	// Handle doctor inference probe: --max-turns is unique to doctor checks.
+	// Doctor passes prompt as positional arg (not stdin), so handle before
+	// detectProtocol which reads stdin.
+	if hasFlag(os.Args[1:], "--max-turns") {
+		// Find the last positional arg (the prompt, e.g. "1+1=").
+		prompt := ""
+		for i := len(os.Args) - 1; i >= 1; i-- {
+			if !strings.HasPrefix(os.Args[i], "-") && (i == 1 || os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" && os.Args[i-1] != "--model" && os.Args[i-1] != "--settings") {
+				prompt = os.Args[i]
+				break
+			}
+		}
+		body := "unknown"
+		if strings.Contains(prompt, "1+1") {
+			body = "2"
+		}
+		if extractOutputFormat(os.Args[1:]) == "stream-json" {
+			fmt.Print(wrapStreamJSON(body))
+		} else {
+			fmt.Print(body)
+		}
+		return
+	}
+
 	proto, prompt := detectProtocol(os.Args[1:])
 	outputFormat := extractOutputFormat(os.Args[1:])
 

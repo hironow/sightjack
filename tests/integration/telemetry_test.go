@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os/exec"
 	"testing"
@@ -36,8 +37,10 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 	exp := setupTestTracer(t)
 
+	ndjson := `{"type":"result","subtype":"success","session_id":"mock","result":"hello","is_error":false,"num_turns":1,"duration_ms":1,"total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
 	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo", "hello")
+		// Drain stdin (prompt comes via stdin now) and emit valid stream-json.
+		return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("cat > /dev/null && printf '%%s' '%s'", ndjson))
 	})
 	t.Cleanup(cleanup)
 
@@ -117,13 +120,14 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	exp := setupTestTracer(t)
 
+	okNDJSON := `{"type":"result","subtype":"success","session_id":"mock","result":"ok","is_error":false,"num_turns":1,"duration_ms":1,"total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
 	callCount := 0
 	cleanup := session.OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
 		if callCount == 1 {
-			return exec.CommandContext(ctx, "false") // exit 1
+			return exec.CommandContext(ctx, "sh", "-c", "cat > /dev/null && exit 1") // drain stdin, exit 1
 		}
-		return exec.CommandContext(ctx, "echo", "ok")
+		return exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("cat > /dev/null && printf '%%s' '%s'", okNDJSON))
 	})
 	t.Cleanup(cleanup)
 
