@@ -78,12 +78,6 @@ sightjackのwave apply時にはスキップしてください（appliedとして
 }
 ```
 
-{{- if .LabelsEnabled}}
-{{- if .IsWaveMode}}
-全アクション適用後、ラベル "{{.LabelPrefix}}:wave-done" が存在することを確認し（なければ `gh label create "{{.LabelPrefix}}:wave-done" --force` で作成）、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:wave-done"` を使用して各対象Issueにラベルを付与してください。同時に古い状態ラベルを除去してください: `gh issue edit <番号> --remove-label "{{.LabelPrefix}}:analyzed"`（ラベルが存在しない場合のエラーは無視）。
-{{- else}}
-全アクション適用後、Linear MCPを使用して各対象Issueに "{{.LabelPrefix}}:wave-done" ラベルを付与してください。
-{{- end}}
-{{- end}}
+{{- /* ラベル: analyzed/wave-done は廃止 — ready ラベルは phases.go で全wave完了後に付与 */}}
 重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
 JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。

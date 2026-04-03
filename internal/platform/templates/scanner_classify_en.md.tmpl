@@ -72,12 +72,6 @@ Write the following JSON to **{{.OutputPath}}**:
 
 Each cluster must have both a "name" (display name, can be any language) and a "key" (lowercase English slug with hyphens, stable across scans).
 
-{{- if .LabelsEnabled}}
-{{- if .IsWaveMode}}
-After classification, ensure the label "{{.LabelPrefix}}:analyzed" exists (create with `gh label create "{{.LabelPrefix}}:analyzed" --force` if needed), then apply it to each analyzed issue using `gh issue edit <number> --add-label "{{.LabelPrefix}}:analyzed"`. Skip issues that already have the "{{.LabelPrefix}}:wave-done" label (do not downgrade their state).
-{{- else}}
-After classification, apply the label "{{.LabelPrefix}}:analyzed" to each analyzed issue using Linear MCP.
-{{- end}}
-{{- end}}
+{{- /* Labels: analyzed/wave-done labels are deprecated — ready label is applied by phases.go after all waves complete */}}
 Important: Write output directly to the file path above. Do not write to stdout.
 Use raw UTF-8 for non-ASCII characters in JSON string values (do not use \uXXXX escape sequences).

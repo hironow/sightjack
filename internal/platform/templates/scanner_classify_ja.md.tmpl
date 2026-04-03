@@ -71,12 +71,6 @@ DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
 
 各クラスタには "name"（表示名、任意の言語可）と "key"（小文字英語のスラグ、ハイフン区切り、スキャン間で安定）の両方が必要です。
 
-{{- if .LabelsEnabled}}
-{{- if .IsWaveMode}}
-分類完了後、ラベル "{{.LabelPrefix}}:analyzed" が存在することを確認し（なければ `gh label create "{{.LabelPrefix}}:analyzed" --force` で作成）、`gh issue edit <番号> --add-label "{{.LabelPrefix}}:analyzed"` を使用して各分析済みIssueにラベルを付与してください。ただし既に "{{.LabelPrefix}}:wave-done" ラベルがついているIssueにはanalyzedラベルをつけないでください（状態をダウングレードしない）。
-{{- else}}
-分類完了後、Linear MCPを使用して各分析済みIssueに "{{.LabelPrefix}}:analyzed" ラベルを付与してください。
-{{- end}}
-{{- end}}
+{{- /* ラベル: analyzed/wave-done は廃止 — ready ラベルは phases.go で全wave完了後に付与 */}}
 重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
 JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。
