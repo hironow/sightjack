@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness/verifier"
 )
 
 // MaxWavesPerCluster is the cap on total waves per cluster.
@@ -181,22 +182,6 @@ func PartialApplyDelta(result *domain.WaveApplyResult, delta domain.WaveDelta) f
 	return delta.Before + (delta.After-delta.Before)*successRate
 }
 
-// ValidateWaveApplyResult checks the apply result for degenerate or invalid states.
-// Returns an error if the result is nil, empty when actions were expected,
-// or reports more applied actions than expected.
-func ValidateWaveApplyResult(result *domain.WaveApplyResult, expectedActions int) error {
-	if result == nil {
-		return fmt.Errorf("wave apply result is nil")
-	}
-	if expectedActions > 0 && result.Applied == 0 && result.TotalCount == 0 && len(result.Errors) == 0 {
-		return fmt.Errorf("wave apply result is empty (expected %d actions)", expectedActions)
-	}
-	if result.Applied > expectedActions {
-		return fmt.Errorf("wave apply result reports %d applied but only %d actions expected", result.Applied, expectedActions)
-	}
-	return nil
-}
-
 // IsWaveApplyComplete returns true when the apply result has no errors,
 // indicating all actions were successfully applied.
 func IsWaveApplyComplete(result *domain.WaveApplyResult) bool {
@@ -329,30 +314,6 @@ func PruneStaleWaves(state *domain.SessionState, validClusters []domain.ClusterS
 	}
 	state.Waves = kept
 	return removed
-}
-
-// ValidateWavePrerequisites removes prerequisites referencing waves not in the wave set.
-// Returns the cleaned wave list and the count of removed dangling prerequisites.
-func ValidateWavePrerequisites(waves []domain.Wave) ([]domain.Wave, int) {
-	allKeys := make(map[string]bool, len(waves))
-	for _, w := range waves {
-		allKeys[domain.WaveKey(w)] = true
-	}
-	result := make([]domain.Wave, len(waves))
-	copy(result, waves)
-	var removed int
-	for i, w := range result {
-		var clean []string
-		for _, p := range w.Prerequisites {
-			if allKeys[p] {
-				clean = append(clean, p)
-			} else {
-				removed++
-			}
-		}
-		result[i].Prerequisites = clean
-	}
-	return result, removed
 }
 
 // RepairLockedWaves unlocks waves whose prerequisites are all met but status is still "locked".
@@ -670,21 +631,6 @@ func LastCompletedWaveForCluster(waves []domain.Wave, clusterName string) (domai
 	return last, found
 }
 
-// validWaveActionTypes is the set of recognized wave action types.
-var validWaveActionTypes = map[string]bool{
-	"add_dod":            true,
-	"add_dependency":     true,
-	"add_label":          true,
-	"update_description": true,
-	"create":             true,
-	"cancel":             true,
-}
-
-// ValidWaveActionType reports whether t is a recognized wave action type.
-func ValidWaveActionType(t string) bool {
-	return validWaveActionTypes[t]
-}
-
 // CollectSpecSentIssueIDs returns issue IDs from completed waves' actions.
 // Used as session-level race condition guard: issues that have already received
 // spec D-Mails should not get new implementation waves even if paintress hasn't
@@ -697,7 +643,7 @@ func CollectSpecSentIssueIDs(completed map[string]bool, waves []domain.Wave) map
 			continue
 		}
 		for _, a := range w.Actions {
-			if a.IssueID != "" && !validWaveActionTypes[a.Type] {
+			if a.IssueID != "" && !verifier.ValidWaveActionType(a.Type) {
 				result[a.IssueID] = true
 			}
 		}
@@ -731,7 +677,7 @@ func FilterPROpenActions(waves []domain.Wave, prOpenIssues map[string]bool) []do
 	for _, w := range waves {
 		var kept []domain.WaveAction
 		for _, a := range w.Actions {
-			if prOpenIssues[a.IssueID] && !validWaveActionTypes[a.Type] {
+			if prOpenIssues[a.IssueID] && !verifier.ValidWaveActionType(a.Type) {
 				continue // implementation action for PR-open issue -> skip
 			}
 			kept = append(kept, a)

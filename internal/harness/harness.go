@@ -26,13 +26,13 @@ var AvailableWaves = policy.AvailableWaves
 var EvaluateUnlocks = policy.EvaluateUnlocks
 var CalcNewlyUnlocked = policy.CalcNewlyUnlocked
 var PartialApplyDelta = policy.PartialApplyDelta
-var ValidateWaveApplyResult = policy.ValidateWaveApplyResult
+var ValidateWaveApplyResult = verifier.ValidateWaveApplyResult
 var IsWaveApplyComplete = policy.IsWaveApplyComplete
 var ApplyModifiedWave = policy.ApplyModifiedWave
 var PropagateWaveUpdate = policy.PropagateWaveUpdate
 var DetectWaveCycles = policy.DetectWaveCycles
 var PruneStaleWaves = policy.PruneStaleWaves
-var ValidateWavePrerequisites = policy.ValidateWavePrerequisites
+var ValidateWavePrerequisites = verifier.ValidateWavePrerequisites
 var RepairLockedWaves = policy.RepairLockedWaves
 var BuildCompletedWaveMap = policy.BuildCompletedWaveMap
 var MergeOldWaves = policy.MergeOldWaves
@@ -48,7 +48,7 @@ var NeedsMoreWaves = policy.NeedsMoreWaves
 var ReadyIssueIDs = policy.ReadyIssueIDs
 var ClustersForIssueIDs = policy.ClustersForIssueIDs
 var LastCompletedWaveForCluster = policy.LastCompletedWaveForCluster
-var ValidWaveActionType = policy.ValidWaveActionType
+var ValidWaveActionType = verifier.ValidWaveActionType
 var CollectSpecSentIssueIDs = policy.CollectSpecSentIssueIDs
 var CollectPROpenIssues = policy.CollectPROpenIssues
 var FilterPROpenActions = policy.FilterPROpenActions
@@ -67,7 +67,7 @@ var ResolveStrictness = policy.ResolveStrictness
 
 // --- Review policy re-exports ---
 
-var IsRateLimited = policy.IsRateLimited
+var IsRateLimited = verifier.IsRateLimited
 var SummarizeReview = policy.SummarizeReview
 
 // --- Filter re-exports ---
