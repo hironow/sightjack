@@ -16,5 +16,7 @@ docs/plans/
 .gocache/
 # firebase local debug log
 firebase-debug.log
-sightjack
+# state
 .siren/
+.expedition/
+.gate/
