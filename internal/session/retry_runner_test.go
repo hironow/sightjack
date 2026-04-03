@@ -331,12 +331,14 @@ func TestRetryRunner_CircuitBreaker_SkipsRetries(t *testing.T) {
 		CircuitBreaker: cb,
 	}
 
-	// when
-	_, err := runner.Run(context.Background(), "test", io.Discard)
+	// when — Allow() blocks, so use short deadline
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := runner.Run(ctx, "test", io.Discard)
 
-	// then — should return ErrCircuitOpen without calling inner
-	if !errors.Is(err, platform.ErrCircuitOpen) {
-		t.Fatalf("expected ErrCircuitOpen, got %v", err)
+	// then — should return context error (blocked by CB) without calling inner
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected DeadlineExceeded (CB blocked), got %v", err)
 	}
 	if inner.calls != 0 {
 		t.Fatalf("expected 0 inner calls, got %d", inner.calls)
