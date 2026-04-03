@@ -14,6 +14,14 @@ import (
 func applyReadyLabelsWaveMode(ctx context.Context, cfg *domain.Config, issueIDs []string, logger domain.Logger) error {
 	label := cfg.Labels.ReadyLabel
 	deprecatedLabels := []string{cfg.Labels.Prefix + ":analyzed", cfg.Labels.Prefix + ":wave-done"}
+
+	// Ensure label exists (--force is idempotent, safe to call every time)
+	createCmd := exec.CommandContext(ctx, "gh", "label", "create", label, "--force")
+	if out, err := createCmd.CombinedOutput(); err != nil {
+		logger.Debug("gh label create %s: %v (%s)", label, err, string(out))
+		// Non-fatal: label may already exist
+	}
+
 	for _, id := range issueIDs {
 		logger.Info("Applying ready label %q to issue %s (wave mode)", label, id)
 		cmd := exec.CommandContext(ctx, "gh", "issue", "edit", id, "--add-label", label)
