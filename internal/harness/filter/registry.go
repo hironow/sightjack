@@ -16,8 +16,8 @@ import (
 //go:embed prompts/*.yaml
 var promptFS embed.FS
 
-// PromptDefinition represents a single prompt loaded from a YAML file.
-type PromptDefinition struct {
+// PromptConfig represents a single prompt loaded from a YAML file.
+type PromptConfig struct {
 	Name        string            `yaml:"name"`
 	Version     string            `yaml:"version"`
 	Description string            `yaml:"description"`
@@ -27,7 +27,7 @@ type PromptDefinition struct {
 
 // Registry loads and serves prompt definitions from embedded YAML files.
 type Registry struct {
-	prompts map[string]PromptDefinition
+	prompts map[string]PromptConfig
 }
 
 // NewRegistry parses all YAML files in prompts/ and returns a Registry.
@@ -48,7 +48,7 @@ func MustNewRegistry() *Registry {
 
 // NewRegistryFromFS is the testable constructor that accepts any fs.FS.
 func NewRegistryFromFS(fsys fs.FS) (*Registry, error) {
-	r := &Registry{prompts: make(map[string]PromptDefinition)}
+	r := &Registry{prompts: make(map[string]PromptConfig)}
 
 	entries, err := fs.ReadDir(fsys, "prompts")
 	if err != nil {
@@ -65,7 +65,7 @@ func NewRegistryFromFS(fsys fs.FS) (*Registry, error) {
 			return nil, fmt.Errorf("read prompt %s: %w", entry.Name(), err)
 		}
 
-		var def PromptDefinition
+		var def PromptConfig
 		if err := yaml.Unmarshal(data, &def); err != nil {
 			return nil, fmt.Errorf("parse prompt %s: %w", entry.Name(), err)
 		}
@@ -84,12 +84,12 @@ func NewRegistryFromFS(fsys fs.FS) (*Registry, error) {
 	return r, nil
 }
 
-// Get returns the PromptDefinition for the given name.
+// Get returns the PromptConfig for the given name.
 // Returns an error if the prompt is not found.
-func (r *Registry) Get(name string) (PromptDefinition, error) {
+func (r *Registry) Get(name string) (PromptConfig, error) {
 	def, ok := r.prompts[name]
 	if !ok {
-		return PromptDefinition{}, fmt.Errorf("prompt %q not found", name)
+		return PromptConfig{}, fmt.Errorf("prompt %q not found", name)
 	}
 	return def, nil
 }

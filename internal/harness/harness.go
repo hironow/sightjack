@@ -75,8 +75,8 @@ var SummarizeReview = policy.SummarizeReview
 // PromptRegistry is the type alias for the prompt registry.
 type PromptRegistry = filter.Registry
 
-// PromptDefinition is the type alias for a prompt definition.
-type PromptDefinition = filter.PromptDefinition
+// PromptConfig is the type alias for a prompt definition.
+type PromptConfig = filter.PromptConfig
 
 // NewPromptRegistry creates a new prompt registry from embedded YAML files.
 var NewPromptRegistry = filter.NewRegistry
@@ -86,6 +86,15 @@ var MustNewPromptRegistry = filter.MustNewRegistry
 
 // ExpandPromptTemplate performs simple {key} replacement on a template string.
 var ExpandPromptTemplate = filter.ExpandTemplate
+
+// --- filter layer: optimization (Phase 3) ---
+
+type PromptOptimizer = filter.PromptOptimizer
+type EvalCase = filter.EvalCase
+type OptimizedResult = filter.OptimizedResult
+
+var SavePrompt = filter.Save
+var PromptsDir = filter.PromptsDir
 
 // --- Verifier re-exports ---
 
