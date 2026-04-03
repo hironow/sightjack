@@ -62,13 +62,17 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 		fbCollector = CollectFeedback(allDmails, inboxCh, notifier, logger)
 	}
 
+	// Create runners once at session startup.
+	runner := NewTrackedRunner(cfg, baseDir, logger)
+	onceRunner := NewOnceRunner(cfg, baseDir, logger)
+
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
 		return err
 	}
 
 	// --- Pass 1+2: Scan (reuse v0.1 RunScan) ---
-	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, dryRun, out, logger)
+	scanResult, err := RunScan(ctx, cfg, baseDir, sessionID, dryRun, out, runner, onceRunner, logger)
 	if err != nil {
 		return fmt.Errorf("scan: %w", err)
 	}
@@ -81,7 +85,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 			Issues:       []domain.IssueDetail{{ID: "SAMPLE-1", Identifier: "SAMPLE-1", Title: "Sample issue", Completeness: 0.5}},
 			Observations: []string{"sample observation for dry-run"},
 		}}
-		if _, _, _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, logger); err != nil {
+		if _, _, _, err := RunWaveGenerate(ctx, cfg, scanDir, sampleClusters, true, runner, logger); err != nil {
 			return fmt.Errorf("wave generate dry-run: %w", err)
 		}
 		// Also generate architect discuss prompt for dry-run
@@ -142,7 +146,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	}
 
 	// --- Pass 3: Wave Generate ---
-	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger)
+	waves, waveWarnings, _, err := RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, runner, logger)
 	if err != nil {
 		return fmt.Errorf("wave generate: %w", err)
 	}
@@ -163,7 +167,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 
 	for {
 		result, latestWaves, latestCompleted, err := runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-			scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, emitter, out, logger)
+			scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, runner, onceRunner, emitter, out, logger)
 		if err != nil {
 			return err
 		}
@@ -172,7 +176,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 		}
 		logger.Info("Auto-rescan: design-feedback triggered fresh scan")
 		scanDir, scanResultPath, scanResult, waves, completed, adrCount, scanTime, err =
-			RescanCore(ctx, cfg, baseDir, sessionID, latestWaves, latestCompleted, emitter, out, logger)
+			RescanCore(ctx, cfg, baseDir, sessionID, latestWaves, latestCompleted, runner, onceRunner, emitter, out, logger)
 		if err != nil {
 			return fmt.Errorf("auto-rescan: %w", err)
 		}
@@ -253,6 +257,10 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 
 	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
+	// Create runners once at session startup.
+	runner := NewTrackedRunner(cfg, baseDir, logger)
+	onceRunner := NewOnceRunner(cfg, baseDir, logger)
+
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {
 		return fmt.Errorf("resume: %w", err)
@@ -283,7 +291,7 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 
 	for {
 		result, latestWaves, latestCompleted, err := runInteractiveLoop(ctx, cfg, baseDir, state.SessionID, scanDir, scanResultPath,
-			scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, emitter, out, logger)
+			scanResult, waves, completed, adrCount, scanner, adrDir, &lastScanned, lastScanned, fbCollector, outboxStore, runner, onceRunner, emitter, out, logger)
 		if err != nil {
 			return err
 		}
@@ -293,7 +301,7 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 		logger.Info("Auto-rescan: design-feedback triggered fresh scan")
 		var rescanTime time.Time
 		scanDir, scanResultPath, scanResult, waves, completed, adrCount, rescanTime, err =
-			RescanCore(ctx, cfg, baseDir, state.SessionID, latestWaves, latestCompleted, emitter, out, logger)
+			RescanCore(ctx, cfg, baseDir, state.SessionID, latestWaves, latestCompleted, runner, onceRunner, emitter, out, logger)
 		if err != nil {
 			return fmt.Errorf("auto-rescan: %w", err)
 		}

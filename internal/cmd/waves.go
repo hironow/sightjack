@@ -59,7 +59,8 @@ for piping into 'select' or 'show'.`,
 
 			logger := loggerFrom(cmd)
 
-			waves, waveWarnings, _, err := session.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun, logger)
+			runner := session.NewTrackedRunner(cfg, baseDir, logger)
+			waves, waveWarnings, _, err := session.RunWaveGenerate(cmd.Context(), cfg, scanDir, scanResult.Clusters, dryRun, runner, logger)
 			if err != nil {
 				return fmt.Errorf("wave generation failed: %w", err)
 			}

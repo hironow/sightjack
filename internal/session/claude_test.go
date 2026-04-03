@@ -14,7 +14,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
+func TestClaudeAdapter_ArgsWithModel(t *testing.T) {
 	// given: config with model set
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -29,9 +29,11 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
 
 	// when
-	session.RunClaudeOnce(context.Background(), cfg, "Analyze these issues", io.Discard, platform.NewLogger(io.Discard, false))
+	adapter.Run(context.Background(), "Analyze these issues", io.Discard)
 
 	// then
 	// Prompt is now passed via stdin, not -p flag, so args should NOT contain "-p" or the prompt text.
@@ -46,7 +48,7 @@ func TestRunClaudeOnce_ArgsWithModel(t *testing.T) {
 	}
 }
 
-func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
+func TestClaudeAdapter_ArgsWithoutModel(t *testing.T) {
 	// given: config without model
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -61,9 +63,11 @@ func TestRunClaudeOnce_ArgsWithoutModel(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
 
 	// when
-	session.RunClaudeOnce(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
+	adapter.Run(context.Background(), "test prompt", io.Discard)
 
 	// then
 	// Prompt is now passed via stdin, not -p flag.
@@ -130,7 +134,7 @@ func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	}
 }
 
-func TestRunClaudeOnceNoRetry(t *testing.T) {
+func TestClaudeAdapter_NoRetry(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
@@ -143,20 +147,22 @@ func TestRunClaudeOnceNoRetry(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
 
-	// when
-	_, err := session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
+	// when: using adapter directly (no retry)
+	_, err := adapter.Run(context.Background(), "test", io.Discard)
 
 	// then: should fail immediately without retrying
 	if err == nil {
-		t.Fatal("expected error from RunClaudeOnce")
+		t.Fatal("expected error from ClaudeAdapter")
 	}
 	if callCount != 1 {
-		t.Errorf("RunClaudeOnce should not retry; expected 1 call, got %d", callCount)
+		t.Errorf("ClaudeAdapter should not retry; expected 1 call, got %d", callCount)
 	}
 }
 
-func TestRunClaudeRetriesOnFailure(t *testing.T) {
+func TestRetryRunner_RetriesOnFailure(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
@@ -174,7 +180,11 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
 	}
-	output, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
+	retrier := session.NewRetryRunner(adapter, cfg, logger)
+
+	output, err := retrier.Run(context.Background(), "test", io.Discard)
 	if err != nil {
 		t.Fatalf("expected success after retries, got: %v", err)
 	}
@@ -186,7 +196,7 @@ func TestRunClaudeRetriesOnFailure(t *testing.T) {
 	}
 }
 
-func TestRunClaudeNoRetryOnCancel(t *testing.T) {
+func TestRetryRunner_NoRetryOnCancel_WithFakeCmd(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
@@ -202,7 +212,11 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
 	}
-	_, err := session.RunClaude(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
+	retrier := session.NewRetryRunner(adapter, cfg, logger)
+
+	_, err := retrier.Run(ctx, "test", io.Discard)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -211,7 +225,7 @@ func TestRunClaudeNoRetryOnCancel(t *testing.T) {
 	}
 }
 
-func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
+func TestClaudeAdapter_ArgsWithAllowedTools(t *testing.T) {
 	// given: config with model and allowed tools option
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -226,9 +240,11 @@ func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
 
 	// when
-	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
+	adapter.Run(context.Background(), "test", io.Discard,
 		session.WithAllowedTools("mcp__linear__list_issues", "mcp__linear__get_issue", "Write"))
 
 	// then: --allowedTools flag present with comma-separated tools
@@ -248,8 +264,8 @@ func TestRunClaudeOnce_ArgsWithAllowedTools(t *testing.T) {
 	}
 }
 
-func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
-	// given: RunClaude with allowed tools option
+func TestRetryRunner_ForwardsAllowedTools(t *testing.T) {
+	// given: RetryRunner with allowed tools option
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		capturedArgs = args
@@ -262,12 +278,15 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
+	retrier := session.NewRetryRunner(adapter, cfg, logger)
 
 	// when
-	session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
+	retrier.Run(context.Background(), "test", io.Discard,
 		session.WithAllowedTools("mcp__linear__list_issues"))
 
-	// then: --allowedTools forwarded to RunClaudeOnce
+	// then: --allowedTools forwarded
 	found := false
 	for i, arg := range capturedArgs {
 		if arg == "--allowedTools" && i+1 < len(capturedArgs) {
@@ -279,11 +298,11 @@ func TestRunClaude_ForwardsAllowedTools(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("--allowedTools flag not found in RunClaude args: %v", capturedArgs)
+		t.Errorf("--allowedTools flag not found in RetryRunner args: %v", capturedArgs)
 	}
 }
 
-func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
+func TestClaudeAdapter_GracefulShutdownOnCancel(t *testing.T) {
 	// given: a command that runs for a long time (sleep 30)
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		return exec.CommandContext(ctx, "sleep", "30")
@@ -296,6 +315,8 @@ func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
 		TimeoutSec: 30,
 		Retry:      domain.RetryConfig{MaxAttempts: 1},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
 
 	// when: cancel context after 100ms
 	go func() {
@@ -304,7 +325,7 @@ func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
 	}()
 
 	start := time.Now()
-	_, err := session.RunClaudeOnce(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
+	_, err := adapter.Run(ctx, "test", io.Discard)
 	elapsed := time.Since(start)
 
 	// then: should terminate with error (context cancelled)
@@ -318,7 +339,7 @@ func TestRunClaudeOnce_GracefulShutdownOnCancel(t *testing.T) {
 	}
 }
 
-func TestRunClaudeExhaustsRetries(t *testing.T) {
+func TestRetryRunner_ExhaustsRetries_WithFakeCmd(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
@@ -331,7 +352,11 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
 	}
-	_, err := session.RunClaude(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
+	retrier := session.NewRetryRunner(adapter, cfg, logger)
+
+	_, err := retrier.Run(context.Background(), "test", io.Discard)
 	if err == nil {
 		t.Fatal("expected error after exhausting retries")
 	}
@@ -340,7 +365,7 @@ func TestRunClaudeExhaustsRetries(t *testing.T) {
 	}
 }
 
-func TestRunClaudeOnce_StrictMCPConfig_WhenFileExists(t *testing.T) {
+func TestClaudeAdapter_StrictMCPConfig_WhenFileExists(t *testing.T) {
 	// given: .mcp.json exists in work dir
 	workDir := t.TempDir()
 	session.GenerateMCPConfig(workDir, domain.ModeWave, false)
@@ -358,9 +383,11 @@ func TestRunClaudeOnce_StrictMCPConfig_WhenFileExists(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
 
 	// when: run with WorkDir containing .mcp.json
-	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
+	adapter.Run(context.Background(), "test", io.Discard,
 		session.WithWorkDir(workDir))
 
 	// then: --strict-mcp-config and --mcp-config should be in args
@@ -373,7 +400,7 @@ func TestRunClaudeOnce_StrictMCPConfig_WhenFileExists(t *testing.T) {
 	}
 }
 
-func TestRunClaudeOnce_NoStrictMCPConfig_WhenFileAbsent(t *testing.T) {
+func TestClaudeAdapter_NoStrictMCPConfig_WhenFileAbsent(t *testing.T) {
 	// given: no .mcp.json
 	workDir := t.TempDir()
 
@@ -390,9 +417,11 @@ func TestRunClaudeOnce_NoStrictMCPConfig_WhenFileAbsent(t *testing.T) {
 		TimeoutSec: 10,
 		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
 	}
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
 
 	// when: run with empty WorkDir (no .mcp.json)
-	session.RunClaudeOnce(context.Background(), cfg, "test", io.Discard, platform.NewLogger(io.Discard, false),
+	adapter.Run(context.Background(), "test", io.Discard,
 		session.WithWorkDir(workDir))
 
 	// then: --strict-mcp-config should NOT be in args

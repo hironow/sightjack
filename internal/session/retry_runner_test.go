@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -314,3 +315,58 @@ func TestRetryRunner_RunDetailed_FallsBackToRun(t *testing.T) {
 
 // Verify RetryRunner satisfies the ClaudeRunner interface at compile time.
 var _ port.ClaudeRunner = (*session.RetryRunner)(nil)
+
+func TestRetryRunner_CircuitBreaker_SkipsRetries(t *testing.T) {
+	// given — a circuit breaker tripped by rate limit
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
+	cb.RecordProviderError(info)
+
+	inner := &fakeRunner{output: "ok"}
+	runner := &session.RetryRunner{
+		Inner:          inner,
+		MaxAttempts:    3,
+		BaseDelay:      time.Millisecond,
+		Logger:         &domain.NopLogger{},
+		CircuitBreaker: cb,
+	}
+
+	// when
+	_, err := runner.Run(context.Background(), "test", io.Discard)
+
+	// then — should return ErrCircuitOpen without calling inner
+	if !errors.Is(err, platform.ErrCircuitOpen) {
+		t.Fatalf("expected ErrCircuitOpen, got %v", err)
+	}
+	if inner.calls != 0 {
+		t.Fatalf("expected 0 inner calls, got %d", inner.calls)
+	}
+}
+
+func TestRetryRunner_CircuitBreaker_AllowsWhenClosed(t *testing.T) {
+	// given — a closed circuit breaker
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+
+	inner := &fakeRunner{output: "hello"}
+	runner := &session.RetryRunner{
+		Inner:          inner,
+		MaxAttempts:    3,
+		BaseDelay:      time.Millisecond,
+		Logger:         &domain.NopLogger{},
+		CircuitBreaker: cb,
+	}
+
+	// when
+	out, err := runner.Run(context.Background(), "test", io.Discard)
+
+	// then — should succeed normally
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if out != "hello" {
+		t.Fatalf("expected 'hello', got %q", out)
+	}
+	if inner.calls != 1 {
+		t.Fatalf("expected 1 inner call, got %d", inner.calls)
+	}
+}

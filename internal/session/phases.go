@@ -103,7 +103,7 @@ const maxDiscussFailures = 5
 // Extracted for testability (inject failing implementations in tests).
 type discussRunnerFunc func(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, topic string, strictness string,
-	out io.Writer, logger domain.Logger) (*domain.ArchitectResponse, error)
+	out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.ArchitectResponse, error)
 
 // approvalPhase handles the wave approval/reject/discuss/selective loop.
 // waves is passed by value (not pointer) because this phase only mutates
@@ -116,12 +116,22 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	feedback []*DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
 	discuss discussRunnerFunc,
+	runner port.ClaudeRunner,
 	out io.Writer, waveSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	gate := cfg.Gate
 
 	// Auto-approve when --auto-approve is set.
 	if gate.IsAutoApprove() {
+		// Circuit breaker: skip entire wave when rate-limited to prevent
+		// D-Mail emission during outage (spec D-Mail, report, feedback).
+		if sharedCircuitBreaker != nil {
+			if cbErr := sharedCircuitBreaker.Allow(ctx); cbErr != nil {
+				logger.Warn("Wave %s skipped: %v", domain.WaveKey(selected), cbErr)
+				return selected, approvalRejected
+			}
+		}
+
 		waveSpan.AddEvent("wave.auto_approved",
 			trace.WithAttributes(
 				attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
@@ -132,7 +142,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 
 		// Auto-discuss: Devil's Advocate debate → ADR generation
 		if cfg.Scribe.Enabled && cfg.Scribe.AutoDiscussRounds > 0 {
-			discussResult, discussErr := RunAutoDiscuss(ctx, cfg, scanDir, selected, feedback, adrDir, resolvedStrictness, out, logger)
+			discussResult, discussErr := RunAutoDiscuss(ctx, cfg, scanDir, selected, feedback, adrDir, resolvedStrictness, out, runner, logger)
 			if discussErr != nil {
 				logger.Warn("Auto-discuss failed (non-fatal): %v", discussErr)
 			} else if discussResult != nil {
@@ -140,7 +150,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				if len(discussResult.OpenIssues) > 0 {
 					logger.Info("Auto-discuss: %d open issues identified", len(discussResult.OpenIssues))
 				}
-				scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, archResp, adrDir, resolvedStrictness, out, logger)
+				scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, archResp, adrDir, resolvedStrictness, out, runner, logger)
 				if scribeErr != nil {
 					logger.Warn("Auto-discuss ADR generation failed (non-fatal): %v", scribeErr)
 				} else {
@@ -215,7 +225,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				logger.Warn("Invalid topic: %v", topicErr)
 				continue
 			}
-			result, discussErr := discuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, logger)
+			result, discussErr := discuss(ctx, cfg, scanDir, selected, topic, resolvedStrictness, out, runner, logger)
 			if discussErr != nil {
 				discussFailures++
 				logger.Error("Architect discussion failed: %v", discussErr)
@@ -243,7 +253,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				// Trigger Scribe to generate ADR for the modification
 				// (runs even for locked waves — the decision itself is worth recording)
 				if cfg.Scribe.Enabled {
-					scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness, out, logger)
+					scribeResp, scribeErr := RunScribeADR(ctx, cfg, scanDir, selected, result, adrDir, resolvedStrictness, out, runner, logger)
 					if scribeErr != nil {
 						logger.Warn("Scribe failed (non-fatal): %v", scribeErr)
 					} else {
@@ -304,9 +314,10 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
+	runner port.ClaudeRunner,
 	emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
 
-	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, logger)
+	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, runner, logger)
 	if err != nil {
 		logger.Error("Apply failed: %v", err)
 		return nil, 0, false
@@ -343,7 +354,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	scanDir, adrDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
-	fbCollector *FeedbackCollector, emitter port.SessionEventEmitter, waveSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, runner port.ClaudeRunner, emitter port.SessionEventEmitter, waveSpan trace.Span, logger domain.Logger) {
 
 	var clusterForNextgen domain.ClusterScanResult
 	for _, c := range scanResult.Clusters {
@@ -378,7 +389,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 		feedback = fbCollector.FeedbackOnly()
 		reports = fbCollector.ReportsOnly()
 	}
-	newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, reports, logger)
+	newWaves, nextgenErr := GenerateNextWaves(ctx, cfg, scanDir, selected, clusterForNextgen, completedWavesForCluster, existingADRs, rejectedForWave, resolvedStrictness, feedback, reports, runner, logger)
 	if nextgenErr != nil {
 		logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
 	} else if len(newWaves) > 0 {
@@ -396,7 +407,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 // in labeledReady to avoid redundant API calls.
 func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
-	labeledReady map[string]bool, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) {
+	labeledReady map[string]bool, runner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) {
 
 	if !cfg.Labels.Enabled {
 		return
@@ -417,7 +428,7 @@ func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 			logger.Warn("Wave mode ready label failed: %v", err)
 			return
 		}
-	} else if err := RunReadyLabel(ctx, cfg, readyIssueStr, out, logger); err != nil {
+	} else if err := RunReadyLabel(ctx, cfg, readyIssueStr, out, runner, logger); err != nil {
 		logger.Warn("Ready label failed: %v", err)
 		return
 	}
@@ -439,11 +450,11 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) {
 
 	gate := cfg.Gate
 
-	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, emitter, out, waveSpan, logger)
+	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, onceRunner, emitter, out, waveSpan, logger)
 	if !ok {
 		return
 	}
@@ -555,9 +566,9 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	DisplayWaveCompletion(out, selected, applyResult.Ripples, scanResult.Completeness, newCount)
 
 	generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, selected, resolvedStrictness,
-		waves, completed, scanResult, sessionRejected, fbCollector, emitter, waveSpan, logger)
+		waves, completed, scanResult, sessionRejected, fbCollector, runner, emitter, waveSpan, logger)
 
-	applyReadyLabelsIfEnabled(ctx, cfg, waves, completed, labeledReady, emitter, out, logger)
+	applyReadyLabelsIfEnabled(ctx, cfg, waves, completed, labeledReady, onceRunner, emitter, out, logger)
 
 	// Save scan result cache (crash resilience)
 	if err := WriteScanResult(scanResultPath, scanResult); err != nil {

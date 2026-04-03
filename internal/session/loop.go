@@ -32,7 +32,7 @@ const (
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store port.OutboxStore, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, []domain.Wave, map[string]bool, error) {
+	store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, []domain.Wave, map[string]bool, error) {
 
 	parentSpan := trace.SpanFromContext(ctx)
 	parentSpan.SetAttributes(attribute.String("sightjack.session_id", platform.SanitizeUTF8(sessionID)))
@@ -81,7 +81,7 @@ waitingCycle:
 				),
 			)
 
-			selected, approvalResult := approvalPhase(waveCtx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, RunArchitectDiscuss, out, waveSpan, logger)
+			selected, approvalResult := approvalPhase(waveCtx, scanner, cfg, scanDir, selected, resolvedStrictness, waves, completed, sessionRejected, adrDir, &adrCount, fbCollector.FeedbackOnly(), store, emitter, RunArchitectDiscuss, runner, out, waveSpan, logger)
 			if approvalResult != approvalApproved {
 				waveSpan.End()
 				continue
@@ -90,7 +90,7 @@ waitingCycle:
 			applyPhase(waveCtx, cfg, scanDir, scanResultPath, adrDir,
 				selected, resolvedStrictness,
 				&waves, completed, scanResult, sessionRejected,
-				labeledReady, fbCollector, store, emitter, out, waveSpan, logger)
+				labeledReady, fbCollector, store, runner, onceRunner, emitter, out, waveSpan, logger)
 			waveSpan.End()
 		}
 
@@ -166,7 +166,7 @@ waitingCycle:
 					),
 				)
 				generateNextWavesIfNeeded(ctx, cfg, scanDir, adrDir, lastWave, resolvedStrictness,
-					&waves, completed, scanResult, sessionRejected, fbCollector, emitter, waveSpan, logger)
+					&waves, completed, scanResult, sessionRejected, fbCollector, runner, emitter, waveSpan, logger)
 				waveSpan.End()
 			}
 		}

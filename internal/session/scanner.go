@@ -11,6 +11,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 
 	pond "github.com/alitto/pond/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -58,7 +59,7 @@ func MergeScanResults(clusters []domain.ClusterScanResult, shibitoWarnings []dom
 // RunScan executes the full two-pass scan.
 // Pass 1: Classify all issues into clusters.
 // Pass 2: Deep scan each cluster in parallel.
-func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, out io.Writer, logger domain.Logger) (*domain.ScanResult, error) {
+func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID string, dryRun bool, out io.Writer, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, logger domain.Logger) (*domain.ScanResult, error) {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -113,18 +114,18 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 		logger.Warn("create classify log: %v", logErr)
 	}
 
-	// Use RunClaudeOnce when labels are enabled because classify applies
+	// Use onceRunner when labels are enabled because classify applies
 	// side-effects (:analyzed labels). Retrying could duplicate label mutations.
 	linearTools := WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)
 	workDir := WithWorkDir(baseDir)
 	configBase := WithConfigBase(baseDir)
 	if cfg.Labels.Enabled {
-		if _, err := RunClaudeOnce(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools, workDir, configBase); err != nil {
+		if _, err := onceRunner.Run(classifyCtx, classifyPrompt, claudeOut, linearTools, workDir, configBase); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
 	} else {
-		if _, err := RunClaude(classifyCtx, cfg, classifyPrompt, claudeOut, logger, linearTools, workDir, configBase); err != nil {
+		if _, err := runner.Run(classifyCtx, classifyPrompt, claudeOut, linearTools, workDir, configBase); err != nil {
 			classifySpan.End()
 			return nil, fmt.Errorf("classify scan: %w", err)
 		}
@@ -191,7 +192,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 			chunkOut, closeChunkLog := savePromptAndCreateLog(scanDir, promptBase, prompt, logger)
 
 			logger.Info("Scanning cluster: %s (%d/%d issues, chunk %d/%d)", cc.Name, len(chunk), len(cc.IssueIDs), j+1, len(chunks))
-			_, runErr := RunClaude(ctx, cfg, prompt, chunkOut, logger, linearTools, workDir, configBase)
+			_, runErr := runner.Run(ctx, prompt, chunkOut, linearTools, workDir, configBase)
 			closeChunkLog()
 			if runErr != nil {
 				return domain.ClusterScanResult{}, fmt.Errorf("deepscan %s chunk %d: %w", cc.Name, j, runErr)
@@ -233,7 +234,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 // RunWaveGenerate generates waves for all clusters. Optional extraPROpenIssues
 // provides session-level knowledge of issues with spec D-Mails already sent
 // (covers the race window before paintress applies the pr-open label).
-func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, clusters []domain.ClusterScanResult, dryRun bool, logger domain.Logger, extraPROpenIssues ...map[string]bool) ([]domain.Wave, []string, map[string]bool, error) {
+func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, clusters []domain.ClusterScanResult, dryRun bool, runner port.ClaudeRunner, logger domain.Logger, extraPROpenIssues ...map[string]bool) ([]domain.Wave, []string, map[string]bool, error) {
 	ctx, waveGenSpan := platform.Tracer.Start(ctx, "wave.generate",
 		trace.WithAttributes(attribute.Int("scan.cluster_count", len(clusters))),
 	)
@@ -245,7 +246,7 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 
 	successResults, warnings := RunParallel(ctx, clusters, cfg.Scan.MaxConcurrency,
 		func(ctx context.Context, index int, cluster domain.ClusterScanResult) (domain.WaveGenerateResult, error) {
-			return generateWaveForCluster(ctx, cfg, scanDir, index, cluster, dryRun, linearTools, logger)
+			return generateWaveForCluster(ctx, cfg, scanDir, index, cluster, dryRun, linearTools, runner, logger)
 		},
 		func(c domain.ClusterScanResult) string { return c.Name },
 		logger)
@@ -320,7 +321,7 @@ func parseAndNormalizeWaveResult(path, clusterName string) (*domain.WaveGenerate
 }
 
 // generateWaveForCluster generates waves for a single cluster.
-func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult, dryRun bool, linearTools RunOption, logger domain.Logger) (domain.WaveGenerateResult, error) {
+func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult, dryRun bool, linearTools RunOption, runner port.ClaudeRunner, logger domain.Logger) (domain.WaveGenerateResult, error) {
 	base := waveFileBase(index, cluster.Name)
 	waveFile := filepath.Join(scanDir, base+".json")
 
@@ -350,7 +351,7 @@ func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir str
 	defer closeLog()
 
 	logger.Info("Generating waves: %s", cluster.Name)
-	if _, err := RunClaude(ctx, cfg, prompt, logOut, logger, linearTools); err != nil {
+	if _, err := runner.Run(ctx, prompt, logOut, linearTools); err != nil {
 		return domain.WaveGenerateResult{}, fmt.Errorf("wave generate %s: %w", cluster.Name, err)
 	}
 

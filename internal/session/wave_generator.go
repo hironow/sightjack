@@ -11,6 +11,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -56,7 +57,7 @@ func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave d
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*DMail, reports []*DMail, logger domain.Logger) ([]domain.Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*DMail, reports []*DMail, runner port.ClaudeRunner, logger domain.Logger) ([]domain.Wave, error) {
 	ctx, nextgenSpan := platform.Tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", platform.SanitizeUTF8(completedWave.ClusterName)),
@@ -87,7 +88,7 @@ func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, 
 	}
 
 	logger.Info("Generating next waves: %s", completedWave.ClusterName)
-	if _, err := RunClaude(ctx, cfg, prompt, nextgenOut, logger, WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)); err != nil {
+	if _, err := runner.Run(ctx, prompt, nextgenOut, WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)); err != nil {
 		return nil, fmt.Errorf("nextgen %s: %w", completedWave.ClusterName, err)
 	}
 

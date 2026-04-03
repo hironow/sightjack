@@ -58,7 +58,9 @@ type ScanRunnerAdapter struct{}
 func NewScanRunnerAdapter() *ScanRunnerAdapter { return &ScanRunnerAdapter{} }
 
 func (a *ScanRunnerAdapter) RunScan(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger domain.Logger) (*domain.ScanResult, error) {
-	return RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, logger)
+	runner := NewTrackedRunner(cfg, baseDir, logger)
+	onceRunner := NewOnceRunner(cfg, baseDir, logger)
+	return RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, runner, onceRunner, logger)
 }
 
 func (a *ScanRunnerAdapter) RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, emitter port.SessionEventEmitter, ts time.Time, logger domain.Logger) {
