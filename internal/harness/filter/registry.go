@@ -37,6 +37,15 @@ func NewRegistry() (*Registry, error) {
 	return NewRegistryFromFS(promptFS)
 }
 
+// MustNewRegistry returns a Registry or panics. Safe with embed.FS.
+func MustNewRegistry() *Registry {
+	r, err := NewRegistry()
+	if err != nil {
+		panic("prompt registry: " + err.Error())
+	}
+	return r
+}
+
 // NewRegistryFromFS is the testable constructor that accepts any fs.FS.
 func NewRegistryFromFS(fsys fs.FS) (*Registry, error) {
 	r := &Registry{prompts: make(map[string]PromptDefinition)}
@@ -95,6 +104,15 @@ func (r *Registry) Expand(name string, vars map[string]string) (string, error) {
 		return "", err
 	}
 	return ExpandTemplate(def.Template, vars), nil
+}
+
+// MustExpand is like Expand but panics on error.
+func (r *Registry) MustExpand(name string, vars map[string]string) string {
+	result, err := r.Expand(name, vars)
+	if err != nil {
+		panic("prompt expand " + name + ": " + err.Error())
+	}
+	return result
 }
 
 // Names returns all registered prompt names in sorted order.

@@ -53,17 +53,9 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*domain.Revie
 // BuildReviewFixPrompt creates a focused prompt for fixing review comments.
 // Uses the PromptRegistry to expand the review_fix YAML template.
 func BuildReviewFixPrompt(branch string, comments string) string {
-	reg, err := harness.NewPromptRegistry()
-	if err != nil {
-		// Fallback: should never happen with embedded YAML.
-		return fmt.Sprintf("You are on branch %s. A code review found the following issues:\n\n%s\n\nFix all review comments above. Commit and push your changes.\nKeep fixes focused — only address the review comments, do not refactor unrelated code.", branch, comments)
-	}
-	result, err := reg.Expand("review_fix", map[string]string{
+	reg := harness.MustNewPromptRegistry()
+	return reg.MustExpand("review_fix", map[string]string{
 		"branch":   branch,
 		"comments": comments,
 	})
-	if err != nil {
-		return fmt.Sprintf("You are on branch %s. A code review found the following issues:\n\n%s\n\nFix all review comments above. Commit and push your changes.\nKeep fixes focused — only address the review comments, do not refactor unrelated code.", branch, comments)
-	}
-	return result
 }

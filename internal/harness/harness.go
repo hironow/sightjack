@@ -81,6 +81,9 @@ type PromptDefinition = filter.PromptDefinition
 // NewPromptRegistry creates a new prompt registry from embedded YAML files.
 var NewPromptRegistry = filter.NewRegistry
 
+// MustNewPromptRegistry returns a Registry or panics. Safe with embed.FS.
+var MustNewPromptRegistry = filter.MustNewRegistry
+
 // ExpandPromptTemplate performs simple {key} replacement on a template string.
 var ExpandPromptTemplate = filter.ExpandTemplate
 
