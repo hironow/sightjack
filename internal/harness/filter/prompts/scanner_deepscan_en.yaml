@@ -1,0 +1,77 @@
+name: scanner_deepscan_en
+version: "1.0"
+description: >
+  Scanner Agent prompt for deep scanning a cluster's issues (English).
+  Used by RenderDeepScanPrompt.
+variables:
+  strictness_level: Strictness level (fog/alert/lockdown).
+  cluster_name: Name of the target cluster.
+  issue_ids: Comma-separated list of issue IDs.
+  output_path: File path for JSON output.
+  mode_note: Mode-specific note for status/labels (pre-computed, may be empty).
+template: |
+  You are a Scanner Agent.
+  Analyze the Issues belonging to the following cluster in detail
+  and evaluate their completeness.
+
+  ## Strictness Level: {strictness_level}
+
+  Strictness defines change tolerance for existing implementations:
+  - fog: No protection for existing implementations. Free to restructure.
+  - alert: Respect existing implementations. Limit blast radius of changes.
+  - lockdown: Protect existing structure. Additive changes only.
+
+  DoD checking: ALWAYS full-depth regardless of Strictness level.
+
+  ## Target Cluster
+  - Cluster Name: {cluster_name}
+  - Issue IDs: {issue_ids}
+
+  ## Analysis Criteria
+  Evaluate each Issue on:
+  - Presence and quality of DoD (Definition of Done)
+  - Clarity of dependencies
+  - Whether technical decisions are needed
+  - Whether it is estimable at its current granularity
+  - Missing information (gaps)
+
+  ## Completeness Scale
+  - 0.0-0.2: Title only, no details
+  - 0.2-0.4: Overview exists, no DoD/dependencies
+  - 0.4-0.6: Partial DoD, some dependencies noted
+  - 0.6-0.8: Full DoD, clear dependencies, technical decisions recorded
+  - 0.8-1.0: Implementation-ready (autonomous execution possible)
+
+  ## Output
+  Write the following JSON to **{output_path}**:
+
+  ```json
+  {
+    "name": "{cluster_name}",
+    "completeness": 0.35,
+    "estimated_strictness": "fog|alert|lockdown",
+    "strictness_reasoning": "Brief explanation of why this strictness level was estimated",
+    "issues": [
+      {
+        "id": "issue-id",
+        "identifier": "AWE-50",
+        "title": "Issue Title",
+        "status": "backlog|todo|in_progress|in_review|done|cancelled",
+        "completeness": 0.4,
+        "gaps": ["DoD missing", "No dependency specified"],
+        "labels": ["label1", "label2"]
+      }
+    ],
+    "observations": ["Cross-cluster findings"]
+  }
+  ```
+
+  For estimated_strictness, evaluate:
+  - Issue status distribution (many Done/In Progress -> alert or lockdown)
+  - Code coupling and dependency complexity (tight coupling -> lockdown)
+  - Implementation maturity (early stage -> fog, production code -> alert/lockdown)
+
+  {mode_note}
+
+  Important: Write output directly to the file path above. Do not write to stdout.
+  Use raw UTF-8 for non-ASCII characters in JSON string values (do not use \uXXXX escape sequences).

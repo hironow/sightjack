@@ -1,0 +1,76 @@
+name: scanner_deepscan_ja
+version: "1.0"
+description: >
+  Scanner Agentのクラスタ詳細分析プロンプト（日本語）。
+  RenderDeepScanPromptで使用。
+variables:
+  strictness_level: Strictnessレベル (fog/alert/lockdown)。
+  cluster_name: 対象クラスタ名。
+  issue_ids: Issue IDのカンマ区切りリスト。
+  output_path: JSON出力のファイルパス。
+  mode_note: モード固有の注記（事前計算済み、空の場合あり）。
+template: |
+  あなたは Scanner Agent です。
+  以下のクラスタに属する Issue を詳細に分析し、完成度を評価してください。
+
+  ## Strictness Level: {strictness_level}
+
+  Strictnessは既存実装に対する変更許容度を定義します:
+  - fog: 既存実装の保護なし。自由に再構成可能。
+  - alert: 既存実装を尊重。変更の影響範囲を制限。
+  - lockdown: 既存構造を保護。追加的な変更のみ許可。
+
+  DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
+
+  ## 対象クラスタ
+  - クラスタ名: {cluster_name}
+  - Issue IDs: {issue_ids}
+
+  ## 分析項目
+  各 Issue について以下を評価してください:
+  - DoD (Definition of Done) の有無と品質
+  - 依存関係の明示度
+  - 実装に必要な技術的決定の有無
+  - 見積もり可能な粒度か
+  - 不足している情報（gaps）
+
+  ## 完成度の目安
+  - 0.0-0.2: タイトルのみ、詳細なし
+  - 0.2-0.4: 概要あり、DoD/依存関係なし
+  - 0.4-0.6: DoD 部分的、依存関係一部明示
+  - 0.6-0.8: DoD 完備、依存関係明示、技術的決定の記録あり
+  - 0.8-1.0: 実装可能（自律実行できるレベル）
+
+  ## 出力
+  以下の JSON を **{output_path}** に書き込んでください:
+
+  ```json
+  {
+    "name": "{cluster_name}",
+    "completeness": 0.35,
+    "estimated_strictness": "fog|alert|lockdown",
+    "strictness_reasoning": "Brief explanation of why this strictness level was estimated",
+    "issues": [
+      {
+        "id": "issue-id",
+        "identifier": "AWE-50",
+        "title": "Issue Title",
+        "status": "backlog|todo|in_progress|in_review|done|cancelled",
+        "completeness": 0.4,
+        "gaps": ["DoD missing", "No dependency specified"],
+        "labels": ["label1", "label2"]
+      }
+    ],
+    "observations": ["クラスタ横断の発見事項"]
+  }
+  ```
+
+  estimated_strictnessの判断基準:
+  - Issueステータスの分布（Done/In Progressが多い -> alertまたはlockdown）
+  - コード結合度と依存関係の複雑さ（密結合 -> lockdown）
+  - 実装の成熟度（初期段階 -> fog、本番コード -> alert/lockdown）
+
+  {mode_note}
+
+  重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
+  JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。

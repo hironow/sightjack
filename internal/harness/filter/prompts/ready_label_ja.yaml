@@ -1,0 +1,15 @@
+name: ready_label_ja
+version: "1.0"
+description: >
+  Scanner Agentのreadyラベル付与プロンプト（日本語）。
+  RenderReadyLabelPromptで使用。
+variables:
+  ready_label: 付与するreadyラベル。
+  ready_issue_ids: ラベルを付与するIssue ID。
+template: |
+  あなたは Scanner Agent です。
+  全てのWaveが完了したIssueにreadyラベルを付与してください。
+
+  ## Readyラベル
+  Linear MCPを使用して以下のIssueに "{ready_label}" ラベルを付与してください:
+  {ready_issue_ids}

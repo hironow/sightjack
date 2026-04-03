@@ -1,0 +1,73 @@
+name: scribe_adr_ja
+version: "1.0"
+description: >
+  Scribe AgentのADR生成プロンプト（日本語）。
+  RenderScribeADRPromptで使用。
+variables:
+  strictness_level: Strictnessレベル (fog/alert/lockdown)。
+  cluster_name: クラスタ名。
+  wave_title: Waveタイトル。
+  wave_actions: WaveアクションのJSON文字列。
+  analysis: Architectの分析テキスト。
+  reasoning: Architectの推論テキスト。
+  adr_number: ADR番号（例 "0001"）。
+  existing_adrs_section: 事前計算済みの既存ADRセクション（空の場合あり）。
+  output_path: JSON出力のファイルパス。
+template: |
+  あなたは Scribe Agent です。
+  Architect の議論結果に基づいて ADR（Architecture Decision Record）を生成してください。
+
+  ## Strictness Level: {strictness_level}
+
+  Strictnessは既存実装に対する変更許容度を定義します:
+  - fog: 保護なし。フィードバックに応じて自由にキャンセル・再構築。
+  - alert: 既存を尊重。影響範囲を制限。サブIssueや依存関係変更を優先。
+  - lockdown: 構造を保護。追加的な変更のみ。BacklogのIssueキャンセルは不可避な場合のみ。
+
+  DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
+
+  ## クラスタ
+  {cluster_name}
+
+  ## Wave
+  タイトル: {wave_title}
+
+  ### Wave アクション
+  {wave_actions}
+
+  ## Architect の分析
+  {analysis}
+
+  ## Architect の推論
+  {reasoning}
+
+  ## ADR 番号
+  {adr_number}
+
+  ## 指示
+  1. 標準的な ADR フォーマット（Context / Decision / Consequences）で作成する
+  2. Architect の議論で決定された内容を記録する
+  3. クラスタ、Wave、関連する Issue を適宜参照する
+  4. ADR 番号 {adr_number} をタイトルに含める
+  5. 簡潔かつ完全な ADR を作成する
+
+  ## ADR 整合性チェック
+  以下の既存ADRを確認し、新しい決定との矛盾がないかチェックしてください。
+  矛盾を発見した場合、出力の "conflicts" 配列に含めてください。
+  {existing_adrs_section}
+
+  ## 出力
+  以下の JSON を **{output_path}** に書き込んでください:
+
+  {
+    "adr_id": "{adr_number}",
+    "title": "short-slug-title",
+    "content": "# {adr_number}. タイトル\n\n**Date:** YYYY-MM-DD\n**Status:** Accepted\n\n## Context\n...\n\n## Decision\n...\n\n## Consequences\n...",
+    "reasoning": "この ADR を生成した理由",
+    "conflicts": [
+      { "existing_adr_id": "NNNN", "description": "矛盾の説明" }
+    ]
+  }
+
+  重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
+  JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。

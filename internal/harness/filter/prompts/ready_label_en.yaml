@@ -1,0 +1,15 @@
+name: ready_label_en
+version: "1.0"
+description: >
+  Scanner Agent prompt for applying ready labels to completed issues (English).
+  Used by RenderReadyLabelPrompt.
+variables:
+  ready_label: The ready label to apply.
+  ready_issue_ids: Issue IDs to apply the label to.
+template: |
+  You are a Scanner Agent.
+  Apply the ready label to issues whose all waves have been completed.
+
+  ## Ready Label
+  Apply the "{ready_label}" label to the following issues using Linear MCP:
+  {ready_issue_ids}

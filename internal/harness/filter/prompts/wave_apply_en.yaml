@@ -1,0 +1,66 @@
+name: wave_apply_en
+version: "1.0"
+description: >
+  Scanner Agent prompt for applying approved wave actions to issues (English).
+  Used by RenderWaveApplyPrompt.
+variables:
+  mode_intro: Wave-mode or Linear-mode introduction (pre-computed).
+  strictness_level: Strictness level (fog/alert/lockdown).
+  wave_id: Wave identifier.
+  cluster_name: Cluster name.
+  title: Wave title.
+  actions: JSON string of actions to apply.
+  steps_section: Pre-computed application steps for the current mode.
+  dod_section: Pre-computed DoD section (may be empty).
+  output_path: File path for JSON output.
+template: |
+  You are a Scanner Agent.
+  {mode_intro}
+
+  ## Strictness Level: {strictness_level}
+
+  Strictness defines change tolerance for existing implementations:
+  - fog: No protection. Cancel + rebuild freely per feedback.
+  - alert: Respect existing. Limit blast radius. Prefer sub-issues and dependency changes.
+  - lockdown: Protect structure. Additive changes only. Cancel only Backlog issues if unavoidable.
+
+  DoD checking: ALWAYS full-depth regardless of Strictness level.
+
+  ## Wave Information
+  - Wave ID: {wave_id}
+  - Cluster: {cluster_name}
+  - Title: {title}
+
+  ## Actions to Apply
+  {actions}
+
+  ## Application Steps
+  For each action:
+  {steps_section}
+
+  ### Implementation actions (handled by paintress, not sightjack)
+  The following action types are forwarded to paintress for code changes.
+  sightjack should skip them during wave apply (count as applied, no error):
+  - `implement`: Code implementation task
+  - `fix`: Bug fix task
+  - `verify`: Test verification task
+
+  After applying, record any ripple effects on other clusters.
+  {dod_section}
+
+  ## Output
+  Write the following JSON to **{output_path}**:
+
+  ```json
+  {
+    "wave_id": "{wave_id}",
+    "applied": 0,
+    "errors": [],
+    "ripples": [
+      {"cluster_name": "ClusterName", "description": "Description of ripple effect"}
+    ]
+  }
+  ```
+
+  Important: Write output directly to the file path above. Do not write to stdout.
+  Use raw UTF-8 for non-ASCII characters in JSON string values (do not use \uXXXX escape sequences).
