@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -53,8 +54,8 @@ waitingCycle:
 		userQuit := false
 	outerLoop:
 		for {
-			waves = domain.EvaluateUnlocks(waves, completed)
-			available := domain.AvailableWaves(waves, completed)
+			waves = harness.EvaluateUnlocks(waves, completed)
+			available := harness.AvailableWaves(waves, completed)
 			if len(available) == 0 {
 				logger.OK("All waves completed or no available waves.")
 				break
@@ -71,7 +72,7 @@ waitingCycle:
 				continue
 			}
 
-			resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, scanResult.StrictnessKeys(selected.ClusterName)))
+			resolvedStrictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, scanResult.StrictnessKeys(selected.ClusterName)))
 
 			waveKey := domain.WaveKey(selected)
 			waveCtx, waveSpan := platform.Tracer.Start(ctx, fmt.Sprintf("wave[%s]", waveKey), // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch in loop [permanent]
@@ -95,7 +96,7 @@ waitingCycle:
 		}
 
 		// Consistency check after each outerLoop iteration
-		if domain.CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
+		if harness.CheckCompletenessConsistency(scanResult.Completeness, scanResult.Clusters) {
 			logger.Warn("Completeness mismatch detected. Recalculating...")
 			scanResult.CalculateCompleteness()
 		}
@@ -150,15 +151,15 @@ waitingCycle:
 
 		// Generate next waves for clusters affected by report D-Mails
 		if hasReport && len(reportIssueIDs) > 0 {
-			affectedClusters := domain.ClustersForIssueIDs(scanResult.Clusters, reportIssueIDs)
+			affectedClusters := harness.ClustersForIssueIDs(scanResult.Clusters, reportIssueIDs)
 			for _, cluster := range affectedClusters {
-				lastWave, ok := domain.LastCompletedWaveForCluster(waves, cluster.Name)
+				lastWave, ok := harness.LastCompletedWaveForCluster(waves, cluster.Name)
 				if !ok {
 					logger.Debug("No completed wave for cluster %s; skipping nextgen from report", cluster.Name)
 					continue
 				}
 				logger.Info("Report D-Mail triggered nextgen for cluster %s", cluster.Name)
-				resolvedStrictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, scanResult.StrictnessKeys(cluster.Name)))
+				resolvedStrictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, scanResult.StrictnessKeys(cluster.Name)))
 				_, waveSpan := platform.Tracer.Start(ctx, fmt.Sprintf("report-nextgen[%s]", cluster.Name), // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after generateNextWavesIfNeeded below [permanent]
 					trace.WithAttributes(
 						attribute.String("wave.cluster", platform.SanitizeUTF8(cluster.Name)),
@@ -176,7 +177,7 @@ waitingCycle:
 		}
 
 		// Re-evaluate waves with new feedback context before resuming
-		waves = domain.EvaluateUnlocks(waves, completed)
+		waves = harness.EvaluateUnlocks(waves, completed)
 	}
 
 	logger.OK("Session events saved to %s", filepath.Join(baseDir, domain.StateDir, "events"))

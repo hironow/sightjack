@@ -1,9 +1,10 @@
-package domain_test
+package policy_test
 
 import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 func TestSanitizeName(t *testing.T) {
@@ -49,7 +50,7 @@ func TestDetectFailedClusterNames(t *testing.T) {
 		}
 
 		// when
-		failed := domain.DetectFailedClusterNames(clusters, successes)
+		failed := harness.DetectFailedClusterNames(clusters, successes)
 
 		// then
 		if len(failed) != 0 {
@@ -68,7 +69,7 @@ func TestDetectFailedClusterNames(t *testing.T) {
 		}
 
 		// when
-		failed := domain.DetectFailedClusterNames(clusters, successes)
+		failed := harness.DetectFailedClusterNames(clusters, successes)
 
 		// then
 		if !failed["billing"] {
@@ -90,7 +91,7 @@ func TestDetectFailedClusterNames(t *testing.T) {
 		}
 
 		// when
-		failed := domain.DetectFailedClusterNames(clusters, successes)
+		failed := harness.DetectFailedClusterNames(clusters, successes)
 
 		// then
 		if !failed["auth"] {
@@ -147,7 +148,7 @@ func TestFilterEmptyClassifications(t *testing.T) {
 		}
 
 		// when
-		filtered, removed := domain.FilterEmptyClassifications(clusters)
+		filtered, removed := harness.FilterEmptyClassifications(clusters)
 
 		// then
 		if len(filtered) != 1 {
@@ -169,7 +170,7 @@ func TestFilterEmptyClassifications(t *testing.T) {
 		}
 
 		// when
-		filtered, removed := domain.FilterEmptyClassifications(clusters)
+		filtered, removed := harness.FilterEmptyClassifications(clusters)
 
 		// then
 		if len(filtered) != 1 {
@@ -188,7 +189,7 @@ func TestFilterEmptyClassifications(t *testing.T) {
 		}
 
 		// when
-		filtered, removed := domain.FilterEmptyClassifications(clusters)
+		filtered, removed := harness.FilterEmptyClassifications(clusters)
 
 		// then
 		if len(filtered) != 0 {
@@ -217,7 +218,7 @@ func TestClampCompleteness(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// when
-			got := domain.ClampCompleteness(tt.in)
+			got := harness.ClampCompleteness(tt.in)
 
 			// then
 			if got != tt.want {
@@ -242,7 +243,7 @@ func TestMergeClusterChunks_ClampsCompleteness(t *testing.T) {
 	}
 
 	// when
-	merged := domain.MergeClusterChunks("auth", chunks)
+	merged := harness.MergeClusterChunks("auth", chunks)
 
 	// then: clamped 1.5->1.0, avg of 1.0 and 0.5 = 0.75
 	if merged.Completeness != 0.75 {
@@ -270,7 +271,7 @@ func TestMergeClusterChunks(t *testing.T) {
 		}
 
 		// when
-		merged := domain.MergeClusterChunks("auth", chunks)
+		merged := harness.MergeClusterChunks("auth", chunks)
 
 		// then
 		if merged.Name != "auth" {
@@ -296,7 +297,7 @@ func TestMergeClusterChunks(t *testing.T) {
 		}
 
 		// when
-		merged := domain.MergeClusterChunks("empty", chunks)
+		merged := harness.MergeClusterChunks("empty", chunks)
 
 		// then
 		if merged.Completeness != 0 {
@@ -318,7 +319,7 @@ func TestBuildScanRecoveryReport_AllSucceeded(t *testing.T) {
 	}
 
 	// when
-	report := domain.BuildScanRecoveryReport(clusters, successes)
+	report := harness.BuildScanRecoveryReport(clusters, successes)
 
 	// then
 	if len(report.Outcomes) != 2 {
@@ -344,7 +345,7 @@ func TestBuildScanRecoveryReport_OneFailure(t *testing.T) {
 	}
 
 	// when
-	report := domain.BuildScanRecoveryReport(clusters, successes)
+	report := harness.BuildScanRecoveryReport(clusters, successes)
 
 	// then
 	if report.FailedCount != 1 {
@@ -382,7 +383,7 @@ func TestBuildScanRecoveryReport_DetectFailedIntegration(t *testing.T) {
 	}
 
 	// when
-	report := domain.BuildScanRecoveryReport(clusters, successes)
+	report := harness.BuildScanRecoveryReport(clusters, successes)
 
 	// then — one instance failed
 	if report.FailedCount != 1 {

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -101,7 +102,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 					return fmt.Errorf("cannot resolve wave context: no CompletedWave in ApplyResult and no event data.\nUse pipe workflow (apply | nextgen) or run 'sightjack scan' first")
 				}
 
-				allWaves = domain.RestoreWaves(state.Waves)
+				allWaves = harness.RestoreWaves(state.Waves)
 
 				var candidates []domain.Wave
 				for _, w := range allWaves {
@@ -134,15 +135,15 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				}
 			}
 
-			if !domain.NeedsMoreWaves(cluster, allWaves) {
+			if !harness.NeedsMoreWaves(cluster, allWaves) {
 				logger.OK("No more waves needed for %s.", cluster.Name)
 				return cacheAndPrint(domain.WavePlan{Waves: []domain.Wave{}})
 			}
 
 			adrDir := session.ADRDir(baseDir)
 			existingADRs, _ := session.ReadExistingADRs(adrDir)
-			completedWaves := domain.CompletedWavesForCluster(allWaves, cluster.Name)
-			strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
+			completedWaves := harness.CompletedWavesForCluster(allWaves, cluster.Name)
+			strictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
 
 			if dryRun {
 				if err := session.GenerateNextWavesDryRun(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger); err != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -64,7 +65,7 @@ into 'nextgen' for follow-up wave generation.`,
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
 
-			strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
+			strictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 
 			logger := loggerFrom(cmd)
 
@@ -79,7 +80,7 @@ into 'nextgen' for follow-up wave generation.`,
 				return fmt.Errorf("apply failed: %w", err)
 			}
 
-			result := domain.ToApplyResult(wave, internal)
+			result := harness.ToApplyResult(wave, internal)
 			result.RemainingWaves = input.RemainingWaves
 			out, jsonErr := json.MarshalIndent(result, "", "  ")
 			if jsonErr != nil {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -17,9 +18,9 @@ import (
 )
 
 // NeedsMoreWaves returns true when post-completion wave generation should run.
-// Delegates to domain.NeedsMoreWaves.
+// Delegates to harness.NeedsMoreWaves.
 func NeedsMoreWaves(cluster domain.ClusterScanResult, waves []domain.Wave) bool {
-	return domain.NeedsMoreWaves(cluster, waves)
+	return harness.NeedsMoreWaves(cluster, waves)
 }
 
 // NextgenFileName returns the output filename for a nextgen wave generation run.
@@ -100,12 +101,12 @@ func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, 
 		return nil, fmt.Errorf("parse nextgen %s: %w", completedWave.ClusterName, err)
 	}
 
-	newWaves := domain.NormalizeWavePrerequisites(result.Waves)
-	newWaves, selfRefCount := domain.RemoveSelfReferences(newWaves)
+	newWaves := harness.NormalizeWavePrerequisites(result.Waves)
+	newWaves, selfRefCount := harness.RemoveSelfReferences(newWaves)
 	if selfRefCount > 0 {
 		logger.Warn("Nextgen: removed %d self-referencing prerequisite(s) for %s", selfRefCount, completedWave.ClusterName)
 	}
-	newWaves, emptyCount := domain.FilterEmptyWaves(newWaves)
+	newWaves, emptyCount := harness.FilterEmptyWaves(newWaves)
 	if emptyCount > 0 {
 		logger.Warn("Nextgen: filtered %d empty wave(s) for %s", emptyCount, completedWave.ClusterName)
 	}

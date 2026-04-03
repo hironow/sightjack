@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -81,7 +82,7 @@ suitable for piping into 'adr' for ADR generation.`,
 				return fmt.Errorf("failed to create scan dir: %w", err)
 			}
 
-			strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
+			strictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 
 			logger := loggerFrom(cmd)
 

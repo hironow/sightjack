@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 func TestClassifyNewMails_Empty(t *testing.T) {
@@ -246,7 +247,7 @@ func TestReportNextgenOrchestration_EndToEnd(t *testing.T) {
 	}
 
 	// when: map issues to clusters
-	affected := domain.ClustersForIssueIDs(clusters, reportIssueIDs)
+	affected := harness.ClustersForIssueIDs(clusters, reportIssueIDs)
 
 	// then: both clusters affected
 	if len(affected) != 2 {
@@ -255,12 +256,12 @@ func TestReportNextgenOrchestration_EndToEnd(t *testing.T) {
 
 	// when: check each cluster for nextgen eligibility
 	for _, cluster := range affected {
-		lastWave, ok := domain.LastCompletedWaveForCluster(waves, cluster.Name)
+		lastWave, ok := harness.LastCompletedWaveForCluster(waves, cluster.Name)
 		if !ok {
 			t.Errorf("expected last completed wave for cluster %q", cluster.Name)
 			continue
 		}
-		needsMore := domain.NeedsMoreWaves(cluster, waves)
+		needsMore := harness.NeedsMoreWaves(cluster, waves)
 
 		// then: all waves completed + completeness < 0.95 → needs more waves
 		if !needsMore {
@@ -293,13 +294,13 @@ func TestReportNextgenOrchestration_SkipsHighCompleteness(t *testing.T) {
 
 	// when
 	reportIssueIDs := []string{"AUTH-100"}
-	affected := domain.ClustersForIssueIDs(clusters, reportIssueIDs)
+	affected := harness.ClustersForIssueIDs(clusters, reportIssueIDs)
 
 	// then
 	if len(affected) != 1 {
 		t.Fatalf("expected 1 affected, got %d", len(affected))
 	}
-	if domain.NeedsMoreWaves(affected[0], waves) {
+	if harness.NeedsMoreWaves(affected[0], waves) {
 		t.Error("expected NeedsMoreWaves=false for 0.96 completeness")
 	}
 }
@@ -324,8 +325,8 @@ func TestReportNextgenOrchestration_SkipsNoCompletedWave(t *testing.T) {
 	}
 
 	// when
-	affected := domain.ClustersForIssueIDs(clusters, []string{"AUTH-100"})
-	_, ok := domain.LastCompletedWaveForCluster(waves, affected[0].Name)
+	affected := harness.ClustersForIssueIDs(clusters, []string{"AUTH-100"})
+	_, ok := harness.LastCompletedWaveForCluster(waves, affected[0].Name)
 
 	// then
 	if ok {
@@ -354,10 +355,10 @@ func TestReportNextgenOrchestration_SkipsRemainingAvailable(t *testing.T) {
 	}
 
 	// when
-	affected := domain.ClustersForIssueIDs(clusters, []string{"AUTH-100"})
+	affected := harness.ClustersForIssueIDs(clusters, []string{"AUTH-100"})
 
 	// then: available wave remains → no nextgen needed
-	if domain.NeedsMoreWaves(affected[0], waves) {
+	if harness.NeedsMoreWaves(affected[0], waves) {
 		t.Error("expected NeedsMoreWaves=false when available waves remain")
 	}
 }
@@ -376,7 +377,7 @@ func TestReportNextgenOrchestration_UnknownIssuesIgnored(t *testing.T) {
 	}
 
 	// when: report contains unknown issue IDs
-	affected := domain.ClustersForIssueIDs(clusters, []string{"UNKNOWN-999"})
+	affected := harness.ClustersForIssueIDs(clusters, []string{"UNKNOWN-999"})
 
 	// then
 	if len(affected) != 0 {
@@ -397,16 +398,16 @@ func TestReportNextgenOrchestration_WaveCapReached(t *testing.T) {
 			Issues:       []domain.IssueDetail{{Identifier: "AUTH-100"}},
 		},
 	}
-	waves := make([]domain.Wave, domain.MaxWavesPerCluster)
+	waves := make([]domain.Wave, harness.MaxWavesPerCluster)
 	for i := range waves {
 		waves[i] = domain.Wave{ClusterName: "auth", ID: fmt.Sprintf("w%d", i+1), Status: "completed"}
 	}
 
 	// when
-	affected := domain.ClustersForIssueIDs(clusters, []string{"AUTH-100"})
+	affected := harness.ClustersForIssueIDs(clusters, []string{"AUTH-100"})
 
 	// then
-	if domain.NeedsMoreWaves(affected[0], waves) {
+	if harness.NeedsMoreWaves(affected[0], waves) {
 		t.Error("expected NeedsMoreWaves=false when wave cap reached")
 	}
 }

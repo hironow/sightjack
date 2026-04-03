@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -75,7 +76,7 @@ func TestAvailableWaves(t *testing.T) {
 	completed := map[string]bool{}
 
 	// when
-	available := domain.AvailableWaves(waves, completed)
+	available := harness.AvailableWaves(waves, completed)
 
 	// then
 	if len(available) != 2 {
@@ -84,10 +85,10 @@ func TestAvailableWaves(t *testing.T) {
 
 	// given: after completing auth-w1
 	completed[domain.WaveKey(waves[0])] = true
-	waves = domain.EvaluateUnlocks(waves, completed)
+	waves = harness.EvaluateUnlocks(waves, completed)
 
 	// when
-	available = domain.AvailableWaves(waves, completed)
+	available = harness.AvailableWaves(waves, completed)
 
 	// then: auth-w2 should be unlocked now (prereq Auth:auth-w1 met)
 	// api-w2 still locked (needs API:api-w1 too)
@@ -111,14 +112,14 @@ func TestMergeWaveResults(t *testing.T) {
 		{ClusterName: "API", Waves: []domain.Wave{{ID: "api-w1"}}},
 	}
 
-	merged := domain.MergeWaveResults(results)
+	merged := harness.MergeWaveResults(results)
 	if len(merged) != 3 {
 		t.Fatalf("expected 3 waves, got %d", len(merged))
 	}
 }
 
 func TestMergeWaveResults_Empty(t *testing.T) {
-	merged := domain.MergeWaveResults(nil)
+	merged := harness.MergeWaveResults(nil)
 	if len(merged) != 0 {
 		t.Errorf("expected 0 waves, got %d", len(merged))
 	}
@@ -190,7 +191,7 @@ func TestAvailableWaves_DuplicateIDsAcrossClusters(t *testing.T) {
 	completed := map[string]bool{domain.WaveKey(waves[0]): true}
 
 	// when
-	available := domain.AvailableWaves(waves, completed)
+	available := harness.AvailableWaves(waves, completed)
 
 	// then: API:w1 should still be available
 	if len(available) != 1 {
@@ -210,7 +211,7 @@ func TestEvaluateUnlocks_DuplicateIDsAcrossClusters(t *testing.T) {
 	completed := map[string]bool{domain.WaveKey(waves[0]): true}
 
 	// when
-	updated := domain.EvaluateUnlocks(waves, completed)
+	updated := harness.EvaluateUnlocks(waves, completed)
 
 	// then: API:w1 should be unlocked
 	if updated[1].Status != "available" {
@@ -227,7 +228,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 	}
 
 	// when
-	normalized := domain.NormalizeWavePrerequisites(waves)
+	normalized := harness.NormalizeWavePrerequisites(waves)
 
 	// then: bare "w1" becomes "Auth:w1", explicit "Auth:w1" stays
 	if len(normalized[0].Prerequisites) != 0 {
@@ -255,7 +256,7 @@ func TestAvailableWaves_AllCompleted(t *testing.T) {
 	}
 
 	// when
-	available := domain.AvailableWaves(waves, completed)
+	available := harness.AvailableWaves(waves, completed)
 
 	// then: no waves should be available — session is done
 	if len(available) != 0 {
@@ -277,7 +278,7 @@ func TestEvaluateUnlocks_AllCompleted(t *testing.T) {
 	}
 
 	// when
-	updated := domain.EvaluateUnlocks(waves, completed)
+	updated := harness.EvaluateUnlocks(waves, completed)
 
 	// then: all remain completed, no status changes
 	for _, w := range updated {
@@ -316,7 +317,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 	completed := map[string]bool{"A:a-w1": true}
 
 	// when
-	updated := domain.EvaluateUnlocks(waves, completed)
+	updated := harness.EvaluateUnlocks(waves, completed)
 
 	// then
 	if updated[1].Status != "available" {

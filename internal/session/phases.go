@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -37,7 +38,7 @@ func selectPhase(ctx context.Context, scanner *bufio.Scanner,
 
 	// Auto-select first available wave when --auto-approve is set.
 	if gate.IsAutoApprove() {
-		if w, ok := domain.AutoSelectWave(available); ok {
+		if w, ok := harness.AutoSelectWave(available); ok {
 			logger.Info("Auto-selecting wave: %s", w.Title)
 			return w, selectChosen, shibitoShown
 		}
@@ -238,8 +239,8 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			discussFailures = 0 // reset on success
 			DisplayArchitectResponse(out, result)
 			if result.ModifiedWave != nil {
-				selected = domain.ApplyModifiedWave(selected, *result.ModifiedWave, completed)
-				domain.PropagateWaveUpdate(waves, selected)
+				selected = harness.ApplyModifiedWave(selected, *result.ModifiedWave, completed)
+				harness.PropagateWaveUpdate(waves, selected)
 				emitter.EmitModifyWave(domain.WaveModifiedPayload{
 					WaveID: selected.ID, ClusterName: selected.ClusterName,
 					UpdatedWave: domain.WaveState{
@@ -291,7 +292,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 				fraction := float64(len(approved)) / float64(totalActions)
 				selected.Delta.After = selected.Delta.Before + (selected.Delta.After-selected.Delta.Before)*fraction
 			}
-			domain.PropagateWaveUpdate(waves, selected)
+			harness.PropagateWaveUpdate(waves, selected)
 			sessionRejected[domain.WaveKey(selected)] = rejected
 			emitter.EmitApproveWave(selected.ID, selected.ClusterName, time.Now().UTC())
 			if err := ComposeSpecification(ctx, store, selected, cfg.Mode); errors.Is(err, ErrSpecNoImplementationSteps) {
@@ -323,7 +324,7 @@ func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 		return nil, 0, false
 	}
 
-	oldAvailable := len(domain.AvailableWaves(*waves, completed))
+	oldAvailable := len(harness.AvailableWaves(*waves, completed))
 
 	emitter.EmitApplyWave(domain.WaveAppliedPayload{
 		WaveID: selected.ID, ClusterName: selected.ClusterName,
@@ -332,7 +333,7 @@ func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	}, time.Now().UTC())
 	platform.RecordWave(ctx, "applied")
 
-	if !domain.IsWaveApplyComplete(applyResult) {
+	if !harness.IsWaveApplyComplete(applyResult) {
 		waveSpan.AddEvent("wave.partial_failure",
 			trace.WithAttributes(
 				attribute.String("wave.id", platform.SanitizeUTF8(selected.ID)),
@@ -377,7 +378,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 		return
 	}
 
-	completedWavesForCluster := domain.CompletedWavesForCluster(*waves, selected.ClusterName)
+	completedWavesForCluster := harness.CompletedWavesForCluster(*waves, selected.ClusterName)
 	existingADRs, adrErr := ReadExistingADRs(adrDir)
 	if adrErr != nil {
 		logger.Warn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
@@ -394,10 +395,10 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 		logger.Warn("Nextgen failed (non-fatal): %v", nextgenErr)
 	} else if len(newWaves) > 0 {
 		*waves = append(*waves, newWaves...)
-		*waves = domain.EvaluateUnlocks(*waves, completed)
+		*waves = harness.EvaluateUnlocks(*waves, completed)
 		emitter.EmitAddNextGenWaves(domain.NextGenWavesAddedPayload{
 			ClusterName: selected.ClusterName,
-			Waves:       domain.BuildWaveStates(newWaves),
+			Waves:       harness.BuildWaveStates(newWaves),
 		}, time.Now().UTC())
 	}
 }
@@ -522,7 +523,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	// Update cluster completeness from delta, then recalculate overall
 	for i, c := range scanResult.Clusters {
 		if c.Name == selected.ClusterName {
-			adjustedAfter := domain.PartialApplyDelta(applyResult, selected.Delta)
+			adjustedAfter := harness.PartialApplyDelta(applyResult, selected.Delta)
 			scanResult.Clusters[i].Completeness = adjustedAfter
 			// Note: per-issue completeness is NOT updated here because
 			// action types vary (add_dod vs add_dependency) and we lack
@@ -547,15 +548,15 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	// Display rich completion summary with grouped ripple effects
 	// Capture available wave keys before unlock to compute the diff
 	beforeAvailable := make(map[string]bool)
-	for _, w := range domain.AvailableWaves(*waves, completed) {
+	for _, w := range harness.AvailableWaves(*waves, completed) {
 		beforeAvailable[domain.WaveKey(w)] = true
 	}
-	*waves = domain.EvaluateUnlocks(*waves, completed)
-	newAvailable := len(domain.AvailableWaves(*waves, completed))
-	newCount := domain.CalcNewlyUnlocked(oldAvailable, newAvailable)
+	*waves = harness.EvaluateUnlocks(*waves, completed)
+	newAvailable := len(harness.AvailableWaves(*waves, completed))
+	newCount := harness.CalcNewlyUnlocked(oldAvailable, newAvailable)
 	if newCount > 0 {
 		var unlockedIDs []string
-		for _, w := range domain.AvailableWaves(*waves, completed) {
+		for _, w := range harness.AvailableWaves(*waves, completed) {
 			key := domain.WaveKey(w)
 			if !beforeAvailable[key] {
 				unlockedIDs = append(unlockedIDs, key)

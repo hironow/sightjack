@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 // RunReview executes the review command and parses the output.
@@ -31,7 +32,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*domain.Revie
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			if domain.IsRateLimited(output) {
+			if harness.IsRateLimited(output) {
 				return nil, fmt.Errorf("review service rate/quota limited")
 			}
 			return &domain.ReviewResult{
@@ -40,7 +41,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*domain.Revie
 				Comments: output,
 			}, nil
 		}
-		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, domain.SummarizeReview(output))
+		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, harness.SummarizeReview(output))
 	}
 
 	return &domain.ReviewResult{

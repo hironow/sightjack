@@ -1,9 +1,10 @@
-package domain_test
+package policy_test
 
 import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 func TestFilterPROpenActions_RemovesImplementationForPROpenIssues(t *testing.T) {
@@ -22,7 +23,7 @@ func TestFilterPROpenActions_RemovesImplementationForPROpenIssues(t *testing.T) 
 	prOpenIssues := map[string]bool{"5": true}
 
 	// when
-	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
+	filtered := harness.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: issue #5's implementation removed, but add_dod kept; issue #3 unchanged
 	if len(filtered) != 1 {
@@ -54,7 +55,7 @@ func TestFilterPROpenActions_KeepsAllWhenNoPROpen(t *testing.T) {
 	prOpenIssues := map[string]bool{}
 
 	// when
-	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
+	filtered := harness.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: all actions preserved
 	if len(filtered[0].Actions) != 2 {
@@ -84,7 +85,7 @@ func TestFilterPROpenActions_RemovesWaveWithNoRemainingActions(t *testing.T) {
 	prOpenIssues := map[string]bool{"5": true}
 
 	// when
-	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
+	filtered := harness.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: w1 removed entirely (no remaining actions), w2 kept
 	if len(filtered) != 1 {
@@ -114,7 +115,7 @@ func TestCollectPROpenIssues_ExtractsFromClusters(t *testing.T) {
 	}
 
 	// when
-	result := domain.CollectPROpenIssues(clusters)
+	result := harness.CollectPROpenIssues(clusters)
 
 	// then
 	if len(result) != 2 {
@@ -150,7 +151,7 @@ func TestCollectSpecSentIssueIDs_FromCompletedWaves(t *testing.T) {
 	completed := map[string]bool{"validation:w1": true} // only w1 completed
 
 	// when
-	result := domain.CollectSpecSentIssueIDs(completed, waves)
+	result := harness.CollectSpecSentIssueIDs(completed, waves)
 
 	// then: only implementation actions from completed waves
 	if !result["5"] {
@@ -196,7 +197,7 @@ func TestFilterPROpenActions_GoTaskboardScenario(t *testing.T) {
 	prOpenIssues := map[string]bool{"5": true, "2": true, "3": true}
 
 	// when
-	filtered := domain.FilterPROpenActions(waves, prOpenIssues)
+	filtered := harness.FilterPROpenActions(waves, prOpenIssues)
 
 	// then: validation-w1 should keep add_dod for #5, implement for #10
 	if len(filtered) != 2 {
@@ -244,7 +245,7 @@ func TestCollectSpecSentIssueIDs_PreventsRaceDuplication(t *testing.T) {
 	completed := map[string]bool{"validation:w1": true}
 
 	// when: collect spec-sent issue IDs
-	specSent := domain.CollectSpecSentIssueIDs(completed, waves)
+	specSent := harness.CollectSpecSentIssueIDs(completed, waves)
 
 	// then: implementation issues are tracked, issue-management issues are not
 	if !specSent["5"] {
@@ -268,7 +269,7 @@ func TestCollectSpecSentIssueIDs_PreventsRaceDuplication(t *testing.T) {
 			},
 		},
 	}
-	filtered := domain.FilterPROpenActions(newWaves, specSent)
+	filtered := harness.FilterPROpenActions(newWaves, specSent)
 
 	// then: issue #5 filtered (spec already sent), issue #9 kept (new)
 	if len(filtered) != 1 {

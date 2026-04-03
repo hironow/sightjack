@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -77,7 +78,7 @@ func showFromState(ctx context.Context, w io.Writer, baseDir string, logger doma
 		result.TotalIssues += c.IssueCount
 	}
 
-	waves := domain.RestoreWaves(state.Waves)
+	waves := harness.RestoreWaves(state.Waves)
 	strictness := state.StrictnessLevel
 	if strictness == "" {
 		strictness = "fog"

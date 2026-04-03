@@ -1,4 +1,4 @@
-package domain_test
+package policy_test
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 func TestWaveKey(t *testing.T) {
@@ -33,7 +34,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 		}
 
 		// when
-		result := domain.NormalizeWavePrerequisites(waves)
+		result := harness.NormalizeWavePrerequisites(waves)
 
 		// then
 		if result[0].Prerequisites[0] != "auth:w1" {
@@ -49,7 +50,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 		}
 
 		// when
-		result := domain.NormalizeWavePrerequisites(waves)
+		result := harness.NormalizeWavePrerequisites(waves)
 
 		// then
 		if result[0].Prerequisites[0] != "billing:w1" {
@@ -65,7 +66,7 @@ func TestNormalizeWavePrerequisites(t *testing.T) {
 		}
 
 		// when
-		_ = domain.NormalizeWavePrerequisites(waves)
+		_ = harness.NormalizeWavePrerequisites(waves)
 
 		// then — original unchanged
 		if waves[0].Prerequisites[0] != "w1" {
@@ -87,7 +88,7 @@ func TestMergeWaveResults(t *testing.T) {
 	}
 
 	// when
-	merged := domain.MergeWaveResults(results)
+	merged := harness.MergeWaveResults(results)
 
 	// then
 	if len(merged) != 2 {
@@ -122,7 +123,7 @@ func TestAvailableWaves(t *testing.T) {
 	completed := map[string]bool{"billing:w1": true}
 
 	// when
-	avail := domain.AvailableWaves(waves, completed)
+	avail := harness.AvailableWaves(waves, completed)
 
 	// then — only auth:w1 (billing:w1 is in completed map)
 	if len(avail) != 1 {
@@ -146,7 +147,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 		completed := map[string]bool{"auth:w1": true}
 
 		// when
-		result := domain.EvaluateUnlocks(waves, completed)
+		result := harness.EvaluateUnlocks(waves, completed)
 
 		// then
 		if result[1].Status != "available" {
@@ -163,7 +164,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 		completed := map[string]bool{}
 
 		// when
-		result := domain.EvaluateUnlocks(waves, completed)
+		result := harness.EvaluateUnlocks(waves, completed)
 
 		// then
 		if result[0].Status != "locked" {
@@ -180,7 +181,7 @@ func TestEvaluateUnlocks(t *testing.T) {
 		}
 
 		// when
-		result := domain.EvaluateUnlocks(waves, map[string]bool{})
+		result := harness.EvaluateUnlocks(waves, map[string]bool{})
 
 		// then
 		if result[0].Status != "available" {
@@ -209,7 +210,7 @@ func TestCalcNewlyUnlocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// when
-			got := domain.CalcNewlyUnlocked(tt.oldAvailable, tt.newAvailable)
+			got := harness.CalcNewlyUnlocked(tt.oldAvailable, tt.newAvailable)
 
 			// then
 			if got != tt.want {
@@ -253,7 +254,7 @@ func TestPartialApplyDelta(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// when
-			got := domain.PartialApplyDelta(tt.result, delta)
+			got := harness.PartialApplyDelta(tt.result, delta)
 
 			// then
 			if got != tt.want {
@@ -272,7 +273,7 @@ func TestIsWaveApplyComplete(t *testing.T) {
 		result := &domain.WaveApplyResult{Applied: 3, TotalCount: 3}
 
 		// when/then
-		if !domain.IsWaveApplyComplete(result) {
+		if !harness.IsWaveApplyComplete(result) {
 			t.Error("expected complete (no errors)")
 		}
 	})
@@ -283,7 +284,7 @@ func TestIsWaveApplyComplete(t *testing.T) {
 		result := &domain.WaveApplyResult{Applied: 2, TotalCount: 3, Errors: []string{"fail"}}
 
 		// when/then
-		if domain.IsWaveApplyComplete(result) {
+		if harness.IsWaveApplyComplete(result) {
 			t.Error("expected incomplete (has errors)")
 		}
 	})
@@ -307,7 +308,7 @@ func TestApplyModifiedWave(t *testing.T) {
 		completed := map[string]bool{"auth:w0": true}
 
 		// when
-		result := domain.ApplyModifiedWave(original, modified, completed)
+		result := harness.ApplyModifiedWave(original, modified, completed)
 
 		// then — identity preserved
 		if result.ID != "w1" {
@@ -334,7 +335,7 @@ func TestApplyModifiedWave(t *testing.T) {
 		completed := map[string]bool{"auth:w0": true}
 
 		// when
-		result := domain.ApplyModifiedWave(original, modified, completed)
+		result := harness.ApplyModifiedWave(original, modified, completed)
 
 		// then — original fields preserved
 		if len(result.Actions) != 1 {
@@ -353,7 +354,7 @@ func TestApplyModifiedWave(t *testing.T) {
 		completed := map[string]bool{"auth:w1": true}
 
 		// when
-		result := domain.ApplyModifiedWave(original, modified, completed)
+		result := harness.ApplyModifiedWave(original, modified, completed)
 
 		// then
 		if result.Prerequisites[0] != "auth:w1" {
@@ -372,7 +373,7 @@ func TestApplyModifiedWave(t *testing.T) {
 		completed := map[string]bool{} // w1 not completed
 
 		// when
-		result := domain.ApplyModifiedWave(original, modified, completed)
+		result := harness.ApplyModifiedWave(original, modified, completed)
 
 		// then
 		if result.Status != "locked" {
@@ -391,7 +392,7 @@ func TestPropagateWaveUpdate(t *testing.T) {
 	updated := domain.Wave{ClusterName: "auth", ID: "w1", Title: "New"}
 
 	// when
-	domain.PropagateWaveUpdate(waves, updated)
+	harness.PropagateWaveUpdate(waves, updated)
 
 	// then
 	if waves[0].Title != "New" {
@@ -412,7 +413,7 @@ func TestBuildCompletedWaveMap(t *testing.T) {
 	}
 
 	// when
-	completed := domain.BuildCompletedWaveMap(waves)
+	completed := harness.BuildCompletedWaveMap(waves)
 
 	// then
 	if !completed["auth:w1"] {
@@ -442,7 +443,7 @@ func TestMergeOldWaves(t *testing.T) {
 		failedClusters := map[string]bool{"auth": true}
 
 		// when
-		merged := domain.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedClusters)
+		merged := harness.MergeOldWaves(oldWaves, newWaves, scannedClusters, failedClusters)
 
 		// then — old auth wave carried forward + new billing wave
 		if len(merged) != 2 {
@@ -460,7 +461,7 @@ func TestMergeOldWaves(t *testing.T) {
 		failedClusters := map[string]bool{}
 
 		// when
-		merged := domain.MergeOldWaves(oldWaves, nil, scannedClusters, failedClusters)
+		merged := harness.MergeOldWaves(oldWaves, nil, scannedClusters, failedClusters)
 
 		// then — auth dropped
 		if len(merged) != 0 {
@@ -480,7 +481,7 @@ func TestMergeOldWaves(t *testing.T) {
 		scannedClusters := map[string]bool{"auth": true}
 
 		// when
-		merged := domain.MergeOldWaves(oldWaves, newWaves, scannedClusters, map[string]bool{})
+		merged := harness.MergeOldWaves(oldWaves, newWaves, scannedClusters, map[string]bool{})
 
 		// then — no duplicate
 		if len(merged) != 1 {
@@ -499,7 +500,7 @@ func TestMergeCompletedStatus(t *testing.T) {
 	}
 
 	// when
-	result := domain.MergeCompletedStatus(oldCompleted, newWaves)
+	result := harness.MergeCompletedStatus(oldCompleted, newWaves)
 
 	// then
 	if result[0].Status != "completed" {
@@ -528,7 +529,7 @@ func TestRestoreWaves(t *testing.T) {
 	}
 
 	// when
-	waves := domain.RestoreWaves(states)
+	waves := harness.RestoreWaves(states)
 
 	// then
 	if len(waves) != 1 {
@@ -563,7 +564,7 @@ func TestBuildWaveStates(t *testing.T) {
 	}
 
 	// when
-	states := domain.BuildWaveStates(waves)
+	states := harness.BuildWaveStates(waves)
 
 	// then
 	if len(states) != 1 {
@@ -621,7 +622,7 @@ func TestCheckCompletenessConsistency(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// when
-			got := domain.CheckCompletenessConsistency(tt.overall, tt.clusters)
+			got := harness.CheckCompletenessConsistency(tt.overall, tt.clusters)
 
 			// then
 			if got != tt.want {
@@ -641,7 +642,7 @@ func TestCompletedWavesForCluster(t *testing.T) {
 	}
 
 	// when
-	result := domain.CompletedWavesForCluster(waves, "auth")
+	result := harness.CompletedWavesForCluster(waves, "auth")
 
 	// then
 	if len(result) != 1 {
@@ -673,7 +674,7 @@ func TestToApplyResult_CreateActionPartialFailure(t *testing.T) {
 	}
 
 	// when
-	result := domain.ToApplyResult(wave, internal)
+	result := harness.ToApplyResult(wave, internal)
 
 	// then: first action succeeded
 	if !result.AppliedActions[0].Success {
@@ -691,7 +692,7 @@ func TestToApplyResult_CreateActionPartialFailure(t *testing.T) {
 	}
 
 	// wave is NOT complete (partial failure)
-	if domain.IsWaveApplyComplete(internal) {
+	if harness.IsWaveApplyComplete(internal) {
 		t.Error("expected wave to be incomplete on partial failure")
 	}
 }
@@ -700,13 +701,13 @@ func TestValidWaveActionType(t *testing.T) {
 	t.Parallel()
 	valid := []string{"add_dod", "add_dependency", "add_label", "update_description", "create", "cancel"}
 	for _, v := range valid {
-		if !domain.ValidWaveActionType(v) {
+		if !harness.ValidWaveActionType(v) {
 			t.Errorf("expected %q to be valid", v)
 		}
 	}
 	invalid := []string{"delete", "remove", "", "Cancel"}
 	for _, v := range invalid {
-		if domain.ValidWaveActionType(v) {
+		if harness.ValidWaveActionType(v) {
 			t.Errorf("expected %q to be invalid", v)
 		}
 	}
@@ -773,7 +774,7 @@ func TestClustersForIssueIDs(t *testing.T) {
 
 	t.Run("single issue maps to cluster", func(t *testing.T) {
 		// when
-		result := domain.ClustersForIssueIDs(clusters, []string{"MY-100"})
+		result := harness.ClustersForIssueIDs(clusters, []string{"MY-100"})
 
 		// then
 		if len(result) != 1 {
@@ -786,7 +787,7 @@ func TestClustersForIssueIDs(t *testing.T) {
 
 	t.Run("multiple issues same cluster deduplicates", func(t *testing.T) {
 		// when
-		result := domain.ClustersForIssueIDs(clusters, []string{"MY-100", "MY-101"})
+		result := harness.ClustersForIssueIDs(clusters, []string{"MY-100", "MY-101"})
 
 		// then
 		if len(result) != 1 {
@@ -796,7 +797,7 @@ func TestClustersForIssueIDs(t *testing.T) {
 
 	t.Run("issues across clusters returns both", func(t *testing.T) {
 		// when
-		result := domain.ClustersForIssueIDs(clusters, []string{"MY-100", "MY-200"})
+		result := harness.ClustersForIssueIDs(clusters, []string{"MY-100", "MY-200"})
 
 		// then
 		if len(result) != 2 {
@@ -806,7 +807,7 @@ func TestClustersForIssueIDs(t *testing.T) {
 
 	t.Run("unknown issue returns empty", func(t *testing.T) {
 		// when
-		result := domain.ClustersForIssueIDs(clusters, []string{"UNKNOWN-999"})
+		result := harness.ClustersForIssueIDs(clusters, []string{"UNKNOWN-999"})
 
 		// then
 		if len(result) != 0 {
@@ -816,7 +817,7 @@ func TestClustersForIssueIDs(t *testing.T) {
 
 	t.Run("empty issues returns empty", func(t *testing.T) {
 		// when
-		result := domain.ClustersForIssueIDs(clusters, nil)
+		result := harness.ClustersForIssueIDs(clusters, nil)
 
 		// then
 		if len(result) != 0 {
@@ -836,7 +837,7 @@ func TestRemoveSelfReferences(t *testing.T) {
 		}
 
 		// when
-		result, removed := domain.RemoveSelfReferences(waves)
+		result, removed := harness.RemoveSelfReferences(waves)
 
 		// then
 		if removed != 1 {
@@ -858,7 +859,7 @@ func TestRemoveSelfReferences(t *testing.T) {
 		}
 
 		// when
-		result, removed := domain.RemoveSelfReferences(waves)
+		result, removed := harness.RemoveSelfReferences(waves)
 
 		// then
 		if removed != 0 {
@@ -877,7 +878,7 @@ func TestRemoveSelfReferences(t *testing.T) {
 		}
 
 		// when
-		result, removed := domain.RemoveSelfReferences(waves)
+		result, removed := harness.RemoveSelfReferences(waves)
 
 		// then
 		if removed != 1 {
@@ -901,7 +902,7 @@ func TestValidateWavePrerequisites(t *testing.T) {
 		}
 
 		// when
-		result, removed := domain.ValidateWavePrerequisites(waves)
+		result, removed := harness.ValidateWavePrerequisites(waves)
 
 		// then
 		if removed != 1 {
@@ -924,7 +925,7 @@ func TestValidateWavePrerequisites(t *testing.T) {
 		}
 
 		// when
-		result, removed := domain.ValidateWavePrerequisites(waves)
+		result, removed := harness.ValidateWavePrerequisites(waves)
 
 		// then
 		if removed != 0 {
@@ -948,7 +949,7 @@ func TestDetectWaveCycles(t *testing.T) {
 		}
 
 		// when
-		err := domain.DetectWaveCycles(waves)
+		err := harness.DetectWaveCycles(waves)
 
 		// then
 		if err == nil {
@@ -965,7 +966,7 @@ func TestDetectWaveCycles(t *testing.T) {
 		}
 
 		// when
-		err := domain.DetectWaveCycles(waves)
+		err := harness.DetectWaveCycles(waves)
 
 		// then
 		if err != nil {
@@ -982,7 +983,7 @@ func TestDetectWaveCycles(t *testing.T) {
 		}
 
 		// when
-		err := domain.DetectWaveCycles(waves)
+		err := harness.DetectWaveCycles(waves)
 
 		// then
 		if err == nil {
@@ -993,7 +994,7 @@ func TestDetectWaveCycles(t *testing.T) {
 	t.Run("empty_waves_no_error", func(t *testing.T) {
 		t.Parallel()
 		// when
-		err := domain.DetectWaveCycles(nil)
+		err := harness.DetectWaveCycles(nil)
 
 		// then
 		if err != nil {
@@ -1009,7 +1010,7 @@ func TestDetectWaveCycles(t *testing.T) {
 		}
 
 		// when
-		err := domain.DetectWaveCycles(waves)
+		err := harness.DetectWaveCycles(waves)
 
 		// then
 		if err == nil {
@@ -1035,7 +1036,7 @@ func TestPruneStaleWaves(t *testing.T) {
 		}
 
 		// when
-		removed := domain.PruneStaleWaves(state, state.Clusters)
+		removed := harness.PruneStaleWaves(state, state.Clusters)
 
 		// then
 		if removed != 1 {
@@ -1062,7 +1063,7 @@ func TestPruneStaleWaves(t *testing.T) {
 		}
 
 		// when
-		removed := domain.PruneStaleWaves(state, state.Clusters)
+		removed := harness.PruneStaleWaves(state, state.Clusters)
 
 		// then: completed waves are preserved
 		if removed != 0 {
@@ -1083,7 +1084,7 @@ func TestPruneStaleWaves(t *testing.T) {
 		}
 
 		// when
-		removed := domain.PruneStaleWaves(state, state.Clusters)
+		removed := harness.PruneStaleWaves(state, state.Clusters)
 
 		// then
 		if removed != 0 {
@@ -1105,7 +1106,7 @@ func TestRepairLockedWaves(t *testing.T) {
 		completed := map[string]bool{"auth:w1": true}
 
 		// when
-		result, repaired := domain.RepairLockedWaves(waves, completed)
+		result, repaired := harness.RepairLockedWaves(waves, completed)
 
 		// then
 		if repaired != 1 {
@@ -1125,7 +1126,7 @@ func TestRepairLockedWaves(t *testing.T) {
 		completed := map[string]bool{}
 
 		// when
-		result, repaired := domain.RepairLockedWaves(waves, completed)
+		result, repaired := harness.RepairLockedWaves(waves, completed)
 
 		// then
 		if repaired != 0 {
@@ -1143,7 +1144,7 @@ func TestValidateWaveApplyResult(t *testing.T) {
 	t.Run("nil_result_returns_error", func(t *testing.T) {
 		t.Parallel()
 		// when
-		err := domain.ValidateWaveApplyResult(nil, 3)
+		err := harness.ValidateWaveApplyResult(nil, 3)
 
 		// then
 		if err == nil {
@@ -1157,7 +1158,7 @@ func TestValidateWaveApplyResult(t *testing.T) {
 		result := &domain.WaveApplyResult{Applied: 0, TotalCount: 0}
 
 		// when
-		err := domain.ValidateWaveApplyResult(result, 3)
+		err := harness.ValidateWaveApplyResult(result, 3)
 
 		// then
 		if err == nil {
@@ -1171,7 +1172,7 @@ func TestValidateWaveApplyResult(t *testing.T) {
 		result := &domain.WaveApplyResult{Applied: 5, TotalCount: 5}
 
 		// when
-		err := domain.ValidateWaveApplyResult(result, 3)
+		err := harness.ValidateWaveApplyResult(result, 3)
 
 		// then
 		if err == nil {
@@ -1185,7 +1186,7 @@ func TestValidateWaveApplyResult(t *testing.T) {
 		result := &domain.WaveApplyResult{Applied: 3, TotalCount: 3}
 
 		// when
-		err := domain.ValidateWaveApplyResult(result, 3)
+		err := harness.ValidateWaveApplyResult(result, 3)
 
 		// then
 		if err != nil {
@@ -1199,7 +1200,7 @@ func TestValidateWaveApplyResult(t *testing.T) {
 		result := &domain.WaveApplyResult{Applied: 2, TotalCount: 3, Errors: []string{"fail"}}
 
 		// when
-		err := domain.ValidateWaveApplyResult(result, 3)
+		err := harness.ValidateWaveApplyResult(result, 3)
 
 		// then
 		if err != nil {
@@ -1213,7 +1214,7 @@ func TestValidateWaveApplyResult(t *testing.T) {
 		result := &domain.WaveApplyResult{Applied: 0, TotalCount: 0}
 
 		// when
-		err := domain.ValidateWaveApplyResult(result, 0)
+		err := harness.ValidateWaveApplyResult(result, 0)
 
 		// then
 		if err != nil {
@@ -1240,7 +1241,7 @@ func TestClampDelta(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// when
-			got := domain.ClampDelta(tt.delta)
+			got := harness.ClampDelta(tt.delta)
 
 			// then
 			if got.Before != tt.wantBefore {
@@ -1266,7 +1267,7 @@ func TestFilterEmptyWaves(t *testing.T) {
 		}
 
 		// when
-		filtered, removed := domain.FilterEmptyWaves(waves)
+		filtered, removed := harness.FilterEmptyWaves(waves)
 
 		// then
 		if len(filtered) != 1 {
@@ -1288,7 +1289,7 @@ func TestFilterEmptyWaves(t *testing.T) {
 		}
 
 		// when
-		filtered, removed := domain.FilterEmptyWaves(waves)
+		filtered, removed := harness.FilterEmptyWaves(waves)
 
 		// then
 		if len(filtered) != 1 {
@@ -1307,7 +1308,7 @@ func TestFilterEmptyWaves(t *testing.T) {
 		}
 
 		// when
-		filtered, removed := domain.FilterEmptyWaves(waves)
+		filtered, removed := harness.FilterEmptyWaves(waves)
 
 		// then
 		if len(filtered) != 0 {
@@ -1331,7 +1332,7 @@ func TestLastCompletedWaveForCluster(t *testing.T) {
 
 	t.Run("returns last completed wave", func(t *testing.T) {
 		// when
-		w, ok := domain.LastCompletedWaveForCluster(waves, "auth")
+		w, ok := harness.LastCompletedWaveForCluster(waves, "auth")
 
 		// then
 		if !ok {
@@ -1344,7 +1345,7 @@ func TestLastCompletedWaveForCluster(t *testing.T) {
 
 	t.Run("no completed waves returns false", func(t *testing.T) {
 		// when
-		_, ok := domain.LastCompletedWaveForCluster(waves, "unknown")
+		_, ok := harness.LastCompletedWaveForCluster(waves, "unknown")
 
 		// then
 		if ok {
@@ -1362,7 +1363,7 @@ func TestSortWavesByComplexity(t *testing.T) {
 		var waves []domain.Wave
 
 		// when
-		result := domain.SortWavesByComplexity(waves)
+		result := harness.SortWavesByComplexity(waves)
 
 		// then
 		if len(result) != 0 {
@@ -1378,7 +1379,7 @@ func TestSortWavesByComplexity(t *testing.T) {
 		}
 
 		// when
-		result := domain.SortWavesByComplexity(waves)
+		result := harness.SortWavesByComplexity(waves)
 
 		// then
 		if len(result) != 1 {
@@ -1404,7 +1405,7 @@ func TestSortWavesByComplexity(t *testing.T) {
 		}
 
 		// when
-		result := domain.SortWavesByComplexity(waves)
+		result := harness.SortWavesByComplexity(waves)
 
 		// then — simpler wave (fewer actions) comes first
 		if domain.WaveKey(result[0]) != "auth:w1" {
@@ -1428,7 +1429,7 @@ func TestSortWavesByComplexity(t *testing.T) {
 		}
 
 		// when
-		result := domain.SortWavesByComplexity(waves)
+		result := harness.SortWavesByComplexity(waves)
 
 		// then — wave with no prereqs comes first (lower complexity)
 		if domain.WaveKey(result[0]) != "auth:w1" {
@@ -1448,7 +1449,7 @@ func TestSortWavesByComplexity(t *testing.T) {
 		}
 
 		// when
-		result := domain.SortWavesByComplexity(waves)
+		result := harness.SortWavesByComplexity(waves)
 
 		// then — stable: original order preserved for equal complexity
 		if domain.WaveKey(result[0]) != "auth:w1" {
@@ -1470,7 +1471,7 @@ func TestSortWavesByComplexity(t *testing.T) {
 		}
 
 		// when
-		result := domain.SortWavesByComplexity(waves)
+		result := harness.SortWavesByComplexity(waves)
 
 		// then — ComplexityScore is populated (actions + prereq weighting)
 		if result[0].ComplexityScore == 0 {

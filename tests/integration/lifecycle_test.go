@@ -18,6 +18,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase"
@@ -650,7 +651,7 @@ func TestLifecycle_HappyPath(t *testing.T) {
 	assertFileExists(t, filepath.Join(scanDir, "scan_result.json"))
 
 	// show path: RestoreWaves should reconstruct waves
-	waves := domain.RestoreWaves(state.Waves)
+	waves := harness.RestoreWaves(state.Waves)
 	if len(waves) != 1 {
 		t.Fatalf("RestoreWaves: expected 1, got %d", len(waves))
 	}
@@ -1424,7 +1425,7 @@ func TestResultCache_ApplyResult(t *testing.T) {
 	}
 
 	wave := waves[0]
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
+	strictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 	internal, err := testRunWaveApply(context.Background(), cfg, scanDir, wave, strictness, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveApply failed: %v", err)
@@ -1487,7 +1488,7 @@ func TestResultCache_DiscussResult(t *testing.T) {
 	}
 
 	wave := waves[0]
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
+	strictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
 	discussRunner, _ := testRunners(cfg)
 	resp, err := session.RunArchitectDiscuss(context.Background(), cfg, scanDir, wave, "review coupling", strictness, io.Discard, discussRunner, platform.NewLogger(io.Discard, false))
 	if err != nil {
@@ -1559,8 +1560,8 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 	cluster.Completeness = 0.65 // post-apply completeness
 
 	existingADRs, _ := session.ReadExistingADRs(session.ADRDir(baseDir))
-	completedWaves := domain.CompletedWavesForCluster(waves, cluster.Name)
-	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
+	completedWaves := harness.CompletedWavesForCluster(waves, cluster.Name)
+	strictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
 
 	nextgenRunner, _ := testRunners(cfg)
 	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, nextgenRunner, platform.NewLogger(io.Discard, false))

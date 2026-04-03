@@ -1,4 +1,4 @@
-package domain_test
+package policy_test
 
 import (
 	"strings"
@@ -8,6 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 func TestDefaultConfig_ScribeEnabled(t *testing.T) {
@@ -232,7 +233,7 @@ func TestGateConfig_HasMethods(t *testing.T) {
 func TestResolveStrictness_DefaultWhenNoOverrides(t *testing.T) {
 	cfg := domain.StrictnessConfig{Default: domain.StrictnessFog}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"feature", "bug"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"feature", "bug"})
 
 	if result != domain.StrictnessFog {
 		t.Errorf("expected fog, got %s", result)
@@ -245,7 +246,7 @@ func TestResolveStrictness_SingleLabelMatch(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"feature", "security"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"feature", "security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown, got %s", result)
@@ -261,7 +262,7 @@ func TestResolveStrictness_StrictestWins(t *testing.T) {
 		},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"enhancement", "security"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"enhancement", "security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (strictest), got %s", result)
@@ -271,7 +272,7 @@ func TestResolveStrictness_StrictestWins(t *testing.T) {
 func TestResolveStrictness_NilOverrides(t *testing.T) {
 	cfg := domain.StrictnessConfig{Default: domain.StrictnessAlert}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"anything"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"anything"})
 
 	if result != domain.StrictnessAlert {
 		t.Errorf("expected alert default, got %s", result)
@@ -284,7 +285,7 @@ func TestResolveStrictness_EmptyLabels(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, nil)
+	result := harness.ResolveStrictness(cfg, nil, nil)
 
 	if result != domain.StrictnessFog {
 		t.Errorf("expected fog default, got %s", result)
@@ -297,7 +298,7 @@ func TestResolveStrictness_NoMatchingLabels(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"feature", "backend"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"feature", "backend"})
 
 	if result != domain.StrictnessFog {
 		t.Errorf("expected fog default, got %s", result)
@@ -310,7 +311,7 @@ func TestResolveStrictness_OverrideCannotLowerBelowDefault(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"Docs": domain.StrictnessFog},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"Docs"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"Docs"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (max never lowers), got %s", result)
@@ -326,7 +327,7 @@ func TestResolveStrictness_MultipleMatchesPickStrictest(t *testing.T) {
 		},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"Docs", "Security"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"Docs", "Security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (default is strictest via max), got %s", result)
@@ -339,7 +340,7 @@ func TestResolveStrictness_ClusterNameAsLabel(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"Security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"Security"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"Security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown for Security cluster, got %s", result)
@@ -352,7 +353,7 @@ func TestResolveStrictness_CaseInsensitiveMatch(t *testing.T) {
 		Overrides: map[string]domain.StrictnessLevel{"security": domain.StrictnessLockdown},
 	}
 
-	result := domain.ResolveStrictness(cfg, nil, []string{"Security"})
+	result := harness.ResolveStrictness(cfg, nil, []string{"Security"})
 
 	if result != domain.StrictnessLockdown {
 		t.Errorf("expected lockdown (case-insensitive match), got %s", result)
@@ -399,7 +400,7 @@ func TestResolveStrictness_EstimatedTakesEffect(t *testing.T) {
 	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
+	got := harness.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then
 	if got != domain.StrictnessAlert {
@@ -416,7 +417,7 @@ func TestResolveStrictness_OverrideTrumpsEstimated(t *testing.T) {
 	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
+	got := harness.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then
 	if got != domain.StrictnessLockdown {
@@ -487,7 +488,7 @@ func TestResolveStrictness_MaxOfDefaultAndEstimated(t *testing.T) {
 	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessFog}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
+	got := harness.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then
 	if got != domain.StrictnessAlert {

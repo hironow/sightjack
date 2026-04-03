@@ -1,10 +1,11 @@
-package domain_test
+package policy_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 func TestWaveAggregate_Approve_Available(t *testing.T) {
@@ -132,9 +133,9 @@ func TestWaveAggregate_Complete_StatusPersistsViaRoundTrip(t *testing.T) {
 
 	// when: complete then persist/restore
 	_, _ = agg.Complete("w1", "auth", 1, 1, time.Now().UTC())
-	states := domain.BuildWaveStates(agg.Waves())
-	restored := domain.RestoreWaves(states)
-	completed := domain.BuildCompletedWaveMap(restored)
+	states := harness.BuildWaveStates(agg.Waves())
+	restored := harness.RestoreWaves(states)
+	completed := harness.BuildCompletedWaveMap(restored)
 
 	// then: restored wave should be in completed map
 	if !completed["auth:w1"] {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -209,7 +210,7 @@ func TestWaitingMode_ReportDMailTriggersClusterIdentification(t *testing.T) {
 			Issues:       []domain.IssueDetail{{Identifier: "BILL-200"}},
 		},
 	}
-	affected := domain.ClustersForIssueIDs(clusters, mail.Issues)
+	affected := harness.ClustersForIssueIDs(clusters, mail.Issues)
 
 	// then: only auth cluster affected
 	if len(affected) != 1 {
@@ -266,7 +267,7 @@ func TestWaitingMode_MultipleReportDMailsAcrossClusters(t *testing.T) {
 		{Name: "billing", Completeness: 0.4, Issues: []domain.IssueDetail{{Identifier: "BILL-200"}}},
 		{Name: "infra", Completeness: 0.8, Issues: []domain.IssueDetail{{Identifier: "INFRA-300"}}},
 	}
-	affected := domain.ClustersForIssueIDs(clusters, issueIDs)
+	affected := harness.ClustersForIssueIDs(clusters, issueIDs)
 
 	// then: auth and billing affected, infra not
 	if len(affected) != 2 {
@@ -345,17 +346,17 @@ func TestWaitingMode_NextgenEligibilityAfterReport(t *testing.T) {
 
 	// when: report arrives for both clusters
 	issueIDs := []string{"AUTH-100", "BILL-200"}
-	affected := domain.ClustersForIssueIDs(clusters, issueIDs)
+	affected := harness.ClustersForIssueIDs(clusters, issueIDs)
 
 	// then
 	authNeedsMore := false
 	billingNeedsMore := false
 	for _, c := range affected {
-		lastWave, ok := domain.LastCompletedWaveForCluster(waves, c.Name)
+		lastWave, ok := harness.LastCompletedWaveForCluster(waves, c.Name)
 		if !ok {
 			continue
 		}
-		needs := domain.NeedsMoreWaves(c, waves)
+		needs := harness.NeedsMoreWaves(c, waves)
 		if c.Name == "auth" {
 			authNeedsMore = needs
 			if lastWave.ID != "w2" {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -43,9 +44,9 @@ func ParseWaveApplyResult(path string) (*domain.WaveApplyResult, error) {
 }
 
 // ToApplyResult converts the internal domain.WaveApplyResult to the pipe wire format domain.ApplyResult.
-// Delegates to domain.ToApplyResult.
+// Delegates to harness.ToApplyResult.
 func ToApplyResult(wave domain.Wave, internal *domain.WaveApplyResult) domain.ApplyResult {
-	return domain.ToApplyResult(wave, internal)
+	return harness.ToApplyResult(wave, internal)
 }
 
 // WaveApplyFileName returns the output filename for a wave apply result.
@@ -119,7 +120,7 @@ func RunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 		return nil, fmt.Errorf("parse apply result %s: %w", wave.ID, err)
 	}
 
-	if vErr := domain.ValidateWaveApplyResult(result, len(wave.Actions)); vErr != nil {
+	if vErr := harness.ValidateWaveApplyResult(result, len(wave.Actions)); vErr != nil {
 		return nil, fmt.Errorf("wave %s apply validation: %w", wave.ID, vErr)
 	}
 
