@@ -5,6 +5,7 @@
 package harness
 
 import (
+	"github.com/hironow/sightjack/internal/harness/filter"
 	"github.com/hironow/sightjack/internal/harness/policy"
 	"github.com/hironow/sightjack/internal/harness/verifier"
 )
@@ -68,6 +69,20 @@ var ResolveStrictness = policy.ResolveStrictness
 
 var IsRateLimited = policy.IsRateLimited
 var SummarizeReview = policy.SummarizeReview
+
+// --- Filter re-exports ---
+
+// PromptRegistry is the type alias for the prompt registry.
+type PromptRegistry = filter.Registry
+
+// PromptDefinition is the type alias for a prompt definition.
+type PromptDefinition = filter.PromptDefinition
+
+// NewPromptRegistry creates a new prompt registry from embedded YAML files.
+var NewPromptRegistry = filter.NewRegistry
+
+// ExpandPromptTemplate performs simple {key} replacement on a template string.
+var ExpandPromptTemplate = filter.ExpandTemplate
 
 // --- Verifier re-exports ---
 

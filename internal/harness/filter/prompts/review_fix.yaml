@@ -1,0 +1,15 @@
+name: review_fix
+version: "1.0"
+description: >
+  Prompt for fixing code review comments on a branch.
+  Used by BuildReviewFixPrompt in session/review.go.
+variables:
+  branch: The git branch name containing the code under review.
+  comments: The review comments to address.
+template: |
+  You are on branch {branch}. A code review found the following issues:
+
+  {comments}
+
+  Fix all review comments above. Commit and push your changes.
+  Keep fixes focused — only address the review comments, do not refactor unrelated code.
