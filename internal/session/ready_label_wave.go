@@ -13,12 +13,18 @@ import (
 // Used in wave mode where Linear MCP is unavailable.
 func applyReadyLabelsWaveMode(ctx context.Context, cfg *domain.Config, issueIDs []string, logger domain.Logger) error {
 	label := cfg.Labels.ReadyLabel
+	deprecatedLabels := []string{cfg.Labels.Prefix + ":analyzed", cfg.Labels.Prefix + ":wave-done"}
 	for _, id := range issueIDs {
 		logger.Info("Applying ready label %q to issue %s (wave mode)", label, id)
 		cmd := exec.CommandContext(ctx, "gh", "issue", "edit", id, "--add-label", label)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			logger.Warn("gh issue edit %s --add-label %s: %s", id, label, string(out))
 			return fmt.Errorf("apply ready label to %s: %w", id, err)
+		}
+		// Remove deprecated state labels (best-effort, ignore errors)
+		for _, old := range deprecatedLabels {
+			rm := exec.CommandContext(ctx, "gh", "issue", "edit", id, "--remove-label", old)
+			rm.CombinedOutput() //nolint:errcheck
 		}
 	}
 	return nil

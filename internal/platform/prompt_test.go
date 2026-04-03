@@ -685,7 +685,8 @@ func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
 	}
 }
 
-func TestRenderClassifyPromptWithLabels(t *testing.T) {
+func TestRenderClassifyPromptWithLabels_NoAnalyzedLabel(t *testing.T) {
+	// analyzed label is deprecated — classify prompt must NOT contain it
 	data := domain.ClassifyPromptData{
 		TeamFilter:      "test",
 		ProjectFilter:   "test",
@@ -699,8 +700,8 @@ func TestRenderClassifyPromptWithLabels(t *testing.T) {
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
-		if !strings.Contains(result, "sightjack:analyzed") {
-			t.Errorf("lang=%s: expected label instruction in output", lang)
+		if strings.Contains(result, "sightjack:analyzed") {
+			t.Errorf("lang=%s: deprecated analyzed label should not appear in output", lang)
 		}
 	}
 }
@@ -724,7 +725,8 @@ func TestRenderClassifyPromptWithoutLabels(t *testing.T) {
 	}
 }
 
-func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
+func TestRenderWaveApplyPromptWithLabels_NoWaveDoneLabel(t *testing.T) {
+	// wave-done label is deprecated — wave apply prompt must NOT contain it
 	data := domain.WaveApplyPromptData{
 		WaveID:          "w1",
 		ClusterName:     "auth",
@@ -740,8 +742,8 @@ func TestRenderWaveApplyPromptWithLabels(t *testing.T) {
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
-		if !strings.Contains(result, "sightjack:wave-done") {
-			t.Errorf("lang=%s: expected label instruction in output", lang)
+		if strings.Contains(result, "sightjack:wave-done") {
+			t.Errorf("lang=%s: deprecated wave-done label should not appear in output", lang)
 		}
 	}
 }
