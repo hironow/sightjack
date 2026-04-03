@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness/verifier"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase/port"
@@ -319,7 +320,7 @@ var _ port.ClaudeRunner = (*session.RetryRunner)(nil)
 func TestRetryRunner_CircuitBreaker_SkipsRetries(t *testing.T) {
 	// given — a circuit breaker tripped by rate limit
 	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
-	info := domain.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
+	info := verifier.ClassifyProviderError(domain.ProviderClaudeCode, "You've hit your limit")
 	cb.RecordProviderError(info)
 
 	inner := &fakeRunner{output: "ok"}

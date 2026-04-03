@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness/verifier"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -136,7 +137,7 @@ func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
 	if classifyTarget == "" {
 		classifyTarget = err.Error()
 	}
-	info := domain.ClassifyProviderError(provider, classifyTarget)
+	info := verifier.ClassifyProviderError(provider, classifyTarget)
 	if info.IsTrip() {
 		sharedCircuitBreaker.RecordProviderError(info)
 	}
