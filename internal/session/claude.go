@@ -3,7 +3,6 @@ package session
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +12,16 @@ import (
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
+
+// sharedCircuitBreaker is the process-wide circuit breaker shared across all
+// provider adapter instances. Set via SetCircuitBreaker at startup.
+var sharedCircuitBreaker *platform.CircuitBreaker
+
+// SetCircuitBreaker sets the process-wide circuit breaker for all provider calls.
+// Call this once during startup before any provider invocations.
+func SetCircuitBreaker(cb *platform.CircuitBreaker) {
+	sharedCircuitBreaker = cb
+}
 
 var newCmd = defaultNewCmd
 
@@ -65,59 +74,75 @@ func NewClaudeAdapter(cfg *domain.Config, logger domain.Logger) *ClaudeAdapter {
 // NewRetryRunner creates a RetryRunner wrapping the given ClaudeRunner.
 func NewRetryRunner(inner port.ClaudeRunner, cfg *domain.Config, logger domain.Logger) *RetryRunner {
 	return &RetryRunner{
-		Inner:       inner,
-		MaxAttempts: cfg.Retry.MaxAttempts,
-		BaseDelay:   time.Duration(cfg.Retry.BaseDelaySec) * time.Second,
-		Timeout:     time.Duration(cfg.TimeoutSec) * time.Second,
-		Logger:      logger,
+		Inner:          inner,
+		MaxAttempts:    cfg.Retry.MaxAttempts,
+		BaseDelay:      time.Duration(cfg.Retry.BaseDelaySec) * time.Second,
+		Timeout:        time.Duration(cfg.TimeoutSec) * time.Second,
+		Logger:         logger,
+		CircuitBreaker: sharedCircuitBreaker,
 	}
 }
 
-// RunClaudeOnce executes the Claude CLI as a subprocess once without retry.
-// Sessions are tracked in SQLite when the state directory is accessible.
-func RunClaudeOnce(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...port.RunOption) (string, error) {
-	adapter := NewClaudeAdapter(cfg, logger)
-	return runWithSessionTracking(ctx, adapter, cfg, prompt, w, logger, opts...)
-}
-
-// RunClaude executes the Claude CLI with exponential backoff retry.
-// Sessions are tracked in SQLite when the state directory is accessible.
-func RunClaude(ctx context.Context, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...port.RunOption) (string, error) {
+// NewTrackedRunner creates a provider-tracked runner with retry, session tracking,
+// and circuit breaker protection. This is the standard way to create a runner
+// for session-level operations that should be retried on transient failures.
+// baseDir is used to resolve the session tracking database path.
+func NewTrackedRunner(cfg *domain.Config, baseDir string, logger domain.Logger) port.ClaudeRunner {
 	adapter := NewClaudeAdapter(cfg, logger)
 	retrier := NewRetryRunner(adapter, cfg, logger)
-	return runWithSessionTracking(ctx, retrier, cfg, prompt, w, logger, opts...)
+	return wrapWithSessionTracking(retrier, baseDir, logger)
 }
 
-// runWithSessionTracking wraps a ClaudeRunner invocation with session persistence.
-// Best-effort: if the session store cannot be opened, falls back to plain execution.
-func runWithSessionTracking(ctx context.Context, runner port.ClaudeRunner, cfg *domain.Config, prompt string, w io.Writer, logger domain.Logger, opts ...port.RunOption) (string, error) {
-	// ClaudeRunner also implements DetailedRunner (ClaudeAdapter, RetryRunner both do)
+// NewOnceRunner creates a provider-tracked runner WITHOUT retry.
+// Use this for operations with side-effects that must not be retried
+// (e.g. wave apply, classify with label mutations).
+// baseDir is used to resolve the session tracking database path.
+func NewOnceRunner(cfg *domain.Config, baseDir string, logger domain.Logger) port.ClaudeRunner {
+	adapter := NewClaudeAdapter(cfg, logger)
+	return wrapWithSessionTracking(adapter, baseDir, logger)
+}
+
+// wrapWithSessionTracking wraps a ClaudeRunner with session persistence.
+// Best-effort: if the session store cannot be opened, returns the runner as-is.
+func wrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, logger domain.Logger) port.ClaudeRunner {
 	detailed, ok := runner.(port.DetailedRunner)
 	if !ok {
-		return runner.Run(ctx, prompt, w, opts...)
+		return runner
 	}
-
-	rc := port.ApplyOptions(opts...)
-	configBase := rc.ConfigBase
-	if configBase == "" {
-		configBase = effectiveDir(rc.WorkDir)
-	}
-	dbPath := filepath.Join(configBase, domain.StateDir, ".run", "sessions.db")
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "sessions.db")
 	store, err := NewSQLiteCodingSessionStore(dbPath)
 	if err != nil {
 		if logger != nil {
 			logger.Debug("session tracking unavailable: %v", err)
 		}
-		return runner.Run(ctx, prompt, w, opts...)
+		return runner
 	}
-	defer store.Close()
-
-	tracker := NewSessionTrackingAdapter(detailed, store, domain.ProviderClaudeCode)
-	_, text, runErr := tracker.RunSession(ctx, prompt, w, opts...)
-	return text, runErr
+	// Note: store is not closed here — it lives for the duration of the session.
+	// The caller (RunSession/RunResumeSession) should hold the runner reference.
+	return NewSessionTrackingAdapter(detailed, store, domain.ProviderClaudeCode)
 }
 
-// RunClaudeDryRun saves the prompt to a file instead of executing Claude,
+// recordCircuitBreaker updates the shared circuit breaker based on provider error classification.
+func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
+	if sharedCircuitBreaker == nil {
+		return
+	}
+	if err == nil {
+		sharedCircuitBreaker.RecordSuccess()
+		return
+	}
+	// Use stderr if available, otherwise try extracting from the error message itself
+	classifyTarget := stderr
+	if classifyTarget == "" {
+		classifyTarget = err.Error()
+	}
+	info := domain.ClassifyProviderError(provider, classifyTarget)
+	if info.IsTrip() {
+		sharedCircuitBreaker.RecordProviderError(info)
+	}
+}
+
+// RunClaudeDryRun saves the prompt to a file instead of executing the provider CLI,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
 func RunClaudeDryRun(cfg *domain.Config, prompt, outputPath string, name string, logger domain.Logger) error {

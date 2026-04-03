@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"text/tabwriter"
 
@@ -62,7 +61,7 @@ func newSessionsListCmd() *cobra.Command {
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {
-				return json.NewEncoder(os.Stdout).Encode(records)
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(records)
 			}
 
 			if len(records) == 0 {
@@ -70,7 +69,7 @@ func newSessionsListCmd() *cobra.Command {
 				return nil
 			}
 
-			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
 			fmt.Fprintln(w, "ID\tPROVIDER\tSTATUS\tMODEL\tPROVIDER_SESSION\tCREATED")
 			for _, r := range records {
 				pid := r.ProviderSessionID
@@ -138,8 +137,8 @@ func newSessionsEnterCmd() *cobra.Command {
 				ProviderSessionID: rec.ProviderSessionID,
 				WorkDir:           rec.WorkDir,
 				ConfigBase:        stateDir,
-				Stdin:             os.Stdin,
-				Stdout:            os.Stdout,
+				Stdin:             cmd.InOrStdin(),
+				Stdout:            cmd.OutOrStdout(),
 				Stderr:            cmd.ErrOrStderr(),
 			}
 			return session.EnterSession(cmd.Context(), enterCfg)

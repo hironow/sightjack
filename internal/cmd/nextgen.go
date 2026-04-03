@@ -152,7 +152,8 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				return nil
 			}
 
-			newWaves, err := session.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, logger)
+			runner := session.NewTrackedRunner(cfg, baseDir, logger)
+			newWaves, err := session.GenerateNextWaves(cmd.Context(), cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, runner, logger)
 			if err != nil {
 				return fmt.Errorf("nextgen failed: %w", err)
 			}

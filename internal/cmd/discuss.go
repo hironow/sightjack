@@ -93,7 +93,8 @@ suitable for piping into 'adr' for ADR generation.`,
 				return nil
 			}
 
-			resp, err := session.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, cmd.OutOrStdout(), logger)
+			runner := session.NewTrackedRunner(cfg, baseDir, logger)
+			resp, err := session.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, cmd.OutOrStdout(), runner, logger)
 			if err != nil {
 				return fmt.Errorf("discussion failed: %w", err)
 			}

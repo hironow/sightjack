@@ -49,7 +49,10 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 		Retry: domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 1},
 	}
 
-	_, err := session.RunClaude(context.Background(), cfg, "test prompt", io.Discard, platform.NewLogger(io.Discard, false))
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
+	retrier := session.NewRetryRunner(adapter, cfg, logger)
+	_, err := retrier.Run(context.Background(), "test prompt", io.Discard)
 	if err != nil {
 		t.Fatalf("RunClaude failed: %v", err)
 	}
@@ -139,7 +142,10 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	// Create a parent span so retry events have a recording span to attach to.
 	tr := otel.Tracer("sightjack-test")
 	ctx, parentSpan := tr.Start(context.Background(), "test-parent") // nosemgrep: adr0003-otel-span-without-defer-end -- parentSpan.End() called explicitly after RunClaude [permanent]
-	_, _ = session.RunClaude(ctx, cfg, "test", io.Discard, platform.NewLogger(io.Discard, false))
+	retryLogger := platform.NewLogger(io.Discard, false)
+	retryAdapter := session.NewClaudeAdapter(cfg, retryLogger)
+	retryRunner := session.NewRetryRunner(retryAdapter, cfg, retryLogger)
+	_, _ = retryRunner.Run(ctx, "test", io.Discard)
 	parentSpan.End()
 
 	spans := exp.GetSpans()

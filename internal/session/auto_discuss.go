@@ -14,6 +14,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // autoDiscussRoundResponse is the JSON output from a single auto-discuss round.
@@ -38,7 +39,7 @@ func autoDiscussOutputFileName(speaker string, wave domain.Wave, round int) stri
 // Returns nil result (not error) when auto_discuss_rounds is 0.
 func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, feedback []*DMail, adrDir string, strictness string,
-	out io.Writer, logger domain.Logger) (*domain.AutoDiscussResult, error) {
+	out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.AutoDiscussResult, error) {
 
 	rounds := cfg.Scribe.AutoDiscussRounds
 	if rounds <= 0 {
@@ -95,13 +96,13 @@ func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 
 		if speaker == "architect" {
 			content, roundErr = runAutoDiscussArchitect(roundCtx, cfg, scanDir, wave,
-				string(actionsJSON), priorContent, feedbackSection, strictness, r, out, logger)
+				string(actionsJSON), priorContent, feedbackSection, strictness, r, out, runner, logger)
 		} else {
 			isFinal := r == totalCalls-1
 			daRoundIndex := (r + 1) / 2
 			content, roundErr = runAutoDiscussDevilsAdvocate(roundCtx, cfg, scanDir, wave,
 				string(actionsJSON), priorContent, existingADRs, claudeMD,
-				strictness, daRoundIndex, rounds, isFinal, r, out, logger)
+				strictness, daRoundIndex, rounds, isFinal, r, out, runner, logger)
 		}
 
 		roundSpan.End()
@@ -163,7 +164,7 @@ func speakerForRound(r int) string {
 
 func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, actionsJSON, priorContent, feedbackSection, strictness string,
-	roundIndex int, out io.Writer, logger domain.Logger) (string, error) {
+	roundIndex int, out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (string, error) {
 
 	outputFile := filepath.Join(scanDir, autoDiscussOutputFileName("architect", wave, roundIndex))
 	_ = os.Remove(outputFile)
@@ -182,7 +183,7 @@ func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir st
 	}
 
 	logger.Info("Auto-discuss: Architect (round %d)", roundIndex)
-	if _, err := RunClaude(ctx, cfg, prompt, out, logger); err != nil {
+	if _, err := runner.Run(ctx, prompt, out); err != nil {
 		return "", fmt.Errorf("auto-discuss architect: %w", err)
 	}
 
@@ -195,7 +196,7 @@ func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir st
 func runAutoDiscussDevilsAdvocate(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, actionsJSON, priorContent string, existingADRs []domain.ExistingADR,
 	claudeMD, strictness string, daRoundIndex, totalRounds int, isFinal bool,
-	roundIndex int, out io.Writer, logger domain.Logger) (string, error) {
+	roundIndex int, out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (string, error) {
 
 	outputFile := filepath.Join(scanDir, autoDiscussOutputFileName("devils_advocate", wave, roundIndex))
 	_ = os.Remove(outputFile)
@@ -222,7 +223,7 @@ func runAutoDiscussDevilsAdvocate(ctx context.Context, cfg *domain.Config, scanD
 		finalTag = " FINAL"
 	}
 	logger.Info("Auto-discuss: Devil's Advocate (round %d/%d%s)", daRoundIndex, totalRounds, finalTag)
-	if _, err := RunClaude(ctx, cfg, prompt, out, logger); err != nil {
+	if _, err := runner.Run(ctx, prompt, out); err != nil {
 		return "", fmt.Errorf("auto-discuss devils_advocate: %w", err)
 	}
 

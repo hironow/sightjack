@@ -668,10 +668,13 @@ fi
 	cfg.TimeoutSec = 30
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
-	cfg.Labels.Enabled = false // avoid RunClaudeOnce label path complexity
+	cfg.Labels.Enabled = false // avoid label path complexity in runner calls
 
 	// when
-	result, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	logger := platform.NewLogger(io.Discard, false)
+	runner := session.NewClaudeAdapter(&cfg, logger)
+	retrier := session.NewRetryRunner(runner, &cfg, logger)
+	result, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, io.Discard, retrier, runner, logger)
 
 	// then: scan should succeed
 	if err != nil {
@@ -786,7 +789,10 @@ fi
 	var recorder writeRecorder
 
 	// when
-	_, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, &recorder, platform.NewLogger(io.Discard, false))
+	scanLogger := platform.NewLogger(io.Discard, false)
+	scanAdapter := session.NewClaudeAdapter(&cfg, scanLogger)
+	scanRetrier := session.NewRetryRunner(scanAdapter, &cfg, scanLogger)
+	_, err := session.RunScan(context.Background(), &cfg, baseDir, sessionID, false, &recorder, scanRetrier, scanAdapter, scanLogger)
 
 	// then
 	if err != nil {
@@ -888,9 +894,10 @@ echo '%s'
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
 	logger := platform.NewLogger(io.Discard, false)
+	wgRunner := session.NewRetryRunner(session.NewClaudeAdapter(&cfg, logger), &cfg, logger)
 
 	// when
-	waves, warnings, _, err := session.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+	waves, warnings, _, err := session.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, wgRunner, logger)
 
 	// then: no fatal error
 	if err != nil {
@@ -929,9 +936,10 @@ func TestRunWaveGenerate_AllFail(t *testing.T) {
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
 	logger := platform.NewLogger(io.Discard, false)
+	wgRunner := session.NewRetryRunner(session.NewClaudeAdapter(&cfg, logger), &cfg, logger)
 
 	// when
-	waves, warnings, _, err := session.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, logger)
+	waves, warnings, _, err := session.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, wgRunner, logger)
 
 	// then: error because ALL clusters failed
 	if err == nil {
@@ -1025,10 +1033,12 @@ func TestRunWaveGenerate_DryRunPopulatesClusterName(t *testing.T) {
 	}
 
 	// when: dry-run wave generation via exported API
+	dryLogger := platform.NewLogger(io.Discard, false)
 	_, _, failedNames, err := session.RunWaveGenerate(
 		context.Background(), &cfg, scanDir, clusters,
 		true, // dryRun
-		platform.NewLogger(io.Discard, false),
+		session.NewClaudeAdapter(&cfg, dryLogger),
+		dryLogger,
 	)
 
 	// then: no error

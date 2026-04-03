@@ -73,7 +73,8 @@ into 'nextgen' for follow-up wave generation.`,
 				return nil
 			}
 
-			internal, err := session.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness, cmd.OutOrStdout(), logger)
+			onceRunner := session.NewOnceRunner(cfg, baseDir, logger)
+			internal, err := session.RunWaveApply(cmd.Context(), cfg, scanDir, wave, strictness, cmd.OutOrStdout(), onceRunner, logger)
 			if err != nil {
 				return fmt.Errorf("apply failed: %w", err)
 			}

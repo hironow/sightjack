@@ -20,6 +20,7 @@ import (
 // triggered by design-feedback D-Mail arrival.
 func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID string,
 	oldWaves []domain.Wave, oldCompleted map[string]bool,
+	runner port.ClaudeRunner, onceRunner port.ClaudeRunner,
 	emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger,
 ) (scanDir, scanResultPath string, scanResult *domain.ScanResult,
 	waves []domain.Wave, completed map[string]bool,
@@ -29,7 +30,7 @@ func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID stri
 	if err != nil {
 		return
 	}
-	scanResult, err = RunScan(ctx, cfg, baseDir, sessionID, false, out, logger)
+	scanResult, err = RunScan(ctx, cfg, baseDir, sessionID, false, out, runner, onceRunner, logger)
 	if err != nil {
 		err = fmt.Errorf("re-scan: %w", err)
 		return
@@ -48,7 +49,7 @@ func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID stri
 	specSentIssues := domain.CollectSpecSentIssueIDs(oldCompleted, oldWaves)
 
 	var failedNames map[string]bool
-	waves, _, failedNames, err = RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, logger, specSentIssues)
+	waves, _, failedNames, err = RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, runner, logger, specSentIssues)
 	if err != nil {
 		err = fmt.Errorf("wave generate: %w", err)
 		return
@@ -142,11 +143,15 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 
 	fbCollector := CollectFeedback(allDmails, inboxCh, notifier, logger)
 
+	// Create runners once at session startup.
+	runner := NewTrackedRunner(cfg, baseDir, logger)
+	onceRunner := NewOnceRunner(cfg, baseDir, logger)
+
 	// Initial rescan via RescanCore
 	oldWaves := domain.RestoreWaves(oldState.Waves)
 	oldCompleted := domain.BuildCompletedWaveMap(oldWaves)
 	scanDir, scanResultPath, scanResult, waves, completed, adrCount, scanTime, err :=
-		RescanCore(ctx, cfg, baseDir, sessionID, oldWaves, oldCompleted, emitter, out, logger)
+		RescanCore(ctx, cfg, baseDir, sessionID, oldWaves, oldCompleted, runner, onceRunner, emitter, out, logger)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "sightjack.rescan.core"))
@@ -163,7 +168,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 
 	for {
 		result, latestWaves, latestCompleted, err := runInteractiveLoop(ctx, cfg, baseDir, sessionID, scanDir, scanResultPath,
-			scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, emitter, out, logger)
+			scanResult, waves, completed, adrCount, scanner, adrDir, nil, scanTime, fbCollector, outboxStore, runner, onceRunner, emitter, out, logger)
 		if err != nil {
 			return err
 		}
@@ -172,7 +177,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 		}
 		logger.Info("Auto-rescan: design-feedback triggered fresh scan")
 		scanDir, scanResultPath, scanResult, waves, completed, adrCount, scanTime, err =
-			RescanCore(ctx, cfg, baseDir, sessionID, latestWaves, latestCompleted, emitter, out, logger)
+			RescanCore(ctx, cfg, baseDir, sessionID, latestWaves, latestCompleted, runner, onceRunner, emitter, out, logger)
 		if err != nil {
 			return fmt.Errorf("auto-rescan: %w", err)
 		}

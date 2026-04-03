@@ -18,6 +18,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 const ADRSubdir = "docs/adr"
@@ -237,7 +238,7 @@ func ParseScribeResult(path string) (*domain.ScribeResponse, error) {
 }
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
-func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, logger domain.Logger) (*domain.ScribeResponse, error) {
+func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.ScribeResponse, error) {
 	ctx, span := platform.Tracer.Start(ctx, "sightjack.scribe")
 	defer span.End()
 
@@ -293,7 +294,7 @@ func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 	}
 
 	logger.Info("Scribe generating ADR %s for: %s - %s", adrID, wave.ClusterName, wave.Title)
-	if _, err := RunClaude(ctx, cfg, prompt, scribeOut, logger, WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)); err != nil {
+	if _, err := runner.Run(ctx, prompt, scribeOut, WithAllowedTools(AllowedToolsForMode(cfg.Mode)...)); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "sightjack.scribe.claude"))
 		return nil, fmt.Errorf("scribe adr %s: %w", wave.ID, err)

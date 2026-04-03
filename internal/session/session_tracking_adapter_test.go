@@ -2,11 +2,13 @@ package session_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"path/filepath"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -131,4 +133,125 @@ func TestSessionTrackingAdapter_RunSession_EmptyProviderSessionID(t *testing.T) 
 	if rec.Status != domain.SessionCompleted {
 		t.Errorf("Status = %q, want %q", rec.Status, domain.SessionCompleted)
 	}
+}
+
+// --- Circuit Breaker Integration Tests ---
+
+func TestSessionTrackingAdapter_TripsCBOnRateLimitStderr(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "sessions.db")
+	store, err := session.NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	defer store.Close()
+
+	// given — a runner that returns rate limit in stderr
+	innerWithStderr := &fakeDetailedRunnerWithStderr{
+		result: port.RunResult{Stderr: "You've hit your limit"},
+		err:    errors.New("claude exit: exit status 1"),
+	}
+
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	session.SetCircuitBreaker(cb)
+	defer session.SetCircuitBreaker(nil)
+
+	adapter := session.NewSessionTrackingAdapter(innerWithStderr, store, domain.ProviderClaudeCode)
+
+	// when
+	_, _, runErr := adapter.RunSession(ctx, "test", io.Discard)
+
+	// then — error returned AND CB tripped
+	if runErr == nil {
+		t.Fatal("expected error")
+	}
+	if !cb.IsOpen() {
+		t.Fatal("expected CB OPEN after rate limit stderr")
+	}
+}
+
+func TestSessionTrackingAdapter_RecordsCBSuccessOnNilError(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "sessions.db")
+	store, err := session.NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	defer store.Close()
+
+	// given — CB was tripped, then RecordSuccess to allow probe
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	cb.RecordProviderError(domain.ProviderErrorInfo{Kind: domain.ProviderErrorRateLimit})
+	cb.RecordSuccess() // transition to allow next call
+	session.SetCircuitBreaker(cb)
+	defer session.SetCircuitBreaker(nil)
+
+	inner := &fakeDetailedRunnerWithStderr{
+		result: port.RunResult{Text: "ok", Stderr: ""},
+		err:    nil,
+	}
+	adapter := session.NewSessionTrackingAdapter(inner, store, domain.ProviderClaudeCode)
+
+	// when
+	_, text, runErr := adapter.RunSession(ctx, "test", io.Discard)
+
+	// then — success recorded, CB closed
+	if runErr != nil {
+		t.Fatalf("expected nil, got %v", runErr)
+	}
+	if text != "ok" {
+		t.Fatalf("expected 'ok', got %q", text)
+	}
+	if cb.IsOpen() {
+		t.Fatal("expected CB CLOSED after success")
+	}
+}
+
+func TestSessionTrackingAdapter_StoresStderrInMetadata(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "sessions.db")
+	store, err := session.NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	defer store.Close()
+
+	cb := platform.NewCircuitBreaker(&domain.NopLogger{})
+	session.SetCircuitBreaker(cb)
+	defer session.SetCircuitBreaker(nil)
+
+	inner := &fakeDetailedRunnerWithStderr{
+		result: port.RunResult{Stderr: "Error: 500 Internal Server Error"},
+		err:    errors.New("claude exit: exit status 1"),
+	}
+	adapter := session.NewSessionTrackingAdapter(inner, store, domain.ProviderClaudeCode)
+
+	// when
+	rec, _, _ := adapter.RunSession(ctx, "test", io.Discard)
+
+	// then — stderr stored in metadata
+	if rec.Metadata["stderr"] != "Error: 500 Internal Server Error" {
+		t.Fatalf("expected stderr in metadata, got %q", rec.Metadata["stderr"])
+	}
+	// CB should also be tripped (500 is a server error)
+	if !cb.IsOpen() {
+		t.Fatal("expected CB OPEN for 500 error")
+	}
+}
+
+// fakeDetailedRunnerWithStderr extends fakeDetailedRunner with Stderr support.
+type fakeDetailedRunnerWithStderr struct {
+	result port.RunResult
+	err    error
+	calls  int
+}
+
+func (f *fakeDetailedRunnerWithStderr) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
+	r, err := f.RunDetailed(ctx, prompt, w, opts...)
+	return r.Text, err
+}
+
+func (f *fakeDetailedRunnerWithStderr) RunDetailed(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (port.RunResult, error) {
+	f.calls++
+	return f.result, f.err
 }

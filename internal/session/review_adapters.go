@@ -55,18 +55,23 @@ func NewReviewFixRunner(runner port.ClaudeRunner, branch port.BranchResolver, di
 }
 
 func (a *reviewFixRunnerAdapter) RunReviewFix(ctx context.Context, _, _, comments string) error {
+	// Circuit breaker: skip review fix when provider is rate-limited.
+	// Note: SessionTrackingAdapter (wrapping the runner) also records CB
+	// from result.Stderr, so no separate recordCircuitBreaker call needed here.
+	if sharedCircuitBreaker != nil {
+		if cbErr := sharedCircuitBreaker.Allow(ctx); cbErr != nil {
+			return cbErr
+		}
+	}
+
 	branch, err := a.branch.CurrentBranch(ctx, a.dir)
 	if err != nil {
 		return err
 	}
 	prompt := BuildReviewFixPrompt(branch, comments)
 	a.logger.Info("Review fix: running claude --continue")
-	out, err := a.runner.Run(ctx, prompt, io.Discard, port.WithContinue(), port.WithWorkDir(a.dir))
-	if err != nil {
-		return err
-	}
-	_ = out
-	return nil
+	_, err = a.runner.Run(ctx, prompt, io.Discard, port.WithContinue(), port.WithWorkDir(a.dir))
+	return err
 }
 
 // currentBranch returns the current git branch name (unexported, used by adapters).

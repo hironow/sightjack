@@ -70,6 +70,10 @@ if event data is found in .siren/events/.`,
 			if err := session.PreflightCheck(bins...); err != nil {
 				return err
 			}
+
+			// Initialize process-wide circuit breaker for rate limit / server error protection
+			session.SetCircuitBreaker(platform.NewCircuitBreaker(logger))
+
 			// Override gate config from flags (Changed = user explicitly set the flag)
 			if cmd.Flags().Changed("notify-cmd") {
 				cfg.Gate.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")

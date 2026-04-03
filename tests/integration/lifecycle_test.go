@@ -29,6 +29,32 @@ func testStateDir(baseDir string) string {
 	return filepath.Join(baseDir, domain.StateDir)
 }
 
+// testRunners creates a tracked runner (with retry) and a once runner (no retry) for tests.
+func testRunners(cfg *domain.Config) (port.ClaudeRunner, port.ClaudeRunner) {
+	logger := platform.NewLogger(io.Discard, false)
+	adapter := session.NewClaudeAdapter(cfg, logger)
+	retrier := session.NewRetryRunner(adapter, cfg, logger)
+	return retrier, adapter
+}
+
+// testRunScan is a test helper that creates runners and calls RunScan.
+func testRunScan(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, out io.Writer, logger domain.Logger) (*domain.ScanResult, error) {
+	runner, onceRunner := testRunners(cfg)
+	return session.RunScan(ctx, cfg, baseDir, sessionID, dryRun, out, runner, onceRunner, logger)
+}
+
+// testRunWaveGenerate is a test helper that creates runners and calls RunWaveGenerate.
+func testRunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, clusters []domain.ClusterScanResult, dryRun bool, logger domain.Logger) ([]domain.Wave, []string, map[string]bool, error) {
+	runner, _ := testRunners(cfg)
+	return session.RunWaveGenerate(ctx, cfg, scanDir, clusters, dryRun, runner, logger)
+}
+
+// testRunWaveApply is a test helper that creates runners and calls RunWaveApply.
+func testRunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, strictness string, out io.Writer, logger domain.Logger) (*domain.WaveApplyResult, error) {
+	_, onceRunner := testRunners(cfg)
+	return session.RunWaveApply(ctx, cfg, scanDir, wave, strictness, out, onceRunner, logger)
+}
+
 // loadTestState loads the latest state from events for test verification.
 func loadTestState(t *testing.T, baseDir string) *domain.SessionState {
 	t.Helper()
@@ -393,7 +419,7 @@ func TestLifecycle_RunScan_SingleCluster(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result, err := session.RunScan(ctx, cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	result, err := testRunScan(ctx, cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -433,7 +459,7 @@ func TestLifecycle_RunScan_StreamingGoesToOut(t *testing.T) {
 	var streamBuf strings.Builder
 
 	// when: pass &streamBuf as the streaming output writer
-	result, err := session.RunScan(context.Background(), cfg, baseDir, sessionID, false, &streamBuf, platform.NewLogger(io.Discard, false))
+	result, err := testRunScan(context.Background(), cfg, baseDir, sessionID, false, &streamBuf, platform.NewLogger(io.Discard, false))
 
 	// then: streaming buffer must contain mock Claude output ("ok" from echo)
 	if err != nil {
@@ -469,7 +495,7 @@ func TestLifecycle_RunScan_JsonPipeStdoutClean(t *testing.T) {
 	var streamBuf strings.Builder // simulates stderr (streaming)
 
 	// when: streaming goes to streamBuf (stderr), NOT to stdout
-	result, err := session.RunScan(context.Background(), cfg, baseDir, sessionID, false, &streamBuf, platform.NewLogger(io.Discard, false))
+	result, err := testRunScan(context.Background(), cfg, baseDir, sessionID, false, &streamBuf, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunScan failed: %v", err)
 	}
@@ -514,7 +540,7 @@ func TestLifecycle_RunScan_SavesScanResultJson(t *testing.T) {
 	defer cleanup()
 
 	// when
-	result, err := session.RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	result, err := testRunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunScan failed: %v", err)
 	}
@@ -556,7 +582,7 @@ func TestLifecycle_RunScan_MultiCluster(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result, err := session.RunScan(ctx, cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	result, err := testRunScan(ctx, cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
 
 	// then
 	if err != nil {
@@ -1327,13 +1353,13 @@ func TestResultCache_WavesPlan(t *testing.T) {
 	cleanup := d.Install()
 	defer cleanup()
 
-	scanResult, err := session.RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	scanResult, err := testRunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
 	scanDir := domain.ScanDir(baseDir, sessionID)
-	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
+	waves, _, _, err := testRunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
@@ -1386,20 +1412,20 @@ func TestResultCache_ApplyResult(t *testing.T) {
 	cleanup := d.Install()
 	defer cleanup()
 
-	scanResult, err := session.RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	scanResult, err := testRunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
 	scanDir := domain.ScanDir(baseDir, sessionID)
-	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
+	waves, _, _, err := testRunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
 
 	wave := waves[0]
 	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
-	internal, err := session.RunWaveApply(context.Background(), cfg, scanDir, wave, strictness, io.Discard, platform.NewLogger(io.Discard, false))
+	internal, err := testRunWaveApply(context.Background(), cfg, scanDir, wave, strictness, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveApply failed: %v", err)
 	}
@@ -1449,20 +1475,21 @@ func TestResultCache_DiscussResult(t *testing.T) {
 	cleanup := d.Install()
 	defer cleanup()
 
-	scanResult, err := session.RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	scanResult, err := testRunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
 	scanDir := domain.ScanDir(baseDir, sessionID)
-	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
+	waves, _, _, err := testRunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
 
 	wave := waves[0]
 	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{wave.ClusterName}))
-	resp, err := session.RunArchitectDiscuss(context.Background(), cfg, scanDir, wave, "review coupling", strictness, io.Discard, platform.NewLogger(io.Discard, false))
+	discussRunner, _ := testRunners(cfg)
+	resp, err := session.RunArchitectDiscuss(context.Background(), cfg, scanDir, wave, "review coupling", strictness, io.Discard, discussRunner, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunArchitectDiscuss failed: %v", err)
 	}
@@ -1516,13 +1543,13 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 	cleanup := d.Install()
 	defer cleanup()
 
-	scanResult, err := session.RunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
+	scanResult, err := testRunScan(context.Background(), cfg, baseDir, sessionID, false, io.Discard, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunScan failed: %v", err)
 	}
 
 	scanDir := domain.ScanDir(baseDir, sessionID)
-	waves, _, _, err := session.RunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
+	waves, _, _, err := testRunWaveGenerate(context.Background(), cfg, scanDir, scanResult.Clusters, false, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("RunWaveGenerate failed: %v", err)
 	}
@@ -1535,7 +1562,8 @@ func TestResultCache_NextgenPlan(t *testing.T) {
 	completedWaves := domain.CompletedWavesForCluster(waves, cluster.Name)
 	strictness := string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
 
-	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, platform.NewLogger(io.Discard, false))
+	nextgenRunner, _ := testRunners(cfg)
+	newWaves, err := session.GenerateNextWaves(context.Background(), cfg, scanDir, wave, cluster, completedWaves, existingADRs, nil, strictness, nil, nil, nextgenRunner, platform.NewLogger(io.Discard, false))
 	if err != nil {
 		t.Fatalf("GenerateNextWaves failed: %v", err)
 	}
