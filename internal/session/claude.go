@@ -14,11 +14,11 @@ import (
 )
 
 // sharedCircuitBreaker is the process-wide circuit breaker shared across all
-// ClaudeAdapter instances. Set via SetCircuitBreaker at startup.
+// provider adapter instances. Set via SetCircuitBreaker at startup.
 var sharedCircuitBreaker *platform.CircuitBreaker
 
-// SetCircuitBreaker sets the process-wide circuit breaker for all Claude calls.
-// Call this once during startup before any Claude invocations.
+// SetCircuitBreaker sets the process-wide circuit breaker for all provider calls.
+// Call this once during startup before any provider invocations.
 func SetCircuitBreaker(cb *platform.CircuitBreaker) {
 	sharedCircuitBreaker = cb
 }
@@ -146,7 +146,7 @@ func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
 	}
 }
 
-// RunClaudeDryRun saves the prompt to a file instead of executing Claude,
+// RunClaudeDryRun saves the prompt to a file instead of executing the provider CLI,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
 func RunClaudeDryRun(cfg *domain.Config, prompt, outputPath string, name string, logger domain.Logger) error {

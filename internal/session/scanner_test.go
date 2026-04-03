@@ -668,7 +668,7 @@ fi
 	cfg.TimeoutSec = 30
 	cfg.Retry.MaxAttempts = 1
 	cfg.Retry.BaseDelaySec = 0
-	cfg.Labels.Enabled = false // avoid RunClaudeOnce label path complexity
+	cfg.Labels.Enabled = false // avoid label path complexity in runner calls
 
 	// when
 	logger := platform.NewLogger(io.Discard, false)
