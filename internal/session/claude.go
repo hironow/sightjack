@@ -109,11 +109,7 @@ func wrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, logger do
 	if !ok {
 		return runner
 	}
-	configBase := baseDir
-	if configBase == "" {
-		configBase = "."
-	}
-	dbPath := filepath.Join(configBase, domain.StateDir, ".run", "sessions.db")
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "sessions.db")
 	store, err := NewSQLiteCodingSessionStore(dbPath)
 	if err != nil {
 		if logger != nil {
