@@ -1,6 +1,7 @@
 package eventsource
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -15,20 +16,18 @@ type eventStore interface {
 	LoadAll() ([]domain.Event, domain.LoadResult, error)
 }
 
-// SessionRecorder wraps a FileEventStore with automatic SessionID assignment.
-// It is safe for concurrent use within a single process.
+// SessionRecorder wraps a FileEventStore with automatic SessionID assignment
+// and optional global SeqNr allocation. Safe for concurrent use.
 type SessionRecorder struct {
-	store     eventStore
-	sessionID string
-	prevID    string // ID of the previous event for CausationID chaining
-	mu        sync.Mutex
+	store      eventStore
+	seqCounter *SeqCounter // nil = no SeqNr assignment (pre-cutover)
+	sessionID  string
+	prevID     string
+	mu         sync.Mutex
 }
 
 // NewSessionRecorder creates a SessionRecorder for the given session.
 func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, error) {
-	// Load existing events to resume CausationID chain from the SAME session.
-	// Without this filter, a new session's first event would incorrectly
-	// point its CausationID at the previous session's last event.
 	events, _, err := store.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
@@ -47,9 +46,14 @@ func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, e
 	}, nil
 }
 
+// SetSeqCounter attaches a SeqCounter for global SeqNr allocation.
+// When set, Record() assigns a monotonic SeqNr to each event before persistence.
+func (r *SessionRecorder) SetSeqCounter(sc *SeqCounter) {
+	r.seqCounter = sc
+}
+
 // Record appends a pre-built event, enriching it with session metadata.
-// SessionID and CorrelationID are set to the session ID.
-// CausationID is set to the previous event's ID.
+// If a SeqCounter is attached, assigns a globally monotonic SeqNr.
 func (r *SessionRecorder) Record(ev domain.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -58,6 +62,13 @@ func (r *SessionRecorder) Record(ev domain.Event) error {
 	ev.CorrelationID = r.sessionID
 	if r.prevID != "" {
 		ev.CausationID = r.prevID
+	}
+	if r.seqCounter != nil {
+		seq, err := r.seqCounter.AllocSeqNr(context.Background())
+		if err != nil {
+			return fmt.Errorf("alloc seq nr: %w", err)
+		}
+		ev.SeqNr = seq
 	}
 	if _, err := r.store.Append(ev); err != nil {
 		return err

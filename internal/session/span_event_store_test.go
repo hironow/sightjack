@@ -63,6 +63,14 @@ func (s *stubEventStore) LoadSince(after time.Time) ([]domain.Event, domain.Load
 	return s.loadEvents, s.loadResult, nil
 }
 
+func (s *stubEventStore) LoadAfterSeqNr(_ uint64) ([]domain.Event, domain.LoadResult, error) {
+	return s.loadEvents, s.loadResult, nil
+}
+
+func (s *stubEventStore) LatestSeqNr() (uint64, error) {
+	return 0, nil
+}
+
 // hasAttribute checks whether a span stub contains a given attribute key.
 func hasAttribute(span *tracetest.SpanStub, key string) bool {
 	for _, attr := range span.Attributes {
