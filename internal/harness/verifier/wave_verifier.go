@@ -46,4 +46,3 @@ func ValidateWavePrerequisites(waves []domain.Wave) ([]domain.Wave, int) {
 	return result, removed
 }
 
-
