@@ -46,17 +46,4 @@ func ValidateWavePrerequisites(waves []domain.Wave) ([]domain.Wave, int) {
 	return result, removed
 }
 
-// validWaveActionTypes is the set of recognized wave action types.
-var validWaveActionTypes = map[string]bool{
-	"add_dod":            true,
-	"add_dependency":     true,
-	"add_label":          true,
-	"update_description": true,
-	"create":             true,
-	"cancel":             true,
-}
 
-// ValidWaveActionType reports whether t is a recognized wave action type.
-func ValidWaveActionType(t string) bool {
-	return validWaveActionTypes[t]
-}

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/harness/verifier"
 )
 
 // MaxWavesPerCluster is the cap on total waves per cluster.
@@ -643,7 +642,7 @@ func CollectSpecSentIssueIDs(completed map[string]bool, waves []domain.Wave) map
 			continue
 		}
 		for _, a := range w.Actions {
-			if a.IssueID != "" && !verifier.ValidWaveActionType(a.Type) {
+			if a.IssueID != "" && !ValidWaveActionType(a.Type) {
 				result[a.IssueID] = true
 			}
 		}
@@ -677,7 +676,7 @@ func FilterPROpenActions(waves []domain.Wave, prOpenIssues map[string]bool) []do
 	for _, w := range waves {
 		var kept []domain.WaveAction
 		for _, a := range w.Actions {
-			if prOpenIssues[a.IssueID] && !verifier.ValidWaveActionType(a.Type) {
+			if prOpenIssues[a.IssueID] && !ValidWaveActionType(a.Type) {
 				continue // implementation action for PR-open issue -> skip
 			}
 			kept = append(kept, a)
@@ -688,4 +687,19 @@ func FilterPROpenActions(waves []domain.Wave, prOpenIssues map[string]bool) []do
 		}
 	}
 	return result
+}
+
+// validWaveActionTypes is the set of recognized wave action types.
+var validWaveActionTypes = map[string]bool{
+	"add_dod":            true,
+	"add_dependency":     true,
+	"add_label":          true,
+	"update_description": true,
+	"create":             true,
+	"cancel":             true,
+}
+
+// ValidWaveActionType reports whether t is a recognized wave action type.
+func ValidWaveActionType(t string) bool {
+	return validWaveActionTypes[t]
 }
