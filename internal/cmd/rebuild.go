@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -33,15 +30,13 @@ If path is omitted, the current working directory is used.`,
 			}
 			logger := loggerFrom(cmd)
 
-			stateDir := filepath.Join(baseDir, domain.StateDir)
-
-			// Load all events across sessions with error checking
-			events, loadResult, loadErr := eventsource.LoadAllEventsAcrossSessions(stateDir)
+			// Load all events across sessions via session layer (not eventsource directly)
+			events, failedCount, loadErr := session.LoadAllEventsWithStatus(cmd.Context(), baseDir)
 			if loadErr != nil {
 				return fmt.Errorf("load events: %w", loadErr)
 			}
-			if loadResult.SessionsFailed > 0 {
-				return fmt.Errorf("rebuild aborted: %d session store(s) could not be read (would produce incomplete snapshot)", loadResult.SessionsFailed)
+			if failedCount > 0 {
+				return fmt.Errorf("rebuild aborted: %d session store(s) could not be read (would produce incomplete snapshot)", failedCount)
 			}
 
 			// Sort events chronologically — LoadAllEventsAcrossSessions
@@ -58,9 +53,7 @@ If path is omitted, the current working directory is used.`,
 				return fmt.Errorf("rebuild: %w", err)
 			}
 
-			// Snapshot SeqNr from global counter (not event scan).
-			// Legacy pre-cutover events have aggregate-local SeqNr values
-			// that may be higher than the global counter.
+			// Snapshot SeqNr from global counter (not event scan)
 			var latestSeqNr uint64
 			seqCounter, scErr := session.NewSeqCounter(baseDir)
 			if scErr == nil {
@@ -70,13 +63,13 @@ If path is omitted, the current working directory is used.`,
 				}
 			}
 
-			// Save snapshot
+			// Save snapshot via session layer
 			snapshotStore := session.NewSnapshotStore(baseDir)
 			state, serErr := projector.Serialize()
 			if serErr != nil {
 				return fmt.Errorf("serialize projection: %w", serErr)
 			}
-			if err := snapshotStore.Save(context.Background(), "sightjack.state", latestSeqNr, state); err != nil {
+			if err := snapshotStore.Save(cmd.Context(), "sightjack.state", latestSeqNr, state); err != nil {
 				return fmt.Errorf("save snapshot: %w", err)
 			}
 
