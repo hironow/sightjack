@@ -388,7 +388,7 @@ just jaeger-down
 
 ## Development
 
-All code lives in `internal/` (Go convention). See [docs/conformance.md](docs/conformance.md) for layer architecture and directory responsibilities. Run `just --list` for available tasks.
+All code lives in `internal/` (Go convention). The layer architecture includes `cmd`, `usecase`, `session`, `harness` (decision/validation/specification with `filter/`, `policy/`, `verifier/` sub-packages), `eventsource`, `platform`, and `domain`. See [docs/conformance.md](docs/conformance.md) for layer architecture, import rules, and directory responsibilities. Run `just --list` for available tasks.
 
 ## What / Why / How
 
