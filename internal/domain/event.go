@@ -39,6 +39,7 @@ const (
 	EventReportSent          EventType = "report_sent"
 	EventFeedbackSent        EventType = "feedback_sent"
 	EventFeedbackReceived    EventType = "feedback_received"
+	EventSystemCutover       EventType = "system.cutover"
 )
 
 // CurrentEventSchemaVersion is the schema version stamped on all new events.
