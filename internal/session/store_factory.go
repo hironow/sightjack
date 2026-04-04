@@ -48,9 +48,10 @@ func NewSnapshotStore(baseDir string) port.SnapshotStore {
 	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir(baseDir), "snapshots"))
 }
 
-// NewSeqCounter creates a SeqCounter at {baseDir}/.siren/.run/seq.db.
+// NewSeqCounter creates a SeqCounter at {baseDir}/.siren/seq.db.
+// seq.db lives at stateDir root (NOT .run/) — .run/ is ephemeral
 func NewSeqCounter(baseDir string) (*eventsource.SeqCounter, error) {
-	return eventsource.NewSeqCounter(filepath.Join(stateDir(baseDir), ".run", "seq.db"))
+	return eventsource.NewSeqCounter(filepath.Join(stateDir(baseDir), "seq.db"))
 }
 
 // EnsureCutover creates a SeqCounter, SnapshotStore, and raw FileEventStore,
@@ -86,7 +87,12 @@ func NewSessionRecorderWithSeqCounter(stateDir, sessionID string, logger domain.
 	}
 	raw := eventsource.NewFileEventStore(stateDir, logger)
 	wrapped := NewSpanEventStore(raw)
-	return eventsource.NewSessionRecorder(wrapped, sessionID)
+	rec, err := eventsource.NewSessionRecorder(wrapped, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	rec.SetSeqCounter(sc)
+	return rec, nil
 }
 
 // EventStorePath returns the filesystem path for a session's event store.
