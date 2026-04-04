@@ -43,6 +43,16 @@ func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
 	return NewSpanEventStore(raw)
 }
 
+// NewSnapshotStore creates a FileSnapshotStore at {baseDir}/.siren/snapshots/.
+func NewSnapshotStore(baseDir string) port.SnapshotStore {
+	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir(baseDir), "snapshots"))
+}
+
+// NewSeqCounter creates a SeqCounter at {baseDir}/.siren/.run/seq.db.
+func NewSeqCounter(baseDir string) (*eventsource.SeqCounter, error) {
+	return eventsource.NewSeqCounter(filepath.Join(stateDir(baseDir), ".run", "seq.db"))
+}
+
 // NewSessionRecorder creates a recorder for the given session.
 func NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
 	raw := eventsource.NewFileEventStore(stateDir, logger)
