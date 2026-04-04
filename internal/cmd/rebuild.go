@@ -3,8 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"sort"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -30,11 +33,23 @@ If path is omitted, the current working directory is used.`,
 			}
 			logger := loggerFrom(cmd)
 
-			// Load all events across sessions
-			events, loadErr := session.LoadAllEvents(cmd.Context(), baseDir)
+			stateDir := filepath.Join(baseDir, domain.StateDir)
+
+			// Load all events across sessions with error checking
+			events, loadResult, loadErr := eventsource.LoadAllEventsAcrossSessions(stateDir)
 			if loadErr != nil {
 				return fmt.Errorf("load events: %w", loadErr)
 			}
+			if loadResult.SessionsFailed > 0 {
+				return fmt.Errorf("rebuild aborted: %d session store(s) could not be read (would produce incomplete snapshot)", loadResult.SessionsFailed)
+			}
+
+			// Sort events chronologically — LoadAllEventsAcrossSessions
+			// concatenates per-session stores in directory order, not
+			// event timestamp order. Projection is order-sensitive.
+			sort.SliceStable(events, func(i, j int) bool {
+				return events[i].Timestamp.Before(events[j].Timestamp)
+			})
 
 			logger.Info("rebuilding projection from %d event(s)", len(events))
 
@@ -43,11 +58,15 @@ If path is omitted, the current working directory is used.`,
 				return fmt.Errorf("rebuild: %w", err)
 			}
 
-			// Determine latest SeqNr from events
+			// Snapshot SeqNr from global counter (not event scan).
+			// Legacy pre-cutover events have aggregate-local SeqNr values
+			// that may be higher than the global counter.
 			var latestSeqNr uint64
-			for _, ev := range events {
-				if ev.SeqNr > latestSeqNr {
-					latestSeqNr = ev.SeqNr
+			seqCounter, scErr := session.NewSeqCounter(baseDir)
+			if scErr == nil {
+				defer seqCounter.Close()
+				if seq, seqErr := seqCounter.LatestSeqNr(cmd.Context()); seqErr == nil {
+					latestSeqNr = seq
 				}
 			}
 
