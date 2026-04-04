@@ -48,9 +48,27 @@ func NewSnapshotStore(baseDir string) port.SnapshotStore {
 	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir(baseDir), "snapshots"))
 }
 
-// NewSeqCounter creates a SeqCounter at {baseDir}/.siren/.run/seq.db.
+// NewSeqCounter creates a SeqCounter at {baseDir}/.siren/seq.db.
+// seq.db lives at stateDir root (NOT .run/) — .run/ is ephemeral
 func NewSeqCounter(baseDir string) (*eventsource.SeqCounter, error) {
-	return eventsource.NewSeqCounter(filepath.Join(stateDir(baseDir), ".run", "seq.db"))
+	return eventsource.NewSeqCounter(filepath.Join(stateDir(baseDir), "seq.db"))
+}
+
+// EnsureCutover creates a SeqCounter, SnapshotStore, and raw FileEventStore,
+// then runs the one-time cutover migration. Returns the SeqCounter for
+// ongoing SeqNr allocation (caller must defer Close).
+func EnsureCutover(ctx context.Context, baseDir, aggregateType string, logger domain.Logger) (*eventsource.SeqCounter, error) {
+	sc, err := NewSeqCounter(baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("ensure cutover: seq counter: %w", err)
+	}
+	ss := eventsource.NewFileSnapshotStore(filepath.Join(stateDir(baseDir), "snapshots"))
+	raw := eventsource.NewFileEventStore(stateDir(baseDir), logger)
+	if _, err := eventsource.RunCutover(ctx, raw, ss, sc, aggregateType, logger); err != nil {
+		sc.Close()
+		return nil, fmt.Errorf("ensure cutover: %w", err)
+	}
+	return sc, nil
 }
 
 // NewSessionRecorder creates a recorder for the given session.
@@ -58,6 +76,23 @@ func NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (port.
 	raw := eventsource.NewFileEventStore(stateDir, logger)
 	wrapped := NewSpanEventStore(raw)
 	return eventsource.NewSessionRecorder(wrapped, sessionID)
+}
+
+// NewSessionRecorderWithSeqCounter creates a recorder for the given session,
+// optionally injecting a SeqCounter for SeqNr allocation. If sc is nil,
+// it falls back to NewSessionRecorder.
+func NewSessionRecorderWithSeqCounter(stateDir, sessionID string, logger domain.Logger, sc *eventsource.SeqCounter) (port.Recorder, error) {
+	if sc == nil {
+		return NewSessionRecorder(stateDir, sessionID, logger)
+	}
+	raw := eventsource.NewFileEventStore(stateDir, logger)
+	wrapped := NewSpanEventStore(raw)
+	rec, err := eventsource.NewSessionRecorder(wrapped, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	rec.SetSeqCounter(sc)
+	return rec, nil
 }
 
 // EventStorePath returns the filesystem path for a session's event store.

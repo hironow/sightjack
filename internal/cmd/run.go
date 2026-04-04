@@ -109,6 +109,16 @@ if event data is found in .siren/events/.`,
 			runner := session.NewSessionRunnerAdapter()
 			factory := session.NewRecorderFactoryAdapter()
 
+			// Cutover wiring: ensure SeqNr allocation is active
+			if !dryRun {
+				seqCounter, cutoverErr := session.EnsureCutover(cmd.Context(), baseDir, "sightjack.state", logger)
+				if cutoverErr != nil {
+					return fmt.Errorf("cutover: %w", cutoverErr)
+				}
+				defer seqCounter.Close()
+				factory.SetSeqCounter(seqCounter)
+			}
+
 			// Check for existing state (resume detection)
 			// First try to find a resumable session; fall back to the latest
 			// state for rescan/new choices.

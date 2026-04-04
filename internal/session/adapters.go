@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/eventsource"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
@@ -70,17 +71,24 @@ func (a *ScanRunnerAdapter) RecordScanState(baseDir, sessionID string, result *d
 // --- RecorderFactory adapter ---
 
 // RecorderFactoryAdapter implements port.RecorderFactory by delegating to session package functions.
-type RecorderFactoryAdapter struct{}
+type RecorderFactoryAdapter struct {
+	seqCounter *eventsource.SeqCounter
+}
 
 // NewRecorderFactoryAdapter creates a new RecorderFactoryAdapter.
 func NewRecorderFactoryAdapter() *RecorderFactoryAdapter { return &RecorderFactoryAdapter{} }
+
+// SetSeqCounter injects a SeqCounter for SeqNr allocation into new recorders.
+func (f *RecorderFactoryAdapter) SetSeqCounter(sc *eventsource.SeqCounter) {
+	f.seqCounter = sc
+}
 
 func (f *RecorderFactoryAdapter) SessionEventsDir(baseDir, sessionID string) string {
 	return SessionEventsDir(baseDir, sessionID)
 }
 
 func (f *RecorderFactoryAdapter) NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
-	return NewSessionRecorder(stateDir, sessionID, logger)
+	return NewSessionRecorderWithSeqCounter(stateDir, sessionID, logger, f.seqCounter)
 }
 
 func (f *RecorderFactoryAdapter) NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
