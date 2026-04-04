@@ -7,12 +7,10 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-// promptRegistry is the package-level singleton loaded from embedded YAML.
-var promptRegistry = MustNewRegistry()
-
-// DefaultRegistry returns the package-level prompt registry.
-func DefaultRegistry() *Registry {
-	return promptRegistry
+// DefaultRegistry returns the package-level prompt registry singleton.
+// It delegates to MustDefault() for lazy, thread-safe initialization.
+func DefaultRegistry() *PromptRegistry {
+	return MustDefault()
 }
 
 // --- Section builders: pre-compute conditional template sections ---

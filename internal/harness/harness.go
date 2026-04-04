@@ -48,7 +48,6 @@ var NeedsMoreWaves = policy.NeedsMoreWaves
 var ReadyIssueIDs = policy.ReadyIssueIDs
 var ClustersForIssueIDs = policy.ClustersForIssueIDs
 var LastCompletedWaveForCluster = policy.LastCompletedWaveForCluster
-var ValidWaveActionType = policy.ValidWaveActionType
 var CollectSpecSentIssueIDs = policy.CollectSpecSentIssueIDs
 var CollectPROpenIssues = policy.CollectPROpenIssues
 var FilterPROpenActions = policy.FilterPROpenActions
@@ -57,9 +56,7 @@ var FilterPROpenActions = policy.FilterPROpenActions
 
 var DetectFailedClusterNames = policy.DetectFailedClusterNames
 var FilterEmptyClassifications = policy.FilterEmptyClassifications
-var ClampCompleteness = policy.ClampCompleteness
 var MergeClusterChunks = policy.MergeClusterChunks
-var BuildScanRecoveryReport = policy.BuildScanRecoveryReport
 
 // --- Config policy re-exports ---
 
@@ -72,20 +69,26 @@ var SummarizeReview = policy.SummarizeReview
 
 // --- Filter re-exports ---
 
-// PromptRegistry is the type alias for the prompt registry.
-type PromptRegistry = filter.Registry
+// MustDefaultPromptRegistry returns the singleton or panics. Safe with embed.FS.
+var MustDefaultPromptRegistry = filter.MustDefault
 
-// PromptConfig is the type alias for a prompt definition.
-type PromptConfig = filter.PromptConfig
+// --- Prompt render re-exports ---
 
-// NewPromptRegistry creates a new prompt registry from embedded YAML files.
-var NewPromptRegistry = filter.NewRegistry
+var RenderClassifyPrompt = filter.RenderClassifyPrompt
+var RenderDeepScanPrompt = filter.RenderDeepScanPrompt
+var RenderWaveGeneratePrompt = filter.RenderWaveGeneratePrompt
+var RenderWaveApplyPrompt = filter.RenderWaveApplyPrompt
+var RenderScribeADRPrompt = filter.RenderScribeADRPrompt
+var RenderArchitectDiscussPrompt = filter.RenderArchitectDiscussPrompt
+var RenderReadyLabelPrompt = filter.RenderReadyLabelPrompt
+var RenderNextGenPrompt = filter.RenderNextGenPrompt
+var RenderAutoDiscussArchitectPrompt = filter.RenderAutoDiscussArchitectPrompt
+var RenderAutoDiscussDevilsAdvocatePrompt = filter.RenderAutoDiscussDevilsAdvocatePrompt
 
-// MustNewPromptRegistry returns a Registry or panics. Safe with embed.FS.
-var MustNewPromptRegistry = filter.MustNewRegistry
+// --- Verifier re-exports ---
 
-// ExpandPromptTemplate performs simple {key} replacement on a template string.
-var ExpandPromptTemplate = filter.ExpandTemplate
+// ClassifyProviderError inspects stderr output and classifies provider errors.
+var ClassifyProviderError = verifier.ClassifyProviderError
 
 // --- filter layer: optimization (Phase 3) ---
 
@@ -95,9 +98,4 @@ type OptimizedResult = filter.OptimizedResult
 
 var SavePrompt = filter.Save
 var PromptsDir = filter.PromptsDir
-
-// --- Verifier re-exports ---
-
-// ClassifyProviderError inspects stderr output and classifies provider errors.
-var ClassifyProviderError = verifier.ClassifyProviderError
 

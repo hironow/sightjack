@@ -5,6 +5,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/harness"
+	"github.com/hironow/sightjack/internal/harness/policy"
 )
 
 func TestSanitizeName(t *testing.T) {
@@ -218,7 +219,7 @@ func TestClampCompleteness(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// when
-			got := harness.ClampCompleteness(tt.in)
+			got := policy.ClampCompleteness(tt.in)
 
 			// then
 			if got != tt.want {
@@ -319,7 +320,7 @@ func TestBuildScanRecoveryReport_AllSucceeded(t *testing.T) {
 	}
 
 	// when
-	report := harness.BuildScanRecoveryReport(clusters, successes)
+	report := policy.BuildScanRecoveryReport(clusters, successes)
 
 	// then
 	if len(report.Outcomes) != 2 {
@@ -345,7 +346,7 @@ func TestBuildScanRecoveryReport_OneFailure(t *testing.T) {
 	}
 
 	// when
-	report := harness.BuildScanRecoveryReport(clusters, successes)
+	report := policy.BuildScanRecoveryReport(clusters, successes)
 
 	// then
 	if report.FailedCount != 1 {
@@ -383,7 +384,7 @@ func TestBuildScanRecoveryReport_DetectFailedIntegration(t *testing.T) {
 	}
 
 	// when
-	report := harness.BuildScanRecoveryReport(clusters, successes)
+	report := policy.BuildScanRecoveryReport(clusters, successes)
 
 	// then — one instance failed
 	if report.FailedCount != 1 {

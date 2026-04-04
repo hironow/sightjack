@@ -1,11 +1,11 @@
-package platform_test
+package filter_test
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/harness/filter"
 )
 
 func TestRenderClassifyPrompt(t *testing.T) {
@@ -17,7 +17,7 @@ func TestRenderClassifyPrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderClassifyPrompt("ja", data)
+	result, err := filter.RenderClassifyPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -40,7 +40,7 @@ func TestRenderDeepScanPrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderDeepScanPrompt("ja", data)
+	result, err := filter.RenderDeepScanPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -65,7 +65,7 @@ func TestRenderWaveGeneratePrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderWaveGeneratePrompt("ja", data)
+	result, err := filter.RenderWaveGeneratePrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -90,7 +90,7 @@ func TestRenderWaveGeneratePrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderWaveGeneratePrompt("en", data)
+	result, err := filter.RenderWaveGeneratePrompt("en", data)
 
 	// then
 	if err != nil {
@@ -115,7 +115,7 @@ func TestRenderWaveApplyPrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderWaveApplyPrompt("ja", data)
+	result, err := filter.RenderWaveApplyPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -140,7 +140,7 @@ func TestRenderWaveApplyPrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderWaveApplyPrompt("en", data)
+	result, err := filter.RenderWaveApplyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -165,7 +165,7 @@ func TestRenderArchitectDiscussPrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderArchitectDiscussPrompt("en", data)
+	result, err := filter.RenderArchitectDiscussPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -193,7 +193,7 @@ func TestRenderArchitectDiscussPrompt_Japanese(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderArchitectDiscussPrompt("ja", data)
+	result, err := filter.RenderArchitectDiscussPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -218,7 +218,7 @@ func TestRenderArchitectDiscussPrompt_UnsupportedLang(t *testing.T) {
 	}
 
 	// when
-	_, err := platform.RenderArchitectDiscussPrompt("fr", data)
+	_, err := filter.RenderArchitectDiscussPrompt("fr", data)
 
 	// then
 	if err == nil {
@@ -237,7 +237,7 @@ func TestRenderArchitectDiscussPrompt_SpecialCharsInTopic(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderArchitectDiscussPrompt("en", data)
+	result, err := filter.RenderArchitectDiscussPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -259,7 +259,7 @@ func TestRenderArchitectDiscussPrompt_EmptyWaveActions(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderArchitectDiscussPrompt("en", data)
+	result, err := filter.RenderArchitectDiscussPrompt("en", data)
 
 	// then: renders successfully with empty section
 	if err != nil {
@@ -279,7 +279,7 @@ func TestRenderClassifyPrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderClassifyPrompt("en", data)
+	result, err := filter.RenderClassifyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -303,7 +303,7 @@ func TestRenderScribeADRPrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderScribeADRPrompt("en", data)
+	result, err := filter.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -336,7 +336,7 @@ func TestRenderScribeADRPrompt_Japanese(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderScribeADRPrompt("ja", data)
+	result, err := filter.RenderScribeADRPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -363,7 +363,7 @@ func TestRenderClassifyPrompt_ContainsStrictnessLevel(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderClassifyPrompt("en", data)
+	result, err := filter.RenderClassifyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -386,7 +386,7 @@ func TestRenderWaveGeneratePrompt_ContainsStrictnessLevel(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderWaveGeneratePrompt("en", data)
+	result, err := filter.RenderWaveGeneratePrompt("en", data)
 
 	// then
 	if err != nil {
@@ -411,7 +411,7 @@ func TestRenderScribeADRPrompt_ContainsStrictnessLevel(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderScribeADRPrompt("en", data)
+	result, err := filter.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -432,7 +432,7 @@ func TestRenderClassifyPrompt_ContainsShibitoSection(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderClassifyPrompt("en", data)
+	result, err := filter.RenderClassifyPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -453,7 +453,7 @@ func TestRenderClassifyPrompt_Japanese_ContainsShibitoSection(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderClassifyPrompt("ja", data)
+	result, err := filter.RenderClassifyPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -482,7 +482,7 @@ func TestRenderScribeADRPrompt_ContainsExistingADRs(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderScribeADRPrompt("en", data)
+	result, err := filter.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -513,7 +513,7 @@ func TestRenderScribeADRPrompt_NoExistingADRs(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderScribeADRPrompt("en", data)
+	result, err := filter.RenderScribeADRPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -533,7 +533,7 @@ func TestRenderScribeADRPrompt_UnsupportedLang(t *testing.T) {
 	}
 
 	// when
-	_, err := platform.RenderScribeADRPrompt("fr", data)
+	_, err := filter.RenderScribeADRPrompt("fr", data)
 
 	// then
 	if err == nil {
@@ -555,7 +555,7 @@ func TestRenderNextGenPrompt_English(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderNextGenPrompt("en", data)
+	result, err := filter.RenderNextGenPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -580,7 +580,7 @@ func TestRenderNextGenPrompt_Japanese(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderNextGenPrompt("ja", data)
+	result, err := filter.RenderNextGenPrompt("ja", data)
 
 	// then
 	if err != nil {
@@ -603,7 +603,7 @@ func TestRenderNextGenPrompt_NoADRs(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderNextGenPrompt("en", data)
+	result, err := filter.RenderNextGenPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -626,7 +626,7 @@ func TestRenderNextGenPrompt_NoRejectedActions(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderNextGenPrompt("en", data)
+	result, err := filter.RenderNextGenPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -651,7 +651,7 @@ func TestRenderWaveGeneratePromptWithDoD(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderWaveGeneratePrompt(lang, data)
+		result, err := filter.RenderWaveGeneratePrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
 		}
@@ -675,7 +675,7 @@ func TestRenderWaveGeneratePromptWithoutDoD(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderWaveGeneratePrompt(lang, data)
+		result, err := filter.RenderWaveGeneratePrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderWaveGeneratePrompt(%s): %v", lang, err)
 		}
@@ -696,7 +696,7 @@ func TestRenderClassifyPromptWithLabels_NoAnalyzedLabel(t *testing.T) {
 		LabelPrefix:     "sightjack",
 	}
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderClassifyPrompt(lang, data)
+		result, err := filter.RenderClassifyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -715,7 +715,7 @@ func TestRenderClassifyPromptWithoutLabels(t *testing.T) {
 		LabelsEnabled:   false,
 	}
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderClassifyPrompt(lang, data)
+		result, err := filter.RenderClassifyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -738,7 +738,7 @@ func TestRenderWaveApplyPromptWithLabels_NoWaveDoneLabel(t *testing.T) {
 		LabelPrefix:     "sightjack",
 	}
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderWaveApplyPrompt(lang, data)
+		result, err := filter.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -764,7 +764,7 @@ func TestRenderWaveApplyPromptNoReadySection(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderWaveApplyPrompt(lang, data)
+		result, err := filter.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -788,7 +788,7 @@ func TestRenderWaveApplyPrompt_WithDoDSection(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderWaveApplyPrompt(lang, data)
+		result, err := filter.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -815,7 +815,7 @@ func TestRenderWaveApplyPrompt_WithoutDoDSection(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderWaveApplyPrompt(lang, data)
+		result, err := filter.RenderWaveApplyPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -839,7 +839,7 @@ func TestRenderWaveApplyPrompt_CreateActionDocumented(t *testing.T) {
 	for _, lang := range []string{"en", "ja"} {
 		t.Run(lang, func(t *testing.T) {
 			// when
-			result, err := platform.RenderWaveApplyPrompt(lang, data)
+			result, err := filter.RenderWaveApplyPrompt(lang, data)
 
 			// then
 			if err != nil {
@@ -877,7 +877,7 @@ func TestRenderWaveGeneratePrompt_CreateActionDocumented(t *testing.T) {
 	for _, lang := range []string{"en", "ja"} {
 		t.Run(lang, func(t *testing.T) {
 			// when
-			result, err := platform.RenderWaveGeneratePrompt(lang, data)
+			result, err := filter.RenderWaveGeneratePrompt(lang, data)
 
 			// then
 			if err != nil {
@@ -899,7 +899,7 @@ func TestRenderReadyLabelPrompt(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderReadyLabelPrompt(lang, data)
+		result, err := filter.RenderReadyLabelPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("lang=%s: %v", lang, err)
 		}
@@ -920,7 +920,7 @@ func TestRenderReadyLabelPrompt_UnsupportedLang(t *testing.T) {
 	}
 
 	// when
-	_, err := platform.RenderReadyLabelPrompt("fr", data)
+	_, err := filter.RenderReadyLabelPrompt("fr", data)
 
 	// then
 	if err == nil {
@@ -942,7 +942,7 @@ func TestRenderNextGenPromptWithDoD(t *testing.T) {
 
 	// when / then
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderNextGenPrompt(lang, data)
+		result, err := filter.RenderNextGenPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
 		}
@@ -966,7 +966,7 @@ func TestRenderNextGenPrompt_WithFeedback(t *testing.T) {
 
 	// when / then: both languages should render feedback
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderNextGenPrompt(lang, data)
+		result, err := filter.RenderNextGenPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
 		}
@@ -995,7 +995,7 @@ func TestRenderAutoDiscussArchitectPrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderAutoDiscussArchitectPrompt("en", data)
+	result, err := filter.RenderAutoDiscussArchitectPrompt("en", data)
 
 	// then
 	if err != nil {
@@ -1028,7 +1028,7 @@ func TestRenderAutoDiscussDevilsAdvocatePrompt(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderAutoDiscussDevilsAdvocatePrompt("en", data)
+	result, err := filter.RenderAutoDiscussDevilsAdvocatePrompt("en", data)
 
 	// then
 	if err != nil {
@@ -1057,7 +1057,7 @@ func TestRenderAutoDiscussDevilsAdvocatePrompt_FinalRound(t *testing.T) {
 	}
 
 	// when
-	result, err := platform.RenderAutoDiscussDevilsAdvocatePrompt("en", data)
+	result, err := filter.RenderAutoDiscussDevilsAdvocatePrompt("en", data)
 
 	// then
 	if err != nil {
@@ -1084,7 +1084,7 @@ func TestRenderNextGenPrompt_NoFeedback(t *testing.T) {
 
 	// when
 	for _, lang := range []string{"en", "ja"} {
-		result, err := platform.RenderNextGenPrompt(lang, data)
+		result, err := filter.RenderNextGenPrompt(lang, data)
 		if err != nil {
 			t.Fatalf("RenderNextGenPrompt(%s): %v", lang, err)
 		}
@@ -1107,7 +1107,7 @@ func TestClassifyPrompt_WaveMode_NoLinearReference(t *testing.T) {
 		}
 
 		// when
-		result, err := platform.RenderClassifyPrompt(lang, data)
+		result, err := filter.RenderClassifyPrompt(lang, data)
 
 		// then
 		if err != nil {
@@ -1133,7 +1133,7 @@ func TestClassifyPrompt_LinearMode_HasLinearReference(t *testing.T) {
 		}
 
 		// when
-		result, err := platform.RenderClassifyPrompt(lang, data)
+		result, err := filter.RenderClassifyPrompt(lang, data)
 
 		// then
 		if err != nil {
@@ -1156,7 +1156,7 @@ func TestDeepScanPrompt_WaveMode_NoLinearReference(t *testing.T) {
 		}
 
 		// when
-		result, err := platform.RenderDeepScanPrompt(lang, data)
+		result, err := filter.RenderDeepScanPrompt(lang, data)
 
 		// then
 		if err != nil {
@@ -1184,7 +1184,7 @@ func TestWaveApplyPrompt_WaveMode_NoLinearReference(t *testing.T) {
 		}
 
 		// when
-		result, err := platform.RenderWaveApplyPrompt(lang, data)
+		result, err := filter.RenderWaveApplyPrompt(lang, data)
 
 		// then
 		if err != nil {

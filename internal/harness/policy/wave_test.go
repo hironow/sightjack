@@ -7,6 +7,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/harness"
+	"github.com/hironow/sightjack/internal/harness/policy"
 )
 
 func TestWaveKey(t *testing.T) {
@@ -701,13 +702,13 @@ func TestValidWaveActionType(t *testing.T) {
 	t.Parallel()
 	valid := []string{"add_dod", "add_dependency", "add_label", "update_description", "create", "cancel"}
 	for _, v := range valid {
-		if !harness.ValidWaveActionType(v) {
+		if !policy.ValidWaveActionType(v) {
 			t.Errorf("expected %q to be valid", v)
 		}
 	}
 	invalid := []string{"delete", "remove", "", "Cancel"}
 	for _, v := range invalid {
-		if harness.ValidWaveActionType(v) {
+		if policy.ValidWaveActionType(v) {
 			t.Errorf("expected %q to be invalid", v)
 		}
 	}

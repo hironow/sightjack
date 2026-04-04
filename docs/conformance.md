@@ -16,14 +16,31 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 ## Layer Architecture
 
 ```
-cmd              --> usecase, session, usecase/port, platform, domain  (composition root)
-usecase          --> usecase/port, domain                              (output port only)
-usecase/port     --> domain (+ stdlib)                                 (interface contracts)
-session          --> eventsource, usecase/port, platform, domain       (adapter impl)
-eventsource      --> domain                                            (event persistence adapter)
-platform         --> domain (+ stdlib)                                 (cross-cutting infra)
-domain           --> (nothing internal, stdlib only)                   (pure types/logic)
+cmd              --> usecase, session, usecase/port, harness, platform, domain  (composition root)
+usecase          --> usecase/port, harness, domain                              (output port only)
+usecase/port     --> domain (+ stdlib)                                          (interface contracts)
+session          --> eventsource, usecase/port, harness, platform, domain       (adapter impl)
+harness          --> domain (+ stdlib)                                          (decision/validation/specification)
+eventsource      --> domain                                                     (event persistence adapter)
+platform         --> domain (+ stdlib)                                          (cross-cutting infra)
+domain           --> (nothing internal, stdlib only)                            (pure types/logic)
 ```
+
+### Harness Layer
+
+`harness` is the decision, validation, and specification layer between the LLM and the environment. It contains three sub-packages arranged on the AutoHarness spectrum:
+
+| Sub-package | Responsibility | May import |
+|-------------|---------------|------------|
+| `harness/policy` | Deterministic wave/scan/config logic (sorting, merging, filtering) | `domain` only |
+| `harness/verifier` | Validation of wave results and provider error classification | `domain`, `harness/policy` |
+| `harness/filter` | Prompt registry, rendering, building, and optimizer (LLM action space) | `domain`, `harness/policy`, `harness/verifier` |
+
+The facade `harness/harness.go` re-exports all public symbols. External callers (cmd, usecase, session, eventsource) MUST import the facade, not the sub-packages directly. Sub-packages MUST NOT import the facade (cycle prevention).
+
+Ref: `.semgrep/layers-harness.yaml`
+
+### Event Source Layer
 
 `eventsource` is the event persistence adapter based on the [AWS Event Sourcing pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/event-sourcing.html).
 Its responsibility is limited to append, load, and replay of domain events.
@@ -35,8 +52,11 @@ Key constraints enforced by semgrep (ERROR severity):
 - `usecase --> session` PROHIBITED (must use output port interfaces)
 - `cmd --> eventsource` PROHIBITED (ADR S0008)
 - `domain` has no I/O, no `context.Context`
+- `domain --> harness` PROHIBITED
+- `eventsource --> harness` PROHIBITED
+- `harness/policy --> harness/verifier` or `harness/filter` PROHIBITED
 
-Ref: `.semgrep/layers.yaml`, ADR S0007
+Ref: `.semgrep/layers.yaml`, `.semgrep/layers-harness.yaml`, ADR S0007
 
 ## Domain Primitives & Parse-Don't-Validate
 

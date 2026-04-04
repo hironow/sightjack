@@ -52,3 +52,6 @@ func SetDMailUUID(fn func() string) func() {
 
 // ShortUUIDForTest exposes shortUUID for tests that need real UUIDs.
 var ShortUUIDForTest = shortUUID
+
+// ConvergenceNames bridges the unexported convergenceNames method for external tests.
+func (c *FeedbackCollector) ConvergenceNames() []string { return c.convergenceNames() }

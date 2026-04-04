@@ -141,7 +141,7 @@ func BuildNextGenPrompt(cfg *domain.Config, scanDir string, completedWave domain
 
 	dodSection := domain.ResolveDoDSection(cfg.DoDTemplates, completedWave.ClusterName)
 
-	return platform.RenderNextGenPrompt(cfg.Lang, domain.NextGenPromptData{
+	return harness.RenderNextGenPrompt(cfg.Lang, domain.NextGenPromptData{
 		ClusterName:     completedWave.ClusterName,
 		Completeness:    fmt.Sprintf("%.0f", cluster.Completeness*100),
 		Issues:          string(issuesJSON),
