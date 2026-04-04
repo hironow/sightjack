@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -417,4 +418,103 @@ type ActionResult struct {
 type ExistingADR struct {
 	Filename string
 	Content  string
+}
+
+// --- Shutdown context key ---
+
+// shutdownKey is the context key for the outer (shutdown) context.
+type shutdownKey struct{}
+
+// ShutdownKey is used to embed the outer context in workCtx via context.WithValue.
+// Commands retrieve it to get a context that survives workCtx cancellation.
+var ShutdownKey = shutdownKey{}
+
+// --- Index entry ---
+
+// IndexEntry represents one line in the archive index JSONL file.
+type IndexEntry struct {
+	Timestamp string `json:"ts"`
+	Operation string `json:"op"`
+	Issue     string `json:"issue"`
+	Status    string `json:"status"`
+	Tool      string `json:"tool"`
+	Path      string `json:"path"`
+	Summary   string `json:"summary"`
+}
+
+// --- Handover ---
+
+// HandoverState captures in-progress work state when an operation is
+// interrupted by a signal. The struct is pure data — no context, no I/O.
+type HandoverState struct {
+	Tool         string // "sightjack"
+	Operation    string // "wave"
+	Timestamp    time.Time
+	InProgress   string            // Current task description
+	Completed    []string          // What was done
+	Remaining    []string          // What's left
+	PartialState map[string]string // Tool-specific state (key=label, value=detail)
+}
+
+// --- Wave key ---
+
+// WaveKey returns a globally unique key for a wave: "ClusterKey:ID".
+// Falls back to ClusterName if ClusterKey is not set (backward compat).
+func WaveKey(w Wave) string {
+	key := w.ClusterKey
+	if key == "" {
+		key = w.ClusterName
+	}
+	return key + ":" + w.ID
+}
+
+// --- Review ---
+
+// ReviewResult represents the outcome of a code review execution.
+type ReviewResult struct {
+	Passed   bool   // true if no actionable comments were found
+	Output   string // raw review output
+	Comments string // extracted review comments (empty if passed)
+}
+
+// --- Sentinel errors ---
+
+// ErrQuit signals the user chose to quit.
+var ErrQuit = errors.New("user quit")
+
+// ErrGoBack signals the user chose to go back to the previous menu.
+var ErrGoBack = errors.New("go back")
+
+// --- Handoff ---
+
+// HandoffResult tracks the outcome of a handoff for a single issue.
+type HandoffResult struct {
+	IssueID string // Linear issue identifier
+	Status  string // "success", "failed", "skipped"
+	Error   string // non-empty when Status is "failed"
+}
+
+// --- Provider error classification ---
+
+// ProviderErrorKind classifies the type of provider error.
+type ProviderErrorKind int
+
+const (
+	// ProviderErrorNone indicates no provider-level error (normal failure).
+	ProviderErrorNone ProviderErrorKind = iota
+	// ProviderErrorRateLimit indicates a rate limit was hit.
+	ProviderErrorRateLimit
+	// ProviderErrorServer indicates a server-side error (5xx).
+	ProviderErrorServer
+)
+
+// ProviderErrorInfo holds the classified result of a provider error.
+type ProviderErrorInfo struct {
+	Kind    ProviderErrorKind
+	ResetAt time.Time // parsed reset time (zero if unknown)
+}
+
+// IsTrip returns true if the error should trip a circuit breaker.
+func (i ProviderErrorInfo) IsTrip() bool {
+	return i.Kind != ProviderErrorNone
 }
