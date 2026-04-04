@@ -384,7 +384,7 @@ func FormatReportsForPrompt(reports []*DMail) string {
 type FeedbackCollector struct {
 	mu               sync.Mutex
 	items            []*DMail
-	convergenceNames []string
+	convNames []string
 	notifier         port.Notifier
 	notify           chan struct{} // signals new D-Mail arrival (buffered, size 1)
 	snapshotIdx      int           // index up to which items have been seen
@@ -446,7 +446,7 @@ func (c *FeedbackCollector) addMail(mail *DMail) {
 	defer c.mu.Unlock()
 	c.items = append(c.items, mail)
 	if mail.Kind == DMailConvergence {
-		c.convergenceNames = append(c.convergenceNames, mail.Name)
+		c.convNames = append(c.convNames, mail.Name)
 	}
 }
 
@@ -474,16 +474,16 @@ func (c *FeedbackCollector) NewSinceSnapshot() []*DMail {
 	return result
 }
 
-// ConvergenceNames returns a copy of convergence d-mail names received
+// convergenceNames returns a copy of convergence d-mail names received
 // mid-session. Used for journaling/state persistence.
-func (c *FeedbackCollector) ConvergenceNames() []string {
+func (c *FeedbackCollector) convergenceNames() []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.convergenceNames) == 0 {
+	if len(c.convNames) == 0 {
 		return nil
 	}
-	cp := make([]string, len(c.convergenceNames))
-	copy(cp, c.convergenceNames)
+	cp := make([]string, len(c.convNames))
+	copy(cp, c.convNames)
 	return cp
 }
 
