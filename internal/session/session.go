@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
@@ -157,10 +158,10 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 
 	// Record waves generated via emitter
 	emitter.EmitRecordWavesGenerated(domain.WavesGeneratedPayload{
-		Waves: domain.BuildWaveStates(waves),
+		Waves: harness.BuildWaveStates(waves),
 	}, time.Now().UTC())
 
-	completed := domain.BuildCompletedWaveMap(waves)
+	completed := harness.BuildCompletedWaveMap(waves)
 	scanner := bufio.NewScanner(input)
 	adrDir := ADRDir(baseDir)
 	adrCount := CountADRFiles(adrDir)
@@ -194,8 +195,8 @@ func ResumeSession(baseDir string, state *domain.SessionState) (*domain.ScanResu
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("load cached scan result: %w", err)
 	}
-	waves := domain.RestoreWaves(state.Waves)
-	completed := domain.BuildCompletedWaveMap(waves)
+	waves := harness.RestoreWaves(state.Waves)
+	completed := harness.BuildCompletedWaveMap(waves)
 	adrCount := CountADRFiles(ADRDir(baseDir))
 	return scanResult, waves, completed, adrCount, nil
 }
@@ -267,11 +268,11 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	}
 
 	// Validate and repair wave state after restore.
-	waves, danglingCount := domain.ValidateWavePrerequisites(waves)
+	waves, danglingCount := harness.ValidateWavePrerequisites(waves)
 	if danglingCount > 0 {
 		logger.Warn("Removed %d dangling wave prerequisites", danglingCount)
 	}
-	waves, repairedCount := domain.RepairLockedWaves(waves, completed)
+	waves, repairedCount := harness.RepairLockedWaves(waves, completed)
 	if repairedCount > 0 {
 		logger.Info("Repaired %d locked waves with met prerequisites", repairedCount)
 	}

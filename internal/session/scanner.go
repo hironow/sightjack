@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 
@@ -142,7 +143,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 	logger.OK("Found %d clusters with %d total issues", len(classify.Clusters), classify.TotalIssues)
 
 	var emptyCount int
-	classify.Clusters, emptyCount = domain.FilterEmptyClassifications(classify.Clusters)
+	classify.Clusters, emptyCount = harness.FilterEmptyClassifications(classify.Clusters)
 	if emptyCount > 0 {
 		logger.Warn("Filtered %d empty cluster(s) from classification", emptyCount)
 	}
@@ -181,7 +182,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 				ClusterName:     cc.Name,
 				IssueIDs:        strings.Join(chunk, ", "),
 				OutputPath:      chunkFile,
-				StrictnessLevel: string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, append([]string{cc.Name}, cc.Labels...))),
+				StrictnessLevel: string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, append([]string{cc.Name}, cc.Labels...))),
 				IsWaveMode:      cfg.Mode.IsWave(),
 			})
 			if renderErr != nil {
@@ -208,7 +209,7 @@ func RunScan(ctx context.Context, cfg *domain.Config, baseDir string, sessionID 
 			chunkResults = append(chunkResults, *result)
 		}
 
-		merged := domain.MergeClusterChunks(cc.Name, chunkResults)
+		merged := harness.MergeClusterChunks(cc.Name, chunkResults)
 		merged.Labels = cc.Labels
 		logger.OK("Cluster %s: %.0f%% complete", cc.Name, merged.Completeness*100)
 		return merged, nil
@@ -257,16 +258,16 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 		return nil, warnings, nil, ctx.Err()
 	}
 
-	failedNames := domain.DetectFailedClusterNames(clusters, successResults)
+	failedNames := harness.DetectFailedClusterNames(clusters, successResults)
 
 	if len(successResults) == 0 && len(clusters) > 0 {
 		return nil, warnings, failedNames, fmt.Errorf("all %d clusters failed wave generation", len(clusters))
 	}
 
-	merged := domain.MergeWaveResults(successResults)
+	merged := harness.MergeWaveResults(successResults)
 
 	// Filter out implementation actions for issues that already have a PR open.
-	prOpenIssues := domain.CollectPROpenIssues(clusters)
+	prOpenIssues := harness.CollectPROpenIssues(clusters)
 	for _, extra := range extraPROpenIssues {
 		for id := range extra {
 			prOpenIssues[id] = true
@@ -274,17 +275,17 @@ func RunWaveGenerate(ctx context.Context, cfg *domain.Config, scanDir string, cl
 	}
 	if len(prOpenIssues) > 0 {
 		before := len(merged)
-		merged = domain.FilterPROpenActions(merged, prOpenIssues)
+		merged = harness.FilterPROpenActions(merged, prOpenIssues)
 		if filtered := before - len(merged); filtered > 0 {
 			logger.Info("Filtered %d wave(s) targeting PR-open issues", filtered)
 		}
 	}
 
-	merged, emptyCount := domain.FilterEmptyWaves(merged)
+	merged, emptyCount := harness.FilterEmptyWaves(merged)
 	if emptyCount > 0 {
 		logger.Warn("Wave generation: filtered %d empty wave(s)", emptyCount)
 	}
-	if cycleErr := domain.DetectWaveCycles(merged); cycleErr != nil {
+	if cycleErr := harness.DetectWaveCycles(merged); cycleErr != nil {
 		return nil, warnings, failedNames, fmt.Errorf("wave prerequisite cycle detected: %w", cycleErr)
 	}
 	return merged, warnings, failedNames, nil
@@ -337,7 +338,7 @@ func generateWaveForCluster(ctx context.Context, cfg *domain.Config, scanDir str
 		Observations:    strings.Join(cluster.Observations, "\n"),
 		DoDSection:      domain.ResolveDoDSection(cfg.DoDTemplates, cluster.Name),
 		OutputPath:      waveFile,
-		StrictnessLevel: string(domain.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, append([]string{cluster.Name}, cluster.Labels...))),
+		StrictnessLevel: string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, append([]string{cluster.Name}, cluster.Labels...))),
 	})
 	if err != nil {
 		return domain.WaveGenerateResult{}, fmt.Errorf("render wave prompt for %s: %w", cluster.Name, err)

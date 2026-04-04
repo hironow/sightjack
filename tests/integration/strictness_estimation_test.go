@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 func TestEstimatedStrictness_MaxWithDefault(t *testing.T) {
@@ -14,7 +15,7 @@ func TestEstimatedStrictness_MaxWithDefault(t *testing.T) {
 	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
+	got := harness.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then: estimated alert wins over default fog
 	if got != domain.StrictnessAlert {
@@ -31,7 +32,7 @@ func TestEstimatedStrictness_OverrideWins(t *testing.T) {
 	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessAlert}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
+	got := harness.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then
 	if got != domain.StrictnessLockdown {
@@ -47,7 +48,7 @@ func TestEstimatedStrictness_DefaultStrongerThanEstimated(t *testing.T) {
 	estimated := map[string]domain.StrictnessLevel{"auth-module": domain.StrictnessFog}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
+	got := harness.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then: default alert wins
 	if got != domain.StrictnessAlert {
@@ -65,7 +66,7 @@ func TestEstimatedStrictness_ClusterKeyUsedForLookup(t *testing.T) {
 	keys := []string{"Auth Module", "auth-module", "security"}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, keys)
+	got := harness.ResolveStrictness(cfg, estimated, keys)
 
 	// then: matched via "auth-module" key
 	if got != domain.StrictnessLockdown {
@@ -81,7 +82,7 @@ func TestEstimatedStrictness_NoMatchFallsToDefault(t *testing.T) {
 	estimated := map[string]domain.StrictnessLevel{"payment": domain.StrictnessLockdown}
 
 	// when
-	got := domain.ResolveStrictness(cfg, estimated, []string{"auth-module"})
+	got := harness.ResolveStrictness(cfg, estimated, []string{"auth-module"})
 
 	// then: no match, falls to default
 	if got != domain.StrictnessFog {

@@ -1,0 +1,60 @@
+name: architect_discuss_ja
+version: "1.0"
+description: >
+  Architect Agentの議論プロンプト（日本語）。
+  RenderArchitectDiscussPromptで使用。
+variables:
+  strictness_level: Strictnessレベル (fog/alert/lockdown)。
+  cluster_name: クラスタ名。
+  wave_title: 現在のWaveタイトル。
+  wave_actions: WaveアクションのJSON文字列。
+  topic: 人間からの議論トピック。
+  output_path: JSON出力のファイルパス。
+template: |
+  あなたは Architect Agent です。
+  人間の議論トピックをクラスタとWaveの文脈で分析してください。
+  議論の結果、Waveアクションの修正が必要であれば提案してください。
+
+  ## Strictness Level: {strictness_level}
+
+  Strictnessは既存実装に対する変更許容度を定義します:
+  - fog: 保護なし。フィードバックに応じて自由にキャンセル・再構築。
+  - alert: 既存を尊重。影響範囲を制限。サブIssueや依存関係変更を優先。
+  - lockdown: 構造を保護。追加的な変更のみ。BacklogのIssueキャンセルは不可避な場合のみ。
+
+  DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
+
+  ## クラスタ
+  {cluster_name}
+
+  ## 現在のWave
+  タイトル: {wave_title}
+
+  ### 現在のアクション
+  {wave_actions}
+
+  ## 議論トピック
+  {topic}
+
+  ## 指示
+  1. クラスタ全体のコンテキストを考慮してトピックを分析する
+  2. 分析結果を明確なテキストで提供する
+  3. 決定事項を簡潔で実行可能なステートメントとして述べる
+  4. 議論の結果Waveの変更が必要であれば、修正されたWaveを提供する
+  5. 変更不要であればmodified_waveをnullにする
+  6. 推論の根拠を説明する
+
+  ## 出力
+  以下の JSON を **{output_path}** に書き込んでください:
+
+  {
+    "analysis": "分析テキスト",
+    "decision": "決定事項を簡潔で実行可能なステートメントで",
+    "modified_wave": null,
+    "reasoning": "変更の理由（または変更不要の理由）"
+  }
+
+  Wave修正を提案する場合は、nullを完全なWaveオブジェクト（id, cluster_name, title, description, actions, prerequisites, delta, statusフィールドを含む）に置き換えてください。
+
+  重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
+  JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。

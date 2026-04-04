@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -46,7 +47,7 @@ func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID stri
 	// Collect issue IDs from previously completed waves as race condition guard:
 	// these issues have already received spec D-Mails but paintress may not have
 	// applied the pr-open label yet.
-	specSentIssues := domain.CollectSpecSentIssueIDs(oldCompleted, oldWaves)
+	specSentIssues := harness.CollectSpecSentIssueIDs(oldCompleted, oldWaves)
 
 	var failedNames map[string]bool
 	waves, _, failedNames, err = RunWaveGenerate(ctx, cfg, scanDir, scanResult.Clusters, false, runner, logger, specSentIssues)
@@ -63,9 +64,9 @@ func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID stri
 	}
 	// Build a temporary SessionState for pruning (PruneStaleWaves expects *SessionState).
 	oldState := &domain.SessionState{
-		Waves: domain.BuildWaveStates(oldWaves),
+		Waves: harness.BuildWaveStates(oldWaves),
 	}
-	if pruned := domain.PruneStaleWaves(oldState, validClusters); pruned > 0 {
+	if pruned := harness.PruneStaleWaves(oldState, validClusters); pruned > 0 {
 		logger.Warn("Pruned %d stale waves from previous session", pruned)
 	}
 
@@ -74,17 +75,17 @@ func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID stri
 	for _, c := range scanResult.Clusters {
 		scannedClusters[c.Name] = true
 	}
-	oldWavesRestored := domain.RestoreWaves(oldState.Waves)
-	waves = domain.MergeOldWaves(oldWavesRestored, waves, scannedClusters, failedNames)
-	waves = domain.MergeCompletedStatus(oldCompleted, waves)
-	waves = domain.EvaluateUnlocks(waves, domain.BuildCompletedWaveMap(waves))
-	completed = domain.BuildCompletedWaveMap(waves)
+	oldWavesRestored := harness.RestoreWaves(oldState.Waves)
+	waves = harness.MergeOldWaves(oldWavesRestored, waves, scannedClusters, failedNames)
+	waves = harness.MergeCompletedStatus(oldCompleted, waves)
+	waves = harness.EvaluateUnlocks(waves, harness.BuildCompletedWaveMap(waves))
+	completed = harness.BuildCompletedWaveMap(waves)
 	adrCount = CountADRFiles(ADRDir(baseDir))
 
 	// Record rescan events
 	emitter.EmitRescan(sessionID, time.Now().UTC())
 	emitter.EmitRecordWavesGenerated(domain.WavesGeneratedPayload{
-		Waves: domain.BuildWaveStates(waves),
+		Waves: harness.BuildWaveStates(waves),
 	}, time.Now().UTC())
 
 	logger.OK("Re-scanned: %d clusters, %d waves (%d previously completed)",
@@ -148,8 +149,8 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 	onceRunner := NewOnceRunner(cfg, baseDir, logger)
 
 	// Initial rescan via RescanCore
-	oldWaves := domain.RestoreWaves(oldState.Waves)
-	oldCompleted := domain.BuildCompletedWaveMap(oldWaves)
+	oldWaves := harness.RestoreWaves(oldState.Waves)
+	oldCompleted := harness.BuildCompletedWaveMap(oldWaves)
 	scanDir, scanResultPath, scanResult, waves, completed, adrCount, scanTime, err :=
 		RescanCore(ctx, cfg, baseDir, sessionID, oldWaves, oldCompleted, runner, onceRunner, emitter, out, logger)
 	if err != nil {

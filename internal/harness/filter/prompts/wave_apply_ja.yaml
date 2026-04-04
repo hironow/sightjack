@@ -1,0 +1,66 @@
+name: wave_apply_ja
+version: "1.0"
+description: >
+  Scanner AgentのWave適用プロンプト（日本語）。
+  RenderWaveApplyPromptで使用。
+variables:
+  mode_intro: Wave/Linearモードの導入テキスト（事前計算済み）。
+  strictness_level: Strictnessレベル (fog/alert/lockdown)。
+  wave_id: Wave識別子。
+  cluster_name: クラスタ名。
+  title: Waveタイトル。
+  actions: 適用するアクションのJSON文字列。
+  steps_section: 現在のモードの適用手順（事前計算済み）。
+  dod_section: 事前計算済みのDoDセクション（空の場合あり）。
+  output_path: JSON出力のファイルパス。
+template: |
+  あなたは Scanner Agent です。
+  {mode_intro}
+
+  ## Strictness Level: {strictness_level}
+
+  Strictnessは既存実装に対する変更許容度を定義します:
+  - fog: 保護なし。フィードバックに応じて自由にキャンセル・再構築。
+  - alert: 既存を尊重。影響範囲を制限。サブIssueや依存関係変更を優先。
+  - lockdown: 構造を保護。追加的な変更のみ。BacklogのIssueキャンセルは不可避な場合のみ。
+
+  DoD分析: Strictnessレベルに関わらず常にフル深度で実施。
+
+  ## Wave情報
+  - Wave ID: {wave_id}
+  - クラスタ: {cluster_name}
+  - タイトル: {title}
+
+  ## 適用するアクション
+  {actions}
+
+  ## 適用手順
+  各アクションについて:
+  {steps_section}
+
+  ### 実装アクション（paintressが担当、sightjackは実行しない）
+  以下のアクションタイプはpaintressに転送されてコード変更が行われます。
+  sightjackのwave apply時にはスキップしてください（appliedとしてカウント、エラーなし）:
+  - `implement`: コード実装タスク
+  - `fix`: バグ修正タスク
+  - `verify`: テスト検証タスク
+
+  適用後、他のクラスタへの波及効果（ripples）があれば記録してください。
+  {dod_section}
+
+  ## 出力
+  以下の JSON を **{output_path}** に書き込んでください:
+
+  ```json
+  {
+    "wave_id": "{wave_id}",
+    "applied": 0,
+    "errors": [],
+    "ripples": [
+      {"cluster_name": "クラスタ名", "description": "波及効果の説明"}
+    ]
+  }
+  ```
+
+  重要: 出力は上記のファイルパスに直接書き込んでください。標準出力には書かないでください。
+  JSONの文字列値には \uXXXX エスケープを使わず、UTF-8の生文字を使用してください。

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -54,7 +55,7 @@ for downstream commands (apply, discuss).`,
 			}
 			defer tty.Close()
 			scanner := bufio.NewScanner(tty)
-			available := domain.AvailableWaves(plan.Waves, map[string]bool{})
+			available := harness.AvailableWaves(plan.Waves, map[string]bool{})
 
 			if len(available) == 0 {
 				return fmt.Errorf("no available waves (all locked or completed)")
