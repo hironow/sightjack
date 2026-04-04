@@ -128,8 +128,12 @@ func (r *Registry) Names() []string {
 // ExpandTemplate performs simple {key} replacement on a template string.
 func ExpandTemplate(tmpl string, vars map[string]string) string {
 	result := processConditionals(tmpl, vars)
-	for key, val := range vars {
-		result = strings.ReplaceAll(result, "{"+key+"}", val)
+	const sentinel = "\x00PROMPT_VAR_"
+	for k := range vars {
+		result = strings.ReplaceAll(result, "{"+k+"}", sentinel+k+"\x00")
+	}
+	for k, v := range vars {
+		result = strings.ReplaceAll(result, sentinel+k+"\x00", v)
 	}
 	return result
 }
