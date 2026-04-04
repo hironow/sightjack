@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -169,7 +170,7 @@ func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir st
 	outputFile := filepath.Join(scanDir, autoDiscussOutputFileName("architect", wave, roundIndex))
 	_ = os.Remove(outputFile)
 
-	prompt, err := platform.RenderAutoDiscussArchitectPrompt(cfg.Lang, domain.AutoDiscussArchitectPromptData{
+	prompt, err := harness.RenderAutoDiscussArchitectPrompt(cfg.Lang, domain.AutoDiscussArchitectPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     actionsJSON,
@@ -201,7 +202,7 @@ func runAutoDiscussDevilsAdvocate(ctx context.Context, cfg *domain.Config, scanD
 	outputFile := filepath.Join(scanDir, autoDiscussOutputFileName("devils_advocate", wave, roundIndex))
 	_ = os.Remove(outputFile)
 
-	prompt, err := platform.RenderAutoDiscussDevilsAdvocatePrompt(cfg.Lang, domain.AutoDiscussDevilsAdvocatePromptData{
+	prompt, err := harness.RenderAutoDiscussDevilsAdvocatePrompt(cfg.Lang, domain.AutoDiscussDevilsAdvocatePromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     actionsJSON,

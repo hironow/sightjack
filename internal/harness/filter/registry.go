@@ -9,15 +9,16 @@ import (
 	"io/fs"
 	"slices"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
 
 //go:embed prompts/*.yaml
-var promptFS embed.FS
+var promptsFS embed.FS
 
-// PromptConfig represents a single prompt loaded from a YAML file.
-type PromptConfig struct {
+// promptFile is the on-disk YAML schema for a prompt template.
+type promptFile struct {
 	Name        string            `yaml:"name"`
 	Version     string            `yaml:"version"`
 	Description string            `yaml:"description"`
@@ -25,30 +26,55 @@ type PromptConfig struct {
 	Template    string            `yaml:"template"`
 }
 
-// Registry loads and serves prompt definitions from embedded YAML files.
-type Registry struct {
-	prompts map[string]PromptConfig
+// PromptConfig is the read-only view of a loaded prompt template.
+type PromptConfig struct {
+	Name        string
+	Version     string
+	Description string
+	Variables   map[string]string
+	Template    string
 }
 
-// NewRegistry parses all YAML files in prompts/ and returns a Registry.
-// It returns an error if any YAML file cannot be parsed or if duplicate
-// prompt names are detected.
-func NewRegistry() (*Registry, error) {
-	return NewRegistryFromFS(promptFS)
+// PromptRegistry holds all embedded prompt templates keyed by name.
+type PromptRegistry struct {
+	entries map[string]PromptConfig
 }
 
-// MustNewRegistry returns a Registry or panics. Safe with embed.FS.
-func MustNewRegistry() *Registry {
-	r, err := NewRegistry()
+// singleton registry (loaded once from embedded YAML).
+var (
+	defaultRegistry     *PromptRegistry
+	defaultRegistryOnce sync.Once
+	defaultRegistryErr  error
+)
+
+// Default returns the package-level PromptRegistry singleton.
+// It is loaded once from embedded YAML files and safe for concurrent use.
+func Default() (*PromptRegistry, error) {
+	defaultRegistryOnce.Do(func() {
+		defaultRegistry, defaultRegistryErr = NewRegistry()
+	})
+	return defaultRegistry, defaultRegistryErr
+}
+
+// MustDefault returns the package-level PromptRegistry singleton,
+// panicking if the embedded YAML files cannot be loaded.
+func MustDefault() *PromptRegistry {
+	r, err := Default()
 	if err != nil {
-		panic("prompt registry: " + err.Error())
+		panic("filter.MustDefault: " + err.Error())
 	}
 	return r
 }
 
+// NewRegistry loads all YAML files from the embedded prompts/ directory
+// and returns a ready-to-use PromptRegistry.
+func NewRegistry() (*PromptRegistry, error) {
+	return NewRegistryFromFS(promptsFS)
+}
+
 // NewRegistryFromFS is the testable constructor that accepts any fs.FS.
-func NewRegistryFromFS(fsys fs.FS) (*Registry, error) {
-	r := &Registry{prompts: make(map[string]PromptConfig)}
+func NewRegistryFromFS(fsys fs.FS) (*PromptRegistry, error) {
+	r := &PromptRegistry{entries: make(map[string]PromptConfig)}
 
 	entries, err := fs.ReadDir(fsys, "prompts")
 	if err != nil {
@@ -65,20 +91,34 @@ func NewRegistryFromFS(fsys fs.FS) (*Registry, error) {
 			return nil, fmt.Errorf("read prompt %s: %w", entry.Name(), err)
 		}
 
-		var def PromptConfig
-		if err := yaml.Unmarshal(data, &def); err != nil {
+		var pf promptFile
+		if err := yaml.Unmarshal(data, &pf); err != nil {
 			return nil, fmt.Errorf("parse prompt %s: %w", entry.Name(), err)
 		}
 
-		if def.Name == "" {
+		if pf.Name == "" {
 			return nil, fmt.Errorf("prompt %s: missing name field", entry.Name())
 		}
 
-		if _, exists := r.prompts[def.Name]; exists {
-			return nil, fmt.Errorf("duplicate prompt name %q in %s", def.Name, entry.Name())
+		if pf.Template == "" {
+			return nil, fmt.Errorf("prompt %s: missing template field", entry.Name())
 		}
 
-		r.prompts[def.Name] = def
+		if _, exists := r.entries[pf.Name]; exists {
+			return nil, fmt.Errorf("duplicate prompt name %q in %s", pf.Name, entry.Name())
+		}
+
+		r.entries[pf.Name] = PromptConfig{
+			Name:        pf.Name,
+			Version:     pf.Version,
+			Description: pf.Description,
+			Variables:   pf.Variables,
+			Template:    pf.Template,
+		}
+	}
+
+	if len(r.entries) == 0 {
+		return nil, fmt.Errorf("load prompt registry: no prompt files found")
 	}
 
 	return r, nil
@@ -86,8 +126,8 @@ func NewRegistryFromFS(fsys fs.FS) (*Registry, error) {
 
 // Get returns the PromptConfig for the given name.
 // Returns an error if the prompt is not found.
-func (r *Registry) Get(name string) (PromptConfig, error) {
-	def, ok := r.prompts[name]
+func (r *PromptRegistry) Get(name string) (PromptConfig, error) {
+	def, ok := r.entries[name]
 	if !ok {
 		return PromptConfig{}, fmt.Errorf("prompt %q not found", name)
 	}
@@ -98,7 +138,7 @@ func (r *Registry) Get(name string) (PromptConfig, error) {
 // placeholders with the corresponding values from vars.
 // Unknown keys in the template are left as-is.
 // Returns an error if the prompt name is not found.
-func (r *Registry) Expand(name string, vars map[string]string) (string, error) {
+func (r *PromptRegistry) Expand(name string, vars map[string]string) (string, error) {
 	def, err := r.Get(name)
 	if err != nil {
 		return "", err
@@ -107,7 +147,7 @@ func (r *Registry) Expand(name string, vars map[string]string) (string, error) {
 }
 
 // MustExpand is like Expand but panics on error.
-func (r *Registry) MustExpand(name string, vars map[string]string) string {
+func (r *PromptRegistry) MustExpand(name string, vars map[string]string) string {
 	result, err := r.Expand(name, vars)
 	if err != nil {
 		panic("prompt expand " + name + ": " + err.Error())
@@ -116,9 +156,9 @@ func (r *Registry) MustExpand(name string, vars map[string]string) string {
 }
 
 // Names returns all registered prompt names in sorted order.
-func (r *Registry) Names() []string {
-	names := make([]string, 0, len(r.prompts))
-	for name := range r.prompts {
+func (r *PromptRegistry) Names() []string {
+	names := make([]string, 0, len(r.entries))
+	for name := range r.entries {
 		names = append(names, name)
 	}
 	slices.Sort(names)

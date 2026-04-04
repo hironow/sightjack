@@ -72,8 +72,50 @@ var SummarizeReview = policy.SummarizeReview
 
 // --- Filter re-exports ---
 
-// MustNewPromptRegistry returns a Registry or panics. Safe with embed.FS.
-var MustNewPromptRegistry = filter.MustNewRegistry
+// PromptRegistry is a type alias for the filter PromptRegistry.
+type PromptRegistry = filter.PromptRegistry
+
+// PromptConfig is a type alias for the filter PromptConfig.
+type PromptConfig = filter.PromptConfig
+
+// NewPromptRegistry creates a new PromptRegistry from embedded YAML files.
+var NewPromptRegistry = filter.NewRegistry
+
+// DefaultPromptRegistry returns the package-level PromptRegistry singleton.
+var DefaultPromptRegistry = filter.Default
+
+// MustDefaultPromptRegistry returns the singleton or panics. Safe with embed.FS.
+var MustDefaultPromptRegistry = filter.MustDefault
+
+// --- GEPA re-exports ---
+
+// PromptOptimizer is the port interface for prompt optimization backends.
+type PromptOptimizer = filter.PromptOptimizer
+
+// EvalCase is a universal evaluation case for prompt optimization.
+type EvalCase = filter.EvalCase
+
+// OptimizedResult is the result of a prompt optimization run.
+type OptimizedResult = filter.OptimizedResult
+
+// SavePrompt writes an updated PromptConfig back to the prompts directory.
+var SavePrompt = filter.Save
+
+// PromptsDir returns the on-disk path to the prompts/ directory.
+var PromptsDir = filter.PromptsDir
+
+// --- Prompt render re-exports ---
+
+var RenderClassifyPrompt = filter.RenderClassifyPrompt
+var RenderDeepScanPrompt = filter.RenderDeepScanPrompt
+var RenderWaveGeneratePrompt = filter.RenderWaveGeneratePrompt
+var RenderWaveApplyPrompt = filter.RenderWaveApplyPrompt
+var RenderScribeADRPrompt = filter.RenderScribeADRPrompt
+var RenderArchitectDiscussPrompt = filter.RenderArchitectDiscussPrompt
+var RenderReadyLabelPrompt = filter.RenderReadyLabelPrompt
+var RenderNextGenPrompt = filter.RenderNextGenPrompt
+var RenderAutoDiscussArchitectPrompt = filter.RenderAutoDiscussArchitectPrompt
+var RenderAutoDiscussDevilsAdvocatePrompt = filter.RenderAutoDiscussDevilsAdvocatePrompt
 
 // --- Verifier re-exports ---
 

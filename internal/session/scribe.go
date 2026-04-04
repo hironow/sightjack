@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
@@ -193,7 +194,7 @@ func RunScribeADRDryRun(cfg *domain.Config, scanDir string, wave domain.Wave, ar
 
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, ScribeFileName(wave))
-	prompt, err := platform.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
+	prompt, err := harness.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),
@@ -264,7 +265,7 @@ func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave 
 
 	adrID := fmt.Sprintf("%04d", adrNum)
 	outputFile := filepath.Join(scanDir, ScribeFileName(wave))
-	prompt, err := platform.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
+	prompt, err := harness.RenderScribeADRPrompt(cfg.Lang, domain.ScribeADRPromptData{
 		ClusterName:     wave.ClusterName,
 		WaveTitle:       wave.Title,
 		WaveActions:     string(actionsJSON),
