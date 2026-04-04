@@ -116,8 +116,6 @@ Pass --execute to actually remove the files.`,
 						out.EventDeleted = len(deleted)
 					}
 
-					// Truncate oversized event files
-					session.TruncateOversizedEventFiles(filepath.Join(baseDir, domain.StateDir), logger)
 				}
 				data, jsonErr := json.Marshal(out)
 				if jsonErr != nil {
@@ -150,54 +148,52 @@ Pass --execute to actually remove the files.`,
 				fmt.Fprintf(errW, "%d event file(s) older than %d days.\n", len(eventFiles), days)
 			}
 
-			if len(files) == 0 && len(eventFiles) == 0 {
-				return nil
-			}
-
 			if !execute {
 				fmt.Fprintln(errW, "(dry-run — pass --execute to delete)")
 				return nil
 			}
 
-			yes, _ := cmd.Flags().GetBool("yes")
 			totalFiles := len(files) + len(eventFiles)
-			if !yes {
-				fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
-				scanner := bufio.NewScanner(cmd.InOrStdin())
-				if !scanner.Scan() {
-					if scanErr := scanner.Err(); scanErr != nil {
-						return fmt.Errorf("read confirmation: %w", scanErr)
+			if totalFiles > 0 {
+				yes, _ := cmd.Flags().GetBool("yes")
+				if !yes {
+					fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
+					scanner := bufio.NewScanner(cmd.InOrStdin())
+					if !scanner.Scan() {
+						if scanErr := scanner.Err(); scanErr != nil {
+							return fmt.Errorf("read confirmation: %w", scanErr)
+						}
+						fmt.Fprintln(errW, "Cancelled.")
+						return nil
 					}
-					fmt.Fprintln(errW, "Cancelled.")
-					return nil
+					answer := strings.TrimSpace(scanner.Text())
+					if answer != "y" && answer != "Y" {
+						fmt.Fprintln(errW, "Cancelled.")
+						return nil
+					}
 				}
-				answer := strings.TrimSpace(scanner.Text())
-				if answer != "y" && answer != "Y" {
-					fmt.Fprintln(errW, "Cancelled.")
-					return nil
-				}
-			}
 
-			// Index archive candidates before deletion
-			if len(files) > 0 {
-				stateDir := filepath.Join(baseDir, domain.StateDir)
-				indexSightjackArchive(files, stateDir, logger)
-			}
-
-			if len(files) > 0 {
-				deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
-				if delErr != nil {
-					return fmt.Errorf("archive prune failed: %w", delErr)
+				// Index archive candidates before deletion
+				if len(files) > 0 {
+					stateDir := filepath.Join(baseDir, domain.StateDir)
+					indexSightjackArchive(files, stateDir, logger)
 				}
-				fmt.Fprintf(errW, "Pruned %d d-mail file(s).\n", len(deleted))
-			}
 
-			if len(eventFiles) > 0 {
-				deleted, delErr := session.PruneEventFiles(cmd.Context(), baseDir, eventFiles)
-				if delErr != nil {
-					return fmt.Errorf("event prune failed: %w", delErr)
+				if len(files) > 0 {
+					deleted, delErr := session.DeleteArchiveFiles(baseDir, files)
+					if delErr != nil {
+						return fmt.Errorf("archive prune failed: %w", delErr)
+					}
+					fmt.Fprintf(errW, "Pruned %d d-mail file(s).\n", len(deleted))
 				}
-				fmt.Fprintf(errW, "Pruned %d event file(s).\n", len(deleted))
+
+				if len(eventFiles) > 0 {
+					deleted, delErr := session.PruneEventFiles(cmd.Context(), baseDir, eventFiles)
+					if delErr != nil {
+						return fmt.Errorf("event prune failed: %w", delErr)
+					}
+					fmt.Fprintf(errW, "Pruned %d event file(s).\n", len(deleted))
+				}
 			}
 
 			// Prune flushed outbox DB rows + incremental vacuum.
@@ -207,9 +203,6 @@ Pass --execute to actually remove the files.`,
 			} else if pruned > 0 {
 				fmt.Fprintf(errW, "Pruned %d flushed outbox row(s).\n", pruned)
 			}
-
-			// Truncate oversized event files
-			session.TruncateOversizedEventFiles(filepath.Join(baseDir, domain.StateDir), logger)
 
 			return nil
 		},
