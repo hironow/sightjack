@@ -128,6 +128,7 @@ func NewRootCommand() *cobra.Command {
 		newConfigCmd(),
 		newMCPConfigCommand(),
 		newSessionsCmd(),
+		newRebuildCmd(),
 	)
 
 	return rootCmd

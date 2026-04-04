@@ -14,6 +14,8 @@ import (
 type EventApplier interface {
 	Apply(event Event) error
 	Rebuild(events []Event) error
+	Serialize() ([]byte, error)
+	Deserialize(data []byte) error
 }
 
 // EventType identifies the kind of domain event.

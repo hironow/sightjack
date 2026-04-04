@@ -43,6 +43,16 @@ func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
 	return NewSpanEventStore(raw)
 }
 
+// NewSnapshotStore creates a FileSnapshotStore at {baseDir}/.siren/snapshots/.
+func NewSnapshotStore(baseDir string) port.SnapshotStore {
+	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir(baseDir), "snapshots"))
+}
+
+// NewSeqCounter creates a SeqCounter at {baseDir}/.siren/.run/seq.db.
+func NewSeqCounter(baseDir string) (*eventsource.SeqCounter, error) {
+	return eventsource.NewSeqCounter(filepath.Join(stateDir(baseDir), ".run", "seq.db"))
+}
+
 // NewSessionRecorder creates a recorder for the given session.
 func NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
 	raw := eventsource.NewFileEventStore(stateDir, logger)
@@ -83,6 +93,13 @@ func LoadLatestResumableState(ctx context.Context, baseDir string, match func(*d
 
 // LoadAllEvents aggregates events from all session stores.
 func LoadAllEvents(ctx context.Context, baseDir string) ([]domain.Event, error) {
+	events, _, err := LoadAllEventsWithStatus(ctx, baseDir)
+	return events, err
+}
+
+// LoadAllEventsWithStatus aggregates events from all session stores and
+// reports the number of failed session loads (for rebuild abort logic).
+func LoadAllEventsWithStatus(ctx context.Context, baseDir string) ([]domain.Event, int, error) {
 	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_all_events")
 	defer span.End()
 	_ = ctx
@@ -90,6 +107,7 @@ func LoadAllEvents(ctx context.Context, baseDir string) ([]domain.Event, error) 
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all_events"))
+		return nil, 0, err
 	}
 	if loadResult.SessionsFailed > 0 {
 		span.SetAttributes(
@@ -97,7 +115,7 @@ func LoadAllEvents(ctx context.Context, baseDir string) ([]domain.Event, error) 
 			attribute.Int("sessions.failed", loadResult.SessionsFailed),
 		)
 	}
-	return events, err
+	return events, loadResult.SessionsFailed, nil
 }
 
 // ListExpiredEventFiles returns event files older than the retention threshold.
