@@ -115,6 +115,9 @@ Pass --execute to actually remove the files.`,
 						}
 						out.EventDeleted = len(deleted)
 					}
+
+					// Truncate oversized event files
+					session.TruncateOversizedEventFiles(filepath.Join(baseDir, domain.StateDir), logger)
 				}
 				data, jsonErr := json.Marshal(out)
 				if jsonErr != nil {
@@ -204,6 +207,9 @@ Pass --execute to actually remove the files.`,
 			} else if pruned > 0 {
 				fmt.Fprintf(errW, "Pruned %d flushed outbox row(s).\n", pruned)
 			}
+
+			// Truncate oversized event files
+			session.TruncateOversizedEventFiles(filepath.Join(baseDir, domain.StateDir), logger)
 
 			return nil
 		},

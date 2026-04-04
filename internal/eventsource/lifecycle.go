@@ -74,8 +74,7 @@ func PruneEventFiles(stateDir string, files []string) ([]string, error) {
 
 // ListOversizedEventFiles returns the names of .jsonl event files under stateDir
 // whose size exceeds EventFileSizeThreshold. Today's file is always excluded
-// because it may still be actively written. Only .jsonl files are considered
-// (directories are not eligible for truncation).
+// because it may still be actively written.
 // Returns (nil, nil) if the events directory does not exist.
 func ListOversizedEventFiles(stateDir string) ([]string, error) {
 	dir := EventsDir(stateDir)
@@ -171,3 +170,4 @@ func TruncateEventFile(stateDir, name string, keepLines int) error {
 	}
 	return nil
 }
+

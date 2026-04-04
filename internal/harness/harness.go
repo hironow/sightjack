@@ -48,7 +48,6 @@ var NeedsMoreWaves = policy.NeedsMoreWaves
 var ReadyIssueIDs = policy.ReadyIssueIDs
 var ClustersForIssueIDs = policy.ClustersForIssueIDs
 var LastCompletedWaveForCluster = policy.LastCompletedWaveForCluster
-var ValidWaveActionType = policy.ValidWaveActionType
 var CollectSpecSentIssueIDs = policy.CollectSpecSentIssueIDs
 var CollectPROpenIssues = policy.CollectPROpenIssues
 var FilterPROpenActions = policy.FilterPROpenActions
@@ -57,9 +56,7 @@ var FilterPROpenActions = policy.FilterPROpenActions
 
 var DetectFailedClusterNames = policy.DetectFailedClusterNames
 var FilterEmptyClassifications = policy.FilterEmptyClassifications
-var ClampCompleteness = policy.ClampCompleteness
 var MergeClusterChunks = policy.MergeClusterChunks
-var BuildScanRecoveryReport = policy.BuildScanRecoveryReport
 
 // --- Config policy re-exports ---
 
@@ -72,37 +69,8 @@ var SummarizeReview = policy.SummarizeReview
 
 // --- Filter re-exports ---
 
-// PromptRegistry is a type alias for the filter PromptRegistry.
-type PromptRegistry = filter.PromptRegistry
-
-// PromptConfig is a type alias for the filter PromptConfig.
-type PromptConfig = filter.PromptConfig
-
-// NewPromptRegistry creates a new PromptRegistry from embedded YAML files.
-var NewPromptRegistry = filter.NewRegistry
-
-// DefaultPromptRegistry returns the package-level PromptRegistry singleton.
-var DefaultPromptRegistry = filter.Default
-
 // MustDefaultPromptRegistry returns the singleton or panics. Safe with embed.FS.
 var MustDefaultPromptRegistry = filter.MustDefault
-
-// --- GEPA re-exports ---
-
-// PromptOptimizer is the port interface for prompt optimization backends.
-type PromptOptimizer = filter.PromptOptimizer
-
-// EvalCase is a universal evaluation case for prompt optimization.
-type EvalCase = filter.EvalCase
-
-// OptimizedResult is the result of a prompt optimization run.
-type OptimizedResult = filter.OptimizedResult
-
-// SavePrompt writes an updated PromptConfig back to the prompts directory.
-var SavePrompt = filter.Save
-
-// PromptsDir returns the on-disk path to the prompts/ directory.
-var PromptsDir = filter.PromptsDir
 
 // --- Prompt render re-exports ---
 
@@ -121,4 +89,13 @@ var RenderAutoDiscussDevilsAdvocatePrompt = filter.RenderAutoDiscussDevilsAdvoca
 
 // ClassifyProviderError inspects stderr output and classifies provider errors.
 var ClassifyProviderError = verifier.ClassifyProviderError
+
+// --- filter layer: optimization (Phase 3) ---
+
+type PromptOptimizer = filter.PromptOptimizer
+type EvalCase = filter.EvalCase
+type OptimizedResult = filter.OptimizedResult
+
+var SavePrompt = filter.Save
+var PromptsDir = filter.PromptsDir
 
