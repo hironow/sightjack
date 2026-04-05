@@ -18,6 +18,7 @@ func TestCorrectionMetadataForWave_PrefersWaveReference(t *testing.T) {
 	}
 	meta := domain.CorrectionMetadata{
 		FailureType:      domain.FailureTypeScopeViolation,
+		Severity:         domain.SeverityMedium,
 		TargetAgent:      "sightjack",
 		CorrelationID:    "corr-wave",
 		CorrectiveAction: "retry",
@@ -52,6 +53,7 @@ func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
 	}
 	meta := domain.CorrectionMetadata{
 		FailureType:      domain.FailureTypeMissingAcceptance,
+		Severity:         domain.SeverityHigh,
 		TargetAgent:      "sightjack",
 		CorrelationID:    "corr-issue",
 		CorrectiveAction: "retry",
@@ -77,5 +79,37 @@ func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
 	}
 	if got.EscalationReason != "recurrence-threshold" {
 		t.Fatalf("EscalationReason = %q, want recurrence-threshold", got.EscalationReason)
+	}
+}
+
+func TestCorrectionMetadataForWave_AcceptsLegacyV1WithoutSchemaVersion(t *testing.T) {
+	wave := domain.Wave{
+		ID:          "auth-w1",
+		ClusterName: "Auth",
+		Actions: []domain.WaveAction{
+			{IssueID: "ENG-3"},
+		},
+	}
+	feedback := []*DMail{{
+		Name:   "feedback-legacy",
+		Issues: []string{"ENG-3"},
+		Metadata: map[string]string{
+			domain.MetadataFailureType:      string(domain.FailureTypeScopeViolation),
+			domain.MetadataSeverity:         "HIGH",
+			domain.MetadataCorrelationID:    "corr-legacy",
+			domain.MetadataCorrectiveAction: "retry",
+		},
+	}}
+
+	got := correctionMetadataForWave(feedback, wave)
+
+	if got.ConsumerSchemaVersion() != domain.ImprovementSchemaVersion {
+		t.Fatalf("ConsumerSchemaVersion = %q, want %q", got.ConsumerSchemaVersion(), domain.ImprovementSchemaVersion)
+	}
+	if got.Severity != domain.SeverityHigh {
+		t.Fatalf("Severity = %q, want %q", got.Severity, domain.SeverityHigh)
+	}
+	if got.Outcome != domain.ImprovementOutcomePending {
+		t.Fatalf("Outcome = %q, want %q", got.Outcome, domain.ImprovementOutcomePending)
 	}
 }
