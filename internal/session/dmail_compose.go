@@ -83,6 +83,7 @@ func ComposeReportWithMetadata(ctx context.Context, store port.OutboxStore, wave
 	if meta.SchemaVersion != "" {
 		mail.Metadata = meta.Apply(mail.Metadata)
 	}
+	mail.Metadata = currentProviderState().ApplyMetadata(mail.Metadata)
 	return ComposeDMail(ctx, store, mail)
 }
 
@@ -129,6 +130,7 @@ func ComposeFeedbackWithMetadata(ctx context.Context, store port.OutboxStore, wa
 	if meta.SchemaVersion != "" {
 		mail.Metadata = meta.Apply(mail.Metadata)
 	}
+	mail.Metadata = currentProviderState().ApplyMetadata(mail.Metadata)
 	return ComposeDMail(ctx, store, mail)
 }
 

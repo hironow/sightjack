@@ -13,6 +13,8 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 		SecondaryType:    "design",
 		TargetAgent:      "sightjack",
 		RoutingMode:      domain.RoutingModeRetry,
+		RoutingHistory:   []string{"retry", "reroute"},
+		OwnerHistory:     []string{"sightjack", "paintress"},
 		RecurrenceCount:  2,
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(true),
@@ -36,6 +38,12 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 	}
 	if got.RoutingMode != domain.RoutingModeRetry {
 		t.Fatalf("RoutingMode = %q, want %q", got.RoutingMode, domain.RoutingModeRetry)
+	}
+	if gotRouting := domain.FormatImprovementHistory(got.RoutingHistory); gotRouting != "retry>reroute" {
+		t.Fatalf("RoutingHistory = %q, want retry>reroute", gotRouting)
+	}
+	if gotOwners := domain.FormatImprovementHistory(got.OwnerHistory); gotOwners != "sightjack>paintress" {
+		t.Fatalf("OwnerHistory = %q, want sightjack>paintress", gotOwners)
 	}
 	if got.RecurrenceCount != 2 {
 		t.Fatalf("RecurrenceCount = %d, want 2", got.RecurrenceCount)
@@ -78,6 +86,12 @@ func TestCorrectionMetadataForwardForRecheck(t *testing.T) {
 	}
 	if got.SchemaVersion != domain.ImprovementSchemaVersion {
 		t.Fatalf("SchemaVersion = %q, want %q", got.SchemaVersion, domain.ImprovementSchemaVersion)
+	}
+	if gotRouting := domain.FormatImprovementHistory(got.RoutingHistory); gotRouting != "" {
+		t.Fatalf("RoutingHistory = %q, want empty", gotRouting)
+	}
+	if gotOwners := domain.FormatImprovementHistory(got.OwnerHistory); gotOwners != "" {
+		t.Fatalf("OwnerHistory = %q, want empty", gotOwners)
 	}
 	if got.RetryAllowed != nil {
 		t.Fatalf("RetryAllowed = %v, want nil", *got.RetryAllowed)

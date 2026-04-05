@@ -20,6 +20,8 @@ func TestCorrectionMetadataForWave_PrefersWaveReference(t *testing.T) {
 		FailureType:      domain.FailureTypeScopeViolation,
 		Severity:         domain.SeverityMedium,
 		TargetAgent:      "sightjack",
+		RoutingHistory:   []string{"retry"},
+		OwnerHistory:     []string{"sightjack"},
 		CorrelationID:    "corr-wave",
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(true),
@@ -41,6 +43,12 @@ func TestCorrectionMetadataForWave_PrefersWaveReference(t *testing.T) {
 	if got.RetryAllowed == nil || !*got.RetryAllowed {
 		t.Fatal("RetryAllowed = nil/false, want true")
 	}
+	if gotHistory := domain.FormatImprovementHistory(got.RoutingHistory); gotHistory != "retry" {
+		t.Fatalf("RoutingHistory = %q, want retry", gotHistory)
+	}
+	if gotOwners := domain.FormatImprovementHistory(got.OwnerHistory); gotOwners != "sightjack" {
+		t.Fatalf("OwnerHistory = %q, want sightjack", gotOwners)
+	}
 }
 
 func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
@@ -55,6 +63,8 @@ func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
 		FailureType:      domain.FailureTypeMissingAcceptance,
 		Severity:         domain.SeverityHigh,
 		TargetAgent:      "sightjack",
+		RoutingHistory:   []string{"retry", "escalate"},
+		OwnerHistory:     []string{"sightjack"},
 		CorrelationID:    "corr-issue",
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(false),
@@ -79,6 +89,9 @@ func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
 	}
 	if got.EscalationReason != "recurrence-threshold" {
 		t.Fatalf("EscalationReason = %q, want recurrence-threshold", got.EscalationReason)
+	}
+	if gotHistory := domain.FormatImprovementHistory(got.RoutingHistory); gotHistory != "retry>escalate" {
+		t.Fatalf("RoutingHistory = %q, want retry>escalate", gotHistory)
 	}
 }
 

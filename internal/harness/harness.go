@@ -62,6 +62,13 @@ var MergeClusterChunks = policy.MergeClusterChunks
 
 var ResolveStrictness = policy.ResolveStrictness
 
+// --- Convergence gate policy re-exports ---
+
+const MaxConvergenceRedrainCycles = policy.MaxConvergenceRedrainCycles
+
+var IsConvergenceKind = policy.IsConvergenceKind
+var BuildConvergenceSummary = policy.BuildConvergenceSummary
+
 // --- Review policy re-exports ---
 
 var IsRateLimited = verifier.IsRateLimited
@@ -98,4 +105,3 @@ type OptimizedResult = filter.OptimizedResult
 
 var SavePrompt = filter.Save
 var PromptsDir = filter.PromptsDir
-
