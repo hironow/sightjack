@@ -382,12 +382,12 @@ func FormatReportsForPrompt(reports []*DMail) string {
 // so they can be included in nextgen prompts.
 // Convergence d-mails are tracked separately for journaling.
 type FeedbackCollector struct {
-	mu               sync.Mutex
-	items            []*DMail
-	convNames []string
-	notifier         port.Notifier
-	notify           chan struct{} // signals new D-Mail arrival (buffered, size 1)
-	snapshotIdx      int           // index up to which items have been seen
+	mu          sync.Mutex
+	items       []*DMail
+	convNames   []string
+	notifier    port.Notifier
+	notify      chan struct{} // signals new D-Mail arrival (buffered, size 1)
+	snapshotIdx int           // index up to which items have been seen
 }
 
 // CollectFeedback creates a FeedbackCollector seeded with initial feedback
@@ -395,6 +395,14 @@ type FeedbackCollector struct {
 // from the channel. Convergence d-mails trigger a notification via notifier.
 // Safe to call with nil initial, nil channel, or nil notifier.
 func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier, logger domain.Logger) *FeedbackCollector {
+	return collectFeedback(initial, ch, notifier, logger, nil)
+}
+
+func CollectFeedbackWithHook(initial []*DMail, ch <-chan *DMail, notifier port.Notifier, logger domain.Logger, onMail func(*DMail)) *FeedbackCollector {
+	return collectFeedback(initial, ch, notifier, logger, onMail)
+}
+
+func collectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier, logger domain.Logger, onMail func(*DMail)) *FeedbackCollector {
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
 	}
@@ -405,12 +413,20 @@ func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 	if len(initial) > 0 {
 		c.items = make([]*DMail, len(initial))
 		copy(c.items, initial)
+		if onMail != nil {
+			for _, mail := range initial {
+				onMail(mail)
+			}
+		}
 	}
 	if ch != nil {
 		go func() {
 			for mail := range ch {
 				domain.LogBanner(logger, domain.BannerRecv, string(mail.Kind), mail.Name, mail.Description)
 				c.addMail(mail)
+				if onMail != nil {
+					onMail(mail)
+				}
 				select {
 				case c.notify <- struct{}{}:
 				default: // non-blocking, don't block if already signaled
