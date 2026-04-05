@@ -143,6 +143,13 @@ func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
 	}
 }
 
+func currentProviderState() domain.ProviderStateSnapshot {
+	if sharedCircuitBreaker == nil {
+		return domain.ActiveProviderState()
+	}
+	return sharedCircuitBreaker.Snapshot()
+}
+
 // RunClaudeDryRun saves the prompt to a file instead of executing the provider CLI,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").

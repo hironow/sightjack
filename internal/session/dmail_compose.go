@@ -67,6 +67,10 @@ func ReportBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 
 // ComposeReport creates and sends a report d-mail for a completed wave.
 func ComposeReport(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
+	return ComposeReportWithMetadata(ctx, store, wave, result, domain.CorrectionMetadata{})
+}
+
+func ComposeReportWithMetadata(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult, meta domain.CorrectionMetadata) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
@@ -75,6 +79,9 @@ func ComposeReport(ctx context.Context, store port.OutboxStore, wave domain.Wave
 		SchemaVersion: "1",
 		Issues:        WaveIssueIDs(wave),
 		Body:          ReportBody(wave, result),
+	}
+	if meta.SchemaVersion != "" {
+		mail.Metadata = meta.Apply(mail.Metadata)
 	}
 	return ComposeDMail(ctx, store, mail)
 }
@@ -106,6 +113,10 @@ func FeedbackBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 // Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
 // Uses DMailReport kind because sightjack's sendable contract only produces specification and report.
 func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
+	return ComposeFeedbackWithMetadata(ctx, store, wave, result, domain.CorrectionMetadata{})
+}
+
+func ComposeFeedbackWithMetadata(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult, meta domain.CorrectionMetadata) error {
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("feedback", key),
@@ -114,6 +125,9 @@ func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wa
 		SchemaVersion: "1",
 		Issues:        WaveIssueIDs(wave),
 		Body:          FeedbackBody(wave, result),
+	}
+	if meta.SchemaVersion != "" {
+		mail.Metadata = meta.Apply(mail.Metadata)
 	}
 	return ComposeDMail(ctx, store, mail)
 }
