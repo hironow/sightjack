@@ -11,7 +11,7 @@ func correctionMetadataForWave(feedback []*DMail, wave domain.Wave) domain.Corre
 			continue
 		}
 		meta := domain.CorrectionMetadataFromMap(mail.Metadata)
-		if meta.SchemaVersion == "" {
+		if !meta.IsImprovement() || !meta.HasSupportedVocabulary() {
 			continue
 		}
 		if mail.Wave != nil && mail.Wave.ID == waveKey {
