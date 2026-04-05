@@ -37,3 +37,24 @@ func TestCorrectionMetadataApplyRoundTrip(t *testing.T) {
 		t.Fatalf("schema version = %q, want %q", applied[domain.MetadataImprovementSchemaVersion], domain.ImprovementSchemaVersion)
 	}
 }
+
+func TestCorrectionMetadataForwardForRecheck(t *testing.T) {
+	meta := domain.CorrectionMetadata{
+		FailureType:      domain.FailureTypeScopeViolation,
+		TargetAgent:      "sightjack",
+		CorrelationID:    "corr-1",
+		CorrectiveAction: "retry",
+	}
+
+	got := meta.ForwardForRecheck()
+
+	if got.TargetAgent != "" {
+		t.Fatalf("TargetAgent = %q, want empty", got.TargetAgent)
+	}
+	if got.Outcome != domain.ImprovementOutcomePending {
+		t.Fatalf("Outcome = %q, want %q", got.Outcome, domain.ImprovementOutcomePending)
+	}
+	if got.SchemaVersion != domain.ImprovementSchemaVersion {
+		t.Fatalf("SchemaVersion = %q, want %q", got.SchemaVersion, domain.ImprovementSchemaVersion)
+	}
+}
