@@ -6,6 +6,8 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
+// white-box-reason: session internals: tests unexported corrective metadata matching helper
+
 func TestCorrectionMetadataForWave_PrefersWaveReference(t *testing.T) {
 	wave := domain.Wave{
 		ID:          "auth-w1",
