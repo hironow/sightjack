@@ -3,6 +3,8 @@ package session_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -95,5 +97,46 @@ func TestComposeSpecification_IssueManagementOnly_ReturnsSentinelError(t *testin
 	// then: should return sentinel error — no spec D-Mail generated
 	if !errors.Is(err, session.ErrSpecNoImplementationSteps) {
 		t.Fatalf("expected ErrSpecNoImplementationSteps, got: %v", err)
+	}
+}
+
+func TestComposeFeedbackWithMetadata_AttachesProviderState(t *testing.T) {
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := domain.Wave{
+		ID:          "w1",
+		ClusterName: "auth",
+		Title:       "Auth Wave",
+		Actions:     []domain.WaveAction{{IssueID: "MY-1", Description: "Add middleware"}},
+	}
+	result := &domain.WaveApplyResult{WaveID: "w1", Applied: 1}
+
+	err := session.ComposeFeedbackWithMetadata(context.Background(), store, wave, result, domain.CorrectionMetadata{
+		SchemaVersion:    domain.ImprovementSchemaVersion,
+		FailureType:      domain.FailureTypeScopeViolation,
+		TargetAgent:      "sightjack",
+		RoutingHistory:   []string{"retry"},
+		OwnerHistory:     []string{"sightjack"},
+		CorrelationID:    "corr-1",
+		CorrectiveAction: "retry",
+	})
+	if err != nil {
+		t.Fatalf("ComposeFeedbackWithMetadata: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(domain.MailDir(dir, "outbox"), "sj-feedback-auth-w1_00000000.md"))
+	if err != nil {
+		t.Fatalf("read feedback dmail: %v", err)
+	}
+	mail, err := session.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail: %v", err)
+	}
+	if got := mail.Metadata[domain.MetadataProviderState]; got != string(domain.ProviderStateActive) {
+		t.Fatalf("provider_state = %q, want %q", got, domain.ProviderStateActive)
+	}
+	if got := mail.Metadata[domain.MetadataRoutingHistory]; got != "retry" {
+		t.Fatalf("routing_history = %q, want retry", got)
 	}
 }

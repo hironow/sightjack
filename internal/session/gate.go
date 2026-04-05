@@ -3,10 +3,10 @@ package session
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -17,7 +17,7 @@ import (
 func FilterConvergence(dmails []*DMail) []*DMail {
 	var result []*DMail
 	for _, m := range dmails {
-		if m.Kind == DMailConvergence {
+		if harness.IsConvergenceKind(string(m.Kind)) {
 			result = append(result, m)
 		}
 	}
@@ -45,7 +45,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Noti
 	for _, m := range convergence {
 		names = append(names, m.Name)
 	}
-	summary := fmt.Sprintf("[CONVERGENCE] Convergence signal received: %s", strings.Join(names, ", "))
+	summary := harness.BuildConvergenceSummary(names)
 
 	// Notify (fire-and-forget — non-blocking with 30s timeout).
 	// Use a detached context for the notification span so it is not tied to
@@ -88,7 +88,7 @@ func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Noti
 // maxRedrainCycles caps how many times the convergence gate re-drains
 // the inbox. Prevents infinite looping when convergence D-Mails arrive
 // faster than the approval cycle.
-const maxRedrainCycles = 3
+const maxRedrainCycles = harness.MaxConvergenceRedrainCycles
 
 // RunConvergenceGateWithRedrain runs the convergence gate in a loop,
 // re-draining the inbox channel after each approval to catch late-arriving
