@@ -36,6 +36,14 @@ const (
 	ImprovementOutcomeIgnored     ImprovementOutcome = "ignored"
 )
 
+type RoutingMode string
+
+const (
+	RoutingModeRetry    RoutingMode = "retry"
+	RoutingModeReroute  RoutingMode = "reroute"
+	RoutingModeEscalate RoutingMode = "escalate"
+)
+
 const ImprovementSchemaVersion = "1"
 
 const (
@@ -43,6 +51,7 @@ const (
 	MetadataSeverity                 = "severity"
 	MetadataSecondaryType            = "secondary_type"
 	MetadataTargetAgent              = "target_agent"
+	MetadataRoutingMode              = "routing_mode"
 	MetadataRecurrenceCount          = "recurrence_count"
 	MetadataCorrectiveAction         = "corrective_action"
 	MetadataRetryAllowed             = "retry_allowed"
@@ -59,6 +68,7 @@ type CorrectionMetadata struct {
 	Severity         Severity
 	SecondaryType    string
 	TargetAgent      string
+	RoutingMode      RoutingMode
 	RecurrenceCount  int
 	CorrectiveAction string
 	RetryAllowed     *bool
@@ -74,6 +84,7 @@ type ImprovementEvent struct {
 	Severity         Severity           `json:"severity,omitempty" yaml:"severity,omitempty"`
 	SecondaryType    string             `json:"secondary_type,omitempty" yaml:"secondary_type,omitempty"`
 	TargetAgent      string             `json:"target_agent,omitempty" yaml:"target_agent,omitempty"`
+	RoutingMode      RoutingMode        `json:"routing_mode,omitempty" yaml:"routing_mode,omitempty"`
 	RecurrenceCount  int                `json:"recurrence_count,omitempty" yaml:"recurrence_count,omitempty"`
 	CorrectiveAction string             `json:"corrective_action,omitempty" yaml:"corrective_action,omitempty"`
 	RetryAllowed     *bool              `json:"retry_allowed,omitempty" yaml:"retry_allowed,omitempty"`
@@ -99,6 +110,28 @@ func NormalizeSeverity(s Severity) Severity {
 func IsKnownSeverity(severity Severity) bool {
 	switch NormalizeSeverity(severity) {
 	case SeverityLow, SeverityMedium, SeverityHigh:
+		return true
+	default:
+		return false
+	}
+}
+
+func NormalizeRoutingMode(mode RoutingMode) RoutingMode {
+	switch RoutingMode(strings.ToLower(string(mode))) {
+	case RoutingModeRetry:
+		return RoutingModeRetry
+	case RoutingModeReroute:
+		return RoutingModeReroute
+	case RoutingModeEscalate:
+		return RoutingModeEscalate
+	default:
+		return mode
+	}
+}
+
+func IsKnownRoutingMode(mode RoutingMode) bool {
+	switch NormalizeRoutingMode(mode) {
+	case RoutingModeRetry, RoutingModeReroute, RoutingModeEscalate:
 		return true
 	default:
 		return false
@@ -137,6 +170,7 @@ func (m CorrectionMetadata) IsImprovement() bool {
 		m.Severity != "" ||
 		m.SecondaryType != "" ||
 		m.TargetAgent != "" ||
+		m.RoutingMode != "" ||
 		m.RecurrenceCount > 0 ||
 		m.CorrectiveAction != "" ||
 		m.RetryAllowed != nil ||
@@ -158,6 +192,7 @@ func (m CorrectionMetadata) ConsumerSchemaVersion() string {
 
 func (m CorrectionMetadata) HasSupportedVocabulary() bool {
 	return (m.Severity == "" || IsKnownSeverity(m.Severity)) &&
+		(m.RoutingMode == "" || IsKnownRoutingMode(m.RoutingMode)) &&
 		(m.Outcome == "" || IsKnownImprovementOutcome(m.Outcome))
 }
 
@@ -179,6 +214,7 @@ func CorrectionMetadataFromMap(meta map[string]string) CorrectionMetadata {
 		Severity:         NormalizeSeverity(Severity(meta[MetadataSeverity])),
 		SecondaryType:    meta[MetadataSecondaryType],
 		TargetAgent:      meta[MetadataTargetAgent],
+		RoutingMode:      NormalizeRoutingMode(RoutingMode(meta[MetadataRoutingMode])),
 		RecurrenceCount:  recurrence,
 		CorrectiveAction: meta[MetadataCorrectiveAction],
 		RetryAllowed:     retryAllowed,
@@ -210,6 +246,9 @@ func (m CorrectionMetadata) Apply(meta map[string]string) map[string]string {
 	}
 	if m.TargetAgent != "" {
 		cp[MetadataTargetAgent] = m.TargetAgent
+	}
+	if m.RoutingMode != "" {
+		cp[MetadataRoutingMode] = string(NormalizeRoutingMode(m.RoutingMode))
 	}
 	if m.RecurrenceCount > 0 {
 		cp[MetadataRecurrenceCount] = strconv.Itoa(m.RecurrenceCount)
@@ -246,6 +285,7 @@ func (m CorrectionMetadata) ImprovementEvent() ImprovementEvent {
 		Severity:         NormalizeSeverity(m.Severity),
 		SecondaryType:    m.SecondaryType,
 		TargetAgent:      m.TargetAgent,
+		RoutingMode:      NormalizeRoutingMode(m.RoutingMode),
 		RecurrenceCount:  m.RecurrenceCount,
 		CorrectiveAction: m.CorrectiveAction,
 		RetryAllowed:     m.RetryAllowed,
@@ -265,6 +305,7 @@ func (m CorrectionMetadata) ForwardForRecheck() CorrectionMetadata {
 		forwarded.SchemaVersion = ImprovementSchemaVersion
 	}
 	forwarded.TargetAgent = ""
+	forwarded.RoutingMode = ""
 	if forwarded.Outcome == "" {
 		forwarded.Outcome = ImprovementOutcomePending
 	}
