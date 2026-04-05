@@ -19,6 +19,7 @@ func TestCorrectionMetadataForWave_PrefersWaveReference(t *testing.T) {
 		TargetAgent:      "sightjack",
 		CorrelationID:    "corr-wave",
 		CorrectiveAction: "retry",
+		RetryAllowed:     domain.BoolPtr(true),
 	}
 	feedback := []*DMail{{
 		Name:     "feedback-1",
@@ -33,6 +34,9 @@ func TestCorrectionMetadataForWave_PrefersWaveReference(t *testing.T) {
 	}
 	if got.TargetAgent != "" {
 		t.Fatalf("TargetAgent = %q, want empty", got.TargetAgent)
+	}
+	if got.RetryAllowed == nil || !*got.RetryAllowed {
+		t.Fatal("RetryAllowed = nil/false, want true")
 	}
 }
 
@@ -49,6 +53,8 @@ func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
 		TargetAgent:      "sightjack",
 		CorrelationID:    "corr-issue",
 		CorrectiveAction: "retry",
+		RetryAllowed:     domain.BoolPtr(false),
+		EscalationReason: "recurrence-threshold",
 	}
 	feedback := []*DMail{{
 		Name:     "feedback-2",
@@ -63,5 +69,11 @@ func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
 	}
 	if got.TargetAgent != "" {
 		t.Fatalf("TargetAgent = %q, want empty", got.TargetAgent)
+	}
+	if got.RetryAllowed == nil || *got.RetryAllowed {
+		t.Fatal("RetryAllowed = nil/true, want false")
+	}
+	if got.EscalationReason != "recurrence-threshold" {
+		t.Fatalf("EscalationReason = %q, want recurrence-threshold", got.EscalationReason)
 	}
 }

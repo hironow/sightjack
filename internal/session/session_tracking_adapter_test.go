@@ -66,6 +66,12 @@ func TestSessionTrackingAdapter_RunSession_Success(t *testing.T) {
 	if loaded.ProviderSessionID != "claude-sess-xyz" {
 		t.Errorf("loaded ProviderSessionID = %q, want %q", loaded.ProviderSessionID, "claude-sess-xyz")
 	}
+	if loaded.Metadata[domain.MetadataProviderState] != string(domain.ProviderStateActive) {
+		t.Errorf("loaded Metadata[provider_state] = %q, want %q", loaded.Metadata[domain.MetadataProviderState], domain.ProviderStateActive)
+	}
+	if loaded.Metadata[domain.MetadataProviderRetryBudget] != "1" {
+		t.Errorf("loaded Metadata[provider_retry_budget] = %q, want 1", loaded.Metadata[domain.MetadataProviderRetryBudget])
+	}
 }
 
 func TestSessionTrackingAdapter_RunSession_Failure(t *testing.T) {
@@ -104,6 +110,9 @@ func TestSessionTrackingAdapter_RunSession_Failure(t *testing.T) {
 	// Even on failure, provider session ID should be captured if available
 	if loaded.ProviderSessionID != "sess-fail" {
 		t.Errorf("loaded ProviderSessionID = %q, want %q", loaded.ProviderSessionID, "sess-fail")
+	}
+	if loaded.Metadata[domain.MetadataProviderState] != string(domain.ProviderStateActive) {
+		t.Errorf("loaded Metadata[provider_state] = %q, want %q", loaded.Metadata[domain.MetadataProviderState], domain.ProviderStateActive)
 	}
 }
 
@@ -159,7 +168,7 @@ func TestSessionTrackingAdapter_TripsCBOnRateLimitStderr(t *testing.T) {
 	adapter := session.NewSessionTrackingAdapter(innerWithStderr, store, domain.ProviderClaudeCode)
 
 	// when
-	_, _, runErr := adapter.RunSession(ctx, "test", io.Discard)
+	rec, _, runErr := adapter.RunSession(ctx, "test", io.Discard)
 
 	// then — error returned AND CB tripped
 	if runErr == nil {
@@ -167,6 +176,19 @@ func TestSessionTrackingAdapter_TripsCBOnRateLimitStderr(t *testing.T) {
 	}
 	if !cb.IsOpen() {
 		t.Fatal("expected CB OPEN after rate limit stderr")
+	}
+	loaded, loadErr := store.Load(ctx, rec.ID)
+	if loadErr != nil {
+		t.Fatalf("Load: %v", loadErr)
+	}
+	if loaded.Metadata[domain.MetadataProviderState] != string(domain.ProviderStateWaiting) {
+		t.Fatalf("provider_state = %q, want %q", loaded.Metadata[domain.MetadataProviderState], domain.ProviderStateWaiting)
+	}
+	if loaded.Metadata[domain.MetadataProviderReason] != "rate_limit" {
+		t.Fatalf("provider_reason = %q, want rate_limit", loaded.Metadata[domain.MetadataProviderReason])
+	}
+	if loaded.Metadata[domain.MetadataProviderRetryBudget] != "0" {
+		t.Fatalf("provider_retry_budget = %q, want 0", loaded.Metadata[domain.MetadataProviderRetryBudget])
 	}
 }
 
