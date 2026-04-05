@@ -38,7 +38,7 @@ domain           --> (nothing internal, stdlib only)                            
 
 The facade `harness/harness.go` re-exports all public symbols. External callers (cmd, usecase, session, eventsource) MUST import the facade, not the sub-packages directly. Sub-packages MUST NOT import the facade (cycle prevention).
 
-Ref: `.semgrep/layers-harness.yaml`
+Ref: `.semgrep/layers-harness.yaml`, `refs/opsx/semgrep-layer-contract.md`
 
 ### Event Source Layer
 
@@ -56,7 +56,7 @@ Key constraints enforced by semgrep (ERROR severity):
 - `eventsource --> harness` PROHIBITED
 - `harness/policy --> harness/verifier` or `harness/filter` PROHIBITED
 
-Ref: `.semgrep/layers.yaml`, `.semgrep/layers-harness.yaml`, ADR S0007
+Ref: `.semgrep/layers.yaml`, `.semgrep/layers-harness.yaml`, `refs/opsx/semgrep-layer-contract.md`, ADR S0007
 
 ## Domain Primitives & Parse-Don't-Validate
 
