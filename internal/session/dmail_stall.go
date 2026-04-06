@@ -24,7 +24,7 @@ func ComposeStallEscalation(ctx context.Context, store port.OutboxStore, wave do
 		Name:          DMailName("stall", key),
 		Kind:          DMailStallEscalation,
 		Description:   fmt.Sprintf("Wave %s stalled: %s", key, reason),
-		SchemaVersion: "1",
+		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
 		Severity:      "high",
 		Action:        "escalate",

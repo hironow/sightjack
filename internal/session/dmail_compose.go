@@ -76,7 +76,7 @@ func ComposeReportWithMetadata(ctx context.Context, store port.OutboxStore, wave
 		Name:          DMailName("report", key),
 		Kind:          DMailReport,
 		Description:   fmt.Sprintf("Wave %s completed", key),
-		SchemaVersion: "1",
+		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
 		Body:          ReportBody(wave, result),
 	}
@@ -123,7 +123,7 @@ func ComposeFeedbackWithMetadata(ctx context.Context, store port.OutboxStore, wa
 		Name:          DMailName("feedback", key),
 		Kind:          DMailReport,
 		Description:   fmt.Sprintf("Wave %s report for amadeus", key),
-		SchemaVersion: "1",
+		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
 		Body:          FeedbackBody(wave, result),
 	}
@@ -155,7 +155,7 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 		Name:          DMailName("spec", key),
 		Kind:          DMailSpecification,
 		Description:   wave.Title,
-		SchemaVersion: "1",
+		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
 		Body:          SpecificationBody(wave),
 	}
