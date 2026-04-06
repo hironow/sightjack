@@ -101,7 +101,7 @@ func ProjectState(events []Event) *SessionState {
 // The projectionContext tracks seen entities to ensure idempotent replay.
 func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 	switch e.Type {
-	case EventSessionStarted, EventSessionStartedV2:
+	case EventSessionStarted:
 		var p SessionStartedPayload
 		if unmarshalPayload(e, &p) {
 			state.Version = StateFormatVersion
@@ -110,7 +110,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			state.StrictnessLevel = p.StrictnessLevel
 		}
 
-	case EventScanCompleted, EventScanCompletedV2:
+	case EventScanCompleted:
 		var p ScanCompletedPayload
 		if unmarshalPayload(e, &p) {
 			state.Clusters = p.Clusters
@@ -120,7 +120,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			state.LastScanned = p.LastScanned
 		}
 
-	case EventWavesGenerated, EventWavesGeneratedV2:
+	case EventWavesGenerated:
 		var p WavesGeneratedPayload
 		if unmarshalPayload(e, &p) {
 			for _, w := range p.Waves {
@@ -132,7 +132,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
-	case EventWaveCompleted, EventWaveCompletedV2:
+	case EventWaveCompleted:
 		var p WaveCompletedPayload
 		if unmarshalPayload(e, &p) {
 			key := p.ClusterName + ":" + p.WaveID
@@ -144,7 +144,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
-	case EventCompletenessUpdated, EventCompletenessUpdatedV2:
+	case EventCompletenessUpdated:
 		var p CompletenessUpdatedPayload
 		if unmarshalPayload(e, &p) {
 			state.Completeness = p.OverallCompleteness
@@ -156,7 +156,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
-	case EventWavesUnlocked, EventWavesUnlockedV2:
+	case EventWavesUnlocked:
 		var p WavesUnlockedPayload
 		if unmarshalPayload(e, &p) {
 			unlocked := make(map[string]bool, len(p.UnlockedWaveIDs))
@@ -171,7 +171,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
-	case EventNextGenWavesAdded, EventNextGenWavesAddedV2:
+	case EventNextGenWavesAdded:
 		var p NextGenWavesAddedPayload
 		if unmarshalPayload(e, &p) {
 			for _, w := range p.Waves {
@@ -183,7 +183,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
-	case EventWaveModified, EventWaveModifiedV2:
+	case EventWaveModified:
 		var p WaveModifiedPayload
 		if unmarshalPayload(e, &p) {
 			key := p.ClusterName + ":" + p.WaveID
@@ -195,7 +195,7 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
-	case EventADRGenerated, EventADRGeneratedV2:
+	case EventADRGenerated:
 		var p ADRGeneratedPayload
 		if unmarshalPayload(e, &p) {
 			if !ctx.seenADRs[p.ADRID] {
@@ -204,21 +204,21 @@ func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 			}
 		}
 
-	case EventFeedbackSent, EventFeedbackSentV2:
+	case EventFeedbackSent:
 		state.FeedbackCount++
 
-	case EventFeedbackReceived, EventFeedbackReceivedV2:
+	case EventFeedbackReceived:
 		// Audit-only: feedback reception is logged but does not mutate state.
 		// The FeedbackCount tracks outbound (sent) feedback only.
 
-	case EventWaveApproved, EventWaveApprovedV2,
-		EventWaveRejected, EventWaveRejectedV2,
-		EventWaveApplied, EventWaveAppliedV2,
-		EventSpecificationSent, EventSpecificationSentV2,
-		EventReportSent, EventReportSentV2,
-		EventReadyLabelsApplied, EventReadyLabelsAppliedV2,
-		EventSessionResumed, EventSessionResumedV2,
-		EventSessionRescanned, EventSessionRescannedV2:
+	case EventWaveApproved,
+		EventWaveRejected,
+		EventWaveApplied,
+		EventSpecificationSent,
+		EventReportSent,
+		EventReadyLabelsApplied,
+		EventSessionResumed,
+		EventSessionRescanned:
 		// Audit-only events: no state mutation needed.
 
 	default:

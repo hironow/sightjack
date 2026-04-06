@@ -401,18 +401,18 @@ func TestProjectState_FeedbackReceived_DoesNotMutateFeedbackCount(t *testing.T) 
 
 // --- SPEC-005 dual-read tests ---
 
-func TestProjectState_DualRead_SessionStartedDotCase(t *testing.T) {
+func TestProjectState_DotCaseSessionStarted(t *testing.T) {
 	t.Parallel()
-	// given: event with dot.case type name
+	// given: dot.case event (only format supported)
 	events := []domain.Event{
-		mustEvent(t, domain.EventSessionStartedV2, "sess-dc-1", 1,
+		mustEvent(t, domain.EventSessionStarted, "sess-dc-1", 1,
 			domain.SessionStartedPayload{Project: "dotcase-proj", StrictnessLevel: "strict"}),
 	}
 
 	// when
 	state := domain.ProjectState(events)
 
-	// then: same result as snake_case event
+	// then
 	if state.SessionID != "sess-dc-1" {
 		t.Errorf("SessionID = %q, want %q", state.SessionID, "sess-dc-1")
 	}
@@ -421,24 +421,24 @@ func TestProjectState_DualRead_SessionStartedDotCase(t *testing.T) {
 	}
 }
 
-func TestProjectState_DualRead_MixedNaming(t *testing.T) {
+func TestProjectState_DotCaseFullLifecycle(t *testing.T) {
 	t.Parallel()
-	// given: mix of legacy snake_case and new dot.case events
+	// given: dot.case events (only format supported)
 	events := []domain.Event{
 		mustEvent(t, domain.EventSessionStarted, "sess-mix", 1,
 			domain.SessionStartedPayload{Project: "mixed", StrictnessLevel: "standard"}),
-		mustEvent(t, domain.EventScanCompletedV2, "sess-mix", 2,
+		mustEvent(t, domain.EventScanCompleted, "sess-mix", 2,
 			domain.ScanCompletedPayload{
 				Clusters:     []domain.ClusterState{{Name: "Auth", Completeness: 50}},
 				Completeness: 50,
 			}),
-		mustEvent(t, domain.EventWavesGeneratedV2, "sess-mix", 3,
+		mustEvent(t, domain.EventWavesGenerated, "sess-mix", 3,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{{ID: "w1", ClusterName: "Auth", Status: "available"}},
 			}),
 		mustEvent(t, domain.EventWaveCompleted, "sess-mix", 4,
 			domain.WaveCompletedPayload{WaveID: "w1", ClusterName: "Auth"}),
-		mustEvent(t, domain.EventFeedbackSentV2, "sess-mix", 5, struct{}{}),
+		mustEvent(t, domain.EventFeedbackSent, "sess-mix", 5, struct{}{}),
 	}
 
 	// when

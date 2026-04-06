@@ -191,7 +191,7 @@ entries: 2
 - **convergence gate** -> `RunConvergenceGateWithRedrain()` runs notify + approve loop before session starts. Re-drains inbox after each approval to catch late-arriving convergence D-Mails.
 - **specification/report** -> **archive/** first, then **outbox/** (archive-first write order)
 - D-mail format: YAML frontmatter (`name`, `kind`, `description`, `dmail-schema-version`, `issues`, `severity`, `metadata`) + Markdown body
-- D-mail kinds: `specification`, `report`, `design-feedback`, `convergence`
+- D-mail kinds: `specification`, `report`, `design-feedback`, `implementation-feedback`, `convergence`, `ci-result`, `stall-escalation`
 - Filename pattern: `{tool}-{kind}-{sanitized-key}_{uuid8}.md` (e.g., `sj-spec-auth-w1_a3f2b7c4.md`, `sj-report-api-w2_b7c4d8e9.md`)
 
 ## File Creators

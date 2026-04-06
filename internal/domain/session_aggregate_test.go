@@ -18,7 +18,7 @@ func TestSessionAggregate_Start(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventSessionStartedV2 {
+	if ev.Type != domain.EventSessionStarted {
 		t.Fatalf("expected session_started, got %s", ev.Type)
 	}
 }
@@ -41,7 +41,7 @@ func TestSessionAggregate_RecordScan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventScanCompletedV2 {
+	if ev.Type != domain.EventScanCompleted {
 		t.Fatalf("expected scan_completed, got %s", ev.Type)
 	}
 }
@@ -57,7 +57,7 @@ func TestSessionAggregate_UpdateCompleteness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventCompletenessUpdatedV2 {
+	if ev.Type != domain.EventCompletenessUpdated {
 		t.Fatalf("expected completeness_updated, got %s", ev.Type)
 	}
 }
@@ -73,7 +73,7 @@ func TestSessionAggregate_Resume(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventSessionResumedV2 {
+	if ev.Type != domain.EventSessionResumed {
 		t.Fatalf("expected session_resumed, got %s", ev.Type)
 	}
 }
@@ -89,7 +89,7 @@ func TestSessionAggregate_Rescan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventSessionRescannedV2 {
+	if ev.Type != domain.EventSessionRescanned {
 		t.Fatalf("expected session_rescanned, got %s", ev.Type)
 	}
 }
@@ -107,7 +107,7 @@ func TestSessionAggregate_RecordWavesGenerated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWavesGeneratedV2 {
+	if ev.Type != domain.EventWavesGenerated {
 		t.Fatalf("expected waves_generated, got %s", ev.Type)
 	}
 }
@@ -123,7 +123,7 @@ func TestSessionAggregate_ApproveWave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveApprovedV2 {
+	if ev.Type != domain.EventWaveApproved {
 		t.Fatalf("expected wave_approved, got %s", ev.Type)
 	}
 }
@@ -139,7 +139,7 @@ func TestSessionAggregate_RejectWave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveRejectedV2 {
+	if ev.Type != domain.EventWaveRejected {
 		t.Fatalf("expected wave_rejected, got %s", ev.Type)
 	}
 }
@@ -158,7 +158,7 @@ func TestSessionAggregate_ModifyWave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveModifiedV2 {
+	if ev.Type != domain.EventWaveModified {
 		t.Fatalf("expected wave_modified, got %s", ev.Type)
 	}
 }
@@ -176,7 +176,7 @@ func TestSessionAggregate_ApplyWave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveAppliedV2 {
+	if ev.Type != domain.EventWaveApplied {
 		t.Fatalf("expected wave_applied, got %s", ev.Type)
 	}
 }
@@ -194,7 +194,7 @@ func TestSessionAggregate_CompleteWave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveCompletedV2 {
+	if ev.Type != domain.EventWaveCompleted {
 		t.Fatalf("expected wave_completed, got %s", ev.Type)
 	}
 }
@@ -213,7 +213,7 @@ func TestSessionAggregate_AddNextGenWaves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventNextGenWavesAddedV2 {
+	if ev.Type != domain.EventNextGenWavesAdded {
 		t.Fatalf("expected nextgen_waves_added, got %s", ev.Type)
 	}
 }
@@ -231,7 +231,7 @@ func TestSessionAggregate_ApplyReadyLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventReadyLabelsAppliedV2 {
+	if ev.Type != domain.EventReadyLabelsApplied {
 		t.Fatalf("expected ready_labels_applied, got %s", ev.Type)
 	}
 }
@@ -247,7 +247,7 @@ func TestSessionAggregate_SendSpecification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventSpecificationSentV2 {
+	if ev.Type != domain.EventSpecificationSent {
 		t.Fatalf("expected specification_sent, got %s", ev.Type)
 	}
 }
@@ -263,7 +263,7 @@ func TestSessionAggregate_SendReport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventReportSentV2 {
+	if ev.Type != domain.EventReportSent {
 		t.Fatalf("expected report_sent, got %s", ev.Type)
 	}
 }
@@ -279,7 +279,7 @@ func TestSessionAggregate_SendFeedback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventFeedbackSentV2 {
+	if ev.Type != domain.EventFeedbackSent {
 		t.Fatalf("expected feedback_sent, got %s", ev.Type)
 	}
 }
@@ -299,7 +299,7 @@ func TestSessionAggregate_ReceiveFeedback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventFeedbackReceivedV2 {
+	if ev.Type != domain.EventFeedbackReceived {
 		t.Fatalf("expected feedback_received, got %s", ev.Type)
 	}
 }
@@ -317,7 +317,7 @@ func TestSessionAggregate_GenerateADR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventADRGeneratedV2 {
+	if ev.Type != domain.EventADRGenerated {
 		t.Fatalf("expected adr_generated, got %s", ev.Type)
 	}
 }
@@ -333,7 +333,7 @@ func TestSessionAggregate_UnlockWaves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWavesUnlockedV2 {
+	if ev.Type != domain.EventWavesUnlocked {
 		t.Fatalf("expected waves_unlocked, got %s", ev.Type)
 	}
 }

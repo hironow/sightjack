@@ -12,7 +12,7 @@ import (
 
 func TestProjectState_SessionStarted(t *testing.T) {
 	// given
-	event := mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1,
+	event := mustNewEvent(t, domain.EventSessionStarted, "s1", 1,
 		domain.SessionStartedPayload{Project: "my-project", StrictnessLevel: "fog"})
 
 	// when
@@ -36,9 +36,9 @@ func TestProjectState_SessionStarted(t *testing.T) {
 func TestProjectState_ScanCompleted(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1,
 			domain.SessionStartedPayload{Project: "p1"}),
-		mustNewEvent(t, domain.EventScanCompletedV2, "s1", 2,
+		mustNewEvent(t, domain.EventScanCompleted, "s1", 2,
 			domain.ScanCompletedPayload{
 				Clusters:       []domain.ClusterState{{Name: "Auth", Completeness: 0.5, IssueCount: 3}},
 				Completeness:   0.5,
@@ -69,8 +69,8 @@ func TestProjectState_ScanCompleted(t *testing.T) {
 func TestProjectState_WavesGenerated(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{
 					{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available", ActionCount: 2},
@@ -94,14 +94,14 @@ func TestProjectState_WavesGenerated(t *testing.T) {
 func TestProjectState_WaveCompleted(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{
 					{ID: "w1", ClusterName: "Auth", Status: "available"},
 				},
 			}),
-		mustNewEvent(t, domain.EventWaveCompletedV2, "s1", 3,
+		mustNewEvent(t, domain.EventWaveCompleted, "s1", 3,
 			domain.WaveCompletedPayload{WaveID: "w1", ClusterName: "Auth", Applied: 3, TotalCount: 3}),
 	}
 
@@ -120,13 +120,13 @@ func TestProjectState_WaveCompleted(t *testing.T) {
 func TestProjectState_CompletenessUpdated(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventScanCompletedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventScanCompleted, "s1", 2,
 			domain.ScanCompletedPayload{
 				Clusters:     []domain.ClusterState{{Name: "Auth", Completeness: 0.3}},
 				Completeness: 0.3,
 			}),
-		mustNewEvent(t, domain.EventCompletenessUpdatedV2, "s1", 3,
+		mustNewEvent(t, domain.EventCompletenessUpdated, "s1", 3,
 			domain.CompletenessUpdatedPayload{ClusterName: "Auth", ClusterCompleteness: 0.7, OverallCompleteness: 0.7}),
 	}
 
@@ -145,15 +145,15 @@ func TestProjectState_CompletenessUpdated(t *testing.T) {
 func TestProjectState_WavesUnlocked(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{
 					{ID: "w1", ClusterName: "Auth", Status: "completed"},
 					{ID: "w2", ClusterName: "Auth", Status: "locked"},
 				},
 			}),
-		mustNewEvent(t, domain.EventWavesUnlockedV2, "s1", 3,
+		mustNewEvent(t, domain.EventWavesUnlocked, "s1", 3,
 			domain.WavesUnlockedPayload{UnlockedWaveIDs: []string{"Auth:w2"}}),
 	}
 
@@ -169,12 +169,12 @@ func TestProjectState_WavesUnlocked(t *testing.T) {
 func TestProjectState_NextGenWavesAdded(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{{ID: "w1", ClusterName: "Auth"}},
 			}),
-		mustNewEvent(t, domain.EventNextGenWavesAddedV2, "s1", 3,
+		mustNewEvent(t, domain.EventNextGenWavesAdded, "s1", 3,
 			domain.NextGenWavesAddedPayload{
 				ClusterName: "Auth",
 				Waves:       []domain.WaveState{{ID: "w2", ClusterName: "Auth"}},
@@ -193,12 +193,12 @@ func TestProjectState_NextGenWavesAdded(t *testing.T) {
 func TestProjectState_WaveModified(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{{ID: "w1", ClusterName: "Auth", Title: "Original"}},
 			}),
-		mustNewEvent(t, domain.EventWaveModifiedV2, "s1", 3,
+		mustNewEvent(t, domain.EventWaveModified, "s1", 3,
 			domain.WaveModifiedPayload{
 				WaveID: "w1", ClusterName: "Auth",
 				UpdatedWave: domain.WaveState{ID: "w1", ClusterName: "Auth", Title: "Modified"},
@@ -217,10 +217,10 @@ func TestProjectState_WaveModified(t *testing.T) {
 func TestProjectState_ADRGenerated(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventADRGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventADRGenerated, "s1", 2,
 			domain.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"}),
-		mustNewEvent(t, domain.EventADRGeneratedV2, "s1", 3,
+		mustNewEvent(t, domain.EventADRGenerated, "s1", 3,
 			domain.ADRGeneratedPayload{ADRID: "0009", Title: "Another"}),
 	}
 
@@ -236,9 +236,9 @@ func TestProjectState_ADRGenerated(t *testing.T) {
 func TestProjectState_FullLifecycle(t *testing.T) {
 	// given: a realistic event sequence
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1,
 			domain.SessionStartedPayload{Project: "test-project", StrictnessLevel: "alert"}),
-		mustNewEvent(t, domain.EventScanCompletedV2, "s1", 2,
+		mustNewEvent(t, domain.EventScanCompleted, "s1", 2,
 			domain.ScanCompletedPayload{
 				Clusters:       []domain.ClusterState{{Name: "Auth", Completeness: 0.3, IssueCount: 5}},
 				Completeness:   0.3,
@@ -246,22 +246,22 @@ func TestProjectState_FullLifecycle(t *testing.T) {
 				ScanResultPath: "/scan.json",
 				LastScanned:    time.Date(2026, 2, 24, 10, 0, 0, 0, time.UTC),
 			}),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 3,
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 3,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{
 					{ID: "w1", ClusterName: "Auth", Title: "First Wave", Status: "available", ActionCount: 3},
 					{ID: "w2", ClusterName: "Auth", Title: "Second Wave", Status: "locked", ActionCount: 2},
 				},
 			}),
-		mustNewEvent(t, domain.EventWaveApprovedV2, "s1", 4,
+		mustNewEvent(t, domain.EventWaveApproved, "s1", 4,
 			domain.WaveIdentityPayload{WaveID: "w1", ClusterName: "Auth"}),
-		mustNewEvent(t, domain.EventWaveCompletedV2, "s1", 5,
+		mustNewEvent(t, domain.EventWaveCompleted, "s1", 5,
 			domain.WaveCompletedPayload{WaveID: "w1", ClusterName: "Auth", Applied: 3, TotalCount: 3}),
-		mustNewEvent(t, domain.EventCompletenessUpdatedV2, "s1", 6,
+		mustNewEvent(t, domain.EventCompletenessUpdated, "s1", 6,
 			domain.CompletenessUpdatedPayload{ClusterName: "Auth", ClusterCompleteness: 0.6, OverallCompleteness: 0.6}),
-		mustNewEvent(t, domain.EventWavesUnlockedV2, "s1", 7,
+		mustNewEvent(t, domain.EventWavesUnlocked, "s1", 7,
 			domain.WavesUnlockedPayload{UnlockedWaveIDs: []string{"Auth:w2"}}),
-		mustNewEvent(t, domain.EventADRGeneratedV2, "s1", 8,
+		mustNewEvent(t, domain.EventADRGenerated, "s1", 8,
 			domain.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"}),
 	}
 
@@ -301,9 +301,9 @@ func TestProjectState_FullLifecycle(t *testing.T) {
 func TestProjectState_Idempotent(t *testing.T) {
 	// given
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1,
 			domain.SessionStartedPayload{Project: "p1"}),
-		mustNewEvent(t, domain.EventScanCompletedV2, "s1", 2,
+		mustNewEvent(t, domain.EventScanCompleted, "s1", 2,
 			domain.ScanCompletedPayload{Completeness: 0.5}),
 	}
 
@@ -323,7 +323,7 @@ func TestProjectState_Idempotent(t *testing.T) {
 func TestProjectState_UnknownEventType_Skipped(t *testing.T) {
 	// given: events including an unknown type
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1,
 			domain.SessionStartedPayload{Project: "p1"}),
 		mustNewEvent(t, "future_event_type", "s1", 2, nil),
 	}
@@ -357,9 +357,9 @@ func TestLoadState_RoundTrip(t *testing.T) {
 		t.Fatalf("NewSessionRecorder: %v", recErr)
 	}
 
-	recorder.Record(mustNewEvent(t, domain.EventSessionStartedV2, "s1", 0,
+	recorder.Record(mustNewEvent(t, domain.EventSessionStarted, "s1", 0,
 		domain.SessionStartedPayload{Project: "test"}))
-	recorder.Record(mustNewEvent(t, domain.EventScanCompletedV2, "s1", 0,
+	recorder.Record(mustNewEvent(t, domain.EventScanCompleted, "s1", 0,
 		domain.ScanCompletedPayload{Completeness: 0.4}))
 
 	// when
@@ -404,9 +404,9 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	if err1 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err1)
 	}
-	rec1.Record(mustNewEvent(t, domain.EventSessionStartedV2, "session-1000-1", 0,
+	rec1.Record(mustNewEvent(t, domain.EventSessionStarted, "session-1000-1", 0,
 		domain.SessionStartedPayload{Project: "old-project"}))
-	rec1.Record(mustNewEvent(t, domain.EventScanCompletedV2, "session-1000-1", 0,
+	rec1.Record(mustNewEvent(t, domain.EventScanCompleted, "session-1000-1", 0,
 		domain.ScanCompletedPayload{Completeness: 0.3}))
 
 	// Newer session
@@ -415,9 +415,9 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	if err2 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err2)
 	}
-	rec2.Record(mustNewEvent(t, domain.EventSessionStartedV2, "session-2000-2", 0,
+	rec2.Record(mustNewEvent(t, domain.EventSessionStarted, "session-2000-2", 0,
 		domain.SessionStartedPayload{Project: "new-project"}))
-	rec2.Record(mustNewEvent(t, domain.EventScanCompletedV2, "session-2000-2", 0,
+	rec2.Record(mustNewEvent(t, domain.EventScanCompleted, "session-2000-2", 0,
 		domain.ScanCompletedPayload{Completeness: 0.7}))
 
 	// when
@@ -468,7 +468,7 @@ func TestLoadLatestState_EmptyEventsDir(t *testing.T) {
 
 func TestProjectState_WavesGenerated_Idempotent(t *testing.T) {
 	// given: same WavesGenerated event replayed twice
-	waveEvent := mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+	waveEvent := mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 		domain.WavesGeneratedPayload{
 			Waves: []domain.WaveState{
 				{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available"},
@@ -476,7 +476,7 @@ func TestProjectState_WavesGenerated_Idempotent(t *testing.T) {
 			},
 		})
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
 		waveEvent,
 		waveEvent, // duplicate replay
 	}
@@ -492,14 +492,14 @@ func TestProjectState_WavesGenerated_Idempotent(t *testing.T) {
 
 func TestProjectState_NextGenWavesAdded_Idempotent(t *testing.T) {
 	// given: same NextGenWavesAdded event replayed twice
-	nextgenEvent := mustNewEvent(t, domain.EventNextGenWavesAddedV2, "s1", 3,
+	nextgenEvent := mustNewEvent(t, domain.EventNextGenWavesAdded, "s1", 3,
 		domain.NextGenWavesAddedPayload{
 			ClusterName: "Auth",
 			Waves:       []domain.WaveState{{ID: "w2", ClusterName: "Auth"}},
 		})
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{{ID: "w1", ClusterName: "Auth"}},
 			}),
@@ -519,17 +519,17 @@ func TestProjectState_NextGenWavesAdded_Idempotent(t *testing.T) {
 func TestProjectState_NextGenWavesAdded_DifferentWaves_Appends(t *testing.T) {
 	// given: two different NextGenWavesAdded events with different waves
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
-		mustNewEvent(t, domain.EventWavesGeneratedV2, "s1", 2,
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
+		mustNewEvent(t, domain.EventWavesGenerated, "s1", 2,
 			domain.WavesGeneratedPayload{
 				Waves: []domain.WaveState{{ID: "w1", ClusterName: "Auth"}},
 			}),
-		mustNewEvent(t, domain.EventNextGenWavesAddedV2, "s1", 3,
+		mustNewEvent(t, domain.EventNextGenWavesAdded, "s1", 3,
 			domain.NextGenWavesAddedPayload{
 				ClusterName: "Auth",
 				Waves:       []domain.WaveState{{ID: "w2", ClusterName: "Auth"}},
 			}),
-		mustNewEvent(t, domain.EventNextGenWavesAddedV2, "s1", 4,
+		mustNewEvent(t, domain.EventNextGenWavesAdded, "s1", 4,
 			domain.NextGenWavesAddedPayload{
 				ClusterName: "Auth",
 				Waves:       []domain.WaveState{{ID: "w3", ClusterName: "Auth"}},
@@ -547,10 +547,10 @@ func TestProjectState_NextGenWavesAdded_DifferentWaves_Appends(t *testing.T) {
 
 func TestProjectState_ADRGenerated_Idempotent(t *testing.T) {
 	// given: same ADRGenerated event replayed twice
-	adrEvent := mustNewEvent(t, domain.EventADRGeneratedV2, "s1", 2,
+	adrEvent := mustNewEvent(t, domain.EventADRGenerated, "s1", 2,
 		domain.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"})
 	events := []domain.Event{
-		mustNewEvent(t, domain.EventSessionStartedV2, "s1", 1, nil),
+		mustNewEvent(t, domain.EventSessionStarted, "s1", 1, nil),
 		adrEvent,
 		adrEvent, // duplicate replay
 	}
@@ -574,7 +574,7 @@ func TestLoadAllEventsAcrossSessions_ReportsFailedSessions(t *testing.T) {
 	if err := os.MkdirAll(validDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	event := mustNewEvent(t, domain.EventSessionStartedV2, "valid-session", 1,
+	event := mustNewEvent(t, domain.EventSessionStarted, "valid-session", 1,
 		domain.SessionStartedPayload{Project: "test"})
 	validStore := eventsource.NewFileEventStore(validDir, &domain.NopLogger{})
 	if _, err := validStore.Append(event); err != nil {

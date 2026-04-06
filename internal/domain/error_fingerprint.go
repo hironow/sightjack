@@ -22,7 +22,7 @@ const (
 
 // EventWaveStalled is emitted when a wave is detected to be stalled
 // due to repeated structural error patterns.
-const EventWaveStalled EventType = "wave_stalled"
+const EventWaveStalled EventType = "wave.stalled"
 
 // structuralPhrases are substrings that indicate structural (non-transient) errors.
 var structuralPhrases = []string{
@@ -93,7 +93,7 @@ func (a *WaveAggregate) MarkStalled(waveID, clusterName, reason string, opts ...
 	if len(opts) > 0 {
 		now = opts[0]
 	}
-	return NewEvent(EventWaveStalledV2, WaveStalledPayload{
+	return NewEvent(EventWaveStalled, WaveStalledPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
 		Reason:      reason,

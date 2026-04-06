@@ -16,7 +16,7 @@ func TestRunCutover_FirstRun(t *testing.T) {
 	eventsDir := filepath.Join(dir, "events")
 	store := eventsource.NewFileEventStore(eventsDir, &domain.NopLogger{})
 	for i := 0; i < 3; i++ {
-		ev, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
+		ev, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 		if _, err := store.Append(ev); err != nil {
 			t.Fatalf("append: %v", err)
 		}

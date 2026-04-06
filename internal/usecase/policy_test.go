@@ -150,15 +150,14 @@ func TestPolicyEngine_UnmatchedEventType(t *testing.T) {
 	}
 }
 
-func TestPolicyEngine_LegacyEventDispatchesToV2Handler(t *testing.T) {
-	// given: handler registered with V2 (dot.case) event type
+func TestPolicyEngine_DotCaseEventDispatches(t *testing.T) {
+	// given: handler registered with dot.case event type
 	engine := NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(domain.EventWaveApprovedV2, func(ctx context.Context, ev domain.Event) error {
+	engine.Register(domain.EventWaveApproved, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	// event emitted with legacy snake_case type
 	ev, err := domain.NewEvent(domain.EventWaveApproved, domain.WaveIdentityPayload{
 		WaveID:      "wave-1",
 		ClusterName: "cluster-a",
@@ -170,11 +169,11 @@ func TestPolicyEngine_LegacyEventDispatchesToV2Handler(t *testing.T) {
 	// when
 	dispatchErr := engine.Dispatch(context.Background(), ev)
 
-	// then: legacy event should dispatch to V2 handler
+	// then
 	if dispatchErr != nil {
 		t.Fatalf("expected no error, got: %v", dispatchErr)
 	}
 	if !fired {
-		t.Fatal("expected V2 handler to fire for legacy event")
+		t.Fatal("expected handler to fire for dot.case event")
 	}
 }

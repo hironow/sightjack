@@ -33,10 +33,10 @@ func Status(ctx context.Context, baseDir string) domain.StatusReport {
 	var success, total int
 	for _, ev := range allEvents {
 		switch ev.Type {
-		case domain.EventWaveApplied, domain.EventWaveAppliedV2:
+		case domain.EventWaveApplied:
 			success++
 			total++
-		case domain.EventWaveRejected, domain.EventWaveRejectedV2:
+		case domain.EventWaveRejected:
 			total++
 		}
 	}
@@ -80,7 +80,7 @@ func applyLatestProviderMetadata(ctx context.Context, baseDir string, report *do
 func latestScanTime(events []domain.Event) time.Time {
 	var latest time.Time
 	for _, ev := range events {
-		if ev.Type != domain.EventScanCompleted && ev.Type != domain.EventScanCompletedV2 {
+		if ev.Type != domain.EventScanCompleted {
 			continue
 		}
 		var payload domain.ScanCompletedPayload

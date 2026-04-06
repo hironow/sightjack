@@ -441,10 +441,10 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		var success, total int
 		for _, ev := range allEvents {
 			switch ev.Type {
-			case domain.EventWaveApplied, domain.EventWaveAppliedV2:
+			case domain.EventWaveApplied:
 				success++
 				total++
-			case domain.EventWaveRejected, domain.EventWaveRejectedV2:
+			case domain.EventWaveRejected:
 				total++
 			}
 		}

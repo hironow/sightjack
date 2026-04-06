@@ -22,25 +22,25 @@ type EventApplier interface {
 type EventType string
 
 const (
-	EventSessionStarted      EventType = "session_started"
-	EventScanCompleted       EventType = "scan_completed"
-	EventWavesGenerated      EventType = "waves_generated"
-	EventWaveApproved        EventType = "wave_approved"
-	EventWaveRejected        EventType = "wave_rejected"
-	EventWaveModified        EventType = "wave_modified"
-	EventWaveApplied         EventType = "wave_applied"
-	EventWaveCompleted       EventType = "wave_completed"
-	EventCompletenessUpdated EventType = "completeness_updated"
-	EventWavesUnlocked       EventType = "waves_unlocked"
-	EventNextGenWavesAdded   EventType = "nextgen_waves_added"
-	EventADRGenerated        EventType = "adr_generated"
-	EventReadyLabelsApplied  EventType = "ready_labels_applied"
-	EventSessionResumed      EventType = "session_resumed"
-	EventSessionRescanned    EventType = "session_rescanned"
-	EventSpecificationSent   EventType = "specification_sent"
-	EventReportSent          EventType = "report_sent"
-	EventFeedbackSent        EventType = "feedback_sent"
-	EventFeedbackReceived    EventType = "feedback_received"
+	EventSessionStarted      EventType = "session.started"
+	EventScanCompleted       EventType = "scan.completed"
+	EventWavesGenerated      EventType = "waves.generated"
+	EventWaveApproved        EventType = "wave.approved"
+	EventWaveRejected        EventType = "wave.rejected"
+	EventWaveModified        EventType = "wave.modified"
+	EventWaveApplied         EventType = "wave.applied"
+	EventWaveCompleted       EventType = "wave.completed"
+	EventCompletenessUpdated EventType = "completeness.updated"
+	EventWavesUnlocked       EventType = "waves.unlocked"
+	EventNextGenWavesAdded   EventType = "nextgen.waves.added"
+	EventADRGenerated        EventType = "adr.generated"
+	EventReadyLabelsApplied  EventType = "ready.labels.applied"
+	EventSessionResumed      EventType = "session.resumed"
+	EventSessionRescanned    EventType = "session.rescanned"
+	EventSpecificationSent   EventType = "specification.sent"
+	EventReportSent          EventType = "report.sent"
+	EventFeedbackSent        EventType = "feedback.sent"
+	EventFeedbackReceived    EventType = "feedback.received"
 	EventSystemCutover       EventType = "system.cutover"
 )
 
@@ -233,9 +233,9 @@ type Policy struct {
 // Policies registers all known implicit policies in sightjack.
 // These document the existing reactive behaviors for future automation.
 var Policies = []Policy{
-	{Name: "WaveAppliedComposeReport", Trigger: EventWaveAppliedV2, Action: "ComposeReport"},
-	{Name: "ReportSentDeliverToPhonewave", Trigger: EventReportSentV2, Action: "DeliverViaPhonewave"},
-	{Name: "ScanCompletedGenerateWaves", Trigger: EventScanCompletedV2, Action: "GenerateWaves"},
-	{Name: "WaveCompletedNextGen", Trigger: EventWaveCompletedV2, Action: "GenerateNextWaves"},
-	{Name: "SpecificationSentDeliverToPhonewave", Trigger: EventSpecificationSentV2, Action: "DeliverViaPhonewave"},
+	{Name: "WaveAppliedComposeReport", Trigger: EventWaveApplied, Action: "ComposeReport"},
+	{Name: "ReportSentDeliverToPhonewave", Trigger: EventReportSent, Action: "DeliverViaPhonewave"},
+	{Name: "ScanCompletedGenerateWaves", Trigger: EventScanCompleted, Action: "GenerateWaves"},
+	{Name: "WaveCompletedNextGen", Trigger: EventWaveCompleted, Action: "GenerateNextWaves"},
+	{Name: "SpecificationSentDeliverToPhonewave", Trigger: EventSpecificationSent, Action: "DeliverViaPhonewave"},
 }

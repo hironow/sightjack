@@ -16,7 +16,7 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 	// POLICY CONTRACT: observation-only — debug log + metrics.
 	// Wave application is an intermediate session step; user sees results
 	// interactively and scan.completed provides the summary notification.
-	engine.Register(domain.EventWaveAppliedV2, func(ctx context.Context, event domain.Event) error {
+	engine.Register(domain.EventWaveApplied, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: wave applied (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "wave.applied", "handled")
 		return nil
@@ -24,13 +24,13 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 
 	// POLICY CONTRACT: observation-only — debug log + metrics.
 	// Report delivery is part of the session flow; user sees it inline.
-	engine.Register(domain.EventReportSentV2, func(ctx context.Context, event domain.Event) error {
+	engine.Register(domain.EventReportSent, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: report sent (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "report.sent", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventScanCompletedV2, func(ctx context.Context, event domain.Event) error {
+	engine.Register(domain.EventScanCompleted, func(ctx context.Context, event domain.Event) error {
 		var data domain.ScanCompletedPayload
 		if err := json.Unmarshal(event.Data, &data); err != nil {
 			logger.Debug("policy: scan completed parse error: %v", err)
@@ -51,7 +51,7 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 
 	// POLICY: wave.completed → notify + metrics.
 	// Wave completion is a milestone in the session flow.
-	engine.Register(domain.EventWaveCompletedV2, func(ctx context.Context, event domain.Event) error {
+	engine.Register(domain.EventWaveCompleted, func(ctx context.Context, event domain.Event) error {
 		logger.Info("policy: wave completed (type=%s)", event.Type)
 		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
@@ -65,14 +65,14 @@ func registerSessionPolicies(engine *PolicyEngine, logger domain.Logger, notifie
 	// POLICY: feedback.received → log + metrics (S02 Phase B).
 	// Design-feedback from downstream tools triggers awareness; re-scan
 	// integration is handled by the session waiting cycle.
-	engine.Register(domain.EventFeedbackReceivedV2, func(ctx context.Context, event domain.Event) error {
+	engine.Register(domain.EventFeedbackReceived, func(ctx context.Context, event domain.Event) error {
 		logger.Info("policy: feedback received (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "feedback.received", "handled")
 		return nil
 	})
 
 	// POLICY: specification.sent → notify + metrics.
-	engine.Register(domain.EventSpecificationSentV2, func(ctx context.Context, event domain.Event) error {
+	engine.Register(domain.EventSpecificationSent, func(ctx context.Context, event domain.Event) error {
 		logger.Info("policy: specification sent (type=%s)", event.Type)
 		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()

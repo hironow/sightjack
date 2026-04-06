@@ -15,8 +15,8 @@ type EventType = domain.EventType
 
 func TestSuccessRate_AllApplied(t *testing.T) {
 	events := []domain.Event{
-		makeEvent(domain.EventWaveAppliedV2),
-		makeEvent(domain.EventWaveAppliedV2),
+		makeEvent(domain.EventWaveApplied),
+		makeEvent(domain.EventWaveApplied),
 	}
 
 	rate := domain.SuccessRate(events)
@@ -28,8 +28,8 @@ func TestSuccessRate_AllApplied(t *testing.T) {
 
 func TestSuccessRate_AllRejected(t *testing.T) {
 	events := []domain.Event{
-		makeEvent(domain.EventWaveRejectedV2),
-		makeEvent(domain.EventWaveRejectedV2),
+		makeEvent(domain.EventWaveRejected),
+		makeEvent(domain.EventWaveRejected),
 	}
 
 	rate := domain.SuccessRate(events)
@@ -41,9 +41,9 @@ func TestSuccessRate_AllRejected(t *testing.T) {
 
 func TestSuccessRate_Mixed(t *testing.T) {
 	events := []domain.Event{
-		makeEvent(domain.EventWaveAppliedV2),
-		makeEvent(domain.EventWaveRejectedV2),
-		makeEvent(domain.EventWaveAppliedV2),
+		makeEvent(domain.EventWaveApplied),
+		makeEvent(domain.EventWaveRejected),
+		makeEvent(domain.EventWaveApplied),
 	}
 
 	rate := domain.SuccessRate(events)
@@ -63,10 +63,10 @@ func TestSuccessRate_NoEvents(t *testing.T) {
 
 func TestSuccessRate_IgnoresOtherEvents(t *testing.T) {
 	events := []domain.Event{
-		makeEvent(domain.EventSessionStartedV2),
-		makeEvent(domain.EventWaveAppliedV2),
-		makeEvent(domain.EventScanCompletedV2),
-		makeEvent(domain.EventWaveRejectedV2),
+		makeEvent(domain.EventSessionStarted),
+		makeEvent(domain.EventWaveApplied),
+		makeEvent(domain.EventScanCompleted),
+		makeEvent(domain.EventWaveRejected),
 	}
 
 	rate := domain.SuccessRate(events)

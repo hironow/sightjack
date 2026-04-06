@@ -83,7 +83,7 @@ The `ErrorFingerprint` algorithm (`internal/domain/error_fingerprint.go`) provid
 - `ErrorFingerprint(errMsg)` — SHA-256 based 16-character hash for stable error identity
 - `ClassifyError(errMsg)` — classifies errors as `structural` (persistent, requires intervention) or `transient` (may self-resolve)
 - `DetectRepeatedPattern(fingerprints, threshold)` — detects when the same error fingerprint appears at least `threshold` times
-- `MarkStalled(waveID, clusterName, reason)` — transitions a wave to "stalled" status and emits a `wave_stalled` event
+- `MarkStalled(waveID, clusterName, reason)` — transitions a wave to "stalled" status and emits a `wave.stalled` event
 
 ### Stall Escalation
 
