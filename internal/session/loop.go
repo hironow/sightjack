@@ -47,6 +47,9 @@ func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessio
 	sessionRejected := make(map[string][]domain.WaveAction)
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
 
+	// Stall detector: N=3 threshold, 30m cooldown (SPEC-001)
+	stallDetector := NewStallDetector(3, 30*time.Minute, logger)
+
 	// waitingCycle wraps the interactive loop: after all waves are processed,
 	// enter a D-Mail waiting phase. When D-Mails arrive, classify and resume.
 waitingCycle:
@@ -91,7 +94,8 @@ waitingCycle:
 			applyPhase(waveCtx, cfg, scanDir, scanResultPath, adrDir,
 				selected, resolvedStrictness,
 				&waves, completed, scanResult, sessionRejected,
-				labeledReady, fbCollector, store, runner, onceRunner, emitter, out, waveSpan, logger)
+				labeledReady, fbCollector, store, runner, onceRunner, emitter, out, waveSpan, logger,
+				stallDetector)
 			waveSpan.End()
 		}
 

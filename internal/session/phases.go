@@ -451,13 +451,23 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger,
+	stallDetector *StallDetector) {
 
 	gate := cfg.Gate
 
 	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, onceRunner, emitter, out, waveSpan, logger)
 	if !ok {
+		// Record partial failure for stall detection (SPEC-001)
+		if stallDetector != nil && applyResult != nil && len(applyResult.Errors) > 0 {
+			stallDetector.RecordFailure(ctx, store, selected, applyResult.Errors)
+		}
 		return
+	}
+
+	// Successful apply clears stall tracking for this wave
+	if stallDetector != nil {
+		stallDetector.RecordSuccess(selected)
 	}
 
 	waveSpan.AddEvent("wave.completed",
