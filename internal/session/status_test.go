@@ -86,7 +86,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		ShibitoCount: 2,
 		LastScanned:  scanTime,
 	}
-	scanEvent, err := domain.NewEvent(domain.EventScanCompleted, scanPayload, scanTime)
+	scanEvent, err := domain.NewEvent(domain.EventScanCompletedV2, scanPayload, scanTime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		Applied:     3,
 		TotalCount:  3,
 	}
-	appliedEvent, err := domain.NewEvent(domain.EventWaveApplied, appliedPayload, scanTime.Add(time.Minute))
+	appliedEvent, err := domain.NewEvent(domain.EventWaveAppliedV2, appliedPayload, scanTime.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		WaveID:      "w2",
 		ClusterName: "cluster-b",
 	}
-	rejectedEvent, err := domain.NewEvent(domain.EventWaveRejected, rejectedPayload, scanTime.Add(2*time.Minute))
+	rejectedEvent, err := domain.NewEvent(domain.EventWaveRejectedV2, rejectedPayload, scanTime.Add(2*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
