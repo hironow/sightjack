@@ -11,7 +11,7 @@ import (
 
 func TestDMailStallEscalation_Constant(t *testing.T) {
 	// given/when: access the constant
-	kind := session.DMailStallEscalation
+	kind := domain.KindStallEscalation
 
 	// then
 	if kind == "" {

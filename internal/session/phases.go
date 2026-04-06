@@ -169,7 +169,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		} else if err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
-			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
+			domain.LogBanner(logger, domain.BannerSend, string(domain.KindSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 			emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
 		}
 		return selected, approvalApproved
@@ -201,7 +201,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			} else if err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
-				domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
+				domain.LogBanner(logger, domain.BannerSend, string(domain.KindSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
 			}
 			return selected, approvalApproved
@@ -300,7 +300,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			} else if err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
-				domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
+				domain.LogBanner(logger, domain.BannerSend, string(domain.KindSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
 			}
 			return selected, approvalApproved
@@ -523,7 +523,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	if err := ComposeReportWithMetadata(ctx, store, selected, applyResult, correctionMeta); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
-		domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
+		domain.LogBanner(logger, domain.BannerSend, string(domain.KindReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
 		emitter.EmitSendReport(selected.ID, selected.ClusterName, time.Now().UTC())
 	}
 
@@ -531,7 +531,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	if feedbackErr := ComposeFeedbackWithMetadata(ctx, store, selected, applyResult, correctionMeta); feedbackErr != nil {
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
-		domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
+		domain.LogBanner(logger, domain.BannerSend, string(domain.KindReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
 		emitter.EmitSendFeedback(selected.ID, selected.ClusterName, time.Now().UTC())
 	}
 

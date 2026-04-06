@@ -193,12 +193,12 @@ waitingCycle:
 func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback bool, reportIssueIDs []string) {
 	for _, m := range mails {
 		switch m.Kind {
-		case DMailSpecification:
+		case domain.KindSpecification:
 			hasSpec = true
-		case DMailReport:
+		case domain.KindReport:
 			hasReport = true
 			reportIssueIDs = append(reportIssueIDs, m.Issues...)
-		case DMailDesignFeedback:
+		case domain.KindDesignFeedback:
 			hasDesignFeedback = true
 		}
 	}
@@ -210,7 +210,7 @@ func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback boo
 func emitDesignFeedback(mails []*DMail, emitter port.SessionEventEmitter, logger domain.Logger) {
 	var names []string
 	for _, m := range mails {
-		if m.Kind == DMailDesignFeedback {
+		if m.Kind == domain.KindDesignFeedback {
 			names = append(names, m.Name)
 		}
 	}
@@ -220,7 +220,7 @@ func emitDesignFeedback(mails []*DMail, emitter port.SessionEventEmitter, logger
 	logger.Info("Design-feedback received (%d D-Mail(s)); re-scan will incorporate feedback", len(names))
 	for _, name := range names {
 		if err := emitter.EmitReceiveFeedback(domain.FeedbackReceivedPayload{
-			Kind:  string(DMailDesignFeedback),
+			Kind:  string(domain.KindDesignFeedback),
 			Name:  name,
 			Count: 1,
 		}, time.Now().UTC()); err != nil {

@@ -10,9 +10,6 @@ import (
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
-// DMailStallEscalation re-exports domain.KindStallEscalation for session convenience.
-const DMailStallEscalation = domain.KindStallEscalation
-
 // ComposeStallEscalation stages a stall-escalation D-Mail in the outbox.
 // Called when a wave is detected as stalled due to repeated structural errors.
 // Metadata includes wave_id, cluster_name, error_fingerprint, failure_count, detected_at
@@ -21,7 +18,7 @@ func ComposeStallEscalation(ctx context.Context, store port.OutboxStore, wave do
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("stall", key),
-		Kind:          DMailStallEscalation,
+		Kind:          domain.KindStallEscalation,
 		Description:   fmt.Sprintf("Wave %s stalled: %s", key, reason),
 		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),

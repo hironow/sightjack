@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 	"github.com/hironow/sightjack/internal/usecase/port"
@@ -25,10 +26,10 @@ func TestFilterConvergence_Empty(t *testing.T) {
 func TestFilterConvergence_MixedKinds(t *testing.T) {
 	// given: mixed d-mails
 	dmails := []*session.DMail{
-		{Name: "fb-1", Kind: session.DMailDesignFeedback, Description: "feedback"},
-		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence 1"},
-		{Name: "spec-1", Kind: session.DMailSpecification, Description: "spec"},
-		{Name: "conv-2", Kind: session.DMailConvergence, Description: "convergence 2"},
+		{Name: "fb-1", Kind: domain.KindDesignFeedback, Description: "feedback"},
+		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence 1"},
+		{Name: "spec-1", Kind: domain.KindSpecification, Description: "spec"},
+		{Name: "conv-2", Kind: domain.KindConvergence, Description: "convergence 2"},
 	}
 
 	// when
@@ -49,7 +50,7 @@ func TestFilterConvergence_MixedKinds(t *testing.T) {
 func TestConvergenceGate_NoConvergence(t *testing.T) {
 	// given: no convergence d-mails
 	dmails := []*session.DMail{
-		{Name: "fb-1", Kind: session.DMailDesignFeedback, Description: "feedback only"},
+		{Name: "fb-1", Kind: domain.KindDesignFeedback, Description: "feedback only"},
 	}
 	notifier := &port.NopNotifier{}
 	approver := &port.AutoApprover{}
@@ -70,7 +71,7 @@ func TestConvergenceGate_NoConvergence(t *testing.T) {
 func TestConvergenceGate_Approved(t *testing.T) {
 	// given: convergence d-mail + auto-approve
 	dmails := []*session.DMail{
-		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
+		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &port.NopNotifier{}
 	approver := &port.AutoApprover{}
@@ -91,7 +92,7 @@ func TestConvergenceGate_Approved(t *testing.T) {
 func TestConvergenceGate_Denied(t *testing.T) {
 	// given: convergence d-mail + denying approver
 	dmails := []*session.DMail{
-		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
+		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &port.NopNotifier{}
 	approver := &denyApprover{}
@@ -112,7 +113,7 @@ func TestConvergenceGate_Denied(t *testing.T) {
 func TestConvergenceGate_FailClosed(t *testing.T) {
 	// given: convergence d-mail + failing approver
 	dmails := []*session.DMail{
-		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
+		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &port.NopNotifier{}
 	approver := &errorApprover{err: fmt.Errorf("approval service down")}
@@ -134,7 +135,7 @@ func TestConvergenceGate_ContextCancel(t *testing.T) {
 	// given: convergence d-mail + cancelled context.
 	// Gate should return ctx.Err(), not (false, nil).
 	dmails := []*session.DMail{
-		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
+		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -158,7 +159,7 @@ func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 	// given: initial drain was empty, but convergence arrived in channel
 	// between the caller's drain and this gate call (simulated by pre-loading channel).
 	ch := make(chan *session.DMail, 2)
-	ch <- &session.DMail{Name: "late-conv", Kind: session.DMailConvergence, Description: "late convergence"}
+	ch <- &session.DMail{Name: "late-conv", Kind: domain.KindConvergence, Description: "late convergence"}
 	notifier := &port.NopNotifier{}
 	approver := &port.AutoApprover{}
 	logger := platform.NewLogger(io.Discard, false)
@@ -191,14 +192,14 @@ func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T
 	ch := make(chan *session.DMail, 2)
 	injectApprover := &injectingApprover{
 		ch:     ch,
-		inject: &session.DMail{Name: "late-conv", Kind: session.DMailConvergence, Description: "late convergence"},
+		inject: &session.DMail{Name: "late-conv", Kind: domain.KindConvergence, Description: "late convergence"},
 	}
 	notifier := &port.NopNotifier{}
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when: initial has convergence, approval triggers inject, re-drain catches it
 	initial := []*session.DMail{
-		{Name: "conv-1", Kind: session.DMailConvergence, Description: "initial convergence"},
+		{Name: "conv-1", Kind: domain.KindConvergence, Description: "initial convergence"},
 	}
 	allDmails, approved, err := session.RunConvergenceGateWithRedrain(
 		context.Background(), initial, ch, notifier, injectApprover, logger,
@@ -225,7 +226,7 @@ func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 	// given: a notifier that blocks indefinitely + convergence d-mail.
 	// Gate should not hang — notification must be non-blocking.
 	dmails := []*session.DMail{
-		{Name: "conv-1", Kind: session.DMailConvergence, Description: "convergence signal"},
+		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &blockingNotifier{ch: make(chan struct{})}
 	approver := &port.AutoApprover{}
@@ -262,7 +263,7 @@ func TestConvergenceGateWithRedrain_CapsRedrainCycles(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	initial := []*session.DMail{
-		{Name: "conv-initial", Kind: session.DMailConvergence, Description: "initial"},
+		{Name: "conv-initial", Kind: domain.KindConvergence, Description: "initial"},
 	}
 
 	// when
@@ -334,7 +335,7 @@ type alwaysInjectingApprover struct {
 func (a *alwaysInjectingApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
 	a.ch <- &session.DMail{
 		Name:        fmt.Sprintf("conv-inject-%d", time.Now().UnixNano()),
-		Kind:        session.DMailConvergence,
+		Kind:        domain.KindConvergence,
 		Description: "injected convergence",
 	}
 	return true, nil

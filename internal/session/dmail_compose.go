@@ -74,7 +74,7 @@ func ComposeReportWithMetadata(ctx context.Context, store port.OutboxStore, wave
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("report", key),
-		Kind:          DMailReport,
+		Kind:          domain.KindReport,
 		Description:   fmt.Sprintf("Wave %s completed", key),
 		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
@@ -112,7 +112,7 @@ func FeedbackBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 
 // ComposeFeedback stages a report D-Mail for amadeus consumption.
 // Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
-// Uses DMailReport kind because sightjack's sendable contract only produces specification and report.
+// Uses domain.KindReport because sightjack's sendable contract only produces specification and report.
 func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
 	return ComposeFeedbackWithMetadata(ctx, store, wave, result, domain.CorrectionMetadata{})
 }
@@ -121,7 +121,7 @@ func ComposeFeedbackWithMetadata(ctx context.Context, store port.OutboxStore, wa
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("feedback", key),
-		Kind:          DMailReport,
+		Kind:          domain.KindReport,
 		Description:   fmt.Sprintf("Wave %s report for amadeus", key),
 		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
@@ -153,7 +153,7 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 	key := domain.WaveKey(wave)
 	mail := &DMail{
 		Name:          DMailName("spec", key),
-		Kind:          DMailSpecification,
+		Kind:          domain.KindSpecification,
 		Description:   wave.Title,
 		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),

@@ -29,17 +29,6 @@ type DMail = domain.DMail
 // DMailKind is an alias for the domain-owned kind type.
 type DMailKind = domain.DMailKind
 
-// Kind constants re-exported from domain for backward compatibility.
-// These will be removed in Stage 3 when all call sites use domain directly.
-const (
-	DMailSpecification  = domain.KindSpecification
-	DMailReport         = domain.KindReport
-	DMailDesignFeedback = domain.KindDesignFeedback
-	DMailImplFeedback   = domain.KindImplFeedback
-	DMailConvergence    = domain.KindConvergence
-	DMailCIResult       = domain.KindCIResult
-)
-
 // Filename is now defined on domain.DMail — no session-level duplicate needed.
 
 const frontmatterDelim = "---"
@@ -178,7 +167,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != DMailDesignFeedback && mail.Kind != DMailImplFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
+	if mail.Kind != domain.KindDesignFeedback && mail.Kind != domain.KindImplFeedback && mail.Kind != domain.KindConvergence && mail.Kind != domain.KindReport {
 		return nil
 	}
 	return mail
@@ -282,7 +271,7 @@ loop:
 	for _, fb := range feedback {
 		domain.LogBanner(logger, domain.BannerRecv, string(fb.Kind), fb.Name, fb.Description)
 		prefix := "[D-Mail]"
-		if fb.Kind == DMailConvergence {
+		if fb.Kind == domain.KindConvergence {
 			prefix = "[D-Mail] [CONVERGENCE]"
 		}
 		switch fb.Severity {
@@ -394,7 +383,7 @@ func collectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 				default: // non-blocking, don't block if already signaled
 				}
 
-				if mail.Kind == DMailConvergence {
+				if mail.Kind == domain.KindConvergence {
 					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
 					// Fire-and-forget with timeout to avoid blocking the drain loop.
 					go func(desc string) {
@@ -423,7 +412,7 @@ func (c *FeedbackCollector) addMail(mail *DMail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.items = append(c.items, mail)
-	if mail.Kind == DMailConvergence {
+	if mail.Kind == domain.KindConvergence {
 		c.convNames = append(c.convNames, mail.Name)
 	}
 }
@@ -473,7 +462,7 @@ func (c *FeedbackCollector) FeedbackOnly() []*DMail {
 	defer c.mu.Unlock()
 	var result []*DMail
 	for _, m := range c.items {
-		if m.Kind == DMailDesignFeedback || m.Kind == DMailImplFeedback {
+		if m.Kind == domain.KindDesignFeedback || m.Kind == domain.KindImplFeedback {
 			result = append(result, m)
 		}
 	}
@@ -488,7 +477,7 @@ func (c *FeedbackCollector) ReportsOnly() []*DMail {
 	defer c.mu.Unlock()
 	var result []*DMail
 	for _, m := range c.items {
-		if m.Kind == DMailReport {
+		if m.Kind == domain.KindReport {
 			result = append(result, m)
 		}
 	}
