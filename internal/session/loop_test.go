@@ -35,7 +35,7 @@ func TestClassifyNewMails_SpecificationOnly(t *testing.T) {
 	t.Parallel()
 
 	// given
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindSpecification, Name: "spec-1"},
 	}
 
@@ -61,7 +61,7 @@ func TestClassifyNewMails_ReportWithIssues(t *testing.T) {
 	t.Parallel()
 
 	// given
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindReport, Name: "report-1", Issues: []string{"AUTH-100", "AUTH-101"}},
 	}
 
@@ -87,7 +87,7 @@ func TestClassifyNewMails_ReportWithoutIssues(t *testing.T) {
 	t.Parallel()
 
 	// given: report D-Mail with no issues (edge case)
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindReport, Name: "report-empty"},
 	}
 
@@ -107,7 +107,7 @@ func TestClassifyNewMails_MultipleReportsAggregateIssues(t *testing.T) {
 	t.Parallel()
 
 	// given
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindReport, Name: "report-1", Issues: []string{"AUTH-100"}},
 		{Kind: domain.KindReport, Name: "report-2", Issues: []string{"BILL-200", "BILL-201"}},
 	}
@@ -125,7 +125,7 @@ func TestClassifyNewMails_MixedKinds(t *testing.T) {
 	t.Parallel()
 
 	// given
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindSpecification, Name: "spec-1"},
 		{Kind: domain.KindReport, Name: "report-1", Issues: []string{"AUTH-100"}},
 		{Kind: domain.KindDesignFeedback, Name: "fb-1"},
@@ -153,7 +153,7 @@ func TestClassifyNewMails_FeedbackOnly(t *testing.T) {
 	t.Parallel()
 
 	// given: only design-feedback D-Mails (no spec, no report)
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindDesignFeedback, Name: "fb-1"},
 		{Kind: domain.KindDesignFeedback, Name: "fb-2"},
 	}
@@ -180,7 +180,7 @@ func TestClassifyNewMails_ConvergenceAndCIResult(t *testing.T) {
 	t.Parallel()
 
 	// given: convergence and ci-result D-Mails (neither spec nor report)
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindConvergence, Name: "conv-1"},
 		{Kind: domain.KindCIResult, Name: "ci-1"},
 	}
@@ -233,7 +233,7 @@ func TestReportNextgenOrchestration_EndToEnd(t *testing.T) {
 	}
 
 	// when: report D-Mails arrive with issue IDs
-	reportMails := []*DMail{
+	reportMails := []*domain.DMail{
 		{Kind: domain.KindReport, Name: "paintress-report", Issues: []string{"AUTH-100", "BILL-200"}},
 	}
 	_, hasReport, _, reportIssueIDs := classifyNewMails(reportMails)
@@ -418,7 +418,7 @@ func TestClassifyNewMails_DesignFeedbackDetected(t *testing.T) {
 	t.Parallel()
 
 	// given: mix of design-feedback and implementation-feedback
-	mails := []*DMail{
+	mails := []*domain.DMail{
 		{Kind: domain.KindDesignFeedback, Name: "fb-design-1"},
 		{Kind: domain.KindImplFeedback, Name: "fb-impl-1"},
 		{Kind: domain.KindDesignFeedback, Name: "fb-design-2"},

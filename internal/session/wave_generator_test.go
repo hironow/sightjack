@@ -241,7 +241,7 @@ func TestBuildNextGenPrompt_WithFeedback(t *testing.T) {
 		Completeness: 0.65,
 		Issues:       []domain.IssueDetail{{ID: "ENG-101", Identifier: "ENG-101", Title: "Auth", Completeness: 0.5}},
 	}
-	feedback := []*session.DMail{
+	feedback := []*domain.DMail{
 		{Name: "fb-arch-001", Kind: domain.KindDesignFeedback, Description: "Architecture drift in auth module", Severity: "high", Body: "Token rotation not aligned with JWT spec."},
 	}
 
@@ -305,7 +305,7 @@ func TestBuildNextGenPrompt_WithReports(t *testing.T) {
 		Completeness: 0.5,
 		Issues:       []domain.IssueDetail{{ID: "ENG-100", Identifier: "ENG-100", Title: "Issue", Completeness: 0.5}},
 	}
-	reports := []*session.DMail{
+	reports := []*domain.DMail{
 		{Name: "rp-amadeus-001", Kind: domain.KindReport, Description: "Drift detected in auth module", Body: "Scoring threshold exceeded."},
 	}
 

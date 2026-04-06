@@ -51,7 +51,7 @@ func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 // TestRace_FeedbackCollector_ConcurrentAccess verifies that the
 // FeedbackCollector mutex protects concurrent field access.
 func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
-	ch := make(chan *session.DMail, 10)
+	ch := make(chan *domain.DMail, 10)
 	fc := session.CollectFeedback(nil, ch, nil, platform.NewLogger(nil, false))
 
 	var wg sync.WaitGroup
@@ -69,7 +69,7 @@ func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
 
 	// Send items concurrently
 	for i := range 5 {
-		dm := &session.DMail{Name: fmt.Sprintf("dm-%d", i), Kind: "report"}
+		dm := &domain.DMail{Name: fmt.Sprintf("dm-%d", i), Kind: "report"}
 		ch <- dm
 	}
 	close(ch)

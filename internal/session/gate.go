@@ -14,8 +14,8 @@ import (
 )
 
 // FilterConvergence returns convergence-kind D-Mails from the slice.
-func FilterConvergence(dmails []*DMail) []*DMail {
-	var result []*DMail
+func FilterConvergence(dmails []*domain.DMail) []*domain.DMail {
+	var result []*domain.DMail
 	for _, m := range dmails {
 		if harness.IsConvergenceKind(string(m.Kind)) {
 			result = append(result, m)
@@ -27,7 +27,7 @@ func FilterConvergence(dmails []*DMail) []*DMail {
 // RunConvergenceGate checks for convergence D-Mails and runs the
 // notify + approve flow. Returns true if approved or no convergence found.
 // Returns false if denied. Returns error on failure (fail-closed).
-func RunConvergenceGate(ctx context.Context, dmails []*DMail, notifier port.Notifier, approver port.Approver, logger domain.Logger) (bool, error) {
+func RunConvergenceGate(ctx context.Context, dmails []*domain.DMail, notifier port.Notifier, approver port.Approver, logger domain.Logger) (bool, error) {
 	convergence := FilterConvergence(dmails)
 	if len(convergence) == 0 {
 		return true, nil
@@ -96,9 +96,9 @@ const maxRedrainCycles = harness.MaxConvergenceRedrainCycles
 // and any error. The loop exits when no new convergence D-Mails arrived
 // during the approval prompt, or when maxRedrainCycles is reached
 // (fail-closed: approved=false).
-func RunConvergenceGateWithRedrain(ctx context.Context, initial []*DMail, inboxCh <-chan *DMail,
-	notifier port.Notifier, approver port.Approver, logger domain.Logger) (dmails []*DMail, approved bool, err error) {
-	all := append([]*DMail{}, initial...)
+func RunConvergenceGateWithRedrain(ctx context.Context, initial []*domain.DMail, inboxCh <-chan *domain.DMail,
+	notifier port.Notifier, approver port.Approver, logger domain.Logger) (dmails []*domain.DMail, approved bool, err error) {
+	all := append([]*domain.DMail{}, initial...)
 	for cycle := 0; cycle < maxRedrainCycles; cycle++ {
 		ok, gateErr := RunConvergenceGate(ctx, all, notifier, approver, logger)
 		if gateErr != nil {

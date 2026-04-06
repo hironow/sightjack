@@ -12,13 +12,13 @@ import (
 
 func TestWaitingMode_FeedbackCollectorNotify(t *testing.T) {
 	// given
-	ch := make(chan *session.DMail, 1)
+	ch := make(chan *domain.DMail, 1)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// when: send D-Mail after short delay
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "test-fb-001", Description: "test", SchemaVersion: "1"}
+		ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "test-fb-001", Description: "test", SchemaVersion: "1"}
 	}()
 
 	// then: notification should arrive
@@ -32,17 +32,17 @@ func TestWaitingMode_FeedbackCollectorNotify(t *testing.T) {
 
 func TestWaitingMode_SnapshotAndNewSince(t *testing.T) {
 	// given
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// Send initial D-Mail and wait for goroutine to process it
-	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-001", Description: "test", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001", Description: "test", SchemaVersion: "1"}
 	time.Sleep(50 * time.Millisecond)
 
 	// when: snapshot, then send new D-Mail
 	fc.Snapshot()
 
-	ch <- &session.DMail{Kind: session.DMailSpecification, Name: "spec-001", Description: "new spec", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindSpecification, Name: "spec-001", Description: "new spec", SchemaVersion: "1"}
 	time.Sleep(50 * time.Millisecond)
 
 	// then: only the post-snapshot D-Mail should appear
@@ -50,7 +50,7 @@ func TestWaitingMode_SnapshotAndNewSince(t *testing.T) {
 	if len(newMails) != 1 {
 		t.Fatalf("expected 1 new mail, got %d", len(newMails))
 	}
-	if newMails[0].Kind != session.DMailSpecification {
+	if newMails[0].Kind != domain.KindSpecification {
 		t.Errorf("expected specification, got %s", newMails[0].Kind)
 	}
 	if newMails[0].Name != "spec-001" {
@@ -92,7 +92,7 @@ func TestWaitingMode_DisabledConfig(t *testing.T) {
 
 func TestWaitingMode_NotifyChNoSignalWithoutMail(t *testing.T) {
 	// given: collector with no incoming D-Mails
-	ch := make(chan *session.DMail, 1)
+	ch := make(chan *domain.DMail, 1)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// then: NotifyCh should not fire within a short window
@@ -106,13 +106,13 @@ func TestWaitingMode_NotifyChNoSignalWithoutMail(t *testing.T) {
 
 func TestWaitingMode_MultipleMailsSingleNotify(t *testing.T) {
 	// given
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// when: send multiple D-Mails rapidly
-	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-001", Description: "first", SchemaVersion: "1"}
-	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-002", Description: "second", SchemaVersion: "1"}
-	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-003", Description: "third", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001", Description: "first", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-002", Description: "second", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-003", Description: "third", SchemaVersion: "1"}
 	time.Sleep(100 * time.Millisecond)
 
 	// then: should get at least one notification (channel is buffered size 1)
@@ -132,17 +132,17 @@ func TestWaitingMode_MultipleMailsSingleNotify(t *testing.T) {
 
 func TestWaitingMode_SnapshotThenMultipleNewMails(t *testing.T) {
 	// given: collector with initial mail
-	initial := []*session.DMail{
-		{Kind: session.DMailDesignFeedback, Name: "init-001", Description: "initial", SchemaVersion: "1"},
+	initial := []*domain.DMail{
+		{Kind: domain.KindDesignFeedback, Name: "init-001", Description: "initial", SchemaVersion: "1"},
 	}
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 	fc := session.CollectFeedback(initial, ch, nil, &domain.NopLogger{})
 
 	// when: snapshot after initial, then send 2 new mails
 	fc.Snapshot()
 
-	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-new-001", Description: "new1", SchemaVersion: "1"}
-	ch <- &session.DMail{Kind: session.DMailReport, Name: "rpt-001", Description: "report", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-new-001", Description: "new1", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindReport, Name: "rpt-001", Description: "report", SchemaVersion: "1"}
 	time.Sleep(100 * time.Millisecond)
 
 	// then
@@ -163,9 +163,9 @@ func TestWaitingMode_SnapshotThenMultipleNewMails(t *testing.T) {
 // cluster identification and nextgen eligibility check.
 func TestWaitingMode_ReportDMailTriggersClusterIdentification(t *testing.T) {
 	// given: a FeedbackCollector with initial feedback, then report arrives
-	ch := make(chan *session.DMail, 5)
-	initial := []*session.DMail{
-		{Kind: session.DMailDesignFeedback, Name: "fb-001", Description: "initial feedback", SchemaVersion: "1"},
+	ch := make(chan *domain.DMail, 5)
+	initial := []*domain.DMail{
+		{Kind: domain.KindDesignFeedback, Name: "fb-001", Description: "initial feedback", SchemaVersion: "1"},
 	}
 	fc := session.CollectFeedback(initial, ch, nil, &domain.NopLogger{})
 
@@ -173,8 +173,8 @@ func TestWaitingMode_ReportDMailTriggersClusterIdentification(t *testing.T) {
 	fc.Snapshot()
 
 	// Report D-Mail arrives during waiting
-	ch <- &session.DMail{
-		Kind:          session.DMailReport,
+	ch <- &domain.DMail{
+		Kind:          domain.KindReport,
 		Name:          "paintress-pr-created",
 		Description:   "PR #42 created for auth issues",
 		SchemaVersion: "1",
@@ -190,7 +190,7 @@ func TestWaitingMode_ReportDMailTriggersClusterIdentification(t *testing.T) {
 
 	// then: report mail has correct kind and issues
 	mail := newMails[0]
-	if mail.Kind != session.DMailReport {
+	if mail.Kind != domain.KindReport {
 		t.Errorf("kind = %s, want report", mail.Kind)
 	}
 	if len(mail.Issues) != 2 {
@@ -226,21 +226,21 @@ func TestWaitingMode_ReportDMailTriggersClusterIdentification(t *testing.T) {
 // and identify all affected clusters.
 func TestWaitingMode_MultipleReportDMailsAcrossClusters(t *testing.T) {
 	// given
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	fc.Snapshot()
 
 	// Two report D-Mails from different tools
-	ch <- &session.DMail{
-		Kind:          session.DMailReport,
+	ch <- &domain.DMail{
+		Kind:          domain.KindReport,
 		Name:          "paintress-auth",
 		Description:   "PR for auth",
 		SchemaVersion: "1",
 		Issues:        []string{"AUTH-100"},
 	}
-	ch <- &session.DMail{
-		Kind:          session.DMailReport,
+	ch <- &domain.DMail{
+		Kind:          domain.KindReport,
 		Name:          "paintress-billing",
 		Description:   "PR for billing",
 		SchemaVersion: "1",
@@ -257,7 +257,7 @@ func TestWaitingMode_MultipleReportDMailsAcrossClusters(t *testing.T) {
 	// Aggregate issue IDs (same logic as classifyNewMails)
 	var issueIDs []string
 	for _, m := range newMails {
-		if m.Kind == session.DMailReport {
+		if m.Kind == domain.KindReport {
 			issueIDs = append(issueIDs, m.Issues...)
 		}
 	}
@@ -285,14 +285,14 @@ func TestWaitingMode_MultipleReportDMailsAcrossClusters(t *testing.T) {
 // report issues from feedback-only mails.
 func TestWaitingMode_ReportAndFeedbackMixed(t *testing.T) {
 	// given
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	fc.Snapshot()
 
-	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-001", Description: "feedback", SchemaVersion: "1"}
-	ch <- &session.DMail{Kind: session.DMailReport, Name: "rpt-001", Description: "report", SchemaVersion: "1", Issues: []string{"AUTH-100"}}
-	ch <- &session.DMail{Kind: session.DMailDesignFeedback, Name: "fb-002", Description: "more feedback", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001", Description: "feedback", SchemaVersion: "1"}
+	ch <- &domain.DMail{Kind: domain.KindReport, Name: "rpt-001", Description: "report", SchemaVersion: "1", Issues: []string{"AUTH-100"}}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-002", Description: "more feedback", SchemaVersion: "1"}
 	time.Sleep(100 * time.Millisecond)
 
 	// when
@@ -309,10 +309,10 @@ func TestWaitingMode_ReportAndFeedbackMixed(t *testing.T) {
 	var issueIDs []string
 	for _, m := range newMails {
 		switch m.Kind {
-		case session.DMailReport:
+		case domain.KindReport:
 			reports++
 			issueIDs = append(issueIDs, m.Issues...)
-		case session.DMailDesignFeedback:
+		case domain.KindDesignFeedback:
 			feedback++
 		}
 	}

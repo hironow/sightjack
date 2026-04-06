@@ -201,3 +201,16 @@ func (e *sessionEventEmitter) EmitGenerateADR(payload domain.ADRGeneratedPayload
 	e.record(evt)
 	return nil
 }
+
+func (e *sessionEventEmitter) EmitWaveStalled(waveID, clusterName, fingerprint, reason string, now time.Time) error {
+	evt, err := domain.NewEvent(domain.EventWaveStalledV2, domain.WaveStalledPayload{
+		WaveID:      waveID,
+		ClusterName: clusterName,
+		Reason:      reason,
+	}, now)
+	if err != nil {
+		return err
+	}
+	e.record(evt)
+	return nil
+}

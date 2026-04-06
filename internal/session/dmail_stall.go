@@ -16,7 +16,7 @@ import (
 // as required by SPEC-001.
 func ComposeStallEscalation(ctx context.Context, store port.OutboxStore, wave domain.Wave, errors []string, reason, fingerprint string, failureCount int) error {
 	key := domain.WaveKey(wave)
-	mail := &DMail{
+	mail := &domain.DMail{
 		Name:          DMailName("stall", key),
 		Kind:          domain.KindStallEscalation,
 		Description:   fmt.Sprintf("Wave %s stalled: %s", key, reason),

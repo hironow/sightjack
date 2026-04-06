@@ -80,7 +80,7 @@ func applyLatestProviderMetadata(ctx context.Context, baseDir string, report *do
 func latestScanTime(events []domain.Event) time.Time {
 	var latest time.Time
 	for _, ev := range events {
-		if ev.Type != domain.EventScanCompletedV2 {
+		if ev.Type != domain.EventScanCompleted && ev.Type != domain.EventScanCompletedV2 {
 			continue
 		}
 		var payload domain.ScanCompletedPayload

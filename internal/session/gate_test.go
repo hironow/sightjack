@@ -25,7 +25,7 @@ func TestFilterConvergence_Empty(t *testing.T) {
 
 func TestFilterConvergence_MixedKinds(t *testing.T) {
 	// given: mixed d-mails
-	dmails := []*session.DMail{
+	dmails := []*domain.DMail{
 		{Name: "fb-1", Kind: domain.KindDesignFeedback, Description: "feedback"},
 		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence 1"},
 		{Name: "spec-1", Kind: domain.KindSpecification, Description: "spec"},
@@ -49,7 +49,7 @@ func TestFilterConvergence_MixedKinds(t *testing.T) {
 
 func TestConvergenceGate_NoConvergence(t *testing.T) {
 	// given: no convergence d-mails
-	dmails := []*session.DMail{
+	dmails := []*domain.DMail{
 		{Name: "fb-1", Kind: domain.KindDesignFeedback, Description: "feedback only"},
 	}
 	notifier := &port.NopNotifier{}
@@ -70,7 +70,7 @@ func TestConvergenceGate_NoConvergence(t *testing.T) {
 
 func TestConvergenceGate_Approved(t *testing.T) {
 	// given: convergence d-mail + auto-approve
-	dmails := []*session.DMail{
+	dmails := []*domain.DMail{
 		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &port.NopNotifier{}
@@ -91,7 +91,7 @@ func TestConvergenceGate_Approved(t *testing.T) {
 
 func TestConvergenceGate_Denied(t *testing.T) {
 	// given: convergence d-mail + denying approver
-	dmails := []*session.DMail{
+	dmails := []*domain.DMail{
 		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &port.NopNotifier{}
@@ -112,7 +112,7 @@ func TestConvergenceGate_Denied(t *testing.T) {
 
 func TestConvergenceGate_FailClosed(t *testing.T) {
 	// given: convergence d-mail + failing approver
-	dmails := []*session.DMail{
+	dmails := []*domain.DMail{
 		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &port.NopNotifier{}
@@ -134,7 +134,7 @@ func TestConvergenceGate_FailClosed(t *testing.T) {
 func TestConvergenceGate_ContextCancel(t *testing.T) {
 	// given: convergence d-mail + cancelled context.
 	// Gate should return ctx.Err(), not (false, nil).
-	dmails := []*session.DMail{
+	dmails := []*domain.DMail{
 		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -158,14 +158,14 @@ func TestConvergenceGate_ContextCancel(t *testing.T) {
 func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 	// given: initial drain was empty, but convergence arrived in channel
 	// between the caller's drain and this gate call (simulated by pre-loading channel).
-	ch := make(chan *session.DMail, 2)
-	ch <- &session.DMail{Name: "late-conv", Kind: domain.KindConvergence, Description: "late convergence"}
+	ch := make(chan *domain.DMail, 2)
+	ch <- &domain.DMail{Name: "late-conv", Kind: domain.KindConvergence, Description: "late convergence"}
 	notifier := &port.NopNotifier{}
 	approver := &port.AutoApprover{}
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when: initial is empty, gate passes through, but re-drain catches late convergence
-	var initial []*session.DMail
+	var initial []*domain.DMail
 	allDmails, approved, err := session.RunConvergenceGateWithRedrain(
 		context.Background(), initial, ch, notifier, approver, logger,
 	)
@@ -189,16 +189,16 @@ func TestConvergenceGateWithRedrain_CatchesLateConvergence(t *testing.T) {
 func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T) {
 	// given: initial has convergence, and more convergence arrives mid-approval.
 	// injectingApprover injects a D-Mail into the channel on first call.
-	ch := make(chan *session.DMail, 2)
+	ch := make(chan *domain.DMail, 2)
 	injectApprover := &injectingApprover{
 		ch:     ch,
-		inject: &session.DMail{Name: "late-conv", Kind: domain.KindConvergence, Description: "late convergence"},
+		inject: &domain.DMail{Name: "late-conv", Kind: domain.KindConvergence, Description: "late convergence"},
 	}
 	notifier := &port.NopNotifier{}
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when: initial has convergence, approval triggers inject, re-drain catches it
-	initial := []*session.DMail{
+	initial := []*domain.DMail{
 		{Name: "conv-1", Kind: domain.KindConvergence, Description: "initial convergence"},
 	}
 	allDmails, approved, err := session.RunConvergenceGateWithRedrain(
@@ -225,7 +225,7 @@ func TestConvergenceGateWithRedrain_ReloopsOnMidApprovalConvergence(t *testing.T
 func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 	// given: a notifier that blocks indefinitely + convergence d-mail.
 	// Gate should not hang — notification must be non-blocking.
-	dmails := []*session.DMail{
+	dmails := []*domain.DMail{
 		{Name: "conv-1", Kind: domain.KindConvergence, Description: "convergence signal"},
 	}
 	notifier := &blockingNotifier{ch: make(chan struct{})}
@@ -257,12 +257,12 @@ func TestConvergenceGate_BlockingNotifierDoesNotStall(t *testing.T) {
 
 func TestConvergenceGateWithRedrain_CapsRedrainCycles(t *testing.T) {
 	// given: approver that injects convergence D-Mail on every approval
-	ch := make(chan *session.DMail, 100)
+	ch := make(chan *domain.DMail, 100)
 	approver := &alwaysInjectingApprover{ch: ch}
 	notifier := &port.NopNotifier{}
 	logger := platform.NewLogger(io.Discard, false)
 
-	initial := []*session.DMail{
+	initial := []*domain.DMail{
 		{Name: "conv-initial", Kind: domain.KindConvergence, Description: "initial"},
 	}
 
@@ -299,8 +299,8 @@ func (n *blockingNotifier) Notify(_ context.Context, _, _ string) error {
 // injectingApprover injects a D-Mail into the channel on the first call,
 // then approves on subsequent calls.
 type injectingApprover struct {
-	ch        chan *session.DMail
-	inject    *session.DMail
+	ch        chan *domain.DMail
+	inject    *domain.DMail
 	callCount int
 }
 
@@ -329,11 +329,11 @@ func (a *errorApprover) RequestApproval(_ context.Context, _ string) (bool, erro
 // alwaysInjectingApprover approves every call and injects a convergence
 // D-Mail into the channel each time — simulating infinite arrivals.
 type alwaysInjectingApprover struct {
-	ch chan *session.DMail
+	ch chan *domain.DMail
 }
 
 func (a *alwaysInjectingApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
-	a.ch <- &session.DMail{
+	a.ch <- &domain.DMail{
 		Name:        fmt.Sprintf("conv-inject-%d", time.Now().UnixNano()),
 		Kind:        domain.KindConvergence,
 		Description: "injected convergence",

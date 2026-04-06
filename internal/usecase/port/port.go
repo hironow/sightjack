@@ -180,6 +180,7 @@ type SessionEventEmitter interface {
 	EmitSendFeedback(waveID, clusterName string, now time.Time) error
 	EmitReceiveFeedback(payload domain.FeedbackReceivedPayload, now time.Time) error
 	EmitGenerateADR(payload domain.ADRGeneratedPayload, now time.Time) error
+	EmitWaveStalled(waveID, clusterName, fingerprint, reason string, now time.Time) error
 }
 
 // NopSessionEventEmitter is a no-op emitter for tests and dry-run mode.
@@ -219,6 +220,9 @@ func (*NopSessionEventEmitter) EmitSendSpecification(string, string, time.Time) 
 func (*NopSessionEventEmitter) EmitSendReport(string, string, time.Time) error        { return nil }
 func (*NopSessionEventEmitter) EmitSendFeedback(string, string, time.Time) error { return nil }
 func (*NopSessionEventEmitter) EmitReceiveFeedback(domain.FeedbackReceivedPayload, time.Time) error {
+	return nil
+}
+func (*NopSessionEventEmitter) EmitWaveStalled(string, string, string, string, time.Time) error {
 	return nil
 }
 func (*NopSessionEventEmitter) EmitGenerateADR(domain.ADRGeneratedPayload, time.Time) error {

@@ -10,7 +10,7 @@ import (
 
 func TestFeedbackCollector_NotifyCh(t *testing.T) {
 	// given
-	ch := make(chan *session.DMail, 1)
+	ch := make(chan *domain.DMail, 1)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// NotifyCh should not fire yet
@@ -21,7 +21,7 @@ func TestFeedbackCollector_NotifyCh(t *testing.T) {
 	}
 
 	// when: send a D-Mail
-	ch <- &session.DMail{Kind: domain.KindDesignFeedback, Name: "test-001"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "test-001"}
 	// Give goroutine time to process
 	time.Sleep(100 * time.Millisecond)
 
@@ -36,13 +36,13 @@ func TestFeedbackCollector_NotifyCh(t *testing.T) {
 
 func TestFeedbackCollector_NotifyCh_multipleDoesNotBlock(t *testing.T) {
 	// given
-	ch := make(chan *session.DMail, 3)
+	ch := make(chan *domain.DMail, 3)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// when: send multiple D-Mails rapidly
-	ch <- &session.DMail{Kind: domain.KindDesignFeedback, Name: "test-001"}
-	ch <- &session.DMail{Kind: domain.KindDesignFeedback, Name: "test-002"}
-	ch <- &session.DMail{Kind: domain.KindDesignFeedback, Name: "test-003"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "test-001"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "test-002"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "test-003"}
 	time.Sleep(100 * time.Millisecond)
 
 	// then: should get at least one notification without blocking

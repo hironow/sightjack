@@ -29,9 +29,19 @@ func NewStallDetector(threshold int, cooldownWindow time.Duration, logger domain
 	}
 }
 
+// StallResult holds stall detection outcome for the caller to emit events.
+type StallResult struct {
+	Detected    bool
+	WaveID      string
+	ClusterName string
+	Fingerprint string
+	Reason      string
+}
+
 // RecordFailure records a partial failure for a wave and checks if stall threshold is met.
 // If threshold is met and cooldown allows, emits a stall-escalation D-Mail.
-func (d *StallDetector) RecordFailure(ctx context.Context, store port.OutboxStore, wave domain.Wave, errors []string) {
+// Returns a StallResult so the caller can emit the corresponding domain event.
+func (d *StallDetector) RecordFailure(ctx context.Context, store port.OutboxStore, wave domain.Wave, errors []string) StallResult {
 	waveKey := domain.WaveKey(wave)
 
 	// Collect fingerprints from structural errors
@@ -45,20 +55,37 @@ func (d *StallDetector) RecordFailure(ctx context.Context, store port.OutboxStor
 	fps := d.waveFingerprints[waveKey]
 	detected, fingerprint := domain.DetectRepeatedPattern(fps, d.threshold)
 	if !detected {
-		return
+		return StallResult{}
 	}
 
-	// Check cooldown
-	if !d.cooldown.Allow(wave.ID, fingerprint) {
+	// Check cooldown (keyed by cluster:waveID, not waveID alone)
+	if !d.cooldown.Allow(waveKey, fingerprint) {
 		d.logger.Debug("Stall escalation suppressed (cooldown): wave=%s fp=%s", waveKey, fingerprint)
-		return
+		return StallResult{}
+	}
+
+	// Count occurrences of the detected fingerprint specifically
+	fpCount := 0
+	for _, f := range fps {
+		if f == fingerprint {
+			fpCount++
+		}
 	}
 
 	reason := "repeated structural error detected"
-	d.logger.Warn("Stall detected for wave %s (fingerprint=%s, count>=%d). Emitting escalation D-Mail.", waveKey, fingerprint, d.threshold)
+	d.logger.Warn("Stall detected for wave %s (fingerprint=%s, count=%d). Emitting escalation D-Mail.", waveKey, fingerprint, fpCount)
 
-	if err := ComposeStallEscalation(ctx, store, wave, structural, reason, fingerprint, len(fps)); err != nil {
+	if err := ComposeStallEscalation(ctx, store, wave, structural, reason, fingerprint, fpCount); err != nil {
 		d.logger.Error("Failed to compose stall escalation D-Mail: %v", err)
+		return StallResult{}
+	}
+
+	return StallResult{
+		Detected:    true,
+		WaveID:      wave.ID,
+		ClusterName: wave.ClusterName,
+		Fingerprint: fingerprint,
+		Reason:      reason,
 	}
 }
 

@@ -72,7 +72,7 @@ func ComposeReport(ctx context.Context, store port.OutboxStore, wave domain.Wave
 
 func ComposeReportWithMetadata(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult, meta domain.CorrectionMetadata) error {
 	key := domain.WaveKey(wave)
-	mail := &DMail{
+	mail := &domain.DMail{
 		Name:          DMailName("report", key),
 		Kind:          domain.KindReport,
 		Description:   fmt.Sprintf("Wave %s completed", key),
@@ -119,7 +119,7 @@ func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wa
 
 func ComposeFeedbackWithMetadata(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult, meta domain.CorrectionMetadata) error {
 	key := domain.WaveKey(wave)
-	mail := &DMail{
+	mail := &domain.DMail{
 		Name:          DMailName("feedback", key),
 		Kind:          domain.KindReport,
 		Description:   fmt.Sprintf("Wave %s report for amadeus", key),
@@ -151,7 +151,7 @@ var issueManagementTypes = map[string]bool{
 // actions remain, the spec D-Mail is not generated.
 func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave domain.Wave, mode ...domain.TrackingMode) error {
 	key := domain.WaveKey(wave)
-	mail := &DMail{
+	mail := &domain.DMail{
 		Name:          DMailName("spec", key),
 		Kind:          domain.KindSpecification,
 		Description:   wave.Title,

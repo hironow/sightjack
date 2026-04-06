@@ -18,7 +18,7 @@ func TestWriteCorrectionInsight_AppendsImprovementInsight(t *testing.T) {
 		t.Fatalf("mkdir run: %v", err)
 	}
 	w := session.NewInsightWriter(filepath.Join(base, ".siren", "insights"), filepath.Join(base, ".siren", ".run"))
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name: "feedback-1",
 		Metadata: map[string]string{
 			domain.MetadataFailureType:         string(domain.FailureTypeScopeViolation),

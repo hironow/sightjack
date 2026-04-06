@@ -24,7 +24,7 @@ func init() {
 }
 
 func TestDMailKind_Valid(t *testing.T) {
-	kinds := []session.DMailKind{domain.KindSpecification, domain.KindReport, domain.KindDesignFeedback, domain.KindImplFeedback, domain.KindConvergence, domain.KindCIResult}
+	kinds := []domain.DMailKind{domain.KindSpecification, domain.KindReport, domain.KindDesignFeedback, domain.KindImplFeedback, domain.KindConvergence, domain.KindCIResult}
 	for _, k := range kinds {
 		if k == "" {
 			t.Errorf("kind constant should not be empty")
@@ -34,7 +34,7 @@ func TestDMailKind_Valid(t *testing.T) {
 
 func TestValidateDMail_ConvergenceKind(t *testing.T) {
 	// given: a d-mail with convergence kind
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "convergence-test",
 		Kind:          domain.KindConvergence,
 		Description:   "Convergence signal from phonewave",
@@ -52,7 +52,7 @@ func TestValidateDMail_ConvergenceKind(t *testing.T) {
 
 func TestMarshalDMail_SchemaVersion(t *testing.T) {
 	// given: a d-mail with SchemaVersion set
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "schema-v1",
 		Kind:          domain.KindSpecification,
 		Description:   "Schema version test",
@@ -156,7 +156,7 @@ func TestComposeReport_SetsSchemaVersion(t *testing.T) {
 }
 
 func TestValidateDMail_Valid(t *testing.T) {
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "spec-my-42",
 		Kind:          domain.KindSpecification,
 		Description:   "Issue MY-42 ready for implementation",
@@ -168,14 +168,14 @@ func TestValidateDMail_Valid(t *testing.T) {
 }
 
 func TestValidateDMail_MissingName(t *testing.T) {
-	mail := &session.DMail{Kind: domain.KindSpecification, Description: "desc"}
+	mail := &domain.DMail{Kind: domain.KindSpecification, Description: "desc"}
 	if err := session.ValidateDMail(mail); err == nil {
 		t.Error("expected error for missing name")
 	}
 }
 
 func TestValidateDMail_MissingKind(t *testing.T) {
-	mail := &session.DMail{Name: "test", Description: "desc", SchemaVersion: "1"}
+	mail := &domain.DMail{Name: "test", Description: "desc", SchemaVersion: "1"}
 	err := session.ValidateDMail(mail)
 	if err == nil {
 		t.Error("expected error for missing kind")
@@ -186,7 +186,7 @@ func TestValidateDMail_MissingKind(t *testing.T) {
 }
 
 func TestValidateDMail_InvalidKind(t *testing.T) {
-	mail := &session.DMail{Name: "test", Kind: "invalid", Description: "desc", SchemaVersion: "1"}
+	mail := &domain.DMail{Name: "test", Kind: "invalid", Description: "desc", SchemaVersion: "1"}
 	err := session.ValidateDMail(mail)
 	if err == nil {
 		t.Error("expected error for invalid kind")
@@ -197,7 +197,7 @@ func TestValidateDMail_InvalidKind(t *testing.T) {
 }
 
 func TestValidateDMail_MissingDescription(t *testing.T) {
-	mail := &session.DMail{Name: "test", Kind: domain.KindDesignFeedback}
+	mail := &domain.DMail{Name: "test", Kind: domain.KindDesignFeedback}
 	if err := session.ValidateDMail(mail); err == nil {
 		t.Error("expected error for missing description")
 	}
@@ -205,7 +205,7 @@ func TestValidateDMail_MissingDescription(t *testing.T) {
 
 func TestValidateDMail_MissingSchemaVersion(t *testing.T) {
 	// given: d-mail with all fields except SchemaVersion
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "test",
 		Kind:        domain.KindDesignFeedback,
 		Description: "feedback message",
@@ -222,7 +222,7 @@ func TestValidateDMail_MissingSchemaVersion(t *testing.T) {
 
 func TestValidateDMail_ValidSchemaVersion(t *testing.T) {
 	// given: d-mail with SchemaVersion set
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "test",
 		Kind:          domain.KindDesignFeedback,
 		Description:   "feedback message",
@@ -245,14 +245,14 @@ func TestValidateDMail_Nil(t *testing.T) {
 }
 
 func TestDMail_Filename(t *testing.T) {
-	mail := &session.DMail{Name: "sj-spec-my-42_00000000"}
+	mail := &domain.DMail{Name: "sj-spec-my-42_00000000"}
 	if got := mail.Filename(); got != "sj-spec-my-42_00000000.md" {
 		t.Errorf("got %s, want sj-spec-my-42_00000000.md", got)
 	}
 }
 
 func TestMarshalDMail_Basic(t *testing.T) {
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "spec-my-42",
 		Kind:        domain.KindSpecification,
 		Description: "Issue MY-42 ready",
@@ -279,7 +279,7 @@ func TestMarshalDMail_Basic(t *testing.T) {
 }
 
 func TestParseDMail_RoundTrip(t *testing.T) {
-	original := &session.DMail{
+	original := &domain.DMail{
 		Name:        "report-my-99",
 		Kind:        domain.KindReport,
 		Description: "PR merged for MY-99",
@@ -371,7 +371,7 @@ func TestComposeDMail_WritesToOutboxAndArchive(t *testing.T) {
 		t.Fatalf("ensure: %v", err)
 	}
 	store := testOutboxStore(t, dir)
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "sj-spec-my-42_00000000",
 		Kind:          domain.KindSpecification,
 		Description:   "Ready for impl",
@@ -409,7 +409,7 @@ func TestComposeDMail_ValidationError(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	store := testOutboxStore(t, dir)
-	mail := &session.DMail{Name: "", Kind: domain.KindSpecification, Description: "bad"}
+	mail := &domain.DMail{Name: "", Kind: domain.KindSpecification, Description: "bad"}
 	if err := session.ComposeDMail(context.Background(), store, mail); err == nil {
 		t.Error("expected validation error for empty name")
 	}
@@ -445,7 +445,7 @@ func TestListDMail_FindsFiles(t *testing.T) {
 func TestReceiveDMail_MovesToArchive(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "feedback-d-001",
 		Kind:        domain.KindDesignFeedback,
 		Description: "Architecture drift detected",
@@ -673,7 +673,7 @@ func TestMonitorInbox_DrainsExistingFeedback(t *testing.T) {
 	session.EnsureMailDirs(dir)
 
 	// Place feedback in inbox before starting monitor
-	fb := &session.DMail{
+	fb := &domain.DMail{
 		Name:        "feedback-mon-001",
 		Kind:        domain.KindDesignFeedback,
 		Description: "Drift detected",
@@ -725,7 +725,7 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	session.EnsureMailDirs(dir)
 
 	// Place a specification d-mail in inbox
-	spec := &session.DMail{
+	spec := &domain.DMail{
 		Name:        "spec-mon-001",
 		Kind:        domain.KindSpecification,
 		Description: "Spec for issue",
@@ -762,7 +762,7 @@ func TestMonitorInbox_DedupSkipsArchived(t *testing.T) {
 	session.EnsureMailDirs(dir)
 
 	// Place feedback in both inbox and archive (already processed)
-	fb := &session.DMail{
+	fb := &domain.DMail{
 		Name:        "feedback-mon-dup",
 		Kind:        domain.KindDesignFeedback,
 		Description: "Duplicate",
@@ -811,7 +811,7 @@ func TestMonitorInbox_DetectsNewFile(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Write a new feedback d-mail to inbox
-	fb := &session.DMail{
+	fb := &domain.DMail{
 		Name:        "feedback-mon-new",
 		Kind:        domain.KindDesignFeedback,
 		Description: "New feedback via fsnotify",
@@ -862,7 +862,7 @@ func TestDrainInboxFeedback_DrainsFeedback(t *testing.T) {
 	session.EnsureMailDirs(dir)
 
 	// Place feedback in inbox
-	fb := &session.DMail{
+	fb := &domain.DMail{
 		Name:        "feedback-drain-001",
 		Kind:        domain.KindDesignFeedback,
 		Description: "Drain test",
@@ -901,7 +901,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	session.EnsureMailDirs(dir)
 
 	// Pre-place feedback in inbox (initial)
-	initialFb := &session.DMail{
+	initialFb := &domain.DMail{
 		Name:        "fb-init-001",
 		Kind:        domain.KindDesignFeedback,
 		Description: "Initial feedback",
@@ -938,7 +938,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Write late-arriving feedback
-	lateFb := &session.DMail{
+	lateFb := &domain.DMail{
 		Name:        "fb-late-001",
 		Kind:        domain.KindDesignFeedback,
 		Description: "Late feedback",
@@ -966,7 +966,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 
 func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 	// given: collector with items
-	initial := []*session.DMail{
+	initial := []*domain.DMail{
 		{Name: "fb-001", Kind: domain.KindDesignFeedback, Description: "Item 1"},
 		{Name: "fb-002", Kind: domain.KindDesignFeedback, Description: "Item 2"},
 	}
@@ -997,11 +997,11 @@ func TestFeedbackCollector_NilChannel(t *testing.T) {
 
 func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
 	// given: nil initial but channel that will receive items
-	ch := make(chan *session.DMail, 1)
+	ch := make(chan *domain.DMail, 1)
 	collector := session.CollectFeedback(nil, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when: send one item
-	ch <- &session.DMail{Name: "fb-late", Kind: domain.KindDesignFeedback, Description: "Late only"}
+	ch <- &domain.DMail{Name: "fb-late", Kind: domain.KindDesignFeedback, Description: "Late only"}
 	close(ch)
 
 	// Wait for goroutine
@@ -1022,14 +1022,14 @@ func TestFormatFeedbackForPrompt_Empty(t *testing.T) {
 	if got != "" {
 		t.Errorf("expected empty string for nil, got %q", got)
 	}
-	got = session.FormatFeedbackForPrompt([]*session.DMail{})
+	got = session.FormatFeedbackForPrompt([]*domain.DMail{})
 	if got != "" {
 		t.Errorf("expected empty string for empty slice, got %q", got)
 	}
 }
 
 func TestFormatFeedbackForPrompt_Single(t *testing.T) {
-	feedback := []*session.DMail{
+	feedback := []*domain.DMail{
 		{Name: "fb-001", Kind: domain.KindDesignFeedback, Description: "Architecture drift", Severity: "high", Body: "Auth module drift detected."},
 	}
 	got := session.FormatFeedbackForPrompt(feedback)
@@ -1048,7 +1048,7 @@ func TestFormatFeedbackForPrompt_Single(t *testing.T) {
 }
 
 func TestFormatFeedbackForPrompt_Multiple(t *testing.T) {
-	feedback := []*session.DMail{
+	feedback := []*domain.DMail{
 		{Name: "fb-001", Kind: domain.KindDesignFeedback, Description: "High severity item", Severity: "high", Body: "Details here."},
 		{Name: "fb-002", Kind: domain.KindDesignFeedback, Description: "Normal item", Severity: "", Body: "Normal details."},
 	}
@@ -1065,7 +1065,7 @@ func TestFormatFeedbackForPrompt_Multiple(t *testing.T) {
 }
 
 func TestFormatFeedbackForPrompt_NoBody(t *testing.T) {
-	feedback := []*session.DMail{
+	feedback := []*domain.DMail{
 		{Name: "fb-003", Kind: domain.KindDesignFeedback, Description: "No body feedback", Severity: "high"},
 	}
 	got := session.FormatFeedbackForPrompt(feedback)
@@ -1076,7 +1076,7 @@ func TestFormatFeedbackForPrompt_NoBody(t *testing.T) {
 
 func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 	// given: collector with mixed feedback + convergence d-mails
-	initial := []*session.DMail{
+	initial := []*domain.DMail{
 		{Name: "fb-001", Kind: domain.KindDesignFeedback, Description: "Architecture drift"},
 		{Name: "conv-001", Kind: domain.KindConvergence, Description: "Convergence signal"},
 		{Name: "fb-002", Kind: domain.KindDesignFeedback, Description: "Naming convention"},
@@ -1099,7 +1099,7 @@ func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 
 func TestFeedbackCollector_FeedbackOnly_IncludesImplFeedback(t *testing.T) {
 	// given: collector with design-feedback and implementation-feedback
-	initial := []*session.DMail{
+	initial := []*domain.DMail{
 		{Name: "fb-001", Kind: domain.KindDesignFeedback, Description: "Architecture drift"},
 		{Name: "impl-001", Kind: domain.KindImplFeedback, Description: "Code quality issue"},
 		{Name: "conv-001", Kind: domain.KindConvergence, Description: "Convergence signal"},
@@ -1153,7 +1153,7 @@ func TestReceiveDMail_PreservesAllFields(t *testing.T) {
 	// given: a d-mail with all fields populated
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	original := &session.DMail{
+	original := &domain.DMail{
 		Name:        "feedback-full",
 		Kind:        domain.KindDesignFeedback,
 		Description: "Full field test",
@@ -1200,7 +1200,7 @@ func TestMonitorInbox_MultipleFeedbackInitialDrain(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 	for _, name := range []string{"feedback-a", "feedback-b", "feedback-c"} {
-		fb := &session.DMail{
+		fb := &domain.DMail{
 			Name:        name,
 			Kind:        domain.KindDesignFeedback,
 			Description: name + " desc",
@@ -1239,7 +1239,7 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 	// given: mixed feedback + specification + report in inbox
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	mails := []*session.DMail{
+	mails := []*domain.DMail{
 		{Name: "feedback-mix-1", Kind: domain.KindDesignFeedback, Description: "feedback 1"},
 		{Name: "spec-mix-1", Kind: domain.KindSpecification, Description: "spec 1"},
 		{Name: "feedback-mix-2", Kind: domain.KindDesignFeedback, Description: "feedback 2"},
@@ -1280,10 +1280,10 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 
 func TestDrainInboxFeedback_MultipleFeedback(t *testing.T) {
 	// given: buffered channel with 3 items
-	ch := make(chan *session.DMail, 3)
-	ch <- &session.DMail{Name: "fb-1", Kind: domain.KindDesignFeedback, Description: "first", Severity: "high"}
-	ch <- &session.DMail{Name: "fb-2", Kind: domain.KindDesignFeedback, Description: "second"}
-	ch <- &session.DMail{Name: "fb-3", Kind: domain.KindDesignFeedback, Description: "third", Severity: "high"}
+	ch := make(chan *domain.DMail, 3)
+	ch <- &domain.DMail{Name: "fb-1", Kind: domain.KindDesignFeedback, Description: "first", Severity: "high"}
+	ch <- &domain.DMail{Name: "fb-2", Kind: domain.KindDesignFeedback, Description: "second"}
+	ch <- &domain.DMail{Name: "fb-3", Kind: domain.KindDesignFeedback, Description: "third", Severity: "high"}
 
 	// when
 	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
@@ -1299,8 +1299,8 @@ func TestDrainInboxFeedback_MultipleFeedback(t *testing.T) {
 
 func TestDrainInboxFeedback_ClosedChannel(t *testing.T) {
 	// given: a closed channel with 1 buffered item
-	ch := make(chan *session.DMail, 1)
-	ch <- &session.DMail{Name: "fb-closed", Kind: domain.KindDesignFeedback, Description: "before close"}
+	ch := make(chan *domain.DMail, 1)
+	ch <- &domain.DMail{Name: "fb-closed", Kind: domain.KindDesignFeedback, Description: "before close"}
 	close(ch)
 
 	// when
@@ -1317,7 +1317,7 @@ func TestDrainInboxFeedback_ClosedChannel(t *testing.T) {
 
 func TestDrainInboxFeedback_EmptyChannel(t *testing.T) {
 	// given: an empty buffered channel (not nil, not closed)
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 
 	// when
 	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
@@ -1332,7 +1332,7 @@ func TestDrainInboxFeedback_EmptyChannel(t *testing.T) {
 
 func TestParseDMail_FrontmatterOnly_NoBody(t *testing.T) {
 	// given: valid frontmatter with no body content
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "no-body-mail",
 		Kind:        domain.KindDesignFeedback,
 		Description: "No body content",
@@ -1375,7 +1375,7 @@ func TestParseDMail_MissingClosingDelimiter(t *testing.T) {
 
 func TestMarshalDMail_NoBody(t *testing.T) {
 	// given: d-mail with empty body
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "no-body",
 		Kind:        domain.KindReport,
 		Description: "Report without body",
@@ -1824,7 +1824,7 @@ func TestDMailName_TrailingSpecialChars(t *testing.T) {
 
 func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 	// given: channel that will receive a convergence d-mail
-	ch := make(chan *session.DMail, 1)
+	ch := make(chan *domain.DMail, 1)
 	var notifyCalled atomic.Bool
 	notifier := &testNotifier{onNotify: func(title, message string) {
 		notifyCalled.Store(true)
@@ -1832,7 +1832,7 @@ func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 	collector := session.CollectFeedback(nil, ch, notifier, platform.NewLogger(io.Discard, false))
 
 	// when: convergence arrives
-	ch <- &session.DMail{Name: "conv-late-001", Kind: domain.KindConvergence, Description: "Late convergence"}
+	ch <- &domain.DMail{Name: "conv-late-001", Kind: domain.KindConvergence, Description: "Late convergence"}
 	close(ch)
 	time.Sleep(100 * time.Millisecond)
 
@@ -1857,13 +1857,13 @@ func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 
 func TestCollectFeedback_MixedFeedbackAndConvergence(t *testing.T) {
 	// given: initial feedback + channel with convergence
-	initial := []*session.DMail{
+	initial := []*domain.DMail{
 		{Name: "fb-init", Kind: domain.KindDesignFeedback, Description: "initial"},
 	}
-	ch := make(chan *session.DMail, 1)
+	ch := make(chan *domain.DMail, 1)
 	collector := session.CollectFeedback(initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
-	ch <- &session.DMail{Name: "conv-mix-001", Kind: domain.KindConvergence, Description: "convergence"}
+	ch <- &domain.DMail{Name: "conv-mix-001", Kind: domain.KindConvergence, Description: "convergence"}
 	close(ch)
 	time.Sleep(100 * time.Millisecond)
 
@@ -1894,15 +1894,15 @@ func (n *testNotifier) Notify(_ context.Context, title, message string) error {
 func TestCollectFeedback_HangingNotifierDoesNotBlockDrain(t *testing.T) {
 	// given: a notifier that blocks for a long time + channel with convergence then feedback.
 	// The collector must drain both d-mails promptly even if the notifier hangs.
-	ch := make(chan *session.DMail, 2)
+	ch := make(chan *domain.DMail, 2)
 	hangingNotifier := &testNotifier{onNotify: func(title, message string) {
 		time.Sleep(10 * time.Second) // simulate hung notifier
 	}}
 	collector := session.CollectFeedback(nil, ch, hangingNotifier, platform.NewLogger(io.Discard, false))
 
 	// when: send convergence (triggers hanging notify) then feedback
-	ch <- &session.DMail{Name: "conv-hang", Kind: domain.KindConvergence, Description: "convergence"}
-	ch <- &session.DMail{Name: "fb-after", Kind: domain.KindDesignFeedback, Description: "feedback after convergence"}
+	ch <- &domain.DMail{Name: "conv-hang", Kind: domain.KindConvergence, Description: "convergence"}
+	ch <- &domain.DMail{Name: "fb-after", Kind: domain.KindDesignFeedback, Description: "feedback after convergence"}
 	close(ch)
 
 	// then: both d-mails should be collected within a reasonable time,
@@ -1927,7 +1927,7 @@ func TestMonitorInbox_DeliversConvergence(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	conv := &session.DMail{
+	conv := &domain.DMail{
 		Name:        "convergence-mon-001",
 		Kind:        domain.KindConvergence,
 		Description: "Convergence signal from phonewave",
@@ -1965,7 +1965,7 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
-	mails := []*session.DMail{
+	mails := []*domain.DMail{
 		{Name: "feedback-mix-conv-1", Kind: domain.KindDesignFeedback, Description: "feedback"},
 		{Name: "convergence-mix-1", Kind: domain.KindConvergence, Description: "convergence"},
 		{Name: "spec-mix-conv-1", Kind: domain.KindSpecification, Description: "spec"},
@@ -2008,7 +2008,7 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 
 func TestFeedbackCollector_ReportsOnly(t *testing.T) {
 	// given: collector with mixed feedback, report, and convergence d-mails
-	initial := []*session.DMail{
+	initial := []*domain.DMail{
 		{Name: "fb-001", Kind: domain.KindDesignFeedback, Description: "Feedback item"},
 		{Name: "rp-001", Kind: domain.KindReport, Description: "Report from amadeus"},
 		{Name: "cv-001", Kind: domain.KindConvergence, Description: "Convergence"},
@@ -2043,7 +2043,7 @@ func TestFormatReportsForPrompt_Empty(t *testing.T) {
 
 func TestFormatReportsForPrompt_Single(t *testing.T) {
 	// given
-	reports := []*session.DMail{
+	reports := []*domain.DMail{
 		{Name: "rp-001", Kind: domain.KindReport, Description: "Drift detected in auth module", Body: "Details of the drift."},
 	}
 
@@ -2064,7 +2064,7 @@ func TestFormatReportsForPrompt_Single(t *testing.T) {
 
 func TestDMailIdempotencyKey_Deterministic(t *testing.T) {
 	// given
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "spec-001",
 		Kind:        domain.KindSpecification,
 		Description: "test spec",
@@ -2086,7 +2086,7 @@ func TestDMailIdempotencyKey_Deterministic(t *testing.T) {
 
 func TestMarshalDMail_IdempotencyKey(t *testing.T) {
 	// given
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "spec-001",
 		Kind:        domain.KindSpecification,
 		Description: "test spec",
@@ -2116,7 +2116,7 @@ func TestMarshalDMail_IdempotencyKey(t *testing.T) {
 
 func TestMarshalDMail_IdempotencyKey_DoesNotMutateOriginal(t *testing.T) {
 	// given: DMail with no metadata
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:        "spec-001",
 		Kind:        domain.KindSpecification,
 		Description: "test",
@@ -2384,7 +2384,7 @@ func TestComposeFeedback_IssuesSorted(t *testing.T) {
 
 func TestValidateDMail_CIResultKind(t *testing.T) {
 	// given: a d-mail with ci-result kind
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "ci-result-pr-123",
 		Kind:          domain.KindCIResult,
 		Description:   "CI pipeline result for PR #123",
@@ -2402,7 +2402,7 @@ func TestValidateDMail_CIResultKind(t *testing.T) {
 
 func TestDMail_ActionPriorityFields(t *testing.T) {
 	// given: a d-mail with action and priority fields set
-	original := &session.DMail{
+	original := &domain.DMail{
 		Name:          "ci-result-roundtrip",
 		Kind:          domain.KindCIResult,
 		Description:   "CI result with action and priority",
@@ -2433,7 +2433,7 @@ func TestDMail_ActionPriorityFields(t *testing.T) {
 
 func TestDMail_ActionPriorityOmitEmpty(t *testing.T) {
 	// given: a d-mail without action and priority (zero values)
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "no-action-priority",
 		Kind:          domain.KindDesignFeedback,
 		Description:   "Feedback without action/priority",
@@ -2458,19 +2458,19 @@ func TestDMail_ActionPriorityOmitEmpty(t *testing.T) {
 
 func TestFeedbackCollector_Snapshot(t *testing.T) {
 	// given: collector with channel
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// send two d-mails before snapshot
-	ch <- &session.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001"}
-	ch <- &session.DMail{Kind: domain.KindReport, Name: "rpt-001"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001"}
+	ch <- &domain.DMail{Kind: domain.KindReport, Name: "rpt-001"}
 	time.Sleep(100 * time.Millisecond)
 
 	// when: take snapshot
 	fc.Snapshot()
 
 	// and: send one more after snapshot
-	ch <- &session.DMail{Kind: domain.KindSpecification, Name: "spec-001"}
+	ch <- &domain.DMail{Kind: domain.KindSpecification, Name: "spec-001"}
 	time.Sleep(100 * time.Millisecond)
 
 	// then: NewSinceSnapshot returns only the post-snapshot item
@@ -2485,11 +2485,11 @@ func TestFeedbackCollector_Snapshot(t *testing.T) {
 
 func TestFeedbackCollector_NewSinceSnapshot_noNew(t *testing.T) {
 	// given: collector with channel
-	ch := make(chan *session.DMail, 5)
+	ch := make(chan *domain.DMail, 5)
 	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
 
 	// send one d-mail and snapshot after it
-	ch <- &session.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001"}
+	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001"}
 	time.Sleep(100 * time.Millisecond)
 
 	fc.Snapshot()
@@ -2505,7 +2505,7 @@ func TestFeedbackCollector_NewSinceSnapshot_noNew(t *testing.T) {
 
 func TestMarshalDMail_ContextRoundTrip(t *testing.T) {
 	// given
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "spec-context-01",
 		Kind:          domain.KindSpecification,
 		Description:   "wave with insight context",
@@ -2549,7 +2549,7 @@ func TestMarshalDMail_ContextRoundTrip(t *testing.T) {
 
 func TestMarshalDMail_NilContextOmitted(t *testing.T) {
 	// given — DMail with nil Context
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "spec-no-context",
 		Kind:          domain.KindSpecification,
 		Description:   "no context",
@@ -2573,7 +2573,7 @@ func TestReceiveDMailIfNew_AcceptsImplFeedback(t *testing.T) {
 	// given: an implementation-feedback d-mail in the inbox
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
-	mail := &session.DMail{
+	mail := &domain.DMail{
 		Name:          "impl-fb-001",
 		Kind:          domain.KindImplFeedback,
 		Description:   "Implementation feedback on auth wave",

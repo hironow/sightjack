@@ -190,7 +190,7 @@ waitingCycle:
 
 // classifyNewMails categorizes newly arrived D-Mails into specification,
 // report (with issue IDs), design-feedback, or other kinds.
-func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback bool, reportIssueIDs []string) {
+func classifyNewMails(mails []*domain.DMail) (hasSpec, hasReport, hasDesignFeedback bool, reportIssueIDs []string) {
 	for _, m := range mails {
 		switch m.Kind {
 		case domain.KindSpecification:
@@ -207,7 +207,7 @@ func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback boo
 
 // emitDesignFeedback emits feedback_received events for any design-feedback D-Mails
 // in the batch. Each D-Mail's actual name is preserved for traceability (P3 fix).
-func emitDesignFeedback(mails []*DMail, emitter port.SessionEventEmitter, logger domain.Logger) {
+func emitDesignFeedback(mails []*domain.DMail, emitter port.SessionEventEmitter, logger domain.Logger) {
 	var names []string
 	for _, m := range mails {
 		if m.Kind == domain.KindDesignFeedback {
