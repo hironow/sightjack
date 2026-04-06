@@ -85,7 +85,7 @@ func TestComposeStallEscalation_StagesOutbox(t *testing.T) {
 	reason := "stalled after 3 structural errors"
 
 	// when
-	err := session.ComposeStallEscalation(ctx, store, wave, errs, reason)
+	err := session.ComposeStallEscalation(ctx, store, wave, errs, reason, "fp-abc123", 3)
 
 	// then
 	if err != nil {
