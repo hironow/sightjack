@@ -114,7 +114,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	cfg *domain.Config, scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves []domain.Wave, completed map[string]bool,
 	sessionRejected map[string][]domain.WaveAction, adrDir string, adrCount *int,
-	feedback []*DMail,
+	feedback []*domain.DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
 	discuss discussRunnerFunc,
 	runner port.ClaudeRunner,
@@ -169,7 +169,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 		} else if err != nil {
 			logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 		} else {
-			domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
+			domain.LogBanner(logger, domain.BannerSend, string(domain.KindSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 			emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
 		}
 		return selected, approvalApproved
@@ -201,7 +201,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			} else if err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
-				domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
+				domain.LogBanner(logger, domain.BannerSend, string(domain.KindSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
 			}
 			return selected, approvalApproved
@@ -300,7 +300,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 			} else if err != nil {
 				logger.Warn("D-Mail specification failed (non-fatal): %v", err)
 			} else {
-				domain.LogBanner(logger, domain.BannerSend, string(DMailSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
+				domain.LogBanner(logger, domain.BannerSend, string(domain.KindSpecification), DMailName("spec", domain.WaveKey(selected)), selected.Title)
 				emitter.EmitSendSpecification(selected.ID, selected.ClusterName, time.Now().UTC())
 			}
 			return selected, approvalApproved
@@ -384,8 +384,8 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 		logger.Warn("Failed to read ADRs for nextgen (non-fatal): %v", adrErr)
 	}
 	rejectedForWave := sessionRejected[domain.WaveKey(selected)]
-	var feedback []*DMail
-	var reports []*DMail
+	var feedback []*domain.DMail
+	var reports []*domain.DMail
 	if fbCollector != nil {
 		feedback = fbCollector.FeedbackOnly()
 		reports = fbCollector.ReportsOnly()
@@ -451,13 +451,28 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger,
+	stallDetector *StallDetector) {
 
 	gate := cfg.Gate
 
 	applyResult, oldAvailable, ok := executeAndRecordApply(ctx, cfg, scanDir, selected, resolvedStrictness, waves, completed, onceRunner, emitter, out, waveSpan, logger)
 	if !ok {
+		// Record partial failure for stall detection (SPEC-001)
+		if stallDetector != nil && applyResult != nil && len(applyResult.Errors) > 0 {
+			result := stallDetector.RecordFailure(ctx, store, selected, applyResult.Errors)
+			if result.Detected {
+				if err := emitter.EmitWaveStalled(result.WaveID, result.ClusterName, result.Fingerprint, result.Reason, time.Now().UTC()); err != nil {
+					logger.Warn("Failed to emit wave.stalled event (non-fatal): %v", err)
+				}
+			}
+		}
 		return
+	}
+
+	// Successful apply clears stall tracking for this wave
+	if stallDetector != nil {
+		stallDetector.RecordSuccess(selected)
 	}
 
 	waveSpan.AddEvent("wave.completed",
@@ -513,7 +528,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	if err := ComposeReportWithMetadata(ctx, store, selected, applyResult, correctionMeta); err != nil {
 		logger.Warn("D-Mail report failed (non-fatal): %v", err)
 	} else {
-		domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
+		domain.LogBanner(logger, domain.BannerSend, string(domain.KindReport), DMailName("report", domain.WaveKey(selected)), selected.Title)
 		emitter.EmitSendReport(selected.ID, selected.ClusterName, time.Now().UTC())
 	}
 
@@ -521,7 +536,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	if feedbackErr := ComposeFeedbackWithMetadata(ctx, store, selected, applyResult, correctionMeta); feedbackErr != nil {
 		logger.Warn("D-Mail feedback failed (non-fatal): %v", feedbackErr)
 	} else {
-		domain.LogBanner(logger, domain.BannerSend, string(DMailReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
+		domain.LogBanner(logger, domain.BannerSend, string(domain.KindReport), DMailName("feedback", domain.WaveKey(selected)), fmt.Sprintf("Wave %s report for amadeus", domain.WaveKey(selected)))
 		emitter.EmitSendFeedback(selected.ID, selected.ClusterName, time.Now().UTC())
 	}
 

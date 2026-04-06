@@ -1003,9 +1003,9 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	feedbackMail := &session.DMail{
+	feedbackMail := &domain.DMail{
 		Name:        "fb-arch-001",
-		Kind:        session.DMailDesignFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "Token rotation drift detected",
 		Severity:    "high",
 		Body:        "JWT rotation interval misaligned with refresh window.",
@@ -1059,7 +1059,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse archived feedback: %v", err)
 	}
-	if archivedFeedback.Kind != session.DMailDesignFeedback {
+	if archivedFeedback.Kind != domain.KindDesignFeedback {
 		t.Errorf("expected feedback kind, got %q", archivedFeedback.Kind)
 	}
 	if archivedFeedback.Severity != "high" {
@@ -1080,7 +1080,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 			if parseErr != nil {
 				t.Fatalf("parse spec: %v", parseErr)
 			}
-			if mail.Kind != session.DMailSpecification {
+			if mail.Kind != domain.KindSpecification {
 				t.Errorf("expected specification kind, got %q", mail.Kind)
 			}
 			if !strings.Contains(mail.Body, "AUTH-1") {
@@ -1097,7 +1097,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 			if parseErr != nil {
 				t.Fatalf("parse report: %v", parseErr)
 			}
-			if mail.Kind != session.DMailReport {
+			if mail.Kind != domain.KindReport {
 				t.Errorf("expected report kind, got %q", mail.Kind)
 			}
 		}
@@ -1186,9 +1186,9 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 	if err := session.EnsureMailDirs(baseDir); err != nil {
 		t.Fatal(err)
 	}
-	feedbackMail := &session.DMail{
+	feedbackMail := &domain.DMail{
 		Name:        "fb-perf-001",
-		Kind:        session.DMailDesignFeedback,
+		Kind:        domain.KindDesignFeedback,
 		Description: "Auth latency spike in token validation",
 		Severity:    "high",
 		Body:        "p99 latency exceeds 500ms under load.",
@@ -1243,7 +1243,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 			if parseErr != nil {
 				t.Fatalf("parse spec: %v", parseErr)
 			}
-			if mail.Kind != session.DMailSpecification {
+			if mail.Kind != domain.KindSpecification {
 				t.Errorf("expected specification, got %q", mail.Kind)
 			}
 			if len(mail.Issues) == 0 {

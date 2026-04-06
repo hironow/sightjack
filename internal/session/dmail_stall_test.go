@@ -11,7 +11,7 @@ import (
 
 func TestDMailStallEscalation_Constant(t *testing.T) {
 	// given/when: access the constant
-	kind := session.DMailStallEscalation
+	kind := domain.KindStallEscalation
 
 	// then
 	if kind == "" {
@@ -85,7 +85,7 @@ func TestComposeStallEscalation_StagesOutbox(t *testing.T) {
 	reason := "stalled after 3 structural errors"
 
 	// when
-	err := session.ComposeStallEscalation(ctx, store, wave, errs, reason)
+	err := session.ComposeStallEscalation(ctx, store, wave, errs, reason, "fp-abc123", 3)
 
 	// then
 	if err != nil {

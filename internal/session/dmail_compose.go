@@ -72,11 +72,11 @@ func ComposeReport(ctx context.Context, store port.OutboxStore, wave domain.Wave
 
 func ComposeReportWithMetadata(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult, meta domain.CorrectionMetadata) error {
 	key := domain.WaveKey(wave)
-	mail := &DMail{
+	mail := &domain.DMail{
 		Name:          DMailName("report", key),
-		Kind:          DMailReport,
+		Kind:          domain.KindReport,
 		Description:   fmt.Sprintf("Wave %s completed", key),
-		SchemaVersion: "1",
+		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
 		Body:          ReportBody(wave, result),
 	}
@@ -112,18 +112,18 @@ func FeedbackBody(wave domain.Wave, result *domain.WaveApplyResult) string {
 
 // ComposeFeedback stages a report D-Mail for amadeus consumption.
 // Called after successful wave apply to complete the sightjack → amadeus feedback loop (O2).
-// Uses DMailReport kind because sightjack's sendable contract only produces specification and report.
+// Uses domain.KindReport because sightjack's sendable contract only produces specification and report.
 func ComposeFeedback(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult) error {
 	return ComposeFeedbackWithMetadata(ctx, store, wave, result, domain.CorrectionMetadata{})
 }
 
 func ComposeFeedbackWithMetadata(ctx context.Context, store port.OutboxStore, wave domain.Wave, result *domain.WaveApplyResult, meta domain.CorrectionMetadata) error {
 	key := domain.WaveKey(wave)
-	mail := &DMail{
+	mail := &domain.DMail{
 		Name:          DMailName("feedback", key),
-		Kind:          DMailReport,
+		Kind:          domain.KindReport,
 		Description:   fmt.Sprintf("Wave %s report for amadeus", key),
-		SchemaVersion: "1",
+		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
 		Body:          FeedbackBody(wave, result),
 	}
@@ -151,11 +151,11 @@ var issueManagementTypes = map[string]bool{
 // actions remain, the spec D-Mail is not generated.
 func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave domain.Wave, mode ...domain.TrackingMode) error {
 	key := domain.WaveKey(wave)
-	mail := &DMail{
+	mail := &domain.DMail{
 		Name:          DMailName("spec", key),
-		Kind:          DMailSpecification,
+		Kind:          domain.KindSpecification,
 		Description:   wave.Title,
-		SchemaVersion: "1",
+		SchemaVersion: domain.DMailSchemaVersion,
 		Issues:        WaveIssueIDs(wave),
 		Body:          SpecificationBody(wave),
 	}

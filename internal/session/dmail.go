@@ -22,52 +22,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DMail represents a d-mail message: YAML frontmatter + Markdown body.
-type DMail struct {
-	Name          string                 `yaml:"name"`
-	Kind          DMailKind              `yaml:"kind"`
-	Description   string                 `yaml:"description"`
-	SchemaVersion string                 `yaml:"dmail-schema-version,omitempty"`
-	Issues        []string               `yaml:"issues,omitempty"`
-	Severity      string                 `yaml:"severity,omitempty"`
-	Action        string                 `yaml:"action,omitempty"`
-	Priority      int                    `yaml:"priority,omitempty"`
-	Wave          *domain.WaveReference  `yaml:"wave,omitempty"`
-	Metadata      map[string]string      `yaml:"metadata,omitempty"`
-	Context       *domain.InsightContext `yaml:"context,omitempty" json:"context,omitempty"`
-	Body          string                 `yaml:"-"`
-}
-
-// DMailKind is the message type for d-mails.
-type DMailKind string
-
-const (
-	DMailSpecification  DMailKind = "specification"
-	DMailReport         DMailKind = "report"
-	DMailDesignFeedback DMailKind = "design-feedback"
-	DMailImplFeedback   DMailKind = "implementation-feedback"
-	DMailConvergence    DMailKind = "convergence"
-	DMailCIResult       DMailKind = "ci-result"
-)
-
-// validActions is the set of valid action values per D-Mail schema v1.
-// Strict on send, liberal on receive (Postel's law / S0021).
-var validActions = map[string]bool{
-	"retry":    true,
-	"escalate": true,
-	"resolve":  true,
-}
-
-// Filename returns the canonical filename: "<name>.md".
-func (d *DMail) Filename() string {
-	return d.Name + ".md"
-}
+// Filename is now defined on domain.DMail — no session-level duplicate needed.
 
 const frontmatterDelim = "---"
 
 // DMailIdempotencyKey computes a SHA256 content-based idempotency key from
-// the core fields of a DMail (name, kind, description, body).
-func DMailIdempotencyKey(mail *DMail) string {
+// the core fields of a domain.DMail (name, kind, description, body).
+func DMailIdempotencyKey(mail *domain.DMail) string {
 	h := sha256.New()
 	h.Write([]byte(mail.Name))
 	h.Write([]byte{0})
@@ -79,10 +40,10 @@ func DMailIdempotencyKey(mail *DMail) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// MarshalDMail serializes a DMail to YAML frontmatter + Markdown body.
+// MarshalDMail serializes a domain.DMail to YAML frontmatter + Markdown body.
 // Automatically injects an idempotency_key into metadata based on content hash.
-func MarshalDMail(mail *DMail) ([]byte, error) {
-	// Create a shallow copy to avoid mutating the caller's DMail.
+func MarshalDMail(mail *domain.DMail) ([]byte, error) {
+	// Create a shallow copy to avoid mutating the caller's domain.DMail.
 	cp := *mail
 	meta := make(map[string]string, len(mail.Metadata)+1)
 	for k, v := range mail.Metadata {
@@ -108,7 +69,7 @@ func MarshalDMail(mail *DMail) ([]byte, error) {
 }
 
 // ParseDMail parses YAML frontmatter + Markdown body from bytes.
-func ParseDMail(data []byte) (*DMail, error) {
+func ParseDMail(data []byte) (*domain.DMail, error) {
 	content := string(data)
 	if !strings.HasPrefix(content, frontmatterDelim+"\n") {
 		return nil, fmt.Errorf("dmail: missing frontmatter delimiter")
@@ -121,7 +82,7 @@ func ParseDMail(data []byte) (*DMail, error) {
 	yamlPart := rest[:idx]
 	bodyPart := rest[idx+len("\n"+frontmatterDelim+"\n"):]
 
-	var mail DMail
+	var mail domain.DMail
 	if err := yaml.Unmarshal([]byte(yamlPart), &mail); err != nil {
 		return nil, fmt.Errorf("dmail parse frontmatter: %w", err)
 	}
@@ -131,7 +92,7 @@ func ParseDMail(data []byte) (*DMail, error) {
 
 // ComposeDMail stages a d-mail via the transactional outbox store, then
 // flushes it to archive/ and outbox/ using atomic file writes.
-func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *DMail) error {
+func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *domain.DMail) error {
 	if err := ValidateDMail(mail); err != nil {
 		return err
 	}
@@ -152,30 +113,13 @@ func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *DMail) erro
 	return nil
 }
 
-// ValidateDMail checks required fields and kind validity.
-func ValidateDMail(mail *DMail) error {
+// ValidateDMail delegates to domain.ValidateDMail (SPEC-004 Stage 2).
+// Session retains this wrapper for nil-check that domain doesn't handle.
+func ValidateDMail(mail *domain.DMail) error {
 	if mail == nil {
 		return fmt.Errorf("dmail: mail is nil")
 	}
-	if mail.Name == "" {
-		return fmt.Errorf("dmail: name is required")
-	}
-	if mail.Description == "" {
-		return fmt.Errorf("dmail: description is required")
-	}
-	if mail.SchemaVersion == "" {
-		return fmt.Errorf("dmail: dmail-schema-version is required")
-	}
-	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult, DMailStallEscalation:
-		// valid
-	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result, stall-escalation)", mail.Kind)
-	}
-	if mail.Action != "" && !validActions[mail.Action] {
-		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", mail.Action)
-	}
-	return nil
+	return domain.ValidateDMail(mail)
 }
 
 // ListDMail returns all .md filenames in the given mail subdirectory.
@@ -198,7 +142,7 @@ func ListDMail(baseDir, sub string) ([]string, error) {
 // receiveDMailIfNew reads a d-mail from inbox, applies consumer-side dedup (MY-271),
 // archives it, and returns it only if it is a feedback d-mail.
 // Returns nil for already-archived, non-feedback, or unreadable files.
-func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
+func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *domain.DMail {
 	// Consumer-side dedup: skip if already in archive.
 	// NOTE: Dedup is filename-based by design — the d-mail filename acts as a
 	// message ID in the protocol. Senders that need to deliver updated content
@@ -216,7 +160,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != DMailDesignFeedback && mail.Kind != DMailImplFeedback && mail.Kind != DMailConvergence && mail.Kind != DMailReport {
+	if mail.Kind != domain.KindDesignFeedback && mail.Kind != domain.KindImplFeedback && mail.Kind != domain.KindConvergence && mail.Kind != domain.KindReport {
 		return nil
 	}
 	return mail
@@ -227,7 +171,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *DMail {
 // Each d-mail is received (archived + removed from inbox). Feedback, convergence,
 // and report d-mails are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
-func MonitorInbox(ctx context.Context, baseDir string, logger domain.Logger) (<-chan *DMail, error) {
+func MonitorInbox(ctx context.Context, baseDir string, logger domain.Logger) (<-chan *domain.DMail, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
@@ -242,7 +186,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger domain.Logger) (<-
 	// Phase 1: Initial drain (synchronous, before goroutine starts).
 	// watcher.Add is called first so files created during the drain
 	// are caught by fsnotify and deduplicated by receiveDMailIfNew.
-	var initial []*DMail
+	var initial []*domain.DMail
 	files, listErr := ListDMail(baseDir, domain.InboxDir)
 	if listErr == nil {
 		for _, filename := range files {
@@ -252,7 +196,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger domain.Logger) (<-
 		}
 	}
 
-	ch := make(chan *DMail, len(initial))
+	ch := make(chan *domain.DMail, len(initial))
 	for _, mail := range initial {
 		ch <- mail
 	}
@@ -296,11 +240,11 @@ func MonitorInbox(ctx context.Context, baseDir string, logger domain.Logger) (<-
 
 // DrainInboxFeedback reads all currently buffered d-mails (feedback and convergence)
 // from the monitor channel and logs them. Returns the drained messages for downstream use.
-func DrainInboxFeedback(ch <-chan *DMail, logger domain.Logger) []*DMail {
+func DrainInboxFeedback(ch <-chan *domain.DMail, logger domain.Logger) []*domain.DMail {
 	if ch == nil {
 		return nil
 	}
-	var feedback []*DMail
+	var feedback []*domain.DMail
 loop:
 	for {
 		select {
@@ -320,7 +264,7 @@ loop:
 	for _, fb := range feedback {
 		domain.LogBanner(logger, domain.BannerRecv, string(fb.Kind), fb.Name, fb.Description)
 		prefix := "[D-Mail]"
-		if fb.Kind == DMailConvergence {
+		if fb.Kind == domain.KindConvergence {
 			prefix = "[D-Mail] [CONVERGENCE]"
 		}
 		switch fb.Severity {
@@ -336,7 +280,7 @@ loop:
 // FormatFeedbackForPrompt formats feedback d-mails as a Markdown section
 // suitable for injection into wave generation prompts. HIGH severity items
 // are emphasized with a ### [HIGH] header. Returns "" for nil or empty input.
-func FormatFeedbackForPrompt(feedback []*DMail) string {
+func FormatFeedbackForPrompt(feedback []*domain.DMail) string {
 	if len(feedback) == 0 {
 		return ""
 	}
@@ -360,7 +304,7 @@ func FormatFeedbackForPrompt(feedback []*DMail) string {
 // suitable for injection into wave generation prompts. Reports come from
 // other tools (e.g. amadeus check results) and provide cross-tool context.
 // Returns "" for nil or empty input.
-func FormatReportsForPrompt(reports []*DMail) string {
+func FormatReportsForPrompt(reports []*domain.DMail) string {
 	if len(reports) == 0 {
 		return ""
 	}
@@ -383,7 +327,7 @@ func FormatReportsForPrompt(reports []*DMail) string {
 // Convergence d-mails are tracked separately for journaling.
 type FeedbackCollector struct {
 	mu          sync.Mutex
-	items       []*DMail
+	items       []*domain.DMail
 	convNames   []string
 	notifier    port.Notifier
 	notify      chan struct{} // signals new D-Mail arrival (buffered, size 1)
@@ -394,15 +338,15 @@ type FeedbackCollector struct {
 // and starts a background goroutine to accumulate late-arriving items
 // from the channel. Convergence d-mails trigger a notification via notifier.
 // Safe to call with nil initial, nil channel, or nil notifier.
-func CollectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier, logger domain.Logger) *FeedbackCollector {
+func CollectFeedback(initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger) *FeedbackCollector {
 	return collectFeedback(initial, ch, notifier, logger, nil)
 }
 
-func CollectFeedbackWithHook(initial []*DMail, ch <-chan *DMail, notifier port.Notifier, logger domain.Logger, onMail func(*DMail)) *FeedbackCollector {
+func CollectFeedbackWithHook(initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger, onMail func(*domain.DMail)) *FeedbackCollector {
 	return collectFeedback(initial, ch, notifier, logger, onMail)
 }
 
-func collectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier, logger domain.Logger, onMail func(*DMail)) *FeedbackCollector {
+func collectFeedback(initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger, onMail func(*domain.DMail)) *FeedbackCollector {
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
 	}
@@ -411,7 +355,7 @@ func collectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 		notify:   make(chan struct{}, 1),
 	}
 	if len(initial) > 0 {
-		c.items = make([]*DMail, len(initial))
+		c.items = make([]*domain.DMail, len(initial))
 		copy(c.items, initial)
 		if onMail != nil {
 			for _, mail := range initial {
@@ -432,7 +376,7 @@ func collectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 				default: // non-blocking, don't block if already signaled
 				}
 
-				if mail.Kind == DMailConvergence {
+				if mail.Kind == domain.KindConvergence {
 					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
 					// Fire-and-forget with timeout to avoid blocking the drain loop.
 					go func(desc string) {
@@ -457,11 +401,11 @@ func collectFeedback(initial []*DMail, ch <-chan *DMail, notifier port.Notifier,
 }
 
 // addMail appends a d-mail to the collector under the mutex.
-func (c *FeedbackCollector) addMail(mail *DMail) {
+func (c *FeedbackCollector) addMail(mail *domain.DMail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.items = append(c.items, mail)
-	if mail.Kind == DMailConvergence {
+	if mail.Kind == domain.KindConvergence {
 		c.convNames = append(c.convNames, mail.Name)
 	}
 }
@@ -479,13 +423,13 @@ func (c *FeedbackCollector) Snapshot() {
 }
 
 // NewSinceSnapshot returns D-Mails received since the last Snapshot call.
-func (c *FeedbackCollector) NewSinceSnapshot() []*DMail {
+func (c *FeedbackCollector) NewSinceSnapshot() []*domain.DMail {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.snapshotIdx >= len(c.items) {
 		return nil
 	}
-	result := make([]*DMail, len(c.items)-c.snapshotIdx)
+	result := make([]*domain.DMail, len(c.items)-c.snapshotIdx)
 	copy(result, c.items[c.snapshotIdx:])
 	return result
 }
@@ -506,12 +450,12 @@ func (c *FeedbackCollector) convergenceNames() []string {
 // FeedbackOnly returns a copy of accumulated d-mails filtered to feedback kind
 // only (excludes convergence). Use this for nextgen prompt injection where only
 // feedback d-mails are relevant.
-func (c *FeedbackCollector) FeedbackOnly() []*DMail {
+func (c *FeedbackCollector) FeedbackOnly() []*domain.DMail {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var result []*DMail
+	var result []*domain.DMail
 	for _, m := range c.items {
-		if m.Kind == DMailDesignFeedback || m.Kind == DMailImplFeedback {
+		if m.Kind == domain.KindDesignFeedback || m.Kind == domain.KindImplFeedback {
 			result = append(result, m)
 		}
 	}
@@ -521,12 +465,12 @@ func (c *FeedbackCollector) FeedbackOnly() []*DMail {
 // ReportsOnly returns a copy of accumulated d-mails filtered to report kind
 // only (excludes feedback and convergence). Use this for nextgen prompt injection
 // where cross-tool reports (e.g. amadeus check results) should inform wave planning.
-func (c *FeedbackCollector) ReportsOnly() []*DMail {
+func (c *FeedbackCollector) ReportsOnly() []*domain.DMail {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var result []*DMail
+	var result []*domain.DMail
 	for _, m := range c.items {
-		if m.Kind == DMailReport {
+		if m.Kind == domain.KindReport {
 			result = append(result, m)
 		}
 	}
@@ -535,19 +479,19 @@ func (c *FeedbackCollector) ReportsOnly() []*DMail {
 
 // All returns a copy of all accumulated feedback (initial + late arrivals).
 // Non-destructive: repeated calls return the same data plus any new arrivals.
-func (c *FeedbackCollector) All() []*DMail {
+func (c *FeedbackCollector) All() []*domain.DMail {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.items) == 0 {
 		return nil
 	}
-	cp := make([]*DMail, len(c.items))
+	cp := make([]*domain.DMail, len(c.items))
 	copy(cp, c.items)
 	return cp
 }
 
 // ReceiveDMail reads a d-mail from inbox/, parses it, and moves it to archive/.
-func ReceiveDMail(baseDir, filename string) (*DMail, error) {
+func ReceiveDMail(baseDir, filename string) (*domain.DMail, error) {
 	inboxPath := filepath.Join(domain.MailDir(baseDir, domain.InboxDir), filename)
 	data, err := os.ReadFile(inboxPath)
 	if err != nil {

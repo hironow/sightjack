@@ -38,7 +38,7 @@ func NewCmdApproverForTest(cmdTemplate string, factory func(ctx context.Context,
 func (s *SQLiteOutboxStore) DBForTest() *sql.DB { return s.db }
 
 // ReceiveDMailIfNewForTest exposes receiveDMailIfNew for external test packages.
-func ReceiveDMailIfNewForTest(baseDir, filename string, logger domain.Logger) *DMail {
+func ReceiveDMailIfNewForTest(baseDir, filename string, logger domain.Logger) *domain.DMail {
 	return receiveDMailIfNew(baseDir, filename, logger)
 }
 

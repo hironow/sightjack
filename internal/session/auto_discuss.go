@@ -39,7 +39,7 @@ func autoDiscussOutputFileName(speaker string, wave domain.Wave, round int) stri
 // RunAutoDiscuss orchestrates the Devil's Advocate debate for auto-approve mode.
 // Returns nil result (not error) when auto_discuss_rounds is 0.
 func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
-	wave domain.Wave, feedback []*DMail, adrDir string, strictness string,
+	wave domain.Wave, feedback []*domain.DMail, adrDir string, strictness string,
 	out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.AutoDiscussResult, error) {
 
 	rounds := cfg.Scribe.AutoDiscussRounds

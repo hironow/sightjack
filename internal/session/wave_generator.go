@@ -48,7 +48,7 @@ func ParseNextGenResult(path string) (*domain.NextGenResult, error) {
 }
 
 // GenerateNextWavesDryRun saves the nextgen prompt to a file instead of executing Claude.
-func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*DMail, reports []*DMail, logger domain.Logger) error {
+func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*domain.DMail, reports []*domain.DMail, logger domain.Logger) error {
 	prompt, err := BuildNextGenPrompt(cfg, scanDir, completedWave, cluster, completedWaves, existingADRs, rejectedActions, strictness, feedback, reports)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave d
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*DMail, reports []*DMail, runner port.ClaudeRunner, logger domain.Logger) ([]domain.Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*domain.DMail, reports []*domain.DMail, runner port.ClaudeRunner, logger domain.Logger) ([]domain.Wave, error) {
 	ctx, nextgenSpan := platform.Tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", platform.SanitizeUTF8(completedWave.ClusterName)),
@@ -117,7 +117,7 @@ func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, 
 }
 
 // BuildNextGenPrompt constructs the prompt for post-completion wave generation.
-func BuildNextGenPrompt(cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*DMail, reports []*DMail) (string, error) {
+func BuildNextGenPrompt(cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*domain.DMail, reports []*domain.DMail) (string, error) {
 	outputFile := filepath.Join(scanDir, NextgenFileName(completedWave))
 
 	issuesJSON, err := json.Marshal(cluster.Issues)

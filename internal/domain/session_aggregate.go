@@ -44,7 +44,7 @@ func (a *SessionAggregate) SessionID() string {
 
 // Start produces a session_started event.
 func (a *SessionAggregate) Start(project, strictness string, now time.Time) (Event, error) {
-	return a.nextEvent(EventSessionStarted, SessionStartedPayload{
+	return a.nextEvent(EventSessionStartedV2, SessionStartedPayload{
 		Project:         project,
 		StrictnessLevel: strictness,
 	}, now)
@@ -52,12 +52,12 @@ func (a *SessionAggregate) Start(project, strictness string, now time.Time) (Eve
 
 // RecordScan produces a scan_completed event.
 func (a *SessionAggregate) RecordScan(payload ScanCompletedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventScanCompleted, payload, now)
+	return a.nextEvent(EventScanCompletedV2, payload, now)
 }
 
 // UpdateCompleteness produces a completeness_updated event.
 func (a *SessionAggregate) UpdateCompleteness(clusterName string, clusterCompleteness, overallCompleteness float64, now time.Time) (Event, error) {
-	return a.nextEvent(EventCompletenessUpdated, CompletenessUpdatedPayload{
+	return a.nextEvent(EventCompletenessUpdatedV2, CompletenessUpdatedPayload{
 		ClusterName:         clusterName,
 		ClusterCompleteness: clusterCompleteness,
 		OverallCompleteness: overallCompleteness,
@@ -66,96 +66,96 @@ func (a *SessionAggregate) UpdateCompleteness(clusterName string, clusterComplet
 
 // Resume produces a session_resumed event.
 func (a *SessionAggregate) Resume(originalSessionID string, now time.Time) (Event, error) {
-	return a.nextEvent(EventSessionResumed, SessionResumedPayload{
+	return a.nextEvent(EventSessionResumedV2, SessionResumedPayload{
 		OriginalSessionID: originalSessionID,
 	}, now)
 }
 
 // Rescan produces a session_rescanned event.
 func (a *SessionAggregate) Rescan(originalSessionID string, now time.Time) (Event, error) {
-	return a.nextEvent(EventSessionRescanned, SessionRescannedPayload{
+	return a.nextEvent(EventSessionRescannedV2, SessionRescannedPayload{
 		OriginalSessionID: originalSessionID,
 	}, now)
 }
 
 // RecordWavesGenerated produces a waves_generated event.
 func (a *SessionAggregate) RecordWavesGenerated(payload WavesGeneratedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventWavesGenerated, payload, now)
+	return a.nextEvent(EventWavesGeneratedV2, payload, now)
 }
 
 // ApproveWave produces a wave_approved event.
 func (a *SessionAggregate) ApproveWave(waveID, clusterName string, now time.Time) (Event, error) {
-	return a.nextEvent(EventWaveApproved, WaveIdentityPayload{
+	return a.nextEvent(EventWaveApprovedV2, WaveIdentityPayload{
 		WaveID: waveID, ClusterName: clusterName,
 	}, now)
 }
 
 // RejectWave produces a wave_rejected event.
 func (a *SessionAggregate) RejectWave(waveID, clusterName string, now time.Time) (Event, error) {
-	return a.nextEvent(EventWaveRejected, WaveIdentityPayload{
+	return a.nextEvent(EventWaveRejectedV2, WaveIdentityPayload{
 		WaveID: waveID, ClusterName: clusterName,
 	}, now)
 }
 
 // ModifyWave produces a wave_modified event.
 func (a *SessionAggregate) ModifyWave(payload WaveModifiedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventWaveModified, payload, now)
+	return a.nextEvent(EventWaveModifiedV2, payload, now)
 }
 
 // ApplyWave produces a wave_applied event.
 func (a *SessionAggregate) ApplyWave(payload WaveAppliedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventWaveApplied, payload, now)
+	return a.nextEvent(EventWaveAppliedV2, payload, now)
 }
 
 // CompleteWave produces a wave_completed event.
 func (a *SessionAggregate) CompleteWave(payload WaveCompletedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventWaveCompleted, payload, now)
+	return a.nextEvent(EventWaveCompletedV2, payload, now)
 }
 
 // AddNextGenWaves produces a nextgen_waves_added event.
 func (a *SessionAggregate) AddNextGenWaves(payload NextGenWavesAddedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventNextGenWavesAdded, payload, now)
+	return a.nextEvent(EventNextGenWavesAddedV2, payload, now)
 }
 
 // ApplyReadyLabels produces a ready_labels_applied event.
 func (a *SessionAggregate) ApplyReadyLabels(payload ReadyLabelsAppliedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventReadyLabelsApplied, payload, now)
+	return a.nextEvent(EventReadyLabelsAppliedV2, payload, now)
 }
 
 // SendSpecification produces a specification_sent event.
 func (a *SessionAggregate) SendSpecification(waveID, clusterName string, now time.Time) (Event, error) {
-	return a.nextEvent(EventSpecificationSent, WaveIdentityPayload{
+	return a.nextEvent(EventSpecificationSentV2, WaveIdentityPayload{
 		WaveID: waveID, ClusterName: clusterName,
 	}, now)
 }
 
 // SendReport produces a report_sent event.
 func (a *SessionAggregate) SendReport(waveID, clusterName string, now time.Time) (Event, error) {
-	return a.nextEvent(EventReportSent, WaveIdentityPayload{
+	return a.nextEvent(EventReportSentV2, WaveIdentityPayload{
 		WaveID: waveID, ClusterName: clusterName,
 	}, now)
 }
 
 // SendFeedback produces a feedback_sent event.
 func (a *SessionAggregate) SendFeedback(waveID, clusterName string, now time.Time) (Event, error) {
-	return a.nextEvent(EventFeedbackSent, WaveIdentityPayload{
+	return a.nextEvent(EventFeedbackSentV2, WaveIdentityPayload{
 		WaveID: waveID, ClusterName: clusterName,
 	}, now)
 }
 
 // GenerateADR produces an adr_generated event.
 func (a *SessionAggregate) GenerateADR(payload ADRGeneratedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventADRGenerated, payload, now)
+	return a.nextEvent(EventADRGeneratedV2, payload, now)
 }
 
 // ReceiveFeedback produces a feedback_received event.
 func (a *SessionAggregate) ReceiveFeedback(payload FeedbackReceivedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventFeedbackReceived, payload, now)
+	return a.nextEvent(EventFeedbackReceivedV2, payload, now)
 }
 
 // UnlockWaves produces a waves_unlocked event.
 func (a *SessionAggregate) UnlockWaves(unlockedIDs []string, now time.Time) (Event, error) {
-	return a.nextEvent(EventWavesUnlocked, WavesUnlockedPayload{
+	return a.nextEvent(EventWavesUnlockedV2, WavesUnlockedPayload{
 		UnlockedWaveIDs: unlockedIDs,
 	}, now)
 }

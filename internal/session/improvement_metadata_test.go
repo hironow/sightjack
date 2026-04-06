@@ -26,7 +26,7 @@ func TestCorrectionMetadataForWave_PrefersWaveReference(t *testing.T) {
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(true),
 	}
-	feedback := []*DMail{{
+	feedback := []*domain.DMail{{
 		Name:     "feedback-1",
 		Wave:     &domain.WaveReference{ID: domain.WaveKey(wave)},
 		Metadata: meta.Apply(nil),
@@ -70,7 +70,7 @@ func TestCorrectionMetadataForWave_FallsBackToIssueMatch(t *testing.T) {
 		RetryAllowed:     domain.BoolPtr(false),
 		EscalationReason: "recurrence-threshold",
 	}
-	feedback := []*DMail{{
+	feedback := []*domain.DMail{{
 		Name:     "feedback-2",
 		Issues:   []string{"ENG-2"},
 		Metadata: meta.Apply(nil),
@@ -103,7 +103,7 @@ func TestCorrectionMetadataForWave_AcceptsLegacyV1WithoutSchemaVersion(t *testin
 			{IssueID: "ENG-3"},
 		},
 	}
-	feedback := []*DMail{{
+	feedback := []*domain.DMail{{
 		Name:   "feedback-legacy",
 		Issues: []string{"ENG-3"},
 		Metadata: map[string]string{

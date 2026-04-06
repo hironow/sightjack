@@ -2,7 +2,7 @@ package session
 
 import "github.com/hironow/sightjack/internal/domain"
 
-func correctionMetadataForWave(feedback []*DMail, wave domain.Wave) domain.CorrectionMetadata {
+func correctionMetadataForWave(feedback []*domain.DMail, wave domain.Wave) domain.CorrectionMetadata {
 	waveKey := domain.WaveKey(wave)
 	issueIDs := WaveIssueIDs(wave)
 	for i := len(feedback) - 1; i >= 0; i-- {

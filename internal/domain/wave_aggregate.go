@@ -82,7 +82,7 @@ func (a *WaveAggregate) Approve(waveID, clusterName string, now time.Time) (Even
 	if _, ok := a.findWave(waveID, clusterName); !ok {
 		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
 	}
-	return a.nextEvent(EventWaveApproved, WaveIdentityPayload{
+	return a.nextEvent(EventWaveApprovedV2, WaveIdentityPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
 	}, now, clusterName+":"+waveID)
@@ -93,7 +93,7 @@ func (a *WaveAggregate) Reject(waveID, clusterName string, now time.Time) (Event
 	if _, ok := a.findWave(waveID, clusterName); !ok {
 		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
 	}
-	return a.nextEvent(EventWaveRejected, WaveIdentityPayload{
+	return a.nextEvent(EventWaveRejectedV2, WaveIdentityPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
 	}, now, clusterName+":"+waveID)
@@ -101,7 +101,7 @@ func (a *WaveAggregate) Reject(waveID, clusterName string, now time.Time) (Event
 
 // RecordApplied produces a wave_applied event.
 func (a *WaveAggregate) RecordApplied(payload WaveAppliedPayload, now time.Time) (Event, error) {
-	return a.nextEvent(EventWaveApplied, payload, now, payload.ClusterName+":"+payload.WaveID)
+	return a.nextEvent(EventWaveAppliedV2, payload, now, payload.ClusterName+":"+payload.WaveID)
 }
 
 // Complete produces a wave_completed event and marks the wave as completed.
@@ -117,7 +117,7 @@ func (a *WaveAggregate) Complete(waveID, clusterName string, applied, totalCount
 			break
 		}
 	}
-	return a.nextEvent(EventWaveCompleted, WaveCompletedPayload{
+	return a.nextEvent(EventWaveCompletedV2, WaveCompletedPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
 		Applied:     applied,
@@ -150,7 +150,7 @@ func (a *WaveAggregate) EvaluateUnlocks(now time.Time) ([]Event, error) {
 		return nil, nil
 	}
 
-	ev, err := a.nextEvent(EventWavesUnlocked, WavesUnlockedPayload{
+	ev, err := a.nextEvent(EventWavesUnlockedV2, WavesUnlockedPayload{
 		UnlockedWaveIDs: unlockedIDs,
 	}, now, "")
 	if err != nil {
@@ -161,7 +161,7 @@ func (a *WaveAggregate) EvaluateUnlocks(now time.Time) ([]Event, error) {
 
 // AddNextGen produces a nextgen_waves_added event.
 func (a *WaveAggregate) AddNextGen(clusterName string, waves []WaveState, now time.Time) (Event, error) {
-	return a.nextEvent(EventNextGenWavesAdded, NextGenWavesAddedPayload{
+	return a.nextEvent(EventNextGenWavesAddedV2, NextGenWavesAddedPayload{
 		ClusterName: clusterName,
 		Waves:       waves,
 	}, now, "")

@@ -29,6 +29,10 @@ func MailDir(baseDir, sub string) string {
 //     and add a migration path for every prior version.
 const StateFormatVersion = "1"
 
+// DMailSchemaVersion is the current D-Mail protocol schema version.
+// All D-Mail generation paths MUST reference this constant (SPEC-003).
+const DMailSchemaVersion = "1"
+
 // ConfigPath returns the path to the config file within .siren/.
 func ConfigPath(baseDir string) string {
 	return filepath.Join(baseDir, StateDir, configFile)

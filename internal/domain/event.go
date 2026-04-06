@@ -233,9 +233,9 @@ type Policy struct {
 // Policies registers all known implicit policies in sightjack.
 // These document the existing reactive behaviors for future automation.
 var Policies = []Policy{
-	{Name: "WaveAppliedComposeReport", Trigger: EventWaveApplied, Action: "ComposeReport"},
-	{Name: "ReportSentDeliverToPhonewave", Trigger: EventReportSent, Action: "DeliverViaPhonewave"},
-	{Name: "ScanCompletedGenerateWaves", Trigger: EventScanCompleted, Action: "GenerateWaves"},
-	{Name: "WaveCompletedNextGen", Trigger: EventWaveCompleted, Action: "GenerateNextWaves"},
-	{Name: "SpecificationSentDeliverToPhonewave", Trigger: EventSpecificationSent, Action: "DeliverViaPhonewave"},
+	{Name: "WaveAppliedComposeReport", Trigger: EventWaveAppliedV2, Action: "ComposeReport"},
+	{Name: "ReportSentDeliverToPhonewave", Trigger: EventReportSentV2, Action: "DeliverViaPhonewave"},
+	{Name: "ScanCompletedGenerateWaves", Trigger: EventScanCompletedV2, Action: "GenerateWaves"},
+	{Name: "WaveCompletedNextGen", Trigger: EventWaveCompletedV2, Action: "GenerateNextWaves"},
+	{Name: "SpecificationSentDeliverToPhonewave", Trigger: EventSpecificationSentV2, Action: "DeliverViaPhonewave"},
 }

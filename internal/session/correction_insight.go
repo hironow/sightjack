@@ -6,23 +6,23 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-func buildCorrectionInsightHook(baseDir string, logger domain.Logger) func(*DMail) {
+func buildCorrectionInsightHook(baseDir string, logger domain.Logger) func(*domain.DMail) {
 	w := NewInsightWriter(
 		filepath.Join(baseDir, domain.StateDir, "insights"),
 		filepath.Join(baseDir, domain.StateDir, ".run"),
 	)
-	return func(mail *DMail) {
+	return func(mail *domain.DMail) {
 		WriteCorrectionInsight(w, mail, logger)
 	}
 }
 
-func WriteCorrectionInsights(w *InsightWriter, mails []*DMail, logger domain.Logger) {
+func WriteCorrectionInsights(w *InsightWriter, mails []*domain.DMail, logger domain.Logger) {
 	for _, mail := range mails {
 		WriteCorrectionInsight(w, mail, logger)
 	}
 }
 
-func WriteCorrectionInsight(w *InsightWriter, mail *DMail, logger domain.Logger) {
+func WriteCorrectionInsight(w *InsightWriter, mail *domain.DMail, logger domain.Logger) {
 	if w == nil || mail == nil {
 		return
 	}

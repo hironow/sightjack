@@ -1,0 +1,85 @@
+package domain
+
+// DMailKind is the message type for D-Mails.
+type DMailKind string
+
+const (
+	KindSpecification  DMailKind = "specification"
+	KindReport         DMailKind = "report"
+	KindDesignFeedback DMailKind = "design-feedback"
+	KindImplFeedback   DMailKind = "implementation-feedback"
+	KindConvergence    DMailKind = "convergence"
+	KindCIResult       DMailKind = "ci-result"
+	KindStallEscalation DMailKind = "stall-escalation"
+)
+
+// ValidDMailKinds is the canonical set of allowed D-Mail kinds per schema v1.
+var ValidDMailKinds = map[DMailKind]bool{
+	KindSpecification:   true,
+	KindReport:          true,
+	KindDesignFeedback:  true,
+	KindImplFeedback:    true,
+	KindConvergence:     true,
+	KindCIResult:        true,
+	KindStallEscalation: true,
+}
+
+// IsValidDMailKind returns true if the given kind is in the canonical set.
+func IsValidDMailKind(kind DMailKind) bool {
+	return ValidDMailKinds[kind]
+}
+
+// DMail represents the domain-owned D-Mail model.
+// Core type and invariants belong here; I/O and orchestration stay in session.
+type DMail struct {
+	Name          string            `yaml:"name"`
+	Kind          DMailKind         `yaml:"kind"`
+	Description   string            `yaml:"description"`
+	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
+	Issues        []string          `yaml:"issues,omitempty"`
+	Severity      string            `yaml:"severity,omitempty"`
+	Action        string            `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
+	Wave          *WaveReference    `yaml:"wave,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
+	Body          string            `yaml:"-"`
+}
+
+// Filename returns the canonical filename: "<name>.md".
+func (d *DMail) Filename() string {
+	return d.Name + ".md"
+}
+
+// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
+// Send-side strict validation (Postel's law).
+func ValidateDMail(d *DMail) error {
+	if d.SchemaVersion == "" {
+		return ErrDMailSchemaRequired
+	}
+	if d.SchemaVersion != DMailSchemaVersion {
+		return ErrDMailSchemaUnsupported
+	}
+	if d.Name == "" {
+		return ErrDMailNameRequired
+	}
+	if d.Kind == "" {
+		return ErrDMailKindRequired
+	}
+	if !IsValidDMailKind(d.Kind) {
+		return ErrDMailKindInvalid
+	}
+	if d.Description == "" {
+		return ErrDMailDescriptionRequired
+	}
+	if d.Action != "" && !validDMailActions[d.Action] {
+		return ErrDMailActionInvalid
+	}
+	return nil
+}
+
+var validDMailActions = map[string]bool{
+	"retry":    true,
+	"escalate": true,
+	"resolve":  true,
+}

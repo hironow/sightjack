@@ -15,8 +15,8 @@ func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
-	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventScanCompletedV2, nil, time.Now())
 
 	// when
 	if _, err := store.Append(e1, e2); err != nil {
@@ -31,10 +31,10 @@ func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
-	if events[0].Type != domain.EventSessionStarted {
+	if events[0].Type != domain.EventSessionStartedV2 {
 		t.Errorf("expected session_started, got %s", events[0].Type)
 	}
-	if events[1].Type != domain.EventScanCompleted {
+	if events[1].Type != domain.EventScanCompletedV2 {
 		t.Errorf("expected scan_completed, got %s", events[1].Type)
 	}
 }
@@ -47,7 +47,7 @@ func TestFileEventStore_LoadSince_FiltersCorrectly(t *testing.T) {
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 	for i := range 5 {
 		ts := base.Add(time.Duration(i) * time.Minute)
-		e, _ := domain.NewEvent(domain.EventSessionStarted, nil, ts)
+		e, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, ts)
 		_, _ = store.Append(e)
 	}
 
@@ -106,7 +106,7 @@ func TestFileEventStore_ManyEvents(t *testing.T) {
 	// when
 	base := time.Now()
 	for i := range count {
-		e, _ := domain.NewEvent(domain.EventSessionStarted, nil, base.Add(time.Duration(i)*time.Millisecond))
+		e, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, base.Add(time.Duration(i)*time.Millisecond))
 		if _, err := store.Append(e); err != nil {
 			t.Fatalf("append event %d: %v", i, err)
 		}
@@ -126,9 +126,9 @@ func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
 	// given: a daily JSONL file with one corrupt line
 	dir := t.TempDir()
 
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
 	data1, _ := domain.MarshalEvent(e1)
-	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventScanCompletedV2, nil, time.Now())
 	data2, _ := domain.MarshalEvent(e2)
 
 	content := string(data1) + "\n" + "THIS IS NOT JSON\n" + string(data2) + "\n"
@@ -155,7 +155,7 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "sub", "dir", "events")
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
-	e, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
 
 	// when
 	_, err := store.Append(e)
@@ -176,9 +176,9 @@ func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when: append in separate calls
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
 	_, _ = store.Append(e1)
-	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventScanCompletedV2, nil, time.Now())
 	_, _ = store.Append(e2)
 
 	// then
@@ -194,8 +194,8 @@ func TestFileEventStore_UUIDUniqueness(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
-	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
 	_, _ = store.Append(e1, e2)
 
 	// then
@@ -219,8 +219,8 @@ func TestFileEventStore_DailyFileRouting(t *testing.T) {
 	day1 := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
 	day2 := time.Date(2025, 3, 2, 10, 0, 0, 0, time.UTC)
 
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, day1)
-	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, day2)
+	e1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, day1)
+	e2, _ := domain.NewEvent(domain.EventScanCompletedV2, nil, day2)
 
 	// when
 	_, _ = store.Append(e1, e2)
@@ -269,7 +269,7 @@ func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "events")
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
-	valid, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
+	valid, _ := domain.NewEvent(domain.EventSessionStartedV2, "data", time.Now())
 	invalid := domain.Event{SessionID: "s1"} // missing ID, Type, Timestamp, Data
 
 	// when: batch append [valid, invalid]
@@ -292,8 +292,8 @@ func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 	later := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
 	earlier := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
 
-	e1, _ := domain.NewEvent(domain.EventScanCompleted, nil, later)
-	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, earlier)
+	e1, _ := domain.NewEvent(domain.EventScanCompletedV2, nil, later)
+	e2, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, earlier)
 
 	_, _ = store.Append(e1)
 	_, _ = store.Append(e2)
@@ -305,10 +305,10 @@ func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
-	if events[0].Type != domain.EventSessionStarted {
+	if events[0].Type != domain.EventSessionStartedV2 {
 		t.Errorf("expected first event to be session_started (earlier), got %s", events[0].Type)
 	}
-	if events[1].Type != domain.EventScanCompleted {
+	if events[1].Type != domain.EventScanCompletedV2 {
 		t.Errorf("expected second event to be scan_completed (later), got %s", events[1].Type)
 	}
 }
@@ -317,7 +317,7 @@ func TestFileEventStore_CorruptLineCount(t *testing.T) {
 	// given: a daily JSONL file with 3 corrupt lines among 2 valid events
 	dir := t.TempDir()
 
-	e1, err := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e1, err := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
 	if err != nil {
 		t.Fatalf("create session_started: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestFileEventStore_CorruptLineCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal session_started: %v", err)
 	}
-	e2, err := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
+	e2, err := domain.NewEvent(domain.EventScanCompletedV2, nil, time.Now())
 	if err != nil {
 		t.Fatalf("create scan_completed: %v", err)
 	}
@@ -368,9 +368,9 @@ func TestFileEventStore_CorruptLineCount_MultiFile(t *testing.T) {
 	// given: corrupt lines spread across two daily files
 	dir := t.TempDir()
 
-	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC))
+	e1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC))
 	data1, _ := domain.MarshalEvent(e1)
-	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Date(2025, 3, 2, 10, 0, 0, 0, time.UTC))
+	e2, _ := domain.NewEvent(domain.EventScanCompletedV2, nil, time.Date(2025, 3, 2, 10, 0, 0, 0, time.UTC))
 	data2, _ := domain.MarshalEvent(e2)
 
 	// day 1: 1 valid + 1 corrupt
@@ -421,11 +421,11 @@ func TestFileEventStore_LoadAfterSeqNr_FiltersAndSorts(t *testing.T) {
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	now := time.Now()
-	ev1, _ := domain.NewEvent(domain.EventSessionStarted, nil, now)
+	ev1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, now)
 	ev1.SeqNr = 1
-	ev2, _ := domain.NewEvent(domain.EventSessionStarted, nil, now.Add(time.Second))
+	ev2, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, now.Add(time.Second))
 	ev2.SeqNr = 2
-	ev3, _ := domain.NewEvent(domain.EventSessionStarted, nil, now.Add(2*time.Second))
+	ev3, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, now.Add(2*time.Second))
 	ev3.SeqNr = 3
 	if _, err := store.Append(ev1, ev2, ev3); err != nil {
 		t.Fatalf("append: %v", err)
@@ -453,8 +453,8 @@ func TestFileEventStore_LoadAfterSeqNr_SkipsZeroSeqNr(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
-	legacy, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
-	postCutover, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now().Add(time.Second))
+	legacy, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
+	postCutover, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now().Add(time.Second))
 	postCutover.SeqNr = 1
 	if _, err := store.Append(legacy, postCutover); err != nil {
 		t.Fatalf("append: %v", err)
@@ -480,9 +480,9 @@ func TestFileEventStore_LatestSeqNr(t *testing.T) {
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 	now := time.Now()
-	ev1, _ := domain.NewEvent(domain.EventSessionStarted, nil, now)
+	ev1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, now)
 	ev1.SeqNr = 3
-	ev2, _ := domain.NewEvent(domain.EventSessionStarted, nil, now.Add(time.Second))
+	ev2, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, now.Add(time.Second))
 	ev2.SeqNr = 7
 	if _, err := store.Append(ev1, ev2); err != nil {
 		t.Fatalf("append: %v", err)

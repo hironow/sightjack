@@ -37,10 +37,16 @@ func (e *PolicyEngine) Register(trigger domain.EventType, handler PolicyHandler)
 
 // Dispatch sends an event to all handlers registered for its type.
 // Best-effort: handler errors are logged but never block event processing.
+// Legacy snake_case event types are resolved to dot.case before handler lookup (SPEC-005).
 func (e *PolicyEngine) Dispatch(ctx context.Context, event domain.Event) error {
-	handlers, ok := e.handlers[event.Type]
+	resolved := domain.ResolveLegacyEventType(event.Type)
+	handlers, ok := e.handlers[resolved]
 	if !ok {
-		return nil
+		// Fallback: try original type for handlers registered with legacy names.
+		handlers, ok = e.handlers[event.Type]
+		if !ok {
+			return nil
+		}
 	}
 	for _, h := range handlers {
 		if err := h(ctx, event); err != nil {

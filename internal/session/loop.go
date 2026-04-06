@@ -47,6 +47,9 @@ func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessio
 	sessionRejected := make(map[string][]domain.WaveAction)
 	labeledReady := make(map[string]bool) // tracks issues already labeled ready
 
+	// Stall detector: N=3 threshold, 30m cooldown (SPEC-001)
+	stallDetector := NewStallDetector(3, 30*time.Minute, logger)
+
 	// waitingCycle wraps the interactive loop: after all waves are processed,
 	// enter a D-Mail waiting phase. When D-Mails arrive, classify and resume.
 waitingCycle:
@@ -91,7 +94,8 @@ waitingCycle:
 			applyPhase(waveCtx, cfg, scanDir, scanResultPath, adrDir,
 				selected, resolvedStrictness,
 				&waves, completed, scanResult, sessionRejected,
-				labeledReady, fbCollector, store, runner, onceRunner, emitter, out, waveSpan, logger)
+				labeledReady, fbCollector, store, runner, onceRunner, emitter, out, waveSpan, logger,
+				stallDetector)
 			waveSpan.End()
 		}
 
@@ -186,15 +190,15 @@ waitingCycle:
 
 // classifyNewMails categorizes newly arrived D-Mails into specification,
 // report (with issue IDs), design-feedback, or other kinds.
-func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback bool, reportIssueIDs []string) {
+func classifyNewMails(mails []*domain.DMail) (hasSpec, hasReport, hasDesignFeedback bool, reportIssueIDs []string) {
 	for _, m := range mails {
 		switch m.Kind {
-		case DMailSpecification:
+		case domain.KindSpecification:
 			hasSpec = true
-		case DMailReport:
+		case domain.KindReport:
 			hasReport = true
 			reportIssueIDs = append(reportIssueIDs, m.Issues...)
-		case DMailDesignFeedback:
+		case domain.KindDesignFeedback:
 			hasDesignFeedback = true
 		}
 	}
@@ -203,10 +207,10 @@ func classifyNewMails(mails []*DMail) (hasSpec, hasReport, hasDesignFeedback boo
 
 // emitDesignFeedback emits feedback_received events for any design-feedback D-Mails
 // in the batch. Each D-Mail's actual name is preserved for traceability (P3 fix).
-func emitDesignFeedback(mails []*DMail, emitter port.SessionEventEmitter, logger domain.Logger) {
+func emitDesignFeedback(mails []*domain.DMail, emitter port.SessionEventEmitter, logger domain.Logger) {
 	var names []string
 	for _, m := range mails {
-		if m.Kind == DMailDesignFeedback {
+		if m.Kind == domain.KindDesignFeedback {
 			names = append(names, m.Name)
 		}
 	}
@@ -216,7 +220,7 @@ func emitDesignFeedback(mails []*DMail, emitter port.SessionEventEmitter, logger
 	logger.Info("Design-feedback received (%d D-Mail(s)); re-scan will incorporate feedback", len(names))
 	for _, name := range names {
 		if err := emitter.EmitReceiveFeedback(domain.FeedbackReceivedPayload{
-			Kind:  string(DMailDesignFeedback),
+			Kind:  string(domain.KindDesignFeedback),
 			Name:  name,
 			Count: 1,
 		}, time.Now().UTC()); err != nil {
