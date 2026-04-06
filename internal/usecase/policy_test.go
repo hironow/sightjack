@@ -149,3 +149,32 @@ func TestPolicyEngine_UnmatchedEventType(t *testing.T) {
 		t.Fatal("handler should not fire for unmatched event type")
 	}
 }
+
+func TestPolicyEngine_LegacyEventDispatchesToV2Handler(t *testing.T) {
+	// given: handler registered with V2 (dot.case) event type
+	engine := NewPolicyEngine(nil)
+	var fired bool
+	engine.Register(domain.EventWaveApprovedV2, func(ctx context.Context, ev domain.Event) error {
+		fired = true
+		return nil
+	})
+	// event emitted with legacy snake_case type
+	ev, err := domain.NewEvent(domain.EventWaveApproved, domain.WaveIdentityPayload{
+		WaveID:      "wave-1",
+		ClusterName: "cluster-a",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	dispatchErr := engine.Dispatch(context.Background(), ev)
+
+	// then: legacy event should dispatch to V2 handler
+	if dispatchErr != nil {
+		t.Fatalf("expected no error, got: %v", dispatchErr)
+	}
+	if !fired {
+		t.Fatal("expected V2 handler to fire for legacy event")
+	}
+}

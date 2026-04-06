@@ -11,23 +11,23 @@ func TestProjector_SerializeDeserialize_RoundTrip(t *testing.T) {
 	// given: projector with accumulated state
 	projector := domain.NewProjector()
 	events := []domain.Event{
-		makeProjectorEvent(domain.EventSessionStarted, domain.SessionStartedPayload{
+		makeProjectorEvent(domain.EventSessionStartedV2, domain.SessionStartedPayload{
 			Project: "test-project", StrictnessLevel: "strict",
 		}),
-		makeProjectorEvent(domain.EventScanCompleted, domain.ScanCompletedPayload{
+		makeProjectorEvent(domain.EventScanCompletedV2, domain.ScanCompletedPayload{
 			Completeness: 0.75,
 			ShibitoCount: 3,
 			Clusters: []domain.ClusterState{
 				{Name: "core", Completeness: 0.8, IssueCount: 5},
 			},
 		}),
-		makeProjectorEvent(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+		makeProjectorEvent(domain.EventWavesGeneratedV2, domain.WavesGeneratedPayload{
 			Waves: []domain.WaveState{
 				{ID: "w1", ClusterName: "core", Status: "available"},
 			},
 		}),
-		makeProjectorEvent(domain.EventADRGenerated, domain.ADRGeneratedPayload{ADRID: "ADR-001"}),
-		makeProjectorEvent(domain.EventFeedbackSent, nil),
+		makeProjectorEvent(domain.EventADRGeneratedV2, domain.ADRGeneratedPayload{ADRID: "ADR-001"}),
+		makeProjectorEvent(domain.EventFeedbackSentV2, nil),
 	}
 	projector.Rebuild(events)
 
@@ -77,24 +77,24 @@ func TestProjector_DeserializeCorrupt(t *testing.T) {
 func TestProjector_SnapshotPlusDelta_DedupPreserved(t *testing.T) {
 	// given: build state from base events, serialize
 	baseEvents := []domain.Event{
-		makeProjectorEvent(domain.EventSessionStarted, domain.SessionStartedPayload{Project: "proj"}),
-		makeProjectorEvent(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+		makeProjectorEvent(domain.EventSessionStartedV2, domain.SessionStartedPayload{Project: "proj"}),
+		makeProjectorEvent(domain.EventWavesGeneratedV2, domain.WavesGeneratedPayload{
 			Waves: []domain.WaveState{{ID: "w1", ClusterName: "core", Status: "available"}},
 		}),
-		makeProjectorEvent(domain.EventADRGenerated, domain.ADRGeneratedPayload{ADRID: "ADR-001"}),
+		makeProjectorEvent(domain.EventADRGeneratedV2, domain.ADRGeneratedPayload{ADRID: "ADR-001"}),
 	}
 	deltaEvents := []domain.Event{
 		// Duplicate wave and ADR — should be deduplicated
-		makeProjectorEvent(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+		makeProjectorEvent(domain.EventWavesGeneratedV2, domain.WavesGeneratedPayload{
 			Waves: []domain.WaveState{{ID: "w1", ClusterName: "core", Status: "available"}},
 		}),
-		makeProjectorEvent(domain.EventADRGenerated, domain.ADRGeneratedPayload{ADRID: "ADR-001"}),
+		makeProjectorEvent(domain.EventADRGeneratedV2, domain.ADRGeneratedPayload{ADRID: "ADR-001"}),
 		// New wave and ADR
-		makeProjectorEvent(domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+		makeProjectorEvent(domain.EventWavesGeneratedV2, domain.WavesGeneratedPayload{
 			Waves: []domain.WaveState{{ID: "w2", ClusterName: "core", Status: "locked"}},
 		}),
-		makeProjectorEvent(domain.EventADRGenerated, domain.ADRGeneratedPayload{ADRID: "ADR-002"}),
-		makeProjectorEvent(domain.EventFeedbackSent, nil),
+		makeProjectorEvent(domain.EventADRGeneratedV2, domain.ADRGeneratedPayload{ADRID: "ADR-002"}),
+		makeProjectorEvent(domain.EventFeedbackSentV2, nil),
 	}
 
 	// Full replay for comparison
@@ -129,9 +129,9 @@ func TestProjector_SnapshotPlusDelta_DedupPreserved(t *testing.T) {
 func TestProjector_BackwardCompatible_WithProjectState(t *testing.T) {
 	// given: same events
 	events := []domain.Event{
-		makeProjectorEvent(domain.EventSessionStarted, domain.SessionStartedPayload{Project: "test"}),
-		makeProjectorEvent(domain.EventScanCompleted, domain.ScanCompletedPayload{Completeness: 0.5}),
-		makeProjectorEvent(domain.EventFeedbackSent, nil),
+		makeProjectorEvent(domain.EventSessionStartedV2, domain.SessionStartedPayload{Project: "test"}),
+		makeProjectorEvent(domain.EventScanCompletedV2, domain.ScanCompletedPayload{Completeness: 0.5}),
+		makeProjectorEvent(domain.EventFeedbackSentV2, nil),
 	}
 
 	// when

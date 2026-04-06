@@ -59,8 +59,8 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 
 	// Verify session_started event
 	e0 := events[0]
-	if e0.Type != domain.EventSessionStarted {
-		t.Errorf("event[0] type: got %s, want %s", e0.Type, domain.EventSessionStarted)
+	if e0.Type != domain.EventSessionStartedV2 {
+		t.Errorf("event[0] type: got %s, want %s", e0.Type, domain.EventSessionStartedV2)
 	}
 	if e0.SessionID != sessionID {
 		t.Errorf("event[0] SessionID: got %q, want %q", e0.SessionID, sessionID)
@@ -71,8 +71,8 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 
 	// Verify scan_completed event
 	e1 := events[1]
-	if e1.Type != domain.EventScanCompleted {
-		t.Errorf("event[1] type: got %s, want %s", e1.Type, domain.EventScanCompleted)
+	if e1.Type != domain.EventScanCompletedV2 {
+		t.Errorf("event[1] type: got %s, want %s", e1.Type, domain.EventScanCompletedV2)
 	}
 	if e1.SessionID != sessionID {
 		t.Errorf("event[1] SessionID: got %q, want %q", e1.SessionID, sessionID)

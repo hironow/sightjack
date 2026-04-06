@@ -48,7 +48,7 @@ func TestPolicyHandler_ScanCompleted_InfoOutput(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, &port.NopNotifier{}, port.NopPolicyMetrics{})
 
-	ev, err := domain.NewEvent(domain.EventScanCompleted, domain.ScanCompletedPayload{
+	ev, err := domain.NewEvent(domain.EventScanCompletedV2, domain.ScanCompletedPayload{
 		Clusters:     []domain.ClusterState{{Name: "auth", Completeness: 0.8, IssueCount: 3}},
 		Completeness: 0.75,
 		ShibitoCount: 2,
@@ -81,7 +81,7 @@ func TestPolicyHandler_ScanCompleted_NotifiesSideEffect(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, spy, port.NopPolicyMetrics{})
 
-	ev, err := domain.NewEvent(domain.EventScanCompleted, domain.ScanCompletedPayload{
+	ev, err := domain.NewEvent(domain.EventScanCompletedV2, domain.ScanCompletedPayload{
 		Clusters:     []domain.ClusterState{{Name: "auth", Completeness: 0.8, IssueCount: 3}},
 		Completeness: 0.75,
 		ShibitoCount: 2,
@@ -114,7 +114,7 @@ func TestPolicyHandler_WaveApplied_RecordsMetrics(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, &port.NopNotifier{}, spy)
 
-	ev, err := domain.NewEvent(domain.EventWaveApplied, map[string]string{
+	ev, err := domain.NewEvent(domain.EventWaveAppliedV2, map[string]string{
 		"wave_id": "test",
 	}, time.Now().UTC())
 	if err != nil {
@@ -144,7 +144,7 @@ func TestPolicyHandler_ReportSent_RecordsMetrics(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, &port.NopNotifier{}, spy)
 
-	ev, err := domain.NewEvent(domain.EventReportSent, map[string]string{
+	ev, err := domain.NewEvent(domain.EventReportSentV2, map[string]string{
 		"target": "test",
 	}, time.Now().UTC())
 	if err != nil {
@@ -171,7 +171,7 @@ func TestPolicyHandler_ScanCompleted_RecordsMetrics(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, &port.NopNotifier{}, spy)
 
-	ev, err := domain.NewEvent(domain.EventScanCompleted, domain.ScanCompletedPayload{
+	ev, err := domain.NewEvent(domain.EventScanCompletedV2, domain.ScanCompletedPayload{
 		Clusters:     []domain.ClusterState{{Name: "auth", Completeness: 0.8, IssueCount: 3}},
 		Completeness: 0.75,
 		ShibitoCount: 2,
@@ -200,7 +200,7 @@ func TestPolicyHandler_WaveCompleted_RecordsMetrics(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, &port.NopNotifier{}, spy)
 
-	ev, err := domain.NewEvent(domain.EventWaveCompleted, map[string]string{
+	ev, err := domain.NewEvent(domain.EventWaveCompletedV2, map[string]string{
 		"wave_id": "test",
 	}, time.Now().UTC())
 	if err != nil {
@@ -227,7 +227,7 @@ func TestPolicyHandler_SpecificationSent_RecordsMetrics(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, &port.NopNotifier{}, spy)
 
-	ev, err := domain.NewEvent(domain.EventSpecificationSent, map[string]string{
+	ev, err := domain.NewEvent(domain.EventSpecificationSentV2, map[string]string{
 		"target": "test",
 	}, time.Now().UTC())
 	if err != nil {
@@ -254,7 +254,7 @@ func TestPolicyHandler_WaveCompleted_NotifiesSideEffect(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, spy, port.NopPolicyMetrics{})
 
-	ev, err := domain.NewEvent(domain.EventWaveCompleted, map[string]string{
+	ev, err := domain.NewEvent(domain.EventWaveCompletedV2, map[string]string{
 		"wave_id": "w-001",
 	}, time.Now().UTC())
 	if err != nil {
@@ -285,7 +285,7 @@ func TestPolicyHandler_SpecificationSent_NotifiesSideEffect(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 	registerSessionPolicies(engine, logger, spy, port.NopPolicyMetrics{})
 
-	ev, err := domain.NewEvent(domain.EventSpecificationSent, map[string]string{
+	ev, err := domain.NewEvent(domain.EventSpecificationSentV2, map[string]string{
 		"target": "architect",
 	}, time.Now().UTC())
 	if err != nil {
