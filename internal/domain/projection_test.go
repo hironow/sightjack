@@ -398,3 +398,63 @@ func TestProjectState_FeedbackReceived_DoesNotMutateFeedbackCount(t *testing.T) 
 		t.Errorf("FeedbackCount = %d, want 0 (feedback_received is audit-only)", state.FeedbackCount)
 	}
 }
+
+// --- SPEC-005 dual-read tests ---
+
+func TestProjectState_DualRead_SessionStartedDotCase(t *testing.T) {
+	t.Parallel()
+	// given: event with dot.case type name
+	events := []domain.Event{
+		mustEvent(t, domain.EventSessionStartedV2, "sess-dc-1", 1,
+			domain.SessionStartedPayload{Project: "dotcase-proj", StrictnessLevel: "strict"}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then: same result as snake_case event
+	if state.SessionID != "sess-dc-1" {
+		t.Errorf("SessionID = %q, want %q", state.SessionID, "sess-dc-1")
+	}
+	if state.Project != "dotcase-proj" {
+		t.Errorf("Project = %q, want %q", state.Project, "dotcase-proj")
+	}
+}
+
+func TestProjectState_DualRead_MixedNaming(t *testing.T) {
+	t.Parallel()
+	// given: mix of legacy snake_case and new dot.case events
+	events := []domain.Event{
+		mustEvent(t, domain.EventSessionStarted, "sess-mix", 1,
+			domain.SessionStartedPayload{Project: "mixed", StrictnessLevel: "standard"}),
+		mustEvent(t, domain.EventScanCompletedV2, "sess-mix", 2,
+			domain.ScanCompletedPayload{
+				Clusters:     []domain.ClusterState{{Name: "Auth", Completeness: 50}},
+				Completeness: 50,
+			}),
+		mustEvent(t, domain.EventWavesGeneratedV2, "sess-mix", 3,
+			domain.WavesGeneratedPayload{
+				Waves: []domain.WaveState{{ID: "w1", ClusterName: "Auth", Status: "available"}},
+			}),
+		mustEvent(t, domain.EventWaveCompleted, "sess-mix", 4,
+			domain.WaveCompletedPayload{WaveID: "w1", ClusterName: "Auth"}),
+		mustEvent(t, domain.EventFeedbackSentV2, "sess-mix", 5, struct{}{}),
+	}
+
+	// when
+	state := domain.ProjectState(events)
+
+	// then
+	if state.Project != "mixed" {
+		t.Errorf("Project = %q, want %q", state.Project, "mixed")
+	}
+	if len(state.Waves) != 1 {
+		t.Fatalf("Waves len = %d, want 1", len(state.Waves))
+	}
+	if state.Waves[0].Status != "completed" {
+		t.Errorf("Wave status = %q, want %q", state.Waves[0].Status, "completed")
+	}
+	if state.FeedbackCount != 1 {
+		t.Errorf("FeedbackCount = %d, want 1", state.FeedbackCount)
+	}
+}
