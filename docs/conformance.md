@@ -98,3 +98,17 @@ Ref: ADR S0035, `internal/domain/primitives.go` (TrackingMode), `internal/sessio
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.
+
+## Harness Inventory (Track A)
+
+| Sub-package | Key functions | Role |
+|-------------|---------------|------|
+| `harness/policy` | `ConfigPolicy`, `ConvergenceGate`, `ScanPolicy`, `WavePolicy`, `EvaluateExhaustion`, `RunGuard` | Deterministic decisions |
+| `harness/verifier` | `ProviderError`, `WaveVerifier` | Validation rules |
+| `harness/filter` | `PromptRegistry`, `PromptBuilder`, `PromptRender`, `Optimizer` | LLM action spaces |
+
+Ref: ADR S0038, S0039
+
+## Improvement Controller (Track D3/F)
+
+The improvement controller resides in amadeus (ADR S0041). sightjack receives corrective D-Mails as a consumer but does not host improvement signal storage.
