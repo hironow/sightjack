@@ -206,6 +206,7 @@ func (e *sessionEventEmitter) EmitWaveStalled(waveID, clusterName, fingerprint, 
 	evt, err := domain.NewEvent(domain.EventWaveStalledV2, domain.WaveStalledPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,
+		Fingerprint: fingerprint,
 		Reason:      reason,
 	}, now)
 	if err != nil {

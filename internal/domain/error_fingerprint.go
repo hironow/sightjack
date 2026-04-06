@@ -74,6 +74,7 @@ func DetectRepeatedPattern(fingerprints []string, threshold int) (bool, string) 
 type WaveStalledPayload struct {
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
+	Fingerprint string `json:"fingerprint,omitempty"`
 	Reason      string `json:"reason"`
 }
 

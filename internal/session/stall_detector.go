@@ -80,6 +80,9 @@ func (d *StallDetector) RecordFailure(ctx context.Context, store port.OutboxStor
 		return StallResult{}
 	}
 
+	// Mark cooldown only after successful send to allow retry on failure.
+	d.cooldown.MarkEmitted(waveKey, fingerprint)
+
 	return StallResult{
 		Detected:    true,
 		WaveID:      wave.ID,

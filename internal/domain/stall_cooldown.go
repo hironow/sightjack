@@ -33,9 +33,10 @@ func (c *StallCooldown) SetClock(clock func() time.Time) {
 	c.clock = clock
 }
 
-// Allow returns true if a stall escalation for the given wave+fingerprint
+// Allow checks whether a stall escalation for the given wave+fingerprint
 // should be emitted. Returns false if the same combination was emitted
-// within the cooldown window.
+// within the cooldown window. Does NOT record the emission — call
+// MarkEmitted after the D-Mail is successfully sent.
 func (c *StallCooldown) Allow(waveID, fingerprint string) bool {
 	key := waveID + ":" + fingerprint
 	now := c.clock()
@@ -44,6 +45,12 @@ func (c *StallCooldown) Allow(waveID, fingerprint string) bool {
 			return false
 		}
 	}
-	c.emitted[key] = now
 	return true
+}
+
+// MarkEmitted records that a stall escalation was successfully emitted.
+// Call this after the D-Mail send succeeds to start the cooldown window.
+func (c *StallCooldown) MarkEmitted(waveID, fingerprint string) {
+	key := waveID + ":" + fingerprint
+	c.emitted[key] = c.clock()
 }

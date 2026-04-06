@@ -90,5 +90,5 @@ func (f *fakeOutboxStore) Stage(_ context.Context, _ string, _ []byte) error {
 	return nil
 }
 
-func (f *fakeOutboxStore) Flush(_ context.Context) (int, error) { return 0, nil }
+func (f *fakeOutboxStore) Flush(_ context.Context) (int, error) { return 1, nil }
 func (f *fakeOutboxStore) Close() error                         { return nil }
