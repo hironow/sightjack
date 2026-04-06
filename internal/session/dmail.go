@@ -22,46 +22,25 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DMail represents a d-mail message: YAML frontmatter + Markdown body.
-type DMail struct {
-	Name          string                 `yaml:"name"`
-	Kind          DMailKind              `yaml:"kind"`
-	Description   string                 `yaml:"description"`
-	SchemaVersion string                 `yaml:"dmail-schema-version,omitempty"`
-	Issues        []string               `yaml:"issues,omitempty"`
-	Severity      string                 `yaml:"severity,omitempty"`
-	Action        string                 `yaml:"action,omitempty"`
-	Priority      int                    `yaml:"priority,omitempty"`
-	Wave          *domain.WaveReference  `yaml:"wave,omitempty"`
-	Metadata      map[string]string      `yaml:"metadata,omitempty"`
-	Context       *domain.InsightContext `yaml:"context,omitempty" json:"context,omitempty"`
-	Body          string                 `yaml:"-"`
-}
+// DMail is an alias for the domain-owned D-Mail model (SPEC-004 Stage 2).
+// Session layer retains orchestration and I/O; type and validation are in domain.
+type DMail = domain.DMail
 
-// DMailKind is the message type for d-mails.
-type DMailKind string
+// DMailKind is an alias for the domain-owned kind type.
+type DMailKind = domain.DMailKind
 
+// Kind constants re-exported from domain for backward compatibility.
+// These will be removed in Stage 3 when all call sites use domain directly.
 const (
-	DMailSpecification  DMailKind = "specification"
-	DMailReport         DMailKind = "report"
-	DMailDesignFeedback DMailKind = "design-feedback"
-	DMailImplFeedback   DMailKind = "implementation-feedback"
-	DMailConvergence    DMailKind = "convergence"
-	DMailCIResult       DMailKind = "ci-result"
+	DMailSpecification  = domain.KindSpecification
+	DMailReport         = domain.KindReport
+	DMailDesignFeedback = domain.KindDesignFeedback
+	DMailImplFeedback   = domain.KindImplFeedback
+	DMailConvergence    = domain.KindConvergence
+	DMailCIResult       = domain.KindCIResult
 )
 
-// validActions is the set of valid action values per D-Mail schema v1.
-// Strict on send, liberal on receive (Postel's law / S0021).
-var validActions = map[string]bool{
-	"retry":    true,
-	"escalate": true,
-	"resolve":  true,
-}
-
-// Filename returns the canonical filename: "<name>.md".
-func (d *DMail) Filename() string {
-	return d.Name + ".md"
-}
+// Filename is now defined on domain.DMail — no session-level duplicate needed.
 
 const frontmatterDelim = "---"
 
@@ -152,30 +131,13 @@ func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *DMail) erro
 	return nil
 }
 
-// ValidateDMail checks required fields and kind validity.
+// ValidateDMail delegates to domain.ValidateDMail (SPEC-004 Stage 2).
+// Session retains this wrapper for nil-check that domain doesn't handle.
 func ValidateDMail(mail *DMail) error {
 	if mail == nil {
 		return fmt.Errorf("dmail: mail is nil")
 	}
-	if mail.Name == "" {
-		return fmt.Errorf("dmail: name is required")
-	}
-	if mail.Description == "" {
-		return fmt.Errorf("dmail: description is required")
-	}
-	if mail.SchemaVersion == "" {
-		return fmt.Errorf("dmail: dmail-schema-version is required")
-	}
-	switch mail.Kind {
-	case DMailSpecification, DMailReport, DMailDesignFeedback, DMailImplFeedback, DMailConvergence, DMailCIResult, DMailStallEscalation:
-		// valid
-	default:
-		return fmt.Errorf("dmail: invalid kind %q (valid: specification, report, design-feedback, implementation-feedback, convergence, ci-result, stall-escalation)", mail.Kind)
-	}
-	if mail.Action != "" && !validActions[mail.Action] {
-		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", mail.Action)
-	}
-	return nil
+	return domain.ValidateDMail(mail)
 }
 
 // ListDMail returns all .md filenames in the given mail subdirectory.

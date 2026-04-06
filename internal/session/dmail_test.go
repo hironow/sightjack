@@ -180,8 +180,8 @@ func TestValidateDMail_MissingKind(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for missing kind")
 	}
-	if err != nil && !strings.Contains(err.Error(), "invalid kind") {
-		t.Errorf("expected kind validation error, got: %v", err)
+	if err != nil && !strings.Contains(err.Error(), "kind") {
+		t.Errorf("expected kind-related error, got: %v", err)
 	}
 }
 
