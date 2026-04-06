@@ -16,7 +16,7 @@ import (
 func TestNopRecorder_NoOp(t *testing.T) {
 	// given
 	var r port.Recorder = port.NopRecorder{}
-	ev, err := domain.NewEvent(domain.EventSessionStartedV2, struct{}{}, time.Now())
+	ev, err := domain.NewEvent(domain.EventSessionStarted, struct{}{}, time.Now())
 	if err != nil {
 		t.Fatalf("NewEvent: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestLoggingRecorder_LogsErrorAndReturnsNil(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, true)
 	recorder := session.NewLoggingRecorder(failingRecorder{}, logger)
-	ev, evErr := domain.NewEvent(domain.EventSessionStartedV2, struct{}{}, time.Now())
+	ev, evErr := domain.NewEvent(domain.EventSessionStarted, struct{}{}, time.Now())
 	if evErr != nil {
 		t.Fatalf("NewEvent: %v", evErr)
 	}
@@ -64,7 +64,7 @@ func TestLoggingRecorder_PassesThroughOnSuccess(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, true)
 	recorder := session.NewLoggingRecorder(port.NopRecorder{}, logger)
-	ev, evErr := domain.NewEvent(domain.EventSessionStartedV2, struct{}{}, time.Now())
+	ev, evErr := domain.NewEvent(domain.EventSessionStarted, struct{}{}, time.Now())
 	if evErr != nil {
 		t.Fatalf("NewEvent: %v", evErr)
 	}

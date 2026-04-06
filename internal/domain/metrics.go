@@ -14,16 +14,16 @@ func FormatSuccessRate(rate float64, success, total int) string {
 }
 
 // SuccessRate calculates the wave success rate from a list of events.
-// It counts EventWaveAppliedV2 as success and EventWaveRejectedV2 as failure.
+// It counts EventWaveApplied as success and EventWaveRejected as failure.
 // Returns 0.0 if there are no relevant events.
 func SuccessRate(events []Event) float64 {
 	var success, total int
 	for _, ev := range events {
 		switch ev.Type {
-		case EventWaveApplied, EventWaveAppliedV2:
+		case EventWaveApplied:
 			success++
 			total++
-		case EventWaveRejected, EventWaveRejectedV2:
+		case EventWaveRejected:
 			total++
 		}
 	}

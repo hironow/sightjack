@@ -106,8 +106,8 @@ func TestEventWaveStalled_Constant(t *testing.T) {
 	if ev == "" {
 		t.Error("EventWaveStalled: constant must not be empty")
 	}
-	if string(ev) != "wave_stalled" {
-		t.Errorf("EventWaveStalled = %q, want %q", ev, "wave_stalled")
+	if string(ev) != "wave.stalled" {
+		t.Errorf("EventWaveStalled = %q, want %q", ev, "wave.stalled")
 	}
 }
 

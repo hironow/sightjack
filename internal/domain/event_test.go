@@ -10,7 +10,7 @@ import (
 
 func TestNewEvent_SetsAllFields(t *testing.T) {
 	// given
-	eventType := domain.EventSessionStartedV2
+	eventType := domain.EventSessionStarted
 	payload := map[string]string{"project": "test"}
 	now := time.Now()
 
@@ -24,8 +24,8 @@ func TestNewEvent_SetsAllFields(t *testing.T) {
 	if event.ID == "" {
 		t.Error("expected non-empty UUID ID")
 	}
-	if event.Type != domain.EventSessionStartedV2 {
-		t.Errorf("expected type %s, got %s", domain.EventSessionStartedV2, event.Type)
+	if event.Type != domain.EventSessionStarted {
+		t.Errorf("expected type %s, got %s", domain.EventSessionStarted, event.Type)
 	}
 	if !event.Timestamp.Equal(now) {
 		t.Errorf("expected timestamp %v, got %v", now, event.Timestamp)
@@ -37,8 +37,8 @@ func TestNewEvent_SetsAllFields(t *testing.T) {
 
 func TestNewEvent_GeneratesUUID(t *testing.T) {
 	// given/when
-	e1, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
-	e2, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
+	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
+	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// then: each event gets a unique UUID
 	if e1.ID == e2.ID {
@@ -53,7 +53,7 @@ func TestMarshalEvent_JSONRoundTrip(t *testing.T) {
 	// given
 	payload := map[string]string{"project": "my-project"}
 	now := time.Now()
-	event, err := domain.NewEvent(domain.EventSessionStartedV2, payload, now)
+	event, err := domain.NewEvent(domain.EventSessionStarted, payload, now)
 	if err != nil {
 		t.Fatalf("NewEvent: %v", err)
 	}
@@ -75,8 +75,8 @@ func TestMarshalEvent_JSONRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
-	if decoded.Type != domain.EventSessionStartedV2 {
-		t.Errorf("expected type %s, got %s", domain.EventSessionStartedV2, decoded.Type)
+	if decoded.Type != domain.EventSessionStarted {
+		t.Errorf("expected type %s, got %s", domain.EventSessionStarted, decoded.Type)
 	}
 	if decoded.SessionID != "session-1" {
 		t.Errorf("expected session-1, got %s", decoded.SessionID)
@@ -88,7 +88,7 @@ func TestMarshalEvent_JSONRoundTrip(t *testing.T) {
 
 func TestMarshalEvent_NoTrailingNewline(t *testing.T) {
 	// given: JSONL format requires no trailing newline in the marshaled bytes
-	event, _ := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// when
 	data, err := domain.MarshalEvent(event)
@@ -104,7 +104,7 @@ func TestMarshalEvent_NoTrailingNewline(t *testing.T) {
 
 func TestNewEvent_NilPayload(t *testing.T) {
 	// given/when
-	event, err := domain.NewEvent(domain.EventSessionStartedV2, nil, time.Now())
+	event, err := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// then
 	if err != nil {
@@ -118,23 +118,23 @@ func TestNewEvent_NilPayload(t *testing.T) {
 func TestEvent_AllEventTypes_Defined(t *testing.T) {
 	// Verify all 17 event types are defined and distinct
 	types := []domain.EventType{
-		domain.EventSessionStartedV2,
-		domain.EventScanCompletedV2,
-		domain.EventWavesGeneratedV2,
-		domain.EventWaveApprovedV2,
-		domain.EventWaveRejectedV2,
-		domain.EventWaveModifiedV2,
-		domain.EventWaveAppliedV2,
-		domain.EventWaveCompletedV2,
-		domain.EventCompletenessUpdatedV2,
-		domain.EventWavesUnlockedV2,
-		domain.EventNextGenWavesAddedV2,
-		domain.EventADRGeneratedV2,
-		domain.EventReadyLabelsAppliedV2,
-		domain.EventSessionResumedV2,
-		domain.EventSessionRescannedV2,
-		domain.EventSpecificationSentV2,
-		domain.EventReportSentV2,
+		domain.EventSessionStarted,
+		domain.EventScanCompleted,
+		domain.EventWavesGenerated,
+		domain.EventWaveApproved,
+		domain.EventWaveRejected,
+		domain.EventWaveModified,
+		domain.EventWaveApplied,
+		domain.EventWaveCompleted,
+		domain.EventCompletenessUpdated,
+		domain.EventWavesUnlocked,
+		domain.EventNextGenWavesAdded,
+		domain.EventADRGenerated,
+		domain.EventReadyLabelsApplied,
+		domain.EventSessionResumed,
+		domain.EventSessionRescanned,
+		domain.EventSpecificationSent,
+		domain.EventReportSent,
 	}
 
 	seen := make(map[domain.EventType]bool)
@@ -156,7 +156,7 @@ func TestEvent_AllEventTypes_Defined(t *testing.T) {
 func TestEvent_TimestampPreservedInJSON(t *testing.T) {
 	// given
 	now := time.Now()
-	event, _ := domain.NewEvent(domain.EventScanCompletedV2, nil, now)
+	event, _ := domain.NewEvent(domain.EventScanCompleted, nil, now)
 
 	// when
 	data, _ := domain.MarshalEvent(event)
@@ -207,7 +207,7 @@ func TestValidateEvent_RejectsFutureSchema(t *testing.T) {
 
 func TestValidateEvent_Valid(t *testing.T) {
 	// given
-	event, _ := domain.NewEvent(domain.EventSessionStartedV2, map[string]string{"k": "v"}, time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, map[string]string{"k": "v"}, time.Now())
 
 	// when
 	err := domain.ValidateEvent(event)
@@ -220,7 +220,7 @@ func TestValidateEvent_Valid(t *testing.T) {
 
 func TestValidateEvent_EmptyType(t *testing.T) {
 	// given
-	event, _ := domain.NewEvent(domain.EventSessionStartedV2, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.Type = ""
 
 	// when
@@ -234,7 +234,7 @@ func TestValidateEvent_EmptyType(t *testing.T) {
 
 func TestValidateEvent_EmptyID(t *testing.T) {
 	// given
-	event, _ := domain.NewEvent(domain.EventSessionStartedV2, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.ID = ""
 
 	// when
@@ -248,7 +248,7 @@ func TestValidateEvent_EmptyID(t *testing.T) {
 
 func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 	// given
-	event, _ := domain.NewEvent(domain.EventSessionStartedV2, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.Timestamp = time.Time{}
 
 	// when
@@ -262,7 +262,7 @@ func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 
 func TestValidateEvent_EmptyData(t *testing.T) {
 	// given
-	event, _ := domain.NewEvent(domain.EventSessionStartedV2, "data", time.Now())
+	event, _ := domain.NewEvent(domain.EventSessionStarted, "data", time.Now())
 	event.Data = nil
 
 	// when
@@ -300,7 +300,7 @@ func TestPayload_SessionStarted_RoundTrip(t *testing.T) {
 		Project:         "my-project",
 		StrictnessLevel: "fog",
 	}
-	event, err := domain.NewEvent(domain.EventSessionStartedV2, payload, time.Now())
+	event, err := domain.NewEvent(domain.EventSessionStarted, payload, time.Now())
 	if err != nil {
 		t.Fatalf("NewEvent: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestPayload_ScanCompleted_RoundTrip(t *testing.T) {
 		ScanResultPath: "/path/to/scan.json",
 		LastScanned:    time.Date(2026, 2, 24, 10, 0, 0, 0, time.UTC),
 	}
-	event, _ := domain.NewEvent(domain.EventScanCompletedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventScanCompleted, payload, time.Now())
 
 	// when
 	var decoded domain.ScanCompletedPayload
@@ -356,7 +356,7 @@ func TestPayload_WavesGenerated_RoundTrip(t *testing.T) {
 			{ID: "w1", ClusterName: "Auth", Title: "First", Status: "available", ActionCount: 2},
 		},
 	}
-	event, _ := domain.NewEvent(domain.EventWavesGeneratedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWavesGenerated, payload, time.Now())
 
 	// when
 	var decoded domain.WavesGeneratedPayload
@@ -373,7 +373,7 @@ func TestPayload_WavesGenerated_RoundTrip(t *testing.T) {
 
 func TestPayload_WaveApproved_RoundTrip(t *testing.T) {
 	payload := domain.WaveIdentityPayload{WaveID: "w1", ClusterName: "Auth"}
-	event, _ := domain.NewEvent(domain.EventWaveApprovedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWaveApproved, payload, time.Now())
 
 	var decoded domain.WaveIdentityPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -390,7 +390,7 @@ func TestPayload_WaveCompleted_RoundTrip(t *testing.T) {
 		Applied:     3,
 		TotalCount:  3,
 	}
-	event, _ := domain.NewEvent(domain.EventWaveCompletedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWaveCompleted, payload, time.Now())
 
 	var decoded domain.WaveCompletedPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -406,7 +406,7 @@ func TestPayload_CompletenessUpdated_RoundTrip(t *testing.T) {
 		ClusterCompleteness: 0.75,
 		OverallCompleteness: 0.60,
 	}
-	event, _ := domain.NewEvent(domain.EventCompletenessUpdatedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventCompletenessUpdated, payload, time.Now())
 
 	var decoded domain.CompletenessUpdatedPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -423,7 +423,7 @@ func TestPayload_NextGenWavesAdded_RoundTrip(t *testing.T) {
 			{ID: "w2", ClusterName: "Auth", Title: "Second", Status: "available"},
 		},
 	}
-	event, _ := domain.NewEvent(domain.EventNextGenWavesAddedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventNextGenWavesAdded, payload, time.Now())
 
 	var decoded domain.NextGenWavesAddedPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -441,7 +441,7 @@ func TestPayload_WaveModified_RoundTrip(t *testing.T) {
 			ID: "w1", ClusterName: "Auth", Title: "Modified", Status: "available",
 		},
 	}
-	event, _ := domain.NewEvent(domain.EventWaveModifiedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWaveModified, payload, time.Now())
 
 	var decoded domain.WaveModifiedPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -453,7 +453,7 @@ func TestPayload_WaveModified_RoundTrip(t *testing.T) {
 
 func TestPayload_ADRGenerated_RoundTrip(t *testing.T) {
 	payload := domain.ADRGeneratedPayload{ADRID: "0008", Title: "Event Sourcing"}
-	event, _ := domain.NewEvent(domain.EventADRGeneratedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventADRGenerated, payload, time.Now())
 
 	var decoded domain.ADRGeneratedPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -467,7 +467,7 @@ func TestPayload_WavesUnlocked_RoundTrip(t *testing.T) {
 	payload := domain.WavesUnlockedPayload{
 		UnlockedWaveIDs: []string{"Auth:w2", "Auth:w3"},
 	}
-	event, _ := domain.NewEvent(domain.EventWavesUnlockedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWavesUnlocked, payload, time.Now())
 
 	var decoded domain.WavesUnlockedPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -479,7 +479,7 @@ func TestPayload_WavesUnlocked_RoundTrip(t *testing.T) {
 
 func TestPayload_ReadyLabelsApplied_RoundTrip(t *testing.T) {
 	payload := domain.ReadyLabelsAppliedPayload{IssueIDs: []string{"ENG-101", "ENG-102"}}
-	event, _ := domain.NewEvent(domain.EventReadyLabelsAppliedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventReadyLabelsApplied, payload, time.Now())
 
 	var decoded domain.ReadyLabelsAppliedPayload
 	domain.UnmarshalEventPayload(event, &decoded)
@@ -497,7 +497,7 @@ func TestPayload_WaveApplied_RoundTrip(t *testing.T) {
 		TotalCount:  3,
 		Errors:      []string{"action 3 failed"},
 	}
-	event, _ := domain.NewEvent(domain.EventWaveAppliedV2, payload, time.Now())
+	event, _ := domain.NewEvent(domain.EventWaveApplied, payload, time.Now())
 
 	var decoded domain.WaveAppliedPayload
 	domain.UnmarshalEventPayload(event, &decoded)

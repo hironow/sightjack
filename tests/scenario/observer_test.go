@@ -271,7 +271,7 @@ func (o *Observer) AssertLabelsDisabled() {
 // --- Scan error recovery and session resume helpers (proposals 039, 042) ---
 
 // AssertScanWarningsExist checks if the scan result contains warnings
-// by reading .siren/events/*.jsonl for scan_completed events with non-empty
+// by reading .siren/events/*.jsonl for scan.completed events with non-empty
 // warnings data.
 func (o *Observer) AssertScanWarningsExist() {
 	o.t.Helper()
@@ -287,31 +287,31 @@ func (o *Observer) AssertScanWarningsExist() {
 		}
 		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
 		content := string(data)
-		if strings.Contains(content, `"scan_completed"`) && strings.Contains(content, `"warnings"`) {
+		if strings.Contains(content, `"scan.completed"`) && strings.Contains(content, `"warnings"`) {
 			return
 		}
 	}
-	o.t.Error("no scan_completed event with warnings found")
+	o.t.Error("no scan.completed event with warnings found")
 }
 
-// AssertSessionResumed checks for a session_resumed event in JSONL.
+// AssertSessionResumed checks for a session.resumed event in JSONL.
 func (o *Observer) AssertSessionResumed() {
 	o.t.Helper()
-	o.AssertEventExists("session_resumed")
+	o.AssertEventExists("session.resumed")
 }
 
-// AssertSessionRescanned checks for a session_rescanned event in JSONL.
+// AssertSessionRescanned checks for a session.rescanned event in JSONL.
 func (o *Observer) AssertSessionRescanned() {
 	o.t.Helper()
-	o.AssertEventExists("session_rescanned")
+	o.AssertEventExists("session.rescanned")
 }
 
 // --- Completeness and ADR format helpers (proposals 044, 047) ---
 
-// AssertCompletenessUpdated checks for a completeness_updated event in JSONL.
+// AssertCompletenessUpdated checks for a completeness.updated event in JSONL.
 func (o *Observer) AssertCompletenessUpdated() {
 	o.t.Helper()
-	o.AssertEventExists("completeness_updated")
+	o.AssertEventExists("completeness.updated")
 }
 
 // AssertADRFileExists checks that at least one ADR .md file exists in docs/adr/.

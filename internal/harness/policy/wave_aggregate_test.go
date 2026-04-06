@@ -22,7 +22,7 @@ func TestWaveAggregate_Approve_Available(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveApprovedV2 {
+	if ev.Type != domain.EventWaveApproved {
 		t.Fatalf("expected wave_approved, got %s", ev.Type)
 	}
 }
@@ -54,7 +54,7 @@ func TestWaveAggregate_Reject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveRejectedV2 {
+	if ev.Type != domain.EventWaveRejected {
 		t.Fatalf("expected wave_rejected, got %s", ev.Type)
 	}
 }
@@ -75,7 +75,7 @@ func TestWaveAggregate_RecordApplied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveAppliedV2 {
+	if ev.Type != domain.EventWaveApplied {
 		t.Fatalf("expected wave_applied, got %s", ev.Type)
 	}
 }
@@ -94,7 +94,7 @@ func TestWaveAggregate_Complete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventWaveCompletedV2 {
+	if ev.Type != domain.EventWaveCompleted {
 		t.Fatalf("expected wave_completed, got %s", ev.Type)
 	}
 	// Completed map should be updated
@@ -181,7 +181,7 @@ func TestWaveAggregate_EvaluateUnlocks(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	if events[0].Type != domain.EventWavesUnlockedV2 {
+	if events[0].Type != domain.EventWavesUnlocked {
 		t.Fatalf("expected waves_unlocked, got %s", events[0].Type)
 	}
 }
@@ -219,7 +219,7 @@ func TestWaveAggregate_AddNextGen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != domain.EventNextGenWavesAddedV2 {
+	if ev.Type != domain.EventNextGenWavesAdded {
 		t.Fatalf("expected nextgen_waves_added, got %s", ev.Type)
 	}
 }

@@ -488,7 +488,7 @@ func TestCheckEventStore_Valid(t *testing.T) {
 	sessionDir := filepath.Join(dir, ".siren", "events", "test-session-001")
 	os.MkdirAll(sessionDir, 0755)
 	os.WriteFile(filepath.Join(sessionDir, "2026-03-09.jsonl"),
-		[]byte(`{"type":"wave_applied","timestamp":"2026-03-09T00:00:00Z"}`+"\n"), 0644)
+		[]byte(`{"type":"wave.applied","timestamp":"2026-03-09T00:00:00Z"}`+"\n"), 0644)
 
 	// when
 	check := session.CheckEventStore(dir)
@@ -556,7 +556,7 @@ func TestCheckEventStore_MultipleSessions(t *testing.T) {
 		sessionDir := filepath.Join(dir, ".siren", "events", sid)
 		os.MkdirAll(sessionDir, 0755)
 		os.WriteFile(filepath.Join(sessionDir, "2026-03-09.jsonl"),
-			[]byte(`{"type":"wave_applied","timestamp":"2026-03-09T00:00:00Z"}`+"\n"), 0644)
+			[]byte(`{"type":"wave.applied","timestamp":"2026-03-09T00:00:00Z"}`+"\n"), 0644)
 	}
 
 	// when
@@ -583,9 +583,9 @@ func TestRunDoctor_SuccessRateWithEvents(t *testing.T) {
 	sessionDir := filepath.Join(dir, ".siren", "events", "test-session-001")
 	os.MkdirAll(sessionDir, 0755)
 	events := strings.Join([]string{
-		`{"id":"e1","type":"wave_applied","timestamp":"2026-03-01T10:00:00Z","data":{"wave_id":"w1","cluster_name":"c1","applied":1,"total_count":1},"session_id":"test-session-001"}`,
-		`{"id":"e2","type":"wave_applied","timestamp":"2026-03-01T10:01:00Z","data":{"wave_id":"w2","cluster_name":"c1","applied":1,"total_count":1},"session_id":"test-session-001"}`,
-		`{"id":"e3","type":"wave_rejected","timestamp":"2026-03-01T10:02:00Z","data":{"wave_id":"w3","cluster_name":"c1"},"session_id":"test-session-001"}`,
+		`{"id":"e1","type":"wave.applied","timestamp":"2026-03-01T10:00:00Z","data":{"wave_id":"w1","cluster_name":"c1","applied":1,"total_count":1},"session_id":"test-session-001"}`,
+		`{"id":"e2","type":"wave.applied","timestamp":"2026-03-01T10:01:00Z","data":{"wave_id":"w2","cluster_name":"c1","applied":1,"total_count":1},"session_id":"test-session-001"}`,
+		`{"id":"e3","type":"wave.rejected","timestamp":"2026-03-01T10:02:00Z","data":{"wave_id":"w3","cluster_name":"c1"},"session_id":"test-session-001"}`,
 	}, "\n") + "\n"
 	os.WriteFile(filepath.Join(sessionDir, "2026-03-01.jsonl"), []byte(events), 0644)
 
