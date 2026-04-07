@@ -160,7 +160,7 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *domain.D
 		logger.Warn("Failed to receive d-mail %s: %v", filename, err)
 		return nil
 	}
-	if mail.Kind != domain.KindDesignFeedback && mail.Kind != domain.KindImplFeedback && mail.Kind != domain.KindConvergence && mail.Kind != domain.KindReport {
+	if mail.Kind != domain.KindDesignFeedback && mail.Kind != domain.KindImplFeedback && mail.Kind != domain.KindConvergence && mail.Kind != domain.KindReport && mail.Kind != domain.KindSpecification {
 		return nil
 	}
 	return mail

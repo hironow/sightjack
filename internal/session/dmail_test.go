@@ -724,6 +724,43 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 	dir := t.TempDir()
 	session.EnsureMailDirs(dir)
 
+	// Place a stall-escalation d-mail in inbox (not a monitored kind)
+	stall := &domain.DMail{
+		Name:        "stall-mon-001",
+		Kind:        domain.KindStallEscalation,
+		Description: "Stall escalation",
+		Body:        "# Stall\n",
+	}
+	data, _ := session.MarshalDMail(stall)
+	os.WriteFile(filepath.Join(domain.MailDir(dir, "inbox"), stall.Filename()), data, 0644)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := session.MonitorInbox(ctx, dir, platform.NewLogger(io.Discard, false))
+	if err != nil {
+		t.Fatalf("MonitorInbox: %v", err)
+	}
+
+	// Should NOT receive anything (stall-escalation is not monitored)
+	select {
+	case mail := <-ch:
+		t.Errorf("unexpected mail: %s", mail.Name)
+	case <-time.After(200 * time.Millisecond):
+		// expected: no mail
+	}
+
+	// But the file should be archived (received, just not sent to channel)
+	archivePath := filepath.Join(domain.MailDir(dir, "archive"), stall.Filename())
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file missing: %v", err)
+	}
+}
+
+func TestMonitorInbox_SpecificationIsMonitored(t *testing.T) {
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+
 	// Place a specification d-mail in inbox
 	spec := &domain.DMail{
 		Name:        "spec-mon-001",
@@ -742,18 +779,14 @@ func TestMonitorInbox_SkipsNonFeedback(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// Should NOT receive anything (spec is not feedback)
+	// Specification should be received on the channel (GAP-ARCH-031)
 	select {
 	case mail := <-ch:
-		t.Errorf("unexpected feedback: %s", mail.Name)
-	case <-time.After(200 * time.Millisecond):
-		// expected: no feedback
-	}
-
-	// But the spec should be archived (received, just not sent to channel)
-	archivePath := filepath.Join(domain.MailDir(dir, "archive"), spec.Filename())
-	if _, err := os.Stat(archivePath); err != nil {
-		t.Errorf("archive file missing: %v", err)
+		if mail.Name != "spec-mon-001" {
+			t.Errorf("name = %q, want spec-mon-001", mail.Name)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Error("expected specification to be received on channel")
 	}
 }
 
@@ -1259,16 +1292,16 @@ func TestMonitorInbox_MixedKindsInitialDrain(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// then: 3 items come through channel (2 feedback + 1 report; spec excluded)
+	// then: 4 items come through channel (2 feedback + 1 spec + 1 report)
 	feedback := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
-	if len(feedback) != 3 {
-		t.Fatalf("expected 3 items (2 feedback + 1 report), got %d", len(feedback))
+	if len(feedback) != 4 {
+		t.Fatalf("expected 4 items (2 feedback + 1 spec + 1 report), got %d", len(feedback))
 	}
 	names := make(map[string]bool)
 	for _, fb := range feedback {
 		names[fb.Name] = true
 	}
-	if !names["feedback-mix-1"] || !names["feedback-mix-2"] || !names["report-mix-1"] {
+	if !names["feedback-mix-1"] || !names["feedback-mix-2"] || !names["report-mix-1"] || !names["spec-mix-1"] {
 		t.Errorf("expected feedback-mix-1, feedback-mix-2, report-mix-1, got %v", names)
 	}
 	// all 4 should be archived (spec is received but not channeled)
@@ -1983,10 +2016,10 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 		t.Fatalf("MonitorInbox: %v", err)
 	}
 
-	// then: 2 d-mails delivered (feedback + convergence), spec excluded
+	// then: 3 d-mails delivered (feedback + convergence + spec)
 	drained := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
-	if len(drained) != 2 {
-		t.Fatalf("expected 2 (feedback + convergence), got %d", len(drained))
+	if len(drained) != 3 {
+		t.Fatalf("expected 3 (feedback + convergence + spec), got %d", len(drained))
 	}
 	names := make(map[string]bool)
 	for _, m := range drained {
@@ -1997,6 +2030,9 @@ func TestMonitorInbox_MixedFeedbackAndConvergence(t *testing.T) {
 	}
 	if !names["convergence-mix-1"] {
 		t.Error("expected convergence-mix-1")
+	}
+	if !names["spec-mix-conv-1"] {
+		t.Error("expected spec-mix-conv-1")
 	}
 
 	// all 3 should be archived
