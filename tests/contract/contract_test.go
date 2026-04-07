@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/session"
 )
 
 const goldenDir = "testdata/golden"
@@ -41,13 +40,13 @@ func readGolden(t *testing.T, name string) []byte {
 	return data
 }
 
-// TestContract_ParseDMail verifies that sightjack's ParseDMail can
+// TestContract_ParseDMail verifies that sightjack's domain.ParseDMail can
 // parse all cross-tool golden files.
 func TestContract_ParseDMail(t *testing.T) {
 	for _, name := range goldenFiles(t) {
 		t.Run(name, func(t *testing.T) {
 			data := readGolden(t, name)
-			dm, err := session.ParseDMail(data)
+			dm, err := domain.ParseDMail(data)
 			if err != nil {
 				t.Fatalf("ParseDMail error: %v", err)
 			}
@@ -71,11 +70,11 @@ func TestContract_ParseDMail(t *testing.T) {
 // strict validation rejects D-Mails with unknown kinds.
 func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	data := readGolden(t, "unknown-kind.md")
-	dm, err := session.ParseDMail(data)
+	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := session.ValidateDMail(dm); err == nil {
+	if err := domain.ValidateDMail(&dm); err == nil {
 		t.Error("expected ValidateDMail to fail for unknown kind 'advisory', but it passed")
 	}
 }
@@ -84,7 +83,7 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 // golden file parses correctly and CorrectionMetadataFromMap extracts all fields.
 func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
 	data := readGolden(t, "corrective-feedback.md")
-	dm, err := session.ParseDMail(data)
+	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}

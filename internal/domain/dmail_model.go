@@ -1,6 +1,11 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
 
 // DMailKind is the message type for D-Mails.
 type DMailKind string
@@ -92,4 +97,32 @@ var validDMailActions = map[string]bool{
 	"retry":    true,
 	"escalate": true,
 	"resolve":  true,
+}
+
+// ParseDMail parses a D-Mail from raw bytes (YAML frontmatter + Markdown body).
+// Postel-liberal: accepts any valid YAML frontmatter regardless of schema version
+// or unknown fields. Validation is a separate step (ValidateDMail).
+func ParseDMail(data []byte) (DMail, error) {
+	content := string(data)
+	if !strings.HasPrefix(content, "---\n") {
+		return DMail{}, fmt.Errorf("dmail: missing frontmatter delimiter")
+	}
+	rest := content[4:]
+	idx := strings.Index(rest, "\n---\n")
+	if idx < 0 {
+		if strings.HasSuffix(rest, "\n---") {
+			idx = len(rest) - 4
+		} else {
+			return DMail{}, fmt.Errorf("dmail: missing closing frontmatter delimiter")
+		}
+	}
+	yamlPart := rest[:idx]
+	bodyPart := rest[idx+5:]
+
+	var mail DMail
+	if err := yaml.Unmarshal([]byte(yamlPart), &mail); err != nil {
+		return DMail{}, fmt.Errorf("dmail parse frontmatter: %w", err)
+	}
+	mail.Body = strings.TrimPrefix(bodyPart, "\n")
+	return mail, nil
 }
