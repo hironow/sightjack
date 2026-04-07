@@ -1,8 +1,6 @@
 //go:build contract
 
-package session
-
-// white-box-reason: contract validation: tests unexported golden file enumeration
+package contract_test
 
 import (
 	"os"
@@ -11,15 +9,16 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/session"
 )
 
-const contractGoldenDir = "testdata/contract"
+const goldenDir = "testdata/golden"
 
-func contractGoldenFiles(t *testing.T) []string {
+func goldenFiles(t *testing.T) []string {
 	t.Helper()
-	entries, err := os.ReadDir(contractGoldenDir)
+	entries, err := os.ReadDir(goldenDir)
 	if err != nil {
-		t.Fatalf("read contract golden dir: %v", err)
+		t.Fatalf("read golden dir: %v", err)
 	}
 	var files []string
 	for _, e := range entries {
@@ -28,28 +27,27 @@ func contractGoldenFiles(t *testing.T) []string {
 		}
 	}
 	if len(files) == 0 {
-		t.Fatal("no contract golden files found")
+		t.Fatal("no golden files found")
 	}
 	return files
 }
 
-func readContractGolden(t *testing.T, name string) []byte {
+func readGolden(t *testing.T, name string) []byte {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(contractGoldenDir, name))
+	data, err := os.ReadFile(filepath.Join(goldenDir, name))
 	if err != nil {
-		t.Fatalf("read contract golden %s: %v", name, err)
+		t.Fatalf("read golden %s: %v", name, err)
 	}
 	return data
 }
 
 // TestContract_ParseDMail verifies that sightjack's ParseDMail can
-// parse all cross-tool golden files. Sightjack is Postel-liberal at
-// the parse level — unknown kinds and future schemas parse without error.
+// parse all cross-tool golden files.
 func TestContract_ParseDMail(t *testing.T) {
-	for _, name := range contractGoldenFiles(t) {
+	for _, name := range goldenFiles(t) {
 		t.Run(name, func(t *testing.T) {
-			data := readContractGolden(t, name)
-			dm, err := ParseDMail(data)
+			data := readGolden(t, name)
+			dm, err := session.ParseDMail(data)
 			if err != nil {
 				t.Fatalf("ParseDMail error: %v", err)
 			}
@@ -72,22 +70,21 @@ func TestContract_ParseDMail(t *testing.T) {
 // TestContract_ValidateDMailRejectsEdgeCases verifies that sightjack's
 // strict validation rejects D-Mails with unknown kinds.
 func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
-	data := readContractGolden(t, "unknown-kind.md")
-	dm, err := ParseDMail(data)
+	data := readGolden(t, "unknown-kind.md")
+	dm, err := session.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	// Parse succeeds, but validation should reject unknown kind
-	if err := ValidateDMail(dm); err == nil {
+	if err := session.ValidateDMail(dm); err == nil {
 		t.Error("expected ValidateDMail to fail for unknown kind 'advisory', but it passed")
 	}
 }
 
-// TestContract_CorrectiveMetadataRoundTrip verifies that corrective-feedback.md
+// TestContract_CorrectiveMetadataRoundTrip verifies corrective-feedback.md
 // golden file parses correctly and CorrectionMetadataFromMap extracts all fields.
 func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
-	data := readContractGolden(t, "corrective-feedback.md")
-	dm, err := ParseDMail(data)
+	data := readGolden(t, "corrective-feedback.md")
+	dm, err := session.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
