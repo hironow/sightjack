@@ -314,6 +314,32 @@ func (o *Observer) AssertCompletenessUpdated() {
 	o.AssertEventExists("completeness.updated")
 }
 
+// AssertFeedbackReceivedEvent checks for a feedback.received event in JSONL.
+func (o *Observer) AssertFeedbackReceivedEvent() {
+	o.t.Helper()
+	o.AssertEventExists("feedback.received")
+}
+
+// AssertSpecificationDMailCount checks that at least n specification D-Mails
+// were produced (in archive). Used to verify rescan→new-wave→new-spec flow.
+func (o *Observer) AssertSpecificationDMailCount(minCount int) {
+	o.t.Helper()
+	archiveDir := filepath.Join(o.ws.RepoPath, ".siren", "archive")
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		o.t.Fatalf("read archive: %v", err)
+	}
+	count := 0
+	for _, e := range entries {
+		if strings.Contains(e.Name(), "spec") && strings.HasSuffix(e.Name(), ".md") {
+			count++
+		}
+	}
+	if count < minCount {
+		o.t.Errorf("specification D-Mails in archive: got %d, want >= %d", count, minCount)
+	}
+}
+
 // AssertADRFileExists checks that at least one ADR .md file exists in docs/adr/.
 func (o *Observer) AssertADRFileExists() {
 	o.t.Helper()
