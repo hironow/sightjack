@@ -97,6 +97,7 @@ func newSessionsEnterCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			stateDir := filepath.Dir(cfgPath)
+			repoRoot := filepath.Dir(stateDir) // stateDir = .siren, repoRoot = parent
 			dbPath := filepath.Join(stateDir, ".run", "sessions.db")
 
 			store, err := session.NewSQLiteCodingSessionStore(dbPath)
@@ -136,7 +137,7 @@ func newSessionsEnterCmd() *cobra.Command {
 				ProviderCmd:       cfg.ClaudeCmd,
 				ProviderSessionID: rec.ProviderSessionID,
 				WorkDir:           rec.WorkDir,
-				ConfigBase:        stateDir,
+				ConfigBase:        repoRoot,
 				Stdin:             cmd.InOrStdin(),
 				Stdout:            cmd.OutOrStdout(),
 				Stderr:            cmd.ErrOrStderr(),
