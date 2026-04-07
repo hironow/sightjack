@@ -7,7 +7,7 @@ var (
 	ErrDMailSchemaUnsupported   = errors.New("dmail: unsupported dmail-schema-version")
 	ErrDMailNameRequired        = errors.New("dmail: name is required")
 	ErrDMailKindRequired        = errors.New("dmail: kind is required")
-	ErrDMailKindInvalid         = errors.New("dmail: invalid kind (not in canonical set)")
+	ErrDMailKindInvalid         = errors.New("dmail: invalid kind")
 	ErrDMailDescriptionRequired = errors.New("dmail: description is required")
 	ErrDMailActionInvalid       = errors.New("dmail: invalid action")
 )
