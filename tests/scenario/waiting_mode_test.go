@@ -39,7 +39,7 @@ func TestScenario_WaitingModeSpecRescan(t *testing.T) {
 	t.Log("Phase 1: waiting mode entered")
 
 	// Phase 2: Inject specification D-Mails into inbox.
-	// Two specs: one unique, one duplicate name (to test name-based dedup).
+	// Two distinct specs for batch coalescing. Name-based dedup is tested in Phase 6.
 	spec1 := FormatDMail(map[string]string{
 		"dmail-schema-version": "1",
 		"name":                 "spec-waiting-001",
