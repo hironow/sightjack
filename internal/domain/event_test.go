@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"encoding/json"
+	"regexp"
 	"testing"
 	"time"
 
@@ -504,5 +505,24 @@ func TestPayload_WaveApplied_RoundTrip(t *testing.T) {
 
 	if decoded.Applied != 2 || len(decoded.Errors) != 1 {
 		t.Errorf("unexpected: %+v", decoded)
+	}
+}
+
+func TestValidateEvent_RejectsUnknownType(t *testing.T) {
+	ev, err := domain.NewEvent("totally.unknown.type", map[string]string{"k": "v"}, time.Now())
+	if err != nil {
+		t.Fatalf("NewEvent: %v", err)
+	}
+	if err := domain.ValidateEvent(ev); err == nil {
+		t.Error("expected ValidateEvent to reject unknown event type")
+	}
+}
+
+func TestAllEventTypes_AreDotCase(t *testing.T) {
+	dotCaseRe := regexp.MustCompile(`^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$`)
+	for et := range domain.AllValidEventTypes() {
+		if !dotCaseRe.MatchString(string(et)) {
+			t.Errorf("EventType %q violates dot.case naming convention", et)
+		}
 	}
 }

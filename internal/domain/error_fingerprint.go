@@ -20,9 +20,7 @@ const (
 	ErrorKindTransient ErrorKind = "transient"
 )
 
-// EventWaveStalled is emitted when a wave is detected to be stalled
-// due to repeated structural error patterns.
-const EventWaveStalled EventType = "wave.stalled"
+// EventWaveStalled is defined in event.go alongside all other EventType constants.
 
 // structuralPhrases are substrings that indicate structural (non-transient) errors.
 var structuralPhrases = []string{
