@@ -176,7 +176,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 		if result != loopResultRescanNeeded {
 			return nil
 		}
-		logger.Info("Auto-rescan: design-feedback triggered fresh scan")
+		logger.Info("Auto-rescan: D-Mail triggered fresh scan")
 		scanDir, scanResultPath, scanResult, waves, completed, adrCount, scanTime, err =
 			RescanCore(ctx, cfg, baseDir, sessionID, latestWaves, latestCompleted, runner, onceRunner, emitter, out, logger)
 		if err != nil {

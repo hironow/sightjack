@@ -326,12 +326,13 @@ func FormatReportsForPrompt(reports []*domain.DMail) string {
 // so they can be included in nextgen prompts.
 // Convergence d-mails are tracked separately for journaling.
 type FeedbackCollector struct {
-	mu          sync.Mutex
-	items       []*domain.DMail
-	convNames   []string
-	notifier    port.Notifier
-	notify      chan struct{} // signals new D-Mail arrival (buffered, size 1)
-	snapshotIdx int           // index up to which items have been seen
+	mu            sync.Mutex
+	items         []*domain.DMail
+	convNames     []string
+	notifier      port.Notifier
+	notify        chan struct{} // signals new D-Mail arrival (buffered, size 1)
+	snapshotIdx   int           // index up to which items have been seen
+	consumedSpecs map[string]bool // spec D-Mail names already used as rescan triggers (cross-cycle idempotency)
 }
 
 // CollectFeedback creates a FeedbackCollector seeded with initial feedback
@@ -420,6 +421,27 @@ func (c *FeedbackCollector) Snapshot() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.snapshotIdx = len(c.items)
+}
+
+// ConsumeSpecNames marks the given specification D-Mail names as consumed.
+// Consumed specs will not trigger rescan in subsequent waiting cycles.
+func (c *FeedbackCollector) ConsumeSpecNames(names []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.consumedSpecs == nil {
+		c.consumedSpecs = make(map[string]bool)
+	}
+	for _, name := range names {
+		c.consumedSpecs[name] = true
+	}
+}
+
+// IsSpecConsumed returns true if the given specification name has already
+// been consumed as a rescan trigger.
+func (c *FeedbackCollector) IsSpecConsumed(name string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.consumedSpecs[name]
 }
 
 // NewSinceSnapshot returns D-Mails received since the last Snapshot call.

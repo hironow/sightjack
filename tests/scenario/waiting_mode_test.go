@@ -78,6 +78,18 @@ func TestScenario_WaitingModeSpecRescan(t *testing.T) {
 		t.Errorf("expected exactly 1 Auto-rescan, got %d — batch was not consumed", rescanCount)
 	}
 	t.Log("Phase 5: no duplicate rescan from same batch")
+
+	// Phase 6: Re-inject the same spec names and verify idempotency.
+	// The consumed spec names (spec-waiting-001, spec-waiting-002) must not
+	// trigger a second rescan even when re-delivered in a new arrival.
+	waitForLog(t, output, "Waiting for", 30*time.Second) // re-entered waiting phase
+	ws.InjectDMail(t, ".siren", "inbox", "spec-waiting-001-dup.md", spec1) // same name in D-Mail, different filename
+	time.Sleep(3 * time.Second)
+	rescanCount2 := strings.Count(output.String(), "Auto-rescan")
+	if rescanCount2 != 1 {
+		t.Errorf("expected still 1 Auto-rescan after re-inject of consumed spec, got %d", rescanCount2)
+	}
+	t.Log("Phase 6: re-injected consumed spec did not trigger duplicate rescan")
 }
 
 // waitForLog polls the output buffer for a substring, with timeout.
