@@ -317,6 +317,30 @@ func (w *Workspace) RunSightjackScan(t *testing.T, ctx context.Context, extraArg
 	return err
 }
 
+// StartSightjackAsync starts sightjack run in the background with the given
+// idle timeout. Returns the combined output buffer. The process is killed on
+// test cleanup.
+func (w *Workspace) StartSightjackAsync(t *testing.T, ctx context.Context, idleTimeout string, extraArgs ...string) (*exec.Cmd, *bytes.Buffer) {
+	t.Helper()
+	args := []string{"run", "--auto-approve", "--idle-timeout", idleTimeout}
+	args = append(args, extraArgs...)
+	args = append(args, w.RepoPath)
+
+	cmd := w.runToolCmd(ctx, "sightjack", args...)
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &output
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start sightjack async: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+	return cmd, &output
+}
+
 // RunPaintress runs paintress with the given args and waits for completion.
 func (w *Workspace) RunPaintress(t *testing.T, ctx context.Context, args ...string) error {
 	t.Helper()
