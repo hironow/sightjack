@@ -130,6 +130,9 @@ waitingCycle:
 			if preHasSpec {
 				logger.Info("Specification D-Mail arrived during scan — triggering rescan (%d)", len(collectSpecNames(preFeedback)))
 			}
+			// Advance snapshot to consume the batch — prevents the same
+			// D-Mails from re-triggering rescan on the next loop iteration.
+			fbCollector.Snapshot()
 			return loopResultRescanNeeded, waves, completed, nil
 		}
 
@@ -163,6 +166,9 @@ waitingCycle:
 				specNames := collectSpecNames(newMails)
 				logger.Info("Specification D-Mail received (%d) — triggering rescan", len(specNames))
 			}
+			// Advance snapshot to consume the batch — prevents the same
+			// D-Mails from re-triggering rescan on the next loop iteration.
+			fbCollector.Snapshot()
 			return loopResultRescanNeeded, waves, completed, nil
 		}
 

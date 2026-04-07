@@ -67,6 +67,17 @@ func TestScenario_WaitingModeSpecRescan(t *testing.T) {
 	// session.go logs "Auto-rescan" when loopResultRescanNeeded is returned.
 	waitForLog(t, output, "Auto-rescan", 30*time.Second)
 	t.Log("Phase 4: auto-rescan completed")
+
+	// Phase 5: Verify the same batch does NOT trigger a second rescan.
+	// After the first auto-rescan, the session re-enters the waiting loop.
+	// The consumed batch (Snapshot advanced) must not re-trigger.
+	// Wait 3s and count "Auto-rescan" occurrences — must be exactly 1.
+	time.Sleep(3 * time.Second)
+	rescanCount := strings.Count(output.String(), "Auto-rescan")
+	if rescanCount != 1 {
+		t.Errorf("expected exactly 1 Auto-rescan, got %d — batch was not consumed", rescanCount)
+	}
+	t.Log("Phase 5: no duplicate rescan from same batch")
 }
 
 // waitForLog polls the output buffer for a substring, with timeout.
