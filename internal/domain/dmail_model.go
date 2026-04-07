@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 // DMailKind is the message type for D-Mails.
 type DMailKind string
 
@@ -27,6 +29,14 @@ var ValidDMailKinds = map[DMailKind]bool{
 // IsValidDMailKind returns true if the given kind is in the canonical set.
 func IsValidDMailKind(kind DMailKind) bool {
 	return ValidDMailKinds[kind]
+}
+
+// ValidateKind checks that kind is one of the allowed D-Mail kinds.
+func ValidateKind(kind DMailKind) error {
+	if !IsValidDMailKind(kind) {
+		return fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
+	}
+	return nil
 }
 
 // DMail represents the domain-owned D-Mail model.
@@ -66,8 +76,8 @@ func ValidateDMail(d *DMail) error {
 	if d.Kind == "" {
 		return ErrDMailKindRequired
 	}
-	if !IsValidDMailKind(d.Kind) {
-		return ErrDMailKindInvalid
+	if err := ValidateKind(d.Kind); err != nil {
+		return err
 	}
 	if d.Description == "" {
 		return ErrDMailDescriptionRequired
