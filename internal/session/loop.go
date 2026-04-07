@@ -120,11 +120,23 @@ waitingCycle:
 			break waitingCycle
 		}
 
-		// Process any design-feedback D-Mails that arrived during scanning
-		// (before entering waiting phase). Without this, feedback collected
-		// during scan/apply/review would be missed by NewSinceSnapshot.
+		// Process D-Mails that arrived during scanning (before entering
+		// waiting phase). Without this, feedback/specs collected during
+		// scan/apply/review would be missed by NewSinceSnapshot.
 		preFeedback := fbCollector.NewSinceSnapshot()
 		emitDesignFeedback(preFeedback, emitter, logger)
+		_, _, preHasDesignFb, _ := classifyNewMails(preFeedback)
+		preNewSpecs := collectNewSpecNames(preFeedback, fbCollector)
+		if len(preNewSpecs) > 0 || preHasDesignFb {
+			if len(preNewSpecs) > 0 {
+				logger.Info("Specification D-Mail arrived during scan — triggering rescan (%d)", len(preNewSpecs))
+				fbCollector.ConsumeSpecNames(preNewSpecs)
+			}
+			// Advance snapshot to consume the batch — prevents the same
+			// D-Mails from re-triggering rescan on the next loop iteration.
+			fbCollector.Snapshot()
+			return loopResultRescanNeeded, waves, completed, nil
+		}
 
 		// Snapshot before entering waiting phase
 		fbCollector.Snapshot()
@@ -138,18 +150,29 @@ waitingCycle:
 			break waitingCycle
 		}
 
+		// Short debounce: allow additional D-Mails to arrive before classifying.
+		// fsnotify may deliver events in rapid succession for batch writes.
+		time.Sleep(200 * time.Millisecond)
+
 		// Classify new D-Mails since snapshot
 		newMails := fbCollector.NewSinceSnapshot()
-		hasSpec, hasReport, hasDesignFeedback, reportIssueIDs := classifyNewMails(newMails)
+		_, hasReport, hasDesignFeedback, reportIssueIDs := classifyNewMails(newMails)
 
-		if hasSpec {
-			logger.Info("New specification received. Rescanning not yet supported in waiting mode.")
-		}
-
-		// Design-feedback triggers rescan: exit loop so caller can perform
-		// scan+wavegen+merge and re-enter with fresh data (ADR-0024 flow).
-		if hasDesignFeedback {
-			emitDesignFeedback(newMails, emitter, logger)
+		// Specification or design-feedback triggers rescan: exit loop so caller
+		// can perform scan+wavegen+merge and re-enter with fresh data.
+		// Only new (unconsumed) spec names count — re-delivered duplicates are idempotent.
+		newSpecNames := collectNewSpecNames(newMails, fbCollector)
+		if len(newSpecNames) > 0 || hasDesignFeedback {
+			if hasDesignFeedback {
+				emitDesignFeedback(newMails, emitter, logger)
+			}
+			if len(newSpecNames) > 0 {
+				logger.Info("Specification D-Mail received (%d) — triggering rescan", len(newSpecNames))
+				fbCollector.ConsumeSpecNames(newSpecNames)
+			}
+			// Advance snapshot to consume the batch — prevents the same
+			// D-Mails from re-triggering rescan on the next loop iteration.
+			fbCollector.Snapshot()
 			return loopResultRescanNeeded, waves, completed, nil
 		}
 
@@ -176,7 +199,7 @@ waitingCycle:
 			}
 		}
 
-		if !hasSpec && !hasReport && !hasDesignFeedback {
+		if len(newSpecNames) == 0 && !hasReport && !hasDesignFeedback {
 			logger.Info("New feedback received. Resuming interactive loop...")
 		}
 
@@ -227,4 +250,19 @@ func emitDesignFeedback(mails []*domain.DMail, emitter port.SessionEventEmitter,
 			logger.Warn("Failed to emit feedback_received event for %s: %v", name, err)
 		}
 	}
+}
+
+// collectNewSpecNames returns specification D-Mail names that have not been
+// consumed by a previous rescan cycle. Deduplicates within the batch and
+// filters out names already marked as consumed in the FeedbackCollector.
+func collectNewSpecNames(mails []*domain.DMail, fc *FeedbackCollector) []string {
+	seen := make(map[string]bool)
+	var names []string
+	for _, m := range mails {
+		if m.Kind == domain.KindSpecification && !seen[m.Name] && !fc.IsSpecConsumed(m.Name) {
+			seen[m.Name] = true
+			names = append(names, m.Name)
+		}
+	}
+	return names
 }
