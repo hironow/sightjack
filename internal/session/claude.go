@@ -24,6 +24,17 @@ func SetCircuitBreaker(cb *platform.CircuitBreaker) {
 	sharedCircuitBreaker = cb
 }
 
+// sharedStreamBus is the process-wide session stream bus. Set via SetStreamBus
+// at startup. All ClaudeAdapter instances created via NewClaudeAdapter
+// automatically pick up this bus.
+var sharedStreamBus port.SessionStreamPublisher
+
+// SetStreamBus sets the process-wide stream bus for live session event publishing.
+// Call this once during startup before any provider invocations.
+func SetStreamBus(bus port.SessionStreamPublisher) {
+	sharedStreamBus = bus
+}
+
 var newCmd = defaultNewCmd
 
 func defaultNewCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -61,6 +72,7 @@ var WithWorkDir = port.WithWorkDir
 var WithConfigBase = port.WithConfigBase
 
 // NewClaudeAdapter creates a ClaudeAdapter implementing port.ClaudeRunner.
+// Automatically wires the process-wide StreamBus if set via SetStreamBus.
 func NewClaudeAdapter(cfg *domain.Config, logger domain.Logger) *ClaudeAdapter {
 	return &ClaudeAdapter{
 		ClaudeCmd:  cfg.ClaudeCmd,
@@ -69,6 +81,8 @@ func NewClaudeAdapter(cfg *domain.Config, logger domain.Logger) *ClaudeAdapter {
 		Logger:     logger,
 		NewCmd:     newCmd,
 		CancelFunc: cancelFunc,
+		StreamBus:  sharedStreamBus,
+		ToolName:   "sightjack",
 	}
 }
 
