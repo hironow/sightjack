@@ -16,6 +16,7 @@ type RunConfig struct {
 	Continue        bool   // passes --continue to resume a prior session
 	Model           string // overrides the default model for this invocation
 	ResumeSessionID string // passes --resume <id> to target a specific session (mutually exclusive with Continue)
+	CodingSessionID string // our CodingSessionRecord.ID for stream event correlation
 }
 
 // ApplyOptions applies RunOption functions to a RunConfig and returns it.
@@ -61,6 +62,15 @@ func WithConfigBase(dir string) RunOption {
 func WithModel(model string) RunOption {
 	return func(c *RunConfig) {
 		c.Model = model
+	}
+}
+
+// WithCodingSessionID sets the CodingSessionRecord.ID for stream event correlation.
+// SessionTrackingAdapter injects this so live stream events can be correlated with
+// the persisted coding session record.
+func WithCodingSessionID(id string) RunOption {
+	return func(c *RunConfig) {
+		c.CodingSessionID = id
 	}
 }
 

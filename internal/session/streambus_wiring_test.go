@@ -1,52 +1,117 @@
 package session
 
-// white-box-reason: tests that SetStreamBus propagates to NewClaudeAdapter
+// white-box-reason: tests that ClaudeAdapter emits exactly 1 session_end via StreamBus
+// and that CodingSessionID propagates through RunOption → normalizer → event
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
-func TestStreamBusWiring_ClaudeAdapter(t *testing.T) {
-	// given: process-wide StreamBus set
+// fakeStreamJSON returns minimal Claude stream-json output for testing.
+func fakeStreamJSON() string {
+	return strings.Join([]string{
+		`{"type":"system","subtype":"init","session_id":"fake-sess","model":"test","tools":[]}`,
+		`{"type":"result","subtype":"success","session_id":"fake-sess","result":"done","usage":{"input_tokens":100,"output_tokens":50},"total_cost_usd":0.001,"duration_ms":500}`,
+	}, "\n") + "\n"
+}
+
+func TestStreamBusWiring_AdapterEmitsExactlyOneSessionEnd(t *testing.T) {
+	// given: bus + subscriber
 	bus := platform.NewInProcessSessionBus()
 	defer bus.Close()
-	sub := bus.Subscribe(16)
+	sub := bus.Subscribe(64)
 	defer sub.Close()
 
 	old := sharedStreamBus
 	SetStreamBus(bus)
 	defer func() { sharedStreamBus = old }()
 
-	// when: NewClaudeAdapter creates an adapter
-	cfg := &domain.Config{ClaudeCmd: "nonexistent", Model: "test", TimeoutSec: 10}
+	// Override NewCmd to echo fake stream-json instead of running real claude
+	cleanup := OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "printf", "%s", fakeStreamJSON())
+	})
+	defer cleanup()
+
+	cfg := &domain.Config{ClaudeCmd: "fake-claude", Model: "test", TimeoutSec: 30}
 	adapter := NewClaudeAdapter(cfg, &domain.NopLogger{})
 
-	// then: StreamBus and ToolName are set
-	if adapter.StreamBus == nil {
-		t.Fatal("expected non-nil StreamBus on adapter")
-	}
-	if adapter.ToolName != "sightjack" {
-		t.Errorf("expected ToolName=sightjack, got %q", adapter.ToolName)
+	// when: run adapter with CodingSessionID via RunOption
+	_, err := adapter.RunDetailed(context.Background(), "test prompt", os.Stdout,
+		port.WithCodingSessionID("test-coding-session-42"))
+	if err != nil {
+		t.Fatalf("RunDetailed: %v", err)
 	}
 
-	// Verify bus is live by publishing and checking subscriber receives
-	bus.Publish(context.Background(), domain.SessionStreamEvent{
-		Tool:      "sightjack",
-		Type: "session_end",
-		Timestamp: time.Now(),
-	})
-
-	select {
-	case ev := <-sub.C():
-		if ev.Tool != "sightjack" {
-			t.Errorf("expected Tool=sightjack, got %q", ev.Tool)
+	// then: collect events from subscriber
+	var events []domain.SessionStreamEvent
+	timeout := time.After(2 * time.Second)
+drain:
+	for {
+		select {
+		case ev := <-sub.C():
+			events = append(events, ev)
+		case <-timeout:
+			break drain
+		default:
+			if len(events) > 0 {
+				time.Sleep(10 * time.Millisecond)
+				select {
+				case ev := <-sub.C():
+					events = append(events, ev)
+				default:
+					break drain
+				}
+			} else {
+				time.Sleep(10 * time.Millisecond)
+			}
 		}
-	case <-time.After(time.Second):
-		t.Fatal("subscriber did not receive event within timeout")
+	}
+
+	// Verify: exactly 1 session_end event
+	var sessionEnds []domain.SessionStreamEvent
+	for _, ev := range events {
+		if ev.Type == domain.StreamSessionEnd {
+			sessionEnds = append(sessionEnds, ev)
+		}
+	}
+	if len(sessionEnds) != 1 {
+		t.Errorf("expected exactly 1 session_end, got %d", len(sessionEnds))
+		for i, ev := range sessionEnds {
+			t.Logf("  session_end[%d]: SessionID=%s, Data=%s", i, ev.SessionID, string(ev.Data))
+		}
+	}
+
+	// Verify: session_end contains CodingSessionID
+	if len(sessionEnds) > 0 {
+		endEv := sessionEnds[0]
+		if endEv.SessionID != "test-coding-session-42" {
+			t.Errorf("expected CodingSessionID=test-coding-session-42, got %q", endEv.SessionID)
+		}
+		if endEv.Tool != "sightjack" {
+			t.Errorf("expected Tool=sightjack, got %q", endEv.Tool)
+		}
+		// Verify usage data is included (from saved result, not double-emitted)
+		data := string(endEv.Data)
+		if !strings.Contains(data, "input_tokens") {
+			t.Errorf("session_end should contain usage data, got: %s", data)
+		}
+	}
+
+	// Verify: at least session_start + session_end
+	if len(events) < 2 {
+		t.Errorf("expected at least 2 events (start + end), got %d", len(events))
+		for i, ev := range events {
+			fmt.Printf("  event[%d]: type=%s\n", i, ev.Type)
+		}
 	}
 }

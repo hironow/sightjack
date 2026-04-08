@@ -106,10 +106,6 @@ if event data is found in .siren/events/.`,
 				return rpErr
 			}
 
-			streamBus := platform.NewInProcessSessionBus()
-			defer streamBus.Close()
-			session.SetStreamBus(streamBus)
-
 			runner := session.NewSessionRunnerAdapter()
 			factory := session.NewRecorderFactoryAdapter()
 
