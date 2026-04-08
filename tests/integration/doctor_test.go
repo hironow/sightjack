@@ -294,8 +294,8 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: wave mode has 13 results (includes gh check)
-	if len(results) != 14 {
-		t.Fatalf("expected 14 results, got %d", len(results))
+	if len(results) != 15 {
+		t.Fatalf("expected 15 results, got %d", len(results))
 	}
 	// Validate by name to avoid index-dependent assertions
 	checkByName := func(name string) *domain.DoctorCheck {
@@ -356,8 +356,8 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: wave mode has 13 results (includes gh check)
-	if len(results) != 14 {
-		t.Fatalf("expected 14 results, got %d", len(results))
+	if len(results) != 15 {
+		t.Fatalf("expected 15 results, got %d", len(results))
 	}
 	// Validate by name to avoid index-dependent assertions
 	checkByName := func(name string) *domain.DoctorCheck {
@@ -415,9 +415,9 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeLinear)
 
-	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate, skills-ref)
-	if len(results) != 12 {
-		t.Fatalf("expected 12 results, got %d: %v", len(results), results)
+	// then: should have 13 results (git, claude, state dir, config, skills, event store, dead-letters, claude auth, linear mcp, claude-inference, context-budget, success-rate, skills-ref)
+	if len(results) != 13 {
+		t.Fatalf("expected 13 results, got %d: %v", len(results), results)
 	}
 	// git binary check (index 0)
 	if results[0].Name != "git" || results[0].Status != domain.CheckOK {
@@ -439,36 +439,40 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	if results[5].Name != "Event Store" {
 		t.Errorf("expected 'Event Store', got %q", results[5].Name)
 	}
-	// claude-auth should be OK (fake-claude mcp list succeeds, index 6)
-	if results[6].Name != "claude-auth" {
-		t.Errorf("expected 'claude-auth', got %q", results[6].Name)
+	// dead-letters (index 6)
+	if results[6].Name != "dead-letters" {
+		t.Errorf("expected 'dead-letters', got %q", results[6].Name)
 	}
-	if results[6].Status != domain.CheckOK {
-		t.Errorf("claude-auth: expected OK, got %v: %s", results[6].Status, results[6].Message)
-	}
-	// linear-mcp should be OK (fake-claude outputs "linear ✓ connected", index 7)
-	if results[7].Name != "linear-mcp" {
-		t.Errorf("expected 'linear-mcp', got %q", results[7].Name)
+	// claude-auth should be OK (fake-claude mcp list succeeds, index 7)
+	if results[7].Name != "claude-auth" {
+		t.Errorf("expected 'claude-auth', got %q", results[7].Name)
 	}
 	if results[7].Status != domain.CheckOK {
-		t.Errorf("linear-mcp: expected OK, got %v: %s", results[7].Status, results[7].Message)
+		t.Errorf("claude-auth: expected OK, got %v: %s", results[7].Status, results[7].Message)
 	}
-	// claude-inference should be OK (fake-claude --print responds with "2", index 8)
-	if results[8].Name != "claude-inference" {
-		t.Errorf("expected 'claude-inference', got %q", results[8].Name)
+	// linear-mcp should be OK (fake-claude outputs "linear ✓ connected", index 8)
+	if results[8].Name != "linear-mcp" {
+		t.Errorf("expected 'linear-mcp', got %q", results[8].Name)
 	}
 	if results[8].Status != domain.CheckOK {
-		t.Errorf("claude-inference: expected OK, got %v: %s", results[8].Status, results[8].Message)
+		t.Errorf("linear-mcp: expected OK, got %v: %s", results[8].Status, results[8].Message)
 	}
-	// context-budget should be OK (index 9)
-	if results[9].Name != "context-budget" {
-		t.Errorf("expected 'context-budget', got %q", results[9].Name)
+	// claude-inference should be OK (fake-claude --print responds with "2", index 9)
+	if results[9].Name != "claude-inference" {
+		t.Errorf("expected 'claude-inference', got %q", results[9].Name)
 	}
 	if results[9].Status != domain.CheckOK {
-		t.Errorf("context-budget: expected OK, got %v: %s", results[9].Status, results[9].Message)
+		t.Errorf("claude-inference: expected OK, got %v: %s", results[9].Status, results[9].Message)
 	}
-	// success-rate should be last result, OK with "no events" (no events dir in temp, index 10)
-	sr := results[10]
+	// context-budget should be OK (index 10)
+	if results[10].Name != "context-budget" {
+		t.Errorf("expected 'context-budget', got %q", results[10].Name)
+	}
+	if results[10].Status != domain.CheckOK {
+		t.Errorf("context-budget: expected OK, got %v: %s", results[10].Status, results[10].Message)
+	}
+	// success-rate (index 11)
+	sr := results[11]
 	if sr.Name != "success-rate" {
 		t.Errorf("expected 'success-rate', got %q", sr.Name)
 	}

@@ -228,6 +228,50 @@ func CheckSkills(baseDir string) domain.DoctorCheck {
 // and corruption status. Delegates to eventsource.ValidateStore which uses the
 // same json.Unmarshal judgment as the real event store replay.
 // Returns CheckSkip if the events directory does not exist yet.
+// checkDeadLetters reports outbox items that have exceeded max retry count.
+func checkDeadLetters(baseDir string) domain.DoctorCheck {
+	// Check DB file exists before opening (avoid creating dirs/DB as side effect)
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "outbox.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: "no outbox DB",
+		}
+	}
+	store, err := NewOutboxStoreForDir(baseDir)
+	if err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: "outbox store unavailable",
+		}
+	}
+	defer store.Close()
+
+	count, err := store.DeadLetterCount(context.Background())
+	if err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: fmt.Sprintf("dead letter count: %v", err),
+		}
+	}
+	if count > 0 {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("%d dead-lettered outbox item(s)", count),
+			Hint:    "these items failed delivery 3+ times and are permanently stuck — inspect outbox.db in .siren/.run/",
+		}
+	}
+	return domain.DoctorCheck{
+		Name:    "dead-letters",
+		Status:  domain.CheckOK,
+		Message: "no dead-lettered items",
+	}
+}
+
 func CheckEventStore(baseDir string) domain.DoctorCheck {
 	stateDir := filepath.Join(baseDir, domain.StateDir)
 	health := eventsource.ValidateStore(stateDir)
@@ -343,6 +387,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		results = append(results, skillResult)
 	}
 	results = append(results, CheckEventStore(baseDir))
+	results = append(results, checkDeadLetters(baseDir))
 
 	// --- Connectivity ---
 	if cfgResult.Status != domain.CheckOK {
