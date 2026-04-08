@@ -175,7 +175,7 @@ if event data is found in .siren/events/.`,
 							logger.Warn("No resumable session found — starting fresh session instead.")
 							goto freshSession
 						}
-						resumeRecorder, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, resumableSessionID), resumableSessionID, logger)
+						resumeRecorder, recErr := factory.NewSessionRecorder(cmd.Context(), factory.SessionEventsDir(baseDir, resumableSessionID), resumableSessionID, logger)
 						if recErr != nil {
 							return fmt.Errorf("resume recorder: %w", recErr)
 						}
@@ -183,7 +183,7 @@ if event data is found in .siren/events/.`,
 						return usecase.ResumeSession(cmd.Context(), domain.NewResumeSessionCommand(rp, resumeSID), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeRecorder, logger, &platform.OTelPolicyMetrics{}, runner)
 					case domain.ResumeChoiceRescan:
 						rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
-						rescanRecorder, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, rescanID), rescanID, logger)
+						rescanRecorder, recErr := factory.NewSessionRecorder(cmd.Context(), factory.SessionEventsDir(baseDir, rescanID), rescanID, logger)
 						if recErr != nil {
 							return fmt.Errorf("rescan recorder: %w", recErr)
 						}
@@ -200,7 +200,7 @@ if event data is found in .siren/events/.`,
 			var recorder port.Recorder = port.NopRecorder{}
 			if !dryRun {
 				sessionInput = cmd.InOrStdin()
-				rec, recErr := factory.NewSessionRecorder(factory.SessionEventsDir(baseDir, sessionID), sessionID, logger)
+				rec, recErr := factory.NewSessionRecorder(cmd.Context(), factory.SessionEventsDir(baseDir, sessionID), sessionID, logger)
 				if recErr != nil {
 					return fmt.Errorf("session recorder: %w", recErr)
 				}

@@ -87,8 +87,8 @@ func (f *RecorderFactoryAdapter) SessionEventsDir(baseDir, sessionID string) str
 	return SessionEventsDir(baseDir, sessionID)
 }
 
-func (f *RecorderFactoryAdapter) NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
-	return NewSessionRecorderWithSeqCounter(stateDir, sessionID, logger, f.seqCounter)
+func (f *RecorderFactoryAdapter) NewSessionRecorder(ctx context.Context, stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
+	return NewSessionRecorderWithSeqCounter(ctx, stateDir, sessionID, logger, f.seqCounter)
 }
 
 func (f *RecorderFactoryAdapter) NewEventStore(stateDir string, logger domain.Logger) port.EventStore {

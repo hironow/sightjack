@@ -15,8 +15,9 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	// given: aggregate + recorder wired to a temp event store
 	baseDir := t.TempDir()
 	sessionID := "test-scan-001"
+	ctx := context.Background()
 	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID), &domain.NopLogger{})
-	recorder, err := eventsource.NewSessionRecorder(store, sessionID)
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, sessionID)
 	if err != nil {
 		t.Fatalf("new recorder: %v", err)
 	}
@@ -28,7 +29,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aggregate start: %v", err)
 	}
-	if err := recorder.Record(startEvt); err != nil {
+	if err := recorder.Record(ctx, startEvt); err != nil {
 		t.Fatalf("record start: %v", err)
 	}
 
@@ -45,7 +46,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aggregate scan: %v", err)
 	}
-	if err := recorder.Record(scanEvt); err != nil {
+	if err := recorder.Record(ctx, scanEvt); err != nil {
 		t.Fatalf("record scan: %v", err)
 	}
 

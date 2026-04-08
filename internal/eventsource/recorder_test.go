@@ -46,21 +46,22 @@ func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
-	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	ctx := context.Background()
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
 	// when
-	if err := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{})); err != nil {
+	if err := recorder.Record(ctx, mustEvent(t, domain.EventSessionStarted, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
-	if err := recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{})); err != nil {
+	if err := recorder.Record(ctx, mustEvent(t, domain.EventScanCompleted, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
 	// then
-	events, _, _ := store.LoadAll(context.Background())
+	events, _, _ := store.LoadAll(ctx)
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -82,7 +83,8 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
-	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	ctx := context.Background()
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
@@ -93,12 +95,12 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	}
 
 	// when
-	if err := recorder.Record(mustEvent(t, domain.EventSessionStarted, payload)); err != nil {
+	if err := recorder.Record(ctx, mustEvent(t, domain.EventSessionStarted, payload)); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
 	// then
-	events, _, _ := store.LoadAll(context.Background())
+	events, _, _ := store.LoadAll(ctx)
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
@@ -113,17 +115,18 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
-	recorder, err := eventsource.NewSessionRecorder(store, "session-42")
+	ctx := context.Background()
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, "session-42")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
 	// when
-	recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
-	recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
+	recorder.Record(ctx, mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	recorder.Record(ctx, mustEvent(t, domain.EventScanCompleted, struct{}{}))
 
 	// then: both events should have CorrelationID == sessionID
-	events, _, _ := store.LoadAll(context.Background())
+	events, _, _ := store.LoadAll(ctx)
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -138,18 +141,19 @@ func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
-	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	ctx := context.Background()
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
 	// when
-	recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
-	recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
-	recorder.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
+	recorder.Record(ctx, mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	recorder.Record(ctx, mustEvent(t, domain.EventScanCompleted, struct{}{}))
+	recorder.Record(ctx, mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
 	// then
-	events, _, _ := store.LoadAll(context.Background())
+	events, _, _ := store.LoadAll(ctx)
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
@@ -172,25 +176,26 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	dir := t.TempDir()
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
-	rec1, _ := eventsource.NewSessionRecorder(store, "session-1")
-	rec1.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
-	rec1.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
-	rec1.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
+	ctx := context.Background()
+	rec1, _ := eventsource.NewSessionRecorder(ctx, store, "session-1")
+	rec1.Record(ctx, mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	rec1.Record(ctx, mustEvent(t, domain.EventScanCompleted, struct{}{}))
+	rec1.Record(ctx, mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
-	events1, _, _ := store.LoadAll(context.Background())
+	events1, _, _ := store.LoadAll(ctx)
 	lastID := events1[len(events1)-1].ID
 
 	// when: create new recorder from same store
-	recorder, err := eventsource.NewSessionRecorder(store, "session-1")
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(mustEvent(t, domain.EventWaveApproved, struct{}{})); err != nil {
+	if err := recorder.Record(ctx, mustEvent(t, domain.EventWaveApproved, struct{}{})); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
 
 	// then: new event should chain from last existing event
-	events, _, _ := store.LoadAll(context.Background())
+	events, _, _ := store.LoadAll(ctx)
 	if len(events) != 4 {
 		t.Fatalf("expected 4 events, got %d", len(events))
 	}
@@ -206,26 +211,27 @@ func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	// given: a store that fails the first Append, then succeeds
 	dir := t.TempDir()
 	real := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
+	ctx := context.Background()
 	fos := &failOnceStore{real: real}
-	recorder, err := eventsource.NewSessionRecorder(fos, "session-1")
+	recorder, err := eventsource.NewSessionRecorder(ctx, fos, "session-1")
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
 
 	// when: first Record fails
-	err1 := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	err1 := recorder.Record(ctx, mustEvent(t, domain.EventSessionStarted, struct{}{}))
 	if err1 == nil {
 		t.Fatal("expected error on first Record")
 	}
 
 	// when: second Record should succeed
-	err2 := recorder.Record(mustEvent(t, domain.EventSessionStarted, struct{}{}))
+	err2 := recorder.Record(ctx, mustEvent(t, domain.EventSessionStarted, struct{}{}))
 	if err2 != nil {
 		t.Fatalf("expected second Record to succeed, got: %v", err2)
 	}
 
 	// then: the store should have exactly 1 event
-	events, _, _ := real.LoadAll(context.Background())
+	events, _, _ := real.LoadAll(ctx)
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}

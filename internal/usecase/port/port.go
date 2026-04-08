@@ -148,14 +148,14 @@ type OutboxStore interface {
 
 // Recorder records domain events during a session.
 type Recorder interface {
-	Record(ev domain.Event) error
+	Record(ctx context.Context, ev domain.Event) error
 }
 
 // NopRecorder is a no-op Recorder for dry-run mode and testing.
 type NopRecorder struct{}
 
 // Record always returns nil without recording anything.
-func (NopRecorder) Record(domain.Event) error { return nil }
+func (NopRecorder) Record(context.Context, domain.Event) error { return nil }
 
 // SessionEventEmitter wraps aggregate event production + recording.
 // Implemented in usecase layer, injected into session by cmd (composition root).
@@ -248,7 +248,7 @@ type ScanRunner interface {
 // RecorderFactory creates session recorders and resolves event directories.
 type RecorderFactory interface {
 	SessionEventsDir(baseDir, sessionID string) string
-	NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (Recorder, error)
+	NewSessionRecorder(ctx context.Context, stateDir, sessionID string, logger domain.Logger) (Recorder, error)
 	NewEventStore(stateDir string, logger domain.Logger) EventStore
 }
 

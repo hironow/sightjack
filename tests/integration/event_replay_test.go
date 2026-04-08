@@ -48,7 +48,7 @@ func TestEventReplay_SessionStartAndScanCompleted(t *testing.T) {
 	}
 
 	// when
-	state, loadErr := eventsource.LoadState(store)
+	state, loadErr := eventsource.LoadState(context.Background(), store)
 
 	// then
 	if loadErr != nil {
@@ -99,7 +99,7 @@ func TestEventReplay_RoundTrip(t *testing.T) {
 	if _, appendErr := store.Append(context.Background(),e1, e2); appendErr != nil {
 		t.Fatalf("append: %v", appendErr)
 	}
-	replayedState, err := eventsource.LoadState(store)
+	replayedState, err := eventsource.LoadState(context.Background(), store)
 	if err != nil {
 		t.Fatalf("LoadState: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestEventReplay_LoadLatestState(t *testing.T) {
 	os.Chtimes(eventsource.EventStorePath(stateDir, "session-new"), newTime, newTime)
 
 	// when
-	state, sessionID, err := eventsource.LoadLatestState(stateDir)
+	state, sessionID, err := eventsource.LoadLatestState(context.Background(), stateDir)
 
 	// then
 	if err != nil {
@@ -184,7 +184,7 @@ func TestEventReplay_StrictnessPreserved(t *testing.T) {
 			store.Append(context.Background(),e)
 
 			// when
-			state, err := eventsource.LoadState(store)
+			state, err := eventsource.LoadState(context.Background(), store)
 
 			// then
 			if err != nil {
@@ -223,7 +223,7 @@ func TestEventReplay_ClusterIssueCountPreserved(t *testing.T) {
 	store.Append(context.Background(),e1, e2)
 
 	// when
-	state, err := eventsource.LoadState(store)
+	state, err := eventsource.LoadState(context.Background(), store)
 
 	// then
 	if err != nil {
