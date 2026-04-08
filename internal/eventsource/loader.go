@@ -2,6 +2,7 @@ package eventsource
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,7 +24,7 @@ var loaderLogger domain.Logger = &domain.NopLogger{}
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
 func LoadState(store *FileEventStore) (*domain.SessionState, error) {
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)
 	}
@@ -117,7 +118,7 @@ func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, LoadAllResult
 			events, loadErr = loadLegacyJSONLFile(filepath.Join(eventsDir, c.name+".jsonl"))
 		} else {
 			store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
-			events, _, loadErr = store.LoadAll()
+			events, _, loadErr = store.LoadAll(context.Background())
 		}
 		if loadErr != nil || len(events) == 0 {
 			result.SessionsFailed++

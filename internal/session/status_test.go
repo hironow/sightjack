@@ -121,7 +121,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	if err := os.MkdirAll(eventsDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Append(scanEvent, appliedEvent, rejectedEvent); err != nil {
+	if _, err := store.Append(context.Background(), scanEvent, appliedEvent, rejectedEvent); err != nil {
 		t.Fatal(err)
 	}
 

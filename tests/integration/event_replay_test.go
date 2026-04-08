@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +43,7 @@ func TestEventReplay_SessionStartAndScanCompleted(t *testing.T) {
 		t.Fatalf("create scan_completed: %v", err)
 	}
 
-	if _, appendErr := store.Append(e1, e2); appendErr != nil {
+	if _, appendErr := store.Append(context.Background(),e1, e2); appendErr != nil {
 		t.Fatalf("append: %v", appendErr)
 	}
 
@@ -95,7 +96,7 @@ func TestEventReplay_RoundTrip(t *testing.T) {
 	directState := domain.ProjectState([]domain.Event{e1, e2})
 
 	// persist + reload
-	if _, appendErr := store.Append(e1, e2); appendErr != nil {
+	if _, appendErr := store.Append(context.Background(),e1, e2); appendErr != nil {
 		t.Fatalf("append: %v", appendErr)
 	}
 	replayedState, err := eventsource.LoadState(store)
@@ -128,7 +129,7 @@ func TestEventReplay_LoadLatestState(t *testing.T) {
 	e1, _ := domain.NewEvent(domain.EventSessionStarted, &domain.SessionStartedPayload{
 		Project: "old-project", StrictnessLevel: "fog",
 	}, base)
-	store1.Append(e1)
+	store1.Append(context.Background(),e1)
 
 	// Newer session
 	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-new"), &domain.NopLogger{})
@@ -138,7 +139,7 @@ func TestEventReplay_LoadLatestState(t *testing.T) {
 	e3, _ := domain.NewEvent(domain.EventScanCompleted, &domain.ScanCompletedPayload{
 		Clusters: []domain.ClusterState{{Name: "core", IssueCount: 30}},
 	}, base.Add(time.Hour+time.Minute))
-	store2.Append(e2, e3)
+	store2.Append(context.Background(),e2, e3)
 
 	// Set modtimes explicitly to guarantee ordering without time.Sleep.
 	oldTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -180,7 +181,7 @@ func TestEventReplay_StrictnessPreserved(t *testing.T) {
 				Project:         "strictness-test",
 				StrictnessLevel: level,
 			}, time.Now())
-			store.Append(e)
+			store.Append(context.Background(),e)
 
 			// when
 			state, err := eventsource.LoadState(store)
@@ -219,7 +220,7 @@ func TestEventReplay_ClusterIssueCountPreserved(t *testing.T) {
 		ShibitoCount: 1,
 	}, base.Add(5*time.Minute))
 
-	store.Append(e1, e2)
+	store.Append(context.Background(),e1, e2)
 
 	// when
 	state, err := eventsource.LoadState(store)

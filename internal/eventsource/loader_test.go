@@ -1,6 +1,7 @@
 package eventsource_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -577,7 +578,7 @@ func TestLoadAllEventsAcrossSessions_ReportsFailedSessions(t *testing.T) {
 	event := mustNewEvent(t, domain.EventSessionStarted, "valid-session", 1,
 		domain.SessionStartedPayload{Project: "test"})
 	validStore := eventsource.NewFileEventStore(validDir, &domain.NopLogger{})
-	if _, err := validStore.Append(event); err != nil {
+	if _, err := validStore.Append(context.Background(), event); err != nil {
 		t.Fatal(err)
 	}
 

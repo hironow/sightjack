@@ -1,6 +1,7 @@
 package eventsource_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -16,19 +17,19 @@ type failOnceStore struct {
 	failed bool
 }
 
-func (s *failOnceStore) Append(events ...domain.Event) (domain.AppendResult, error) {
+func (s *failOnceStore) Append(ctx context.Context, events ...domain.Event) (domain.AppendResult, error) {
 	if !s.failed {
 		s.failed = true
 		return domain.AppendResult{}, errors.New("simulated I/O error")
 	}
-	return s.real.Append(events...)
+	return s.real.Append(ctx, events...)
 }
 
-func (s *failOnceStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
-	return s.real.LoadAll()
+func (s *failOnceStore) LoadAll(ctx context.Context) ([]domain.Event, domain.LoadResult, error) {
+	return s.real.LoadAll(ctx)
 }
-func (s *failOnceStore) LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error) {
-	return s.real.LoadSince(after)
+func (s *failOnceStore) LoadSince(ctx context.Context, after time.Time) ([]domain.Event, domain.LoadResult, error) {
+	return s.real.LoadSince(ctx, after)
 }
 
 // mustEvent is a test helper that creates a domain.Event and fails on error.
@@ -59,7 +60,7 @@ func TestSessionRecorder_Record_AutoUUID(t *testing.T) {
 	}
 
 	// then
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -97,7 +98,7 @@ func TestSessionRecorder_Record_WithPayload(t *testing.T) {
 	}
 
 	// then
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
@@ -122,7 +123,7 @@ func TestSessionRecorder_CorrelationID_MatchesSessionID(t *testing.T) {
 	recorder.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
 
 	// then: both events should have CorrelationID == sessionID
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -148,7 +149,7 @@ func TestSessionRecorder_CausationID_ChainsPreviousEvent(t *testing.T) {
 	recorder.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
 	// then
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
@@ -176,7 +177,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	rec1.Record(mustEvent(t, domain.EventScanCompleted, struct{}{}))
 	rec1.Record(mustEvent(t, domain.EventWavesGenerated, struct{}{}))
 
-	events1, _, _ := store.LoadAll()
+	events1, _, _ := store.LoadAll(context.Background())
 	lastID := events1[len(events1)-1].ID
 
 	// when: create new recorder from same store
@@ -189,7 +190,7 @@ func TestSessionRecorder_ResumeFromExistingStore(t *testing.T) {
 	}
 
 	// then: new event should chain from last existing event
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 4 {
 		t.Fatalf("expected 4 events, got %d", len(events))
 	}
@@ -224,7 +225,7 @@ func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	}
 
 	// then: the store should have exactly 1 event
-	events, _, _ := real.LoadAll()
+	events, _, _ := real.LoadAll(context.Background())
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}

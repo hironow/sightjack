@@ -388,7 +388,6 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	}
 	results = append(results, CheckEventStore(baseDir))
 	results = append(results, checkDeadLetters(baseDir))
-
 	// --- Connectivity ---
 	if cfgResult.Status != domain.CheckOK {
 		results = append(results, domain.DoctorCheck{
@@ -441,7 +440,6 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 
 		authResult := checkClaudeAuth(mcpOutput, mcpErr, claudeName)
 		results = append(results, authResult)
-
 		// Linear MCP: skip in wave mode (no Linear dependency)
 		if mode.IsWave() {
 			results = append(results, domain.DoctorCheck{
@@ -599,7 +597,6 @@ func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 		Hint:    hint,
 	}}
 }
-
 // ExtractStreamResult parses stream-json output and returns the "result" field
 // from the result message. Used to reuse inference check output for inference validation.
 func ExtractStreamResult(streamJSON string) string {
@@ -699,6 +696,5 @@ func CheckContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 			}
 		}
 	}
-
 	return result
 }

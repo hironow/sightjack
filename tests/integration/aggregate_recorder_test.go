@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -49,7 +50,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	}
 
 	// then: events are stored with SessionID, CorrelationID, and CausationID chain
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 	if err != nil {
 		t.Fatalf("load events: %v", err)
 	}
