@@ -529,7 +529,6 @@ rules:
       exclude:
         - "*_test.go"
         - "**/store_factory.go"
-        - "**/doctor_eventstore.go"
     message: |
       session 層で .jsonl ファイル操作は禁止です。
       Why: event persistence は eventsource 層の専管事項であり、session が直接操作すると責務境界が崩れる (event sourcing pattern)

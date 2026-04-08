@@ -294,8 +294,8 @@ func TestRunDoctor_ConfigFailure_ClaudeAuthAndMCPSkipped(t *testing.T) {
 	results := session.RunDoctor(ctx, "/nonexistent/sightjack.yaml", dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: wave mode has 13 results (includes gh check)
-	if len(results) != 15 {
-		t.Fatalf("expected 15 results, got %d", len(results))
+	if len(results) != 14 {
+		t.Fatalf("expected 14 results, got %d", len(results))
 	}
 	// Validate by name to avoid index-dependent assertions
 	checkByName := func(name string) *domain.DoctorCheck {
@@ -356,8 +356,8 @@ claude_cmd: "nonexistent-claude-binary-xyz"
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeWave)
 
 	// then: wave mode has 13 results (includes gh check)
-	if len(results) != 15 {
-		t.Fatalf("expected 15 results, got %d", len(results))
+	if len(results) != 14 {
+		t.Fatalf("expected 14 results, got %d", len(results))
 	}
 	// Validate by name to avoid index-dependent assertions
 	checkByName := func(name string) *domain.DoctorCheck {
@@ -415,9 +415,9 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeLinear)
 
-	// then: should have 13 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate, skills-ref, event store integrity)
-	if len(results) != 13 {
-		t.Fatalf("expected 13 results, got %d: %v", len(results), results)
+	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate, skills-ref)
+	if len(results) != 12 {
+		t.Fatalf("expected 12 results, got %d: %v", len(results), results)
 	}
 	// git binary check (index 0)
 	if results[0].Name != "git" || results[0].Status != domain.CheckOK {
@@ -515,9 +515,12 @@ func TestCheckEventStore_Corrupt(t *testing.T) {
 	// when
 	check := session.CheckEventStore(dir)
 
-	// then
-	if check.Status != domain.CheckFail {
-		t.Errorf("expected FAIL, got %v: %s", check.Status, check.Message)
+	// then: corrupt lines produce WARN (not FAIL) because replay skips them
+	if check.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v: %s", check.Status, check.Message)
+	}
+	if !strings.Contains(check.Message, "corrupt") {
+		t.Errorf("expected 'corrupt' in message: %s", check.Message)
 	}
 }
 
