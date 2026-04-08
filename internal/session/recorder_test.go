@@ -23,7 +23,7 @@ func TestNopRecorder_NoOp(t *testing.T) {
 	}
 
 	// when/then: should return nil without recording anything
-	if err := r.Record(ev); err != nil {
+	if err := r.Record(context.Background(), ev); err != nil {
 		t.Errorf("NopRecorder should return nil, got: %v", err)
 	}
 }
@@ -31,7 +31,7 @@ func TestNopRecorder_NoOp(t *testing.T) {
 // failingRecorder is a test stub that always returns an error.
 type failingRecorder struct{}
 
-func (failingRecorder) Record(domain.Event) error {
+func (failingRecorder) Record(context.Context, domain.Event) error {
 	return fmt.Errorf("disk full")
 }
 
@@ -46,7 +46,7 @@ func TestLoggingRecorder_LogsErrorAndReturnsNil(t *testing.T) {
 	}
 
 	// when
-	err := recorder.Record(ev)
+	err := recorder.Record(context.Background(), ev)
 
 	// then: error should be nil (swallowed) and warn should be logged
 	if err != nil {
@@ -71,7 +71,7 @@ func TestLoggingRecorder_PassesThroughOnSuccess(t *testing.T) {
 	}
 
 	// when
-	err := recorder.Record(ev)
+	err := recorder.Record(context.Background(), ev)
 
 	// then: error should be nil and no warn should be logged
 	if err != nil {
