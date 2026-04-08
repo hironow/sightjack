@@ -224,8 +224,9 @@ func CheckSkills(baseDir string) domain.DoctorCheck {
 	}
 }
 
-// CheckEventStore validates the event store directory structure and JSONL integrity.
-// Delegates to eventsource.ValidateStore for the actual file-level checks.
+// CheckEventStore validates the event store directory structure, JSONL integrity,
+// and corruption status. Delegates to eventsource.ValidateStore which uses the
+// same json.Unmarshal judgment as the real event store replay.
 // Returns CheckSkip if the events directory does not exist yet.
 func CheckEventStore(baseDir string) domain.DoctorCheck {
 	stateDir := filepath.Join(baseDir, domain.StateDir)
@@ -239,11 +240,26 @@ func CheckEventStore(baseDir string) domain.DoctorCheck {
 		}
 	}
 
-	if health.Err != nil {
+	// Load errors (permission issues, etc.) — WARN level
+	if len(health.LoadErrors) > 0 {
+		msg := fmt.Sprintf("%d load error(s)", len(health.LoadErrors))
+		if health.CorruptLines > 0 {
+			msg = fmt.Sprintf("%d corrupt line(s), %d load error(s)", health.CorruptLines, len(health.LoadErrors))
+		}
 		return domain.DoctorCheck{
 			Name:    "Event Store",
-			Status:  domain.CheckFail,
-			Message: health.Err.Error(),
+			Status:  domain.CheckWarn,
+			Message: msg,
+			Hint:    health.ErrHint,
+		}
+	}
+
+	// Corrupt lines detected — WARN level (not FAIL: replay skips them)
+	if health.CorruptLines > 0 {
+		return domain.DoctorCheck{
+			Name:    "Event Store",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("%d session(s), %d event(s), %d corrupt line(s)", health.Sessions, health.Events, health.CorruptLines),
 			Hint:    health.ErrHint,
 		}
 	}

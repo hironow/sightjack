@@ -415,7 +415,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	// when
 	results := session.RunDoctor(ctx, cfgPath, dir, platform.NewLogger(io.Discard, false), false, domain.ModeLinear)
 
-	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, skills-ref, success-rate)
+	// then: should have 12 results (git, claude, state dir, config, skills, event store, claude auth, linear mcp, claude-inference, context-budget, success-rate, skills-ref)
 	if len(results) != 12 {
 		t.Fatalf("expected 12 results, got %d: %v", len(results), results)
 	}
@@ -515,9 +515,12 @@ func TestCheckEventStore_Corrupt(t *testing.T) {
 	// when
 	check := session.CheckEventStore(dir)
 
-	// then
-	if check.Status != domain.CheckFail {
-		t.Errorf("expected FAIL, got %v: %s", check.Status, check.Message)
+	// then: corrupt lines produce WARN (not FAIL) because replay skips them
+	if check.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v: %s", check.Status, check.Message)
+	}
+	if !strings.Contains(check.Message, "corrupt") {
+		t.Errorf("expected 'corrupt' in message: %s", check.Message)
 	}
 }
 
