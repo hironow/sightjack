@@ -230,6 +230,15 @@ func CheckSkills(baseDir string) domain.DoctorCheck {
 // Returns CheckSkip if the events directory does not exist yet.
 // checkDeadLetters reports outbox items that have exceeded max retry count.
 func checkDeadLetters(baseDir string) domain.DoctorCheck {
+	// Check DB file exists before opening (avoid creating dirs/DB as side effect)
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "outbox.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: "no outbox DB",
+		}
+	}
 	store, err := NewOutboxStoreForDir(baseDir)
 	if err != nil {
 		return domain.DoctorCheck{
