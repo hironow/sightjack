@@ -2,6 +2,9 @@ package cmd_test
 
 import (
 	"bytes"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -30,6 +33,43 @@ func TestRunCmd_FailsWithoutInit(t *testing.T) {
 	got := err.Error()
 	if !strings.Contains(got, "init") {
 		t.Errorf("expected error to mention 'init', got: %s", got)
+	}
+}
+
+func TestRunCmd_BootstrapWithInit(t *testing.T) {
+	// given: initialized repo with .siren/ structure + minimal config
+	dir := t.TempDir()
+	sirenDir := filepath.Join(dir, ".siren")
+	for _, sub := range []string{".run", "events", "inbox", "outbox", "archive"} {
+		os.MkdirAll(filepath.Join(sirenDir, sub), 0755)
+	}
+	// Minimal config (empty YAML uses defaults)
+	os.WriteFile(filepath.Join(sirenDir, "config.yaml"), []byte("claude_cmd: echo\n"), 0644)
+
+	// git init (required by preflight check)
+	gitInit := exec.Command("git", "init")
+	gitInit.Dir = dir
+	if out, err := gitInit.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+
+	// when: run with --dry-run --session-mode=new --idle-timeout=-1s
+	rootCmd := cmd.NewRootCommand()
+	rootCmd.SetArgs([]string{"--config", filepath.Join(sirenDir, "config.yaml"), "run", "--dry-run", "--session-mode=new", "--idle-timeout=-1s", dir})
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+
+	err := rootCmd.Execute()
+
+	// then: should NOT fail with "init" or "config not found"
+	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "init") || strings.Contains(errMsg, "config not found") {
+			t.Fatalf("bootstrap failed: %v", err)
+		}
+		// Other errors are acceptable — bootstrap passed
+		t.Logf("run completed with non-init error (bootstrap OK): %v", err)
 	}
 }
 
