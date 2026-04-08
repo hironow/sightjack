@@ -262,7 +262,7 @@ func checkDeadLetters(baseDir string) domain.DoctorCheck {
 			Name:    "dead-letters",
 			Status:  domain.CheckWarn,
 			Message: fmt.Sprintf("%d dead-lettered outbox item(s)", count),
-			Hint:    `these items failed delivery 3+ times — review or purge via "sightjack archive prune --include-dead-letters"`,
+			Hint:    "these items failed delivery 3+ times and are permanently stuck — inspect outbox.db in .siren/.run/",
 		}
 	}
 	return domain.DoctorCheck{
