@@ -170,6 +170,64 @@ func TestStreamNormalizer_Result_SavesUsageForSessionEnd(t *testing.T) {
 	}
 }
 
+func TestStreamNormalizer_OutputPassesDomainValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("session_start", func(t *testing.T) {
+		t.Parallel()
+		n := platform.NewStreamNormalizer("sightjack", domain.ProviderClaudeCode)
+		msg := &platform.StreamMessage{
+			Type:      "system",
+			Subtype:   "init",
+			SessionID: "sess-val-1",
+			Model:     "opus",
+			Tools:     []string{"Read"},
+		}
+		raw, _ := json.Marshal(msg)
+		ev := n.Normalize(msg, raw)
+		if ev == nil {
+			t.Fatal("expected event")
+		}
+		if err := domain.ValidateSessionStreamEvent(*ev); err != nil {
+			t.Errorf("session_start failed validation: %v", err)
+		}
+	})
+
+	t.Run("tool_use", func(t *testing.T) {
+		t.Parallel()
+		n := platform.NewStreamNormalizer("sightjack", domain.ProviderClaudeCode)
+		content := []map[string]any{{
+			"type":  "tool_use",
+			"id":    "toolu_val_01",
+			"name":  "Write",
+			"input": json.RawMessage(`{"file_path":"/tmp/x"}`),
+		}}
+		messageBytes, _ := json.Marshal(map[string]any{"content": content})
+		msg := &platform.StreamMessage{
+			Type:    "assistant",
+			Message: messageBytes,
+		}
+		raw, _ := json.Marshal(msg)
+		ev := n.Normalize(msg, raw)
+		if ev == nil {
+			t.Fatal("expected event")
+		}
+		if err := domain.ValidateSessionStreamEvent(*ev); err != nil {
+			t.Errorf("tool_use failed validation: %v", err)
+		}
+	})
+
+	t.Run("session_end", func(t *testing.T) {
+		t.Parallel()
+		n := platform.NewStreamNormalizer("sightjack", domain.ProviderClaudeCode)
+		n.SetCodingSessionID("sess-val-end")
+		ev := n.SessionEnd("provider-val", nil)
+		if err := domain.ValidateSessionStreamEvent(ev); err != nil {
+			t.Errorf("session_end failed validation: %v", err)
+		}
+	})
+}
+
 func TestStreamNormalizer_SessionEnd(t *testing.T) {
 	t.Parallel()
 	n := platform.NewStreamNormalizer("sightjack", domain.ProviderClaudeCode)
