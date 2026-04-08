@@ -479,55 +479,6 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	return results
 }
 
-// checkEventStoreIntegrity scans all session event stores and reports corrupt lines.
-// sightjack stores events per-session under stateDir/events/<sessionID>/.
-func checkEventStoreIntegrity(baseDir string) domain.DoctorCheck {
-	eventsRoot := filepath.Join(baseDir, domain.StateDir, "events")
-	if _, err := os.Stat(eventsRoot); err != nil {
-		return domain.DoctorCheck{
-			Name:    "Event Store",
-			Status:  domain.CheckSkip,
-			Message: "no events directory",
-		}
-	}
-	entries, err := os.ReadDir(eventsRoot)
-	if err != nil {
-		return domain.DoctorCheck{
-			Name:    "Event Store",
-			Status:  domain.CheckFail,
-			Message: fmt.Sprintf("read events dir: %v", err),
-		}
-	}
-	totalFiles := 0
-	totalCorrupt := 0
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		sessionDir := filepath.Join(eventsRoot, e.Name())
-		store := NewEventStore(sessionDir, &domain.NopLogger{})
-		_, result, loadErr := store.LoadAll()
-		if loadErr != nil {
-			continue // best-effort per session
-		}
-		totalFiles += result.FileCount
-		totalCorrupt += result.CorruptLineCount
-	}
-	if totalCorrupt > 0 {
-		return domain.DoctorCheck{
-			Name:    "Event Store",
-			Status:  domain.CheckWarn,
-			Message: fmt.Sprintf("%d corrupt line(s) across %d file(s)", totalCorrupt, totalFiles),
-			Hint:    "corrupt lines are skipped during replay — review JSONL files in " + eventsRoot,
-		}
-	}
-	return domain.DoctorCheck{
-		Name:    "Event Store",
-		Status:  domain.CheckOK,
-		Message: fmt.Sprintf("event store OK (%d session(s), %d file(s), 0 corrupt lines)", len(entries), totalFiles),
-	}
-}
-
 // skillsRefBinNames lists possible binary names for the skills-ref package.
 // "uv tool install skills-ref" installs as "agentskills", not "skills-ref".
 var skillsRefBinNames = []string{"skills-ref", "agentskills"}
