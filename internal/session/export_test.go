@@ -55,3 +55,6 @@ var ShortUUIDForTest = shortUUID
 
 // ConvergenceNames bridges the unexported convergenceNames method for external tests.
 func (c *FeedbackCollector) ConvergenceNames() []string { return c.convergenceNames() }
+
+// ExportBuildIsolationFlags exposes buildIsolationFlags for contract testing.
+func ExportBuildIsolationFlags(cfg EnterConfig) []string { return buildIsolationFlags(cfg) }
