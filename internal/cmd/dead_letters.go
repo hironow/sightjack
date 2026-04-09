@@ -24,6 +24,11 @@ func newDeadLettersCmd() *cobra.Command {
 and are permanently stuck.
 
 Use the purge subcommand to remove dead-lettered items.`,
+		Example: `  # Show dead-letter count (dry-run)
+  sightjack dead-letters purge
+
+  # Remove dead-lettered items
+  sightjack dead-letters purge --execute --yes`,
 	}
 
 	cmd.AddCommand(newDeadLettersPurgeCmd())
