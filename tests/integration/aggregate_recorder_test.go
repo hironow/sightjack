@@ -17,7 +17,7 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	sessionID := "test-scan-001"
 	ctx := context.Background()
 	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID), &domain.NopLogger{})
-	recorder, err := eventsource.NewSessionRecorder(ctx, store, sessionID)
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, sessionID, nil)
 	if err != nil {
 		t.Fatalf("new recorder: %v", err)
 	}

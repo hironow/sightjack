@@ -27,10 +27,15 @@ type SessionRecorder struct {
 }
 
 // NewSessionRecorder creates a SessionRecorder for the given session.
-func NewSessionRecorder(ctx context.Context, store eventStore, sessionID string) (*SessionRecorder, error) {
-	events, _, err := store.LoadAll(ctx)
+// logger may be nil; when non-nil, corruption detected during LoadAll is
+// surfaced as a warning rather than silently discarded.
+func NewSessionRecorder(ctx context.Context, store eventStore, sessionID string, logger domain.Logger) (*SessionRecorder, error) {
+	events, lr, err := store.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
+	}
+	if lr.CorruptLineCount > 0 && logger != nil {
+		logger.Warn("event store corruption: %d corrupt lines in %d files (session %s)", lr.CorruptLineCount, lr.FileCount, sessionID)
 	}
 	var prevID string
 	for i := len(events) - 1; i >= 0; i-- {

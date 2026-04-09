@@ -81,7 +81,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 	t.Helper()
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
 	ctx := context.Background()
-	recorder, err := eventsource.NewSessionRecorder(ctx, store, sessionID)
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, sessionID, nil)
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
@@ -124,7 +124,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 func testRecorder(baseDir, sessionID string) port.Recorder {
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
 	ctx := context.Background()
-	rec, recErr := eventsource.NewSessionRecorder(ctx, store, sessionID)
+	rec, recErr := eventsource.NewSessionRecorder(ctx, store, sessionID, nil)
 	if recErr != nil {
 		panic("NewSessionRecorder: " + recErr.Error())
 	}

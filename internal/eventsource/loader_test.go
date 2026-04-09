@@ -354,7 +354,7 @@ func TestLoadState_RoundTrip(t *testing.T) {
 	storePath := filepath.Join(dir, "events", "s1.jsonl")
 	store := eventsource.NewFileEventStore(storePath, &domain.NopLogger{})
 	ctx := context.Background()
-	recorder, recErr := eventsource.NewSessionRecorder(ctx, store, "s1")
+	recorder, recErr := eventsource.NewSessionRecorder(ctx, store, "s1", nil)
 	if recErr != nil {
 		t.Fatalf("NewSessionRecorder: %v", recErr)
 	}
@@ -403,7 +403,7 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 	// Older session
 	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-1000-1"), &domain.NopLogger{})
 	ctx := context.Background()
-	rec1, err1 := eventsource.NewSessionRecorder(ctx, store1, "session-1000-1")
+	rec1, err1 := eventsource.NewSessionRecorder(ctx, store1, "session-1000-1", nil)
 	if err1 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err1)
 	}
@@ -414,7 +414,7 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 
 	// Newer session
 	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-2000-2"), &domain.NopLogger{})
-	rec2, err2 := eventsource.NewSessionRecorder(ctx, store2, "session-2000-2")
+	rec2, err2 := eventsource.NewSessionRecorder(ctx, store2, "session-2000-2", nil)
 	if err2 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err2)
 	}
