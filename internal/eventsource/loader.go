@@ -24,9 +24,12 @@ var loaderLogger domain.Logger = &domain.NopLogger{}
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
 func LoadState(ctx context.Context, store *FileEventStore) (*domain.SessionState, error) {
-	events, _, err := store.LoadAll(ctx)
+	events, loadResult, err := store.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)
+	}
+	if loadResult.CorruptLineCount > 0 {
+		loaderLogger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 	if len(events) == 0 {
 		return nil, fmt.Errorf("load state: no events in store")
@@ -118,7 +121,11 @@ func LoadAllEventsAcrossSessions(ctx context.Context, stateDir string) ([]domain
 			events, loadErr = loadLegacyJSONLFile(filepath.Join(eventsDir, c.name+".jsonl"))
 		} else {
 			store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
-			events, _, loadErr = store.LoadAll(ctx)
+			var lr domain.LoadResult
+			events, lr, loadErr = store.LoadAll(ctx)
+			if loadErr == nil && lr.CorruptLineCount > 0 {
+				loaderLogger.Warn("event store: %d corrupt line(s) skipped", lr.CorruptLineCount)
+			}
 		}
 		if loadErr != nil || len(events) == 0 {
 			result.SessionsFailed++
