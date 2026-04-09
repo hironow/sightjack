@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -12,6 +13,7 @@ import (
 // to preserve session continuity — matching the existing LoggingRecorder
 // semantics. Aggregate errors remain critical and are returned.
 type sessionEventEmitter struct {
+	ctx      context.Context
 	agg      *domain.SessionAggregate
 	recorder port.Recorder
 	logger   domain.Logger
@@ -19,14 +21,15 @@ type sessionEventEmitter struct {
 
 // NewSessionEventEmitter creates a SessionEventEmitter that wraps aggregate
 // event production and recording. Record errors are logged as warnings via
-// logger and do not abort the session.
-func NewSessionEventEmitter(agg *domain.SessionAggregate, recorder port.Recorder, logger domain.Logger) port.SessionEventEmitter {
-	return &sessionEventEmitter{agg: agg, recorder: recorder, logger: logger}
+// logger and do not abort the session. The ctx is used for downstream Record
+// calls (event store, seq counter).
+func NewSessionEventEmitter(ctx context.Context, agg *domain.SessionAggregate, recorder port.Recorder, logger domain.Logger) port.SessionEventEmitter {
+	return &sessionEventEmitter{ctx: ctx, agg: agg, recorder: recorder, logger: logger}
 }
 
 // record persists an event best-effort: errors are warned, not returned.
 func (e *sessionEventEmitter) record(evt domain.Event) {
-	if err := e.recorder.Record(evt); err != nil {
+	if err := e.recorder.Record(e.ctx, evt); err != nil {
 		e.logger.Warn("record event %s: %v", evt.Type, err)
 	}
 }

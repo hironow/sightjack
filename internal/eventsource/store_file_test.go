@@ -1,6 +1,7 @@
 package eventsource_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,10 +20,10 @@ func TestFileEventStore_AppendAndLoadAll_RoundTrip(t *testing.T) {
 	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
 
 	// when
-	if _, err := store.Append(e1, e2); err != nil {
+	if _, err := store.Append(context.Background(),e1, e2); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 
 	// then
 	if err != nil {
@@ -48,12 +49,12 @@ func TestFileEventStore_LoadSince_FiltersCorrectly(t *testing.T) {
 	for i := range 5 {
 		ts := base.Add(time.Duration(i) * time.Minute)
 		e, _ := domain.NewEvent(domain.EventSessionStarted, nil, ts)
-		_, _ = store.Append(e)
+		_, _ = store.Append(context.Background(),e)
 	}
 
 	// when: load events after the 3rd event's timestamp (index 2 = base+2min)
 	cutoff := base.Add(2 * time.Minute)
-	events, _, err := store.LoadSince(cutoff)
+	events, _, err := store.LoadSince(context.Background(),cutoff)
 
 	// then
 	if err != nil {
@@ -70,7 +71,7 @@ func TestFileEventStore_LoadAll_EmptyDir(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 
 	// then
 	if err != nil {
@@ -86,7 +87,7 @@ func TestFileEventStore_LoadAll_NonExistentDir(t *testing.T) {
 	store := eventsource.NewFileEventStore(filepath.Join(t.TempDir(), "does-not-exist"), &domain.NopLogger{})
 
 	// when
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 
 	// then
 	if err != nil {
@@ -107,13 +108,13 @@ func TestFileEventStore_ManyEvents(t *testing.T) {
 	base := time.Now()
 	for i := range count {
 		e, _ := domain.NewEvent(domain.EventSessionStarted, nil, base.Add(time.Duration(i)*time.Millisecond))
-		if _, err := store.Append(e); err != nil {
+		if _, err := store.Append(context.Background(),e); err != nil {
 			t.Fatalf("append event %d: %v", i, err)
 		}
 	}
 
 	// then
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 	if err != nil {
 		t.Fatalf("LoadAll: %v", err)
 	}
@@ -139,7 +140,7 @@ func TestFileEventStore_CorruptLineSkipped(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
-	events, _, err := store.LoadAll()
+	events, _, err := store.LoadAll(context.Background())
 
 	// then: corrupt line is skipped, valid events remain
 	if err != nil {
@@ -158,13 +159,13 @@ func TestFileEventStore_AutoCreateDirectory(t *testing.T) {
 	e, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 
 	// when
-	_, err := store.Append(e)
+	_, err := store.Append(context.Background(),e)
 
 	// then
 	if err != nil {
 		t.Fatalf("Append should auto-create dirs: %v", err)
 	}
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 1 {
 		t.Errorf("expected 1 event after auto-create, got %d", len(events))
 	}
@@ -177,12 +178,12 @@ func TestFileEventStore_MultipleAppendCalls(t *testing.T) {
 
 	// when: append in separate calls
 	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
-	_, _ = store.Append(e1)
+	_, _ = store.Append(context.Background(),e1)
 	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, time.Now())
-	_, _ = store.Append(e2)
+	_, _ = store.Append(context.Background(),e2)
 
 	// then
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -196,10 +197,10 @@ func TestFileEventStore_UUIDUniqueness(t *testing.T) {
 	// when
 	e1, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
-	_, _ = store.Append(e1, e2)
+	_, _ = store.Append(context.Background(),e1, e2)
 
 	// then
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
@@ -223,7 +224,7 @@ func TestFileEventStore_DailyFileRouting(t *testing.T) {
 	e2, _ := domain.NewEvent(domain.EventScanCompleted, nil, day2)
 
 	// when
-	_, _ = store.Append(e1, e2)
+	_, _ = store.Append(context.Background(),e1, e2)
 
 	// then: two separate daily files created
 	entries, _ := os.ReadDir(dir)
@@ -238,7 +239,7 @@ func TestFileEventStore_DailyFileRouting(t *testing.T) {
 	}
 
 	// and all events are returned by LoadAll
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events from 2 files, got %d", len(events))
 	}
@@ -252,7 +253,7 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	invalid := domain.Event{} // all fields empty
 
 	// when
-	_, err := store.Append(invalid)
+	_, err := store.Append(context.Background(),invalid)
 
 	// then
 	if err == nil {
@@ -273,7 +274,7 @@ func TestFileEventStore_Append_AtomicValidation(t *testing.T) {
 	invalid := domain.Event{SessionID: "s1"} // missing ID, Type, Timestamp, Data
 
 	// when: batch append [valid, invalid]
-	_, err := store.Append(valid, invalid)
+	_, err := store.Append(context.Background(),valid, invalid)
 
 	// then: entire batch rejected, valid event NOT written
 	if err == nil {
@@ -295,11 +296,11 @@ func TestFileEventStore_ChronologicalOrder(t *testing.T) {
 	e1, _ := domain.NewEvent(domain.EventScanCompleted, nil, later)
 	e2, _ := domain.NewEvent(domain.EventSessionStarted, nil, earlier)
 
-	_, _ = store.Append(e1)
-	_, _ = store.Append(e2)
+	_, _ = store.Append(context.Background(),e1)
+	_, _ = store.Append(context.Background(),e2)
 
 	// when
-	events, _, _ := store.LoadAll()
+	events, _, _ := store.LoadAll(context.Background())
 
 	// then: events returned in chronological order
 	if len(events) != 2 {
@@ -347,7 +348,7 @@ func TestFileEventStore_CorruptLineCount(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
-	events, result, err := store.LoadAll()
+	events, result, err := store.LoadAll(context.Background())
 
 	// then
 	if err != nil {
@@ -383,7 +384,7 @@ func TestFileEventStore_CorruptLineCount_MultiFile(t *testing.T) {
 	store := eventsource.NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
-	events, result, err := store.LoadAll()
+	events, result, err := store.LoadAll(context.Background())
 
 	// then
 	if err != nil {
@@ -427,12 +428,12 @@ func TestFileEventStore_LoadAfterSeqNr_FiltersAndSorts(t *testing.T) {
 	ev2.SeqNr = 2
 	ev3, _ := domain.NewEvent(domain.EventSessionStarted, nil, now.Add(2*time.Second))
 	ev3.SeqNr = 3
-	if _, err := store.Append(ev1, ev2, ev3); err != nil {
+	if _, err := store.Append(context.Background(),ev1, ev2, ev3); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
 	// when
-	events, _, err := store.LoadAfterSeqNr(1)
+	events, _, err := store.LoadAfterSeqNr(context.Background(),1)
 	if err != nil {
 		t.Fatalf("load after seq nr: %v", err)
 	}
@@ -456,12 +457,12 @@ func TestFileEventStore_LoadAfterSeqNr_SkipsZeroSeqNr(t *testing.T) {
 	legacy, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now())
 	postCutover, _ := domain.NewEvent(domain.EventSessionStarted, nil, time.Now().Add(time.Second))
 	postCutover.SeqNr = 1
-	if _, err := store.Append(legacy, postCutover); err != nil {
+	if _, err := store.Append(context.Background(),legacy, postCutover); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
 	// when
-	events, _, err := store.LoadAfterSeqNr(0)
+	events, _, err := store.LoadAfterSeqNr(context.Background(),0)
 	if err != nil {
 		t.Fatalf("load after seq nr: %v", err)
 	}
@@ -484,12 +485,12 @@ func TestFileEventStore_LatestSeqNr(t *testing.T) {
 	ev1.SeqNr = 3
 	ev2, _ := domain.NewEvent(domain.EventSessionStarted, nil, now.Add(time.Second))
 	ev2.SeqNr = 7
-	if _, err := store.Append(ev1, ev2); err != nil {
+	if _, err := store.Append(context.Background(),ev1, ev2); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
 	// when
-	seqNr, err := store.LatestSeqNr()
+	seqNr, err := store.LatestSeqNr(context.Background())
 	if err != nil {
 		t.Fatalf("latest seq nr: %v", err)
 	}
@@ -505,7 +506,7 @@ func TestFileEventStore_LatestSeqNr_EmptyStore(t *testing.T) {
 	store := eventsource.NewFileEventStore(t.TempDir(), &domain.NopLogger{})
 
 	// when
-	seqNr, err := store.LatestSeqNr()
+	seqNr, err := store.LatestSeqNr(context.Background())
 	if err != nil {
 		t.Fatalf("latest seq nr: %v", err)
 	}

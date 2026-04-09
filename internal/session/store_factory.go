@@ -72,22 +72,22 @@ func EnsureCutover(ctx context.Context, baseDir, aggregateType string, logger do
 }
 
 // NewSessionRecorder creates a recorder for the given session.
-func NewSessionRecorder(stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
+func NewSessionRecorder(ctx context.Context, stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
 	raw := eventsource.NewFileEventStore(stateDir, logger)
 	wrapped := NewSpanEventStore(raw)
-	return eventsource.NewSessionRecorder(wrapped, sessionID)
+	return eventsource.NewSessionRecorder(ctx, wrapped, sessionID)
 }
 
 // NewSessionRecorderWithSeqCounter creates a recorder for the given session,
 // optionally injecting a SeqCounter for SeqNr allocation. If sc is nil,
 // it falls back to NewSessionRecorder.
-func NewSessionRecorderWithSeqCounter(stateDir, sessionID string, logger domain.Logger, sc *eventsource.SeqCounter) (port.Recorder, error) {
+func NewSessionRecorderWithSeqCounter(ctx context.Context, stateDir, sessionID string, logger domain.Logger, sc *eventsource.SeqCounter) (port.Recorder, error) {
 	if sc == nil {
-		return NewSessionRecorder(stateDir, sessionID, logger)
+		return NewSessionRecorder(ctx, stateDir, sessionID, logger)
 	}
 	raw := eventsource.NewFileEventStore(stateDir, logger)
 	wrapped := NewSpanEventStore(raw)
-	rec, err := eventsource.NewSessionRecorder(wrapped, sessionID)
+	rec, err := eventsource.NewSessionRecorder(ctx, wrapped, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +104,7 @@ func EventStorePath(baseDir, sessionID string) string {
 func LoadLatestState(ctx context.Context, baseDir string) (*domain.SessionState, string, error) {
 	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_latest_state")
 	defer span.End()
-	_ = ctx
-	state, id, err := eventsource.LoadLatestState(stateDir(baseDir))
+	state, id, err := eventsource.LoadLatestState(ctx, stateDir(baseDir))
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_latest_state"))
@@ -117,8 +116,7 @@ func LoadLatestState(ctx context.Context, baseDir string) (*domain.SessionState,
 func LoadLatestResumableState(ctx context.Context, baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
 	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_latest_resumable_state")
 	defer span.End()
-	_ = ctx
-	state, id, err := eventsource.LoadLatestResumableState(stateDir(baseDir), match)
+	state, id, err := eventsource.LoadLatestResumableState(ctx, stateDir(baseDir), match)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_latest_resumable_state"))
@@ -137,8 +135,7 @@ func LoadAllEvents(ctx context.Context, baseDir string) ([]domain.Event, error) 
 func LoadAllEventsWithStatus(ctx context.Context, baseDir string) ([]domain.Event, int, error) {
 	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_all_events")
 	defer span.End()
-	_ = ctx
-	events, loadResult, err := eventsource.LoadAllEventsAcrossSessions(stateDir(baseDir))
+	events, loadResult, err := eventsource.LoadAllEventsAcrossSessions(ctx, stateDir(baseDir))
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all_events"))

@@ -2,6 +2,7 @@ package eventsource
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,8 +23,8 @@ var loaderLogger domain.Logger = &domain.NopLogger{}
 
 // LoadState reads all events from the store and projects them into a SessionState.
 // Returns an error if the store is empty (no events to replay).
-func LoadState(store *FileEventStore) (*domain.SessionState, error) {
-	events, _, err := store.LoadAll()
+func LoadState(ctx context.Context, store *FileEventStore) (*domain.SessionState, error) {
+	events, _, err := store.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load state read events: %w", err)
 	}
@@ -37,16 +38,16 @@ func LoadState(store *FileEventStore) (*domain.SessionState, error) {
 // replays its events to produce a SessionState.
 // stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
 // Returns the state, the sessionID, and any error.
-func LoadLatestState(stateDir string) (*domain.SessionState, string, error) {
-	return loadLatestStateMatching(stateDir, nil)
+func LoadLatestState(ctx context.Context, stateDir string) (*domain.SessionState, string, error) {
+	return loadLatestStateMatching(ctx, stateDir, nil)
 }
 
 // LoadLatestResumableState finds the most recent event store whose projected
 // state satisfies the given predicate. This allows callers to skip over
 // non-resumable sessions (e.g. scan-only) and find an older interactive session.
 // stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
-func LoadLatestResumableState(stateDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
-	return loadLatestStateMatching(stateDir, match)
+func LoadLatestResumableState(ctx context.Context, stateDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
+	return loadLatestStateMatching(ctx, stateDir, match)
 }
 
 type eventCandidate struct {
@@ -98,7 +99,7 @@ type LoadAllResult struct {
 // LoadAllEventsAcrossSessions aggregates events from all session stores under
 // events/. stateDir is the tool's state directory (e.g. ".siren/"), not the repo root.
 // Returns nil, LoadAllResult{}, nil when the events directory does not exist.
-func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, LoadAllResult, error) {
+func LoadAllEventsAcrossSessions(ctx context.Context, stateDir string) ([]domain.Event, LoadAllResult, error) {
 	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
@@ -117,7 +118,7 @@ func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, LoadAllResult
 			events, loadErr = loadLegacyJSONLFile(filepath.Join(eventsDir, c.name+".jsonl"))
 		} else {
 			store := NewFileEventStore(EventStorePath(stateDir, c.name), loaderLogger)
-			events, _, loadErr = store.LoadAll()
+			events, _, loadErr = store.LoadAll(ctx)
 		}
 		if loadErr != nil || len(events) == 0 {
 			result.SessionsFailed++
@@ -131,7 +132,7 @@ func LoadAllEventsAcrossSessions(stateDir string) ([]domain.Event, LoadAllResult
 
 // loadLatestStateMatching iterates event stores by modtime descending and
 // returns the first state that satisfies match (nil match accepts any).
-func loadLatestStateMatching(stateDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
+func loadLatestStateMatching(ctx context.Context, stateDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error) {
 	eventsDir := EventsDir(stateDir)
 	candidates, err := sortedEventCandidates(eventsDir)
 	if err != nil {
@@ -144,7 +145,7 @@ func loadLatestStateMatching(stateDir string, match func(*domain.SessionState) b
 	for _, c := range candidates {
 		sessionID := c.name
 		store := NewFileEventStore(EventStorePath(stateDir, sessionID), loaderLogger)
-		state, loadErr := LoadState(store)
+		state, loadErr := LoadState(ctx, store)
 		if loadErr != nil {
 			continue
 		}

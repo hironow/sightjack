@@ -1,6 +1,7 @@
 package eventsource_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -352,18 +353,19 @@ func TestLoadState_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "events", "s1.jsonl")
 	store := eventsource.NewFileEventStore(storePath, &domain.NopLogger{})
-	recorder, recErr := eventsource.NewSessionRecorder(store, "s1")
+	ctx := context.Background()
+	recorder, recErr := eventsource.NewSessionRecorder(ctx, store, "s1")
 	if recErr != nil {
 		t.Fatalf("NewSessionRecorder: %v", recErr)
 	}
 
-	recorder.Record(mustNewEvent(t, domain.EventSessionStarted, "s1", 0,
+	recorder.Record(ctx, mustNewEvent(t, domain.EventSessionStarted, "s1", 0,
 		domain.SessionStartedPayload{Project: "test"}))
-	recorder.Record(mustNewEvent(t, domain.EventScanCompleted, "s1", 0,
+	recorder.Record(ctx, mustNewEvent(t, domain.EventScanCompleted, "s1", 0,
 		domain.ScanCompletedPayload{Completeness: 0.4}))
 
 	// when
-	state, err := eventsource.LoadState(store)
+	state, err := eventsource.LoadState(ctx, store)
 
 	// then
 	if err != nil {
@@ -383,7 +385,7 @@ func TestLoadState_EmptyStore_ReturnsError(t *testing.T) {
 	store := eventsource.NewFileEventStore(filepath.Join(dir, "empty.jsonl"), &domain.NopLogger{})
 
 	// when
-	_, err := eventsource.LoadState(store)
+	_, err := eventsource.LoadState(context.Background(), store)
 
 	// then
 	if err == nil {
@@ -400,28 +402,29 @@ func TestLoadLatestState_FindsNewestSession(t *testing.T) {
 
 	// Older session
 	store1 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-1000-1"), &domain.NopLogger{})
-	rec1, err1 := eventsource.NewSessionRecorder(store1, "session-1000-1")
+	ctx := context.Background()
+	rec1, err1 := eventsource.NewSessionRecorder(ctx, store1, "session-1000-1")
 	if err1 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err1)
 	}
-	rec1.Record(mustNewEvent(t, domain.EventSessionStarted, "session-1000-1", 0,
+	rec1.Record(ctx, mustNewEvent(t, domain.EventSessionStarted, "session-1000-1", 0,
 		domain.SessionStartedPayload{Project: "old-project"}))
-	rec1.Record(mustNewEvent(t, domain.EventScanCompleted, "session-1000-1", 0,
+	rec1.Record(ctx, mustNewEvent(t, domain.EventScanCompleted, "session-1000-1", 0,
 		domain.ScanCompletedPayload{Completeness: 0.3}))
 
 	// Newer session
 	store2 := eventsource.NewFileEventStore(eventsource.EventStorePath(stateDir, "session-2000-2"), &domain.NopLogger{})
-	rec2, err2 := eventsource.NewSessionRecorder(store2, "session-2000-2")
+	rec2, err2 := eventsource.NewSessionRecorder(ctx, store2, "session-2000-2")
 	if err2 != nil {
 		t.Fatalf("NewSessionRecorder: %v", err2)
 	}
-	rec2.Record(mustNewEvent(t, domain.EventSessionStarted, "session-2000-2", 0,
+	rec2.Record(ctx, mustNewEvent(t, domain.EventSessionStarted, "session-2000-2", 0,
 		domain.SessionStartedPayload{Project: "new-project"}))
-	rec2.Record(mustNewEvent(t, domain.EventScanCompleted, "session-2000-2", 0,
+	rec2.Record(ctx, mustNewEvent(t, domain.EventScanCompleted, "session-2000-2", 0,
 		domain.ScanCompletedPayload{Completeness: 0.7}))
 
 	// when
-	state, sessionID, err := eventsource.LoadLatestState(stateDir)
+	state, sessionID, err := eventsource.LoadLatestState(ctx, stateDir)
 
 	// then
 	if err != nil {
@@ -444,7 +447,7 @@ func TestLoadLatestState_NoEventsDir(t *testing.T) {
 	os.MkdirAll(stateDir, 0755)
 
 	// when
-	_, _, err := eventsource.LoadLatestState(stateDir)
+	_, _, err := eventsource.LoadLatestState(context.Background(), stateDir)
 
 	// then
 	if err == nil {
@@ -458,7 +461,7 @@ func TestLoadLatestState_EmptyEventsDir(t *testing.T) {
 	os.MkdirAll(eventsource.EventsDir(stateDir), 0755)
 
 	// when
-	_, _, err := eventsource.LoadLatestState(stateDir)
+	_, _, err := eventsource.LoadLatestState(context.Background(), stateDir)
 
 	// then
 	if err == nil {
@@ -577,7 +580,7 @@ func TestLoadAllEventsAcrossSessions_ReportsFailedSessions(t *testing.T) {
 	event := mustNewEvent(t, domain.EventSessionStarted, "valid-session", 1,
 		domain.SessionStartedPayload{Project: "test"})
 	validStore := eventsource.NewFileEventStore(validDir, &domain.NopLogger{})
-	if _, err := validStore.Append(event); err != nil {
+	if _, err := validStore.Append(context.Background(), event); err != nil {
 		t.Fatal(err)
 	}
 
@@ -588,7 +591,7 @@ func TestLoadAllEventsAcrossSessions_ReportsFailedSessions(t *testing.T) {
 	}
 
 	// when
-	events, result, err := eventsource.LoadAllEventsAcrossSessions(stateDir)
+	events, result, err := eventsource.LoadAllEventsAcrossSessions(context.Background(), stateDir)
 
 	// then
 	if err != nil {
@@ -610,7 +613,7 @@ func TestLoadAllEventsAcrossSessions_NoEventsDir_ReturnsEmpty(t *testing.T) {
 	stateDir := t.TempDir()
 
 	// when
-	events, result, err := eventsource.LoadAllEventsAcrossSessions(stateDir)
+	events, result, err := eventsource.LoadAllEventsAcrossSessions(context.Background(), stateDir)
 
 	// then
 	if err != nil {

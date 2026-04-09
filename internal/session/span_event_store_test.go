@@ -51,23 +51,23 @@ type stubEventStore struct {
 	loadResult   domain.LoadResult
 }
 
-func (s *stubEventStore) Append(events ...domain.Event) (domain.AppendResult, error) {
+func (s *stubEventStore) Append(_ context.Context, events ...domain.Event) (domain.AppendResult, error) {
 	return s.appendResult, nil
 }
 
-func (s *stubEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
+func (s *stubEventStore) LoadAll(_ context.Context) ([]domain.Event, domain.LoadResult, error) {
 	return s.loadEvents, s.loadResult, nil
 }
 
-func (s *stubEventStore) LoadSince(after time.Time) ([]domain.Event, domain.LoadResult, error) {
+func (s *stubEventStore) LoadSince(_ context.Context, after time.Time) ([]domain.Event, domain.LoadResult, error) {
 	return s.loadEvents, s.loadResult, nil
 }
 
-func (s *stubEventStore) LoadAfterSeqNr(_ uint64) ([]domain.Event, domain.LoadResult, error) {
+func (s *stubEventStore) LoadAfterSeqNr(_ context.Context, _ uint64) ([]domain.Event, domain.LoadResult, error) {
 	return s.loadEvents, s.loadResult, nil
 }
 
-func (s *stubEventStore) LatestSeqNr() (uint64, error) {
+func (s *stubEventStore) LatestSeqNr(_ context.Context) (uint64, error) {
 	return 0, nil
 }
 
@@ -93,8 +93,8 @@ func TestSpanEventStore_AlwaysCollectsAllAttributes(t *testing.T) {
 	store := NewSpanEventStore(stub).(*SpanEventStore)
 
 	// when
-	store.Append(domain.Event{Type: "test"})
-	store.LoadAll()
+	store.Append(context.Background(),domain.Event{Type: "test"})
+	store.LoadAll(context.Background())
 
 	// then — all attributes always present
 	spans := exp.GetSpans()
@@ -138,8 +138,8 @@ func TestSpanEventStore_NoPII_InAttributes(t *testing.T) {
 	store := NewSpanEventStore(stub).(*SpanEventStore)
 
 	// when
-	store.Append(domain.Event{Type: "test", Data: secretData})
-	store.LoadAll()
+	store.Append(context.Background(),domain.Event{Type: "test", Data: secretData})
+	store.LoadAll(context.Background())
 
 	// then — no attribute value contains event body or PII-like data
 	spans := exp.GetSpans()

@@ -59,7 +59,7 @@ func testRunWaveApply(ctx context.Context, cfg *domain.Config, scanDir string, w
 // loadTestState loads the latest state from events for test verification.
 func loadTestState(t *testing.T, baseDir string) *domain.SessionState {
 	t.Helper()
-	state, _, err := eventsource.LoadLatestState(testStateDir(baseDir))
+	state, _, err := eventsource.LoadLatestState(context.Background(), testStateDir(baseDir))
 	if err != nil {
 		t.Fatalf("LoadLatestState: %v", err)
 	}
@@ -80,17 +80,18 @@ func mustTestEvent(t *testing.T, eventType domain.EventType, payload any) domain
 func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.SessionState) {
 	t.Helper()
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
-	recorder, err := eventsource.NewSessionRecorder(store, sessionID)
+	ctx := context.Background()
+	recorder, err := eventsource.NewSessionRecorder(ctx, store, sessionID)
 	if err != nil {
 		t.Fatalf("NewSessionRecorder: %v", err)
 	}
-	if err := recorder.Record(mustTestEvent(t, domain.EventSessionStarted, domain.SessionStartedPayload{
+	if err := recorder.Record(ctx, mustTestEvent(t, domain.EventSessionStarted, domain.SessionStartedPayload{
 		Project:         state.Project,
 		StrictnessLevel: state.StrictnessLevel,
 	})); err != nil {
 		t.Fatalf("record SessionStarted: %v", err)
 	}
-	if err := recorder.Record(mustTestEvent(t, domain.EventScanCompleted, domain.ScanCompletedPayload{
+	if err := recorder.Record(ctx, mustTestEvent(t, domain.EventScanCompleted, domain.ScanCompletedPayload{
 		Clusters:       state.Clusters,
 		Completeness:   state.Completeness,
 		ShibitoCount:   state.ShibitoCount,
@@ -100,7 +101,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 		t.Fatalf("record ScanCompleted: %v", err)
 	}
 	if len(state.Waves) > 0 {
-		if err := recorder.Record(mustTestEvent(t, domain.EventWavesGenerated, domain.WavesGeneratedPayload{
+		if err := recorder.Record(ctx, mustTestEvent(t, domain.EventWavesGenerated, domain.WavesGeneratedPayload{
 			Waves: state.Waves,
 		})); err != nil {
 			t.Fatalf("record WavesGenerated: %v", err)
@@ -109,7 +110,7 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 	// Mark completed waves via separate events
 	for _, w := range state.Waves {
 		if w.Status == "completed" {
-			if err := recorder.Record(mustTestEvent(t, domain.EventWaveCompleted, domain.WaveCompletedPayload{
+			if err := recorder.Record(ctx, mustTestEvent(t, domain.EventWaveCompleted, domain.WaveCompletedPayload{
 				WaveID:      w.ID,
 				ClusterName: w.ClusterName,
 			})); err != nil {
@@ -122,7 +123,8 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 // testRecorder creates a real Recorder backed by the event store for lifecycle tests.
 func testRecorder(baseDir, sessionID string) port.Recorder {
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
-	rec, recErr := eventsource.NewSessionRecorder(store, sessionID)
+	ctx := context.Background()
+	rec, recErr := eventsource.NewSessionRecorder(ctx, store, sessionID)
 	if recErr != nil {
 		panic("NewSessionRecorder: " + recErr.Error())
 	}
@@ -130,7 +132,7 @@ func testRecorder(baseDir, sessionID string) port.Recorder {
 }
 
 func testEmitter(baseDir, sessionID string) port.SessionEventEmitter {
-	return usecase.NewSessionEventEmitter(domain.NewSessionAggregate(), testRecorder(baseDir, sessionID), &domain.NopLogger{})
+	return usecase.NewSessionEventEmitter(context.Background(), domain.NewSessionAggregate(), testRecorder(baseDir, sessionID), &domain.NopLogger{})
 }
 
 // testConfig returns a minimal Config for lifecycle tests.
