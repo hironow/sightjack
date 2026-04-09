@@ -31,6 +31,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
 * [sightjack archive-prune](sightjack_archive-prune.md)	 - Prune expired d-mails and event files
 * [sightjack clean](sightjack_clean.md)	 - Remove state directory (.siren/)
 * [sightjack config](sightjack_config.md)	 - View or update sightjack configuration
+* [sightjack dead-letters](sightjack_dead-letters.md)	 - Manage dead-lettered outbox items
 * [sightjack discuss](sightjack_discuss.md)	 - Architect discussion from stdin Wave JSON
 * [sightjack doctor](sightjack_doctor.md)	 - Check environment and tool availability
 * [sightjack init](sightjack_init.md)	 - Create .siren/config.yaml
