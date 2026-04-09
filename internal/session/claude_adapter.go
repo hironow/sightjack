@@ -153,6 +153,12 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		normalizer.SetCodingSessionID(rc.CodingSessionID)
 		defer func() {
 			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
+			if vErr := domain.ValidateSessionStreamEvent(endEvent); vErr != nil {
+				if a.Logger != nil {
+					a.Logger.Warn("session_end event dropped (invalid): %v", vErr)
+				}
+				return
+			}
 			// Use Background: ctx may be cancelled, but session_end must still publish.
 			a.StreamBus.Publish(context.Background(), endEvent)
 		}()
@@ -171,6 +177,12 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		if normalizer != nil {
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := normalizer.Normalize(msg, raw); ev != nil {
+					if vErr := domain.ValidateSessionStreamEvent(*ev); vErr != nil {
+						if a.Logger != nil {
+							a.Logger.Warn("stream event dropped (invalid): %v", vErr)
+						}
+						return
+					}
 					a.StreamBus.Publish(ctx, *ev)
 				}
 			})
