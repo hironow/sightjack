@@ -52,7 +52,7 @@ func TestRace_OutboxStore_ConcurrentStageAndRead(t *testing.T) {
 // FeedbackCollector mutex protects concurrent field access.
 func TestRace_FeedbackCollector_ConcurrentAccess(t *testing.T) {
 	ch := make(chan *domain.DMail, 10)
-	fc := session.CollectFeedback(nil, ch, nil, platform.NewLogger(nil, false))
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, platform.NewLogger(nil, false))
 
 	var wg sync.WaitGroup
 	for i := range 20 {

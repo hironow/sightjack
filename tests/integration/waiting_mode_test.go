@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"sort"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 func TestWaitingMode_FeedbackCollectorNotify(t *testing.T) {
 	// given
 	ch := make(chan *domain.DMail, 1)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// when: send D-Mail after short delay
 	go func() {
@@ -33,7 +34,7 @@ func TestWaitingMode_FeedbackCollectorNotify(t *testing.T) {
 func TestWaitingMode_SnapshotAndNewSince(t *testing.T) {
 	// given
 	ch := make(chan *domain.DMail, 5)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// Send initial D-Mail and wait for goroutine to process it
 	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001", Description: "test", SchemaVersion: "1"}
@@ -60,7 +61,7 @@ func TestWaitingMode_SnapshotAndNewSince(t *testing.T) {
 
 func TestWaitingMode_SnapshotEmpty(t *testing.T) {
 	// given: collector with no D-Mails
-	fc := session.CollectFeedback(nil, nil, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, nil, nil, &domain.NopLogger{})
 
 	// when
 	fc.Snapshot()
@@ -93,7 +94,7 @@ func TestWaitingMode_DisabledConfig(t *testing.T) {
 func TestWaitingMode_NotifyChNoSignalWithoutMail(t *testing.T) {
 	// given: collector with no incoming D-Mails
 	ch := make(chan *domain.DMail, 1)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// then: NotifyCh should not fire within a short window
 	select {
@@ -107,7 +108,7 @@ func TestWaitingMode_NotifyChNoSignalWithoutMail(t *testing.T) {
 func TestWaitingMode_MultipleMailsSingleNotify(t *testing.T) {
 	// given
 	ch := make(chan *domain.DMail, 5)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// when: send multiple D-Mails rapidly
 	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001", Description: "first", SchemaVersion: "1"}
@@ -136,7 +137,7 @@ func TestWaitingMode_SnapshotThenMultipleNewMails(t *testing.T) {
 		{Kind: domain.KindDesignFeedback, Name: "init-001", Description: "initial", SchemaVersion: "1"},
 	}
 	ch := make(chan *domain.DMail, 5)
-	fc := session.CollectFeedback(initial, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), initial, ch, nil, &domain.NopLogger{})
 
 	// when: snapshot after initial, then send 2 new mails
 	fc.Snapshot()
@@ -167,7 +168,7 @@ func TestWaitingMode_ReportDMailTriggersClusterIdentification(t *testing.T) {
 	initial := []*domain.DMail{
 		{Kind: domain.KindDesignFeedback, Name: "fb-001", Description: "initial feedback", SchemaVersion: "1"},
 	}
-	fc := session.CollectFeedback(initial, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), initial, ch, nil, &domain.NopLogger{})
 
 	// Snapshot before waiting
 	fc.Snapshot()
@@ -227,7 +228,7 @@ func TestWaitingMode_ReportDMailTriggersClusterIdentification(t *testing.T) {
 func TestWaitingMode_MultipleReportDMailsAcrossClusters(t *testing.T) {
 	// given
 	ch := make(chan *domain.DMail, 5)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	fc.Snapshot()
 
@@ -286,7 +287,7 @@ func TestWaitingMode_MultipleReportDMailsAcrossClusters(t *testing.T) {
 func TestWaitingMode_ReportAndFeedbackMixed(t *testing.T) {
 	// given
 	ch := make(chan *domain.DMail, 5)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	fc.Snapshot()
 

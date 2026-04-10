@@ -142,7 +142,7 @@ func RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, o
 		return nil
 	}
 
-	fbCollector := CollectFeedbackWithHook(allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
+	fbCollector := CollectFeedbackWithHook(ctx, allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
 
 	// Create runners once at session startup.
 	runner := NewTrackedRunner(cfg, baseDir, logger)

@@ -1,7 +1,8 @@
 package session
 
-// white-box-reason: tests that ClaudeAdapter emits exactly 1 session_end via StreamBus
-// and that CodingSessionID propagates through RunOption → normalizer → event
+// white-box-reason: tests that ClaudeAdapter emits exactly 1 session_end via StreamBus,
+// that CodingSessionID propagates through RunOption → normalizer → event,
+// and that child spans inherit the caller's trace ID (GAP-TST-051).
 
 import (
 	"context"
@@ -112,6 +113,48 @@ drain:
 		t.Errorf("expected at least 2 events (start + end), got %d", len(events))
 		for i, ev := range events {
 			fmt.Printf("  event[%d]: type=%s\n", i, ev.Type)
+		}
+	}
+}
+
+func TestStreamBusWiring_SessionEndInheritsParentTrace(t *testing.T) {
+	exp := setupTestTracer(t)
+
+	bus := platform.NewInProcessSessionBus()
+	defer bus.Close()
+
+	old := sharedStreamBus
+	SetStreamBus(bus)
+	defer func() { sharedStreamBus = old }()
+
+	// Override NewCmd to echo fake stream-json instead of running real claude
+	cleanup := OverrideNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "printf", "%s", fakeStreamJSON())
+	})
+	defer cleanup()
+
+	cfg := &domain.Config{ClaudeCmd: "fake-claude", Model: "test", TimeoutSec: 30}
+	adapter := NewClaudeAdapter(cfg, &domain.NopLogger{})
+
+	// Create parent span
+	parentCtx, parentSpan := platform.Tracer.Start(context.Background(), "test.parent")
+	defer parentSpan.End()
+	parentTraceID := parentSpan.SpanContext().TraceID()
+
+	_, err := adapter.RunDetailed(parentCtx, "trace test", os.Stdout)
+	if err != nil {
+		t.Fatalf("RunDetailed: %v", err)
+	}
+
+	// Verify child spans inherit parent trace
+	spans := exp.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span from RunDetailed")
+	}
+	for _, s := range spans {
+		if s.SpanContext.TraceID() != parentTraceID {
+			t.Errorf("span %q trace ID = %s, want parent trace ID = %s",
+				s.Name, s.SpanContext.TraceID(), parentTraceID)
 		}
 	}
 }

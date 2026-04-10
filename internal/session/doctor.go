@@ -229,7 +229,7 @@ func CheckSkills(baseDir string) domain.DoctorCheck {
 // same json.Unmarshal judgment as the real event store replay.
 // Returns CheckSkip if the events directory does not exist yet.
 // checkDeadLetters reports outbox items that have exceeded max retry count.
-func checkDeadLetters(baseDir string) domain.DoctorCheck {
+func checkDeadLetters(ctx context.Context, baseDir string) domain.DoctorCheck {
 	// Check DB file exists before opening (avoid creating dirs/DB as side effect)
 	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "outbox.db")
 	if _, err := os.Stat(dbPath); err != nil {
@@ -249,7 +249,7 @@ func checkDeadLetters(baseDir string) domain.DoctorCheck {
 	}
 	defer store.Close()
 
-	count, err := store.DeadLetterCount(context.Background())
+	count, err := store.DeadLetterCount(ctx)
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "dead-letters",
@@ -387,7 +387,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		results = append(results, skillResult)
 	}
 	results = append(results, CheckEventStore(baseDir))
-	results = append(results, checkDeadLetters(baseDir))
+	results = append(results, checkDeadLetters(ctx, baseDir))
 	// --- Connectivity ---
 	if cfgResult.Status != domain.CheckOK {
 		results = append(results, domain.DoctorCheck{

@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 func TestFeedbackCollector_NotifyCh(t *testing.T) {
 	// given
 	ch := make(chan *domain.DMail, 1)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// NotifyCh should not fire yet
 	select {
@@ -37,7 +38,7 @@ func TestFeedbackCollector_NotifyCh(t *testing.T) {
 func TestFeedbackCollector_NotifyCh_multipleDoesNotBlock(t *testing.T) {
 	// given
 	ch := make(chan *domain.DMail, 3)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// when: send multiple D-Mails rapidly
 	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "test-001"}

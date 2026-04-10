@@ -339,15 +339,15 @@ type FeedbackCollector struct {
 // and starts a background goroutine to accumulate late-arriving items
 // from the channel. Convergence d-mails trigger a notification via notifier.
 // Safe to call with nil initial, nil channel, or nil notifier.
-func CollectFeedback(initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger) *FeedbackCollector {
-	return collectFeedback(initial, ch, notifier, logger, nil)
+func CollectFeedback(ctx context.Context, initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger) *FeedbackCollector {
+	return collectFeedback(ctx, initial, ch, notifier, logger, nil)
 }
 
-func CollectFeedbackWithHook(initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger, onMail func(*domain.DMail)) *FeedbackCollector {
-	return collectFeedback(initial, ch, notifier, logger, onMail)
+func CollectFeedbackWithHook(ctx context.Context, initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger, onMail func(*domain.DMail)) *FeedbackCollector {
+	return collectFeedback(ctx, initial, ch, notifier, logger, onMail)
 }
 
-func collectFeedback(initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger, onMail func(*domain.DMail)) *FeedbackCollector {
+func collectFeedback(ctx context.Context, initial []*domain.DMail, ch <-chan *domain.DMail, notifier port.Notifier, logger domain.Logger, onMail func(*domain.DMail)) *FeedbackCollector {
 	if notifier == nil {
 		notifier = &port.NopNotifier{}
 	}
@@ -380,8 +380,9 @@ func collectFeedback(initial []*domain.DMail, ch <-chan *domain.DMail, notifier 
 				if mail.Kind == domain.KindConvergence {
 					logger.Warn("[D-Mail] [CONVERGENCE] %s: %s", mail.Name, mail.Description)
 					// Fire-and-forget with timeout to avoid blocking the drain loop.
+					// Detached context: goroutine outlives caller; preserve trace, detach cancel.
 					go func(desc string) {
-						notifyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+						notifyCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 						defer cancel()
 						if err := c.notifier.Notify(notifyCtx, "Sightjack Convergence", desc); err != nil {
 							logger.Warn("Convergence notification failed (non-fatal): %v", err)

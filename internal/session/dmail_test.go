@@ -956,7 +956,7 @@ func TestFeedbackCollector_AccumulatesInitialAndLate(t *testing.T) {
 	initial := session.DrainInboxFeedback(ch, platform.NewLogger(io.Discard, false))
 
 	// Start collector with initial feedback
-	collector := session.CollectFeedback(initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(context.Background(), initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// All() should return initial feedback
 	all := collector.All()
@@ -1003,7 +1003,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 		{Name: "fb-001", Kind: domain.KindDesignFeedback, Description: "Item 1"},
 		{Name: "fb-002", Kind: domain.KindDesignFeedback, Description: "Item 2"},
 	}
-	collector := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(context.Background(), initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when: call All() multiple times
 	first := collector.All()
@@ -1020,7 +1020,7 @@ func TestFeedbackCollector_AllIsNonDestructive(t *testing.T) {
 
 func TestFeedbackCollector_NilChannel(t *testing.T) {
 	// given: nil channel
-	collector := session.CollectFeedback(nil, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(context.Background(), nil, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// then: All() returns nil
 	if all := collector.All(); all != nil {
@@ -1031,7 +1031,7 @@ func TestFeedbackCollector_NilChannel(t *testing.T) {
 func TestFeedbackCollector_NilInitialWithChannel(t *testing.T) {
 	// given: nil initial but channel that will receive items
 	ch := make(chan *domain.DMail, 1)
-	collector := session.CollectFeedback(nil, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(context.Background(), nil, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when: send one item
 	ch <- &domain.DMail{Name: "fb-late", Kind: domain.KindDesignFeedback, Description: "Late only"}
@@ -1114,7 +1114,7 @@ func TestFeedbackCollector_FeedbackOnly_ExcludesConvergence(t *testing.T) {
 		{Name: "conv-001", Kind: domain.KindConvergence, Description: "Convergence signal"},
 		{Name: "fb-002", Kind: domain.KindDesignFeedback, Description: "Naming convention"},
 	}
-	c := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+	c := session.CollectFeedback(context.Background(), initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when
 	feedbackOnly := c.FeedbackOnly()
@@ -1137,7 +1137,7 @@ func TestFeedbackCollector_FeedbackOnly_IncludesImplFeedback(t *testing.T) {
 		{Name: "impl-001", Kind: domain.KindImplFeedback, Description: "Code quality issue"},
 		{Name: "conv-001", Kind: domain.KindConvergence, Description: "Convergence signal"},
 	}
-	c := session.CollectFeedback(initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+	c := session.CollectFeedback(context.Background(), initial, nil, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	// when
 	feedbackOnly := c.FeedbackOnly()
@@ -1862,7 +1862,7 @@ func TestCollectFeedback_ConvergenceNotification(t *testing.T) {
 	notifier := &testNotifier{onNotify: func(title, message string) {
 		notifyCalled.Store(true)
 	}}
-	collector := session.CollectFeedback(nil, ch, notifier, platform.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(context.Background(), nil, ch, notifier, platform.NewLogger(io.Discard, false))
 
 	// when: convergence arrives
 	ch <- &domain.DMail{Name: "conv-late-001", Kind: domain.KindConvergence, Description: "Late convergence"}
@@ -1894,7 +1894,7 @@ func TestCollectFeedback_MixedFeedbackAndConvergence(t *testing.T) {
 		{Name: "fb-init", Kind: domain.KindDesignFeedback, Description: "initial"},
 	}
 	ch := make(chan *domain.DMail, 1)
-	collector := session.CollectFeedback(initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(context.Background(), initial, ch, &port.NopNotifier{}, platform.NewLogger(io.Discard, false))
 
 	ch <- &domain.DMail{Name: "conv-mix-001", Kind: domain.KindConvergence, Description: "convergence"}
 	close(ch)
@@ -1931,7 +1931,7 @@ func TestCollectFeedback_HangingNotifierDoesNotBlockDrain(t *testing.T) {
 	hangingNotifier := &testNotifier{onNotify: func(title, message string) {
 		time.Sleep(10 * time.Second) // simulate hung notifier
 	}}
-	collector := session.CollectFeedback(nil, ch, hangingNotifier, platform.NewLogger(io.Discard, false))
+	collector := session.CollectFeedback(context.Background(), nil, ch, hangingNotifier, platform.NewLogger(io.Discard, false))
 
 	// when: send convergence (triggers hanging notify) then feedback
 	ch <- &domain.DMail{Name: "conv-hang", Kind: domain.KindConvergence, Description: "convergence"}
@@ -2050,7 +2050,7 @@ func TestFeedbackCollector_ReportsOnly(t *testing.T) {
 		{Name: "cv-001", Kind: domain.KindConvergence, Description: "Convergence"},
 		{Name: "rp-002", Kind: domain.KindReport, Description: "Another report"},
 	}
-	c := session.CollectFeedback(initial, nil, nil, nil)
+	c := session.CollectFeedback(context.Background(), initial, nil, nil, nil)
 
 	// when
 	reports := c.ReportsOnly()
@@ -2495,7 +2495,7 @@ func TestDMail_ActionPriorityOmitEmpty(t *testing.T) {
 func TestFeedbackCollector_Snapshot(t *testing.T) {
 	// given: collector with channel
 	ch := make(chan *domain.DMail, 5)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// send two d-mails before snapshot
 	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001"}
@@ -2522,7 +2522,7 @@ func TestFeedbackCollector_Snapshot(t *testing.T) {
 func TestFeedbackCollector_NewSinceSnapshot_noNew(t *testing.T) {
 	// given: collector with channel
 	ch := make(chan *domain.DMail, 5)
-	fc := session.CollectFeedback(nil, ch, nil, &domain.NopLogger{})
+	fc := session.CollectFeedback(context.Background(), nil, ch, nil, &domain.NopLogger{})
 
 	// send one d-mail and snapshot after it
 	ch <- &domain.DMail{Kind: domain.KindDesignFeedback, Name: "fb-001"}
