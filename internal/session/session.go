@@ -60,7 +60,7 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 			return nil
 		}
 
-		fbCollector = CollectFeedbackWithHook(allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
+		fbCollector = CollectFeedbackWithHook(ctx, allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
 	}
 
 	// Create runners once at session startup.
@@ -256,7 +256,7 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 		return nil
 	}
 
-	fbCollector := CollectFeedbackWithHook(allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
+	fbCollector := CollectFeedbackWithHook(ctx, allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
 
 	// Create runners once at session startup.
 	runner := NewTrackedRunner(cfg, baseDir, logger)

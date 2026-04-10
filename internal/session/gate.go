@@ -48,10 +48,9 @@ func RunConvergenceGate(ctx context.Context, dmails []*domain.DMail, notifier po
 	summary := harness.BuildConvergenceSummary(names)
 
 	// Notify (fire-and-forget — non-blocking with 30s timeout).
-	// Use a detached context for the notification span so it is not tied to
-	// the lifetime or cancellation of the gate context.
+	// Detached context: preserve trace for notification span, detach cancel from gate lifetime.
 	if notifier != nil {
-		notifySpanCtx := trace.ContextWithSpan(context.Background(), trace.SpanFromContext(ctx))
+		notifySpanCtx := context.WithoutCancel(ctx)
 		go func(spanCtx context.Context, title, msg string) {
 			_, notifySpan := platform.Tracer.Start(spanCtx, "notify.convergence")
 			defer notifySpan.End()

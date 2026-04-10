@@ -3,12 +3,26 @@ package eventsource_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/eventsource"
 )
+
+// warnCapture captures Warn calls for assertion.
+type warnCapture struct {
+	domain.NopLogger
+	warns []string
+}
+
+func (w *warnCapture) Warn(format string, args ...any) {
+	w.warns = append(w.warns, fmt.Sprintf(format, args...))
+}
 
 // failOnceStore wraps a real FileEventStore and fails the first Append call,
 // then delegates to the real store for subsequent calls.
@@ -237,5 +251,39 @@ func TestSessionRecorder_Record_RecoverAfterAppendFailure(t *testing.T) {
 	}
 	if events[0].ID == "" {
 		t.Error("expected non-empty UUID ID")
+	}
+}
+
+func TestSessionRecorder_WarnsOnCorruptLines(t *testing.T) {
+	// given: a store directory with one valid and one corrupt JSONL line
+	dir := t.TempDir()
+	validLine := `{"type":"session_started","aggregate_id":"test","seq_nr":1,"timestamp":"2026-01-01T00:00:00Z"}`
+	corruptLine := `{CORRUPT`
+	if err := os.WriteFile(
+		filepath.Join(dir, "2026-01-01.jsonl"),
+		[]byte(validLine+"\n"+corruptLine+"\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// when: create recorder with warn-capturing logger
+	logger := &warnCapture{}
+	store := eventsource.NewFileEventStore(dir, logger)
+	_, err := eventsource.NewSessionRecorder(context.Background(), store, "test-session", logger)
+	if err != nil {
+		t.Fatalf("NewSessionRecorder: %v", err)
+	}
+
+	// then: logger.Warn was called with message containing "corrupt"
+	found := false
+	for _, w := range logger.warns {
+		if strings.Contains(strings.ToLower(w), "corrupt") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning about corrupt lines, got warns: %v", logger.warns)
 	}
 }
