@@ -22,6 +22,12 @@ declare -A EXPECTED=(
     ["docs/shared-adr/S0037-coding-session-abstraction-layer.md"]="2515700a3e8d672863e6d10e2ab89e913eef85a9805a0c84fdd59dfac1de4a58"
 )
 
+# --- Phase 2 canonical files (contract-level check, not checksum) ---
+# internal/cmd/sessions_resolve.go: resolveSessionsDir function must exist with
+# the canonical resolution order (--path → --config → cwd) and state dir validation.
+# Config loading differs by tool (domain.Config vs ProjectConfig), so full checksum
+# comparison is not applicable. Verified by TestResolveSessionsDir_* tests instead.
+
 rc=0
 for file in "${!EXPECTED[@]}"; do
     path="${REPO_ROOT}/${file}"
@@ -45,6 +51,21 @@ for file in "${!EXPECTED[@]}"; do
         echo "  OK: ${file}"
     fi
 done
+
+# --- Phase 2: sessions contract structural checks ---
+resolve_file="${REPO_ROOT}/internal/cmd/sessions_resolve.go"
+if [[ ! -f "$resolve_file" ]]; then
+    echo "DRIFT: internal/cmd/sessions_resolve.go — file missing"
+    rc=1
+else
+    # Verify canonical resolveSessionsDir signature exists
+    if ! grep -q 'func resolveSessionsDir(cmd \*cobra.Command) (repoRoot, stateDirPath string, err error)' "$resolve_file"; then
+        echo "DRIFT: internal/cmd/sessions_resolve.go — canonical resolveSessionsDir signature missing"
+        rc=1
+    else
+        echo "  OK: internal/cmd/sessions_resolve.go (resolveSessionsDir signature)"
+    fi
+fi
 
 if [[ $rc -eq 0 ]]; then
     echo "substrate-drift-check: all canonical files match"

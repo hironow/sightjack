@@ -57,5 +57,8 @@ func loadSessionsConfig(path string) (*domain.Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+	if cfg.ClaudeCmd == "" {
+		cfg.ClaudeCmd = domain.DefaultClaudeCmd
+	}
 	return &cfg, nil
 }
