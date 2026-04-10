@@ -11,6 +11,7 @@ sightjack sessions list [flags]
 ```
   -h, --help            help for list
       --limit int       Max results (default 20)
+      --path string     Repository root path
       --status string   Filter by status (running, completed, failed, abandoned)
 ```
 
