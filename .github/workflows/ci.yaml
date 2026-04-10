@@ -62,6 +62,9 @@ jobs:
       - name: Test semgrep rules
         run: just semgrep-test
 
+      - name: Check substrate drift
+        run: just substrate-drift-check
+
   package-audit:
     runs-on: ubuntu-latest
     steps:

@@ -98,10 +98,11 @@ func NewRetryRunner(inner port.ClaudeRunner, cfg *domain.Config, logger domain.L
 	}
 }
 
-// NewTrackedRunner creates a provider-tracked runner with retry, session tracking,
-// and circuit breaker protection. This is the standard way to create a runner
-// for session-level operations that should be retried on transient failures.
-// baseDir is used to resolve the session tracking database path.
+// NewTrackedRunner creates a provider-tracked runner with retry and session tracking.
+// This is the standard path for resumable provider-backed invocations.
+// Retry IS included — sightjack retries at the runner level via RetryRunner.
+// Store ownership: caller-owned. The store lives for the session/command lifetime;
+// the caller holding the runner reference is responsible for its scope.
 func NewTrackedRunner(cfg *domain.Config, baseDir string, logger domain.Logger) port.ClaudeRunner {
 	adapter := NewClaudeAdapter(cfg, logger)
 	retrier := NewRetryRunner(adapter, cfg, logger)
@@ -109,9 +110,9 @@ func NewTrackedRunner(cfg *domain.Config, baseDir string, logger domain.Logger) 
 }
 
 // NewOnceRunner creates a provider-tracked runner WITHOUT retry.
-// Use this for operations with side-effects that must not be retried
+// This is the side-effect-safe path where retry is intentionally disabled
 // (e.g. wave apply, classify with label mutations).
-// baseDir is used to resolve the session tracking database path.
+// Store ownership: caller-owned, same as NewTrackedRunner.
 func NewOnceRunner(cfg *domain.Config, baseDir string, logger domain.Logger) port.ClaudeRunner {
 	adapter := NewClaudeAdapter(cfg, logger)
 	return wrapWithSessionTracking(adapter, baseDir, logger)
@@ -132,8 +133,8 @@ func wrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, logger do
 		}
 		return runner
 	}
-	// Note: store is not closed here — it lives for the duration of the session.
-	// The caller (RunSession/RunResumeSession) should hold the runner reference.
+	// Store ownership: caller-owned. Not closed here — lives for the session/command lifetime.
+	// The caller holding the runner reference is responsible for its scope.
 	return NewSessionTrackingAdapter(detailed, store, domain.ProviderClaudeCode)
 }
 
