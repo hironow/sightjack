@@ -75,7 +75,7 @@ func EnsureCutover(ctx context.Context, baseDir, aggregateType string, logger do
 func NewSessionRecorder(ctx context.Context, stateDir, sessionID string, logger domain.Logger) (port.Recorder, error) {
 	raw := eventsource.NewFileEventStore(stateDir, logger)
 	wrapped := NewSpanEventStore(raw)
-	return eventsource.NewSessionRecorder(ctx, wrapped, sessionID)
+	return eventsource.NewSessionRecorder(ctx, wrapped, sessionID, logger)
 }
 
 // NewSessionRecorderWithSeqCounter creates a recorder for the given session,
@@ -87,7 +87,7 @@ func NewSessionRecorderWithSeqCounter(ctx context.Context, stateDir, sessionID s
 	}
 	raw := eventsource.NewFileEventStore(stateDir, logger)
 	wrapped := NewSpanEventStore(raw)
-	rec, err := eventsource.NewSessionRecorder(ctx, wrapped, sessionID)
+	rec, err := eventsource.NewSessionRecorder(ctx, wrapped, sessionID, logger)
 	if err != nil {
 		return nil, err
 	}

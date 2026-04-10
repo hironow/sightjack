@@ -49,6 +49,10 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 // RunDetailed executes the Claude CLI once with streaming, returning the result
 // text and provider session ID.
 func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (port.RunResult, error) {
+	// publishCtx inherits ctx values (trace IDs, etc.) but is NOT cancelled
+	// when ctx is cancelled, ensuring session_end events are always published.
+	publishCtx := context.WithoutCancel(ctx)
+
 	rc := port.ApplyOptions(opts...)
 
 	model := a.Model
@@ -159,8 +163,8 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 				}
 				return
 			}
-			// Use Background: ctx may be cancelled, but session_end must still publish.
-			a.StreamBus.Publish(context.Background(), endEvent)
+			// publishCtx is not cancelled when ctx is, so session_end always publishes.
+			a.StreamBus.Publish(publishCtx, endEvent)
 		}()
 	}
 
