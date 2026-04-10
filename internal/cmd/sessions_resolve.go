@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 const sessionsToolName = "sightjack"
@@ -37,4 +40,22 @@ func resolveSessionsDir(cmd *cobra.Command) (repoRoot, stateDirPath string, err 
 		return "", "", fmt.Errorf("state directory not found: %s (run '%s init' first)", stateDirPath, sessionsToolName)
 	}
 	return repoRoot, stateDirPath, nil
+}
+
+// loadSessionsConfig reads config from path for sessions enter.
+// Missing file → DefaultConfig (graceful). Malformed YAML → error (fail-fast).
+func loadSessionsConfig(path string) (*domain.Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			cfg := domain.DefaultConfig()
+			return &cfg, nil
+		}
+		return nil, err
+	}
+	cfg := domain.DefaultConfig()
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }

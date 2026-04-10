@@ -138,10 +138,9 @@ func newSessionsEnterCmd() *cobra.Command {
 			if f := cmd.Flags().Lookup("config"); f != nil && cmd.Flags().Changed("config") {
 				configPath, _ = cmd.Flags().GetString("config")
 			}
-			cfg, err := session.LoadConfig(configPath)
-			if err != nil {
-				defaultCfg := domain.DefaultConfig()
-				cfg = &defaultCfg
+			cfg, cfgErr := loadSessionsConfig(configPath)
+			if cfgErr != nil {
+				return fmt.Errorf("load config %s: %w", configPath, cfgErr)
 			}
 
 			enterCfg := session.EnterConfig{
