@@ -94,6 +94,98 @@ func TestSessionsEnter_ByProviderID(t *testing.T) {
 	}
 }
 
+func TestSessionsEnter_ByConfigFlag(t *testing.T) {
+	// given
+	workDir := t.TempDir()
+	repoRoot := t.TempDir()
+	stateDir := filepath.Join(repoRoot, domain.StateDir)
+	runDir := filepath.Join(stateDir, ".run")
+	os.MkdirAll(runDir, 0755)
+
+	// Write config with custom claude_cmd
+	customCfg := "claude_cmd: custom-claude-binary\n"
+	configPath := filepath.Join(stateDir, "config.yaml")
+	os.WriteFile(configPath, []byte(customCfg), 0644)
+
+	store, err := session.NewSQLiteCodingSessionStore(filepath.Join(runDir, "sessions.db"))
+	if err != nil {
+		t.Fatalf("create session store: %v", err)
+	}
+	defer store.Close()
+
+	rec := domain.NewCodingSessionRecord(domain.ProviderClaudeCode, "test-model", workDir)
+	rec.ProviderSessionID = "provider-sess-config"
+	if err := store.Save(context.Background(), rec); err != nil {
+		t.Fatalf("save session record: %v", err)
+	}
+
+	var stderr bytes.Buffer
+	rootCmd := NewRootCommand()
+	// sightjack has --config as persistent root flag
+	rootCmd.SetArgs([]string{"--config", configPath, "sessions", "enter", rec.ID})
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&stderr)
+
+	// when — this will fail because custom-claude-binary doesn't exist, but
+	// the error should reference the custom command, proving config was loaded.
+	err = rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error from non-existent custom-claude-binary")
+	}
+	errMsg := err.Error() + stderr.String()
+	if !strings.Contains(errMsg, "custom-claude-binary") {
+		t.Errorf("expected error to reference custom-claude-binary from --config, got: %q", errMsg)
+	}
+}
+
+func TestSessionsEnter_ByPathFlag(t *testing.T) {
+	// given
+	workDir := t.TempDir()
+	repoRoot, recordID := setupSessionsEnterEnv(t, "provider-sess-003", workDir)
+
+	var stdout bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, recordID})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("sessions enter --path failed: %v", err)
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "--resume provider-sess-003") {
+		t.Errorf("expected --resume provider-sess-003, got: %q", output)
+	}
+}
+
+func TestSessionsEnter_NoWorkDir(t *testing.T) {
+	// given
+	repoRoot, recordID := setupSessionsEnterEnv(t, "provider-sess-004", "")
+
+	var stdout bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, recordID})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for session with no work directory")
+	}
+	if !strings.Contains(err.Error(), "has no work directory recorded") {
+		t.Errorf("error = %q, want 'has no work directory recorded'", err)
+	}
+}
+
 func TestSessionsEnter_ConfigBaseIsRepoRoot(t *testing.T) {
 	// Regression test for GAP-ARCH-037: ConfigBase must be repoRoot, not stateDir.
 	// If ConfigBase were stateDir, settings would resolve to .siren/.siren/...
