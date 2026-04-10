@@ -47,16 +47,10 @@ func TestSessionsEnter_ByRecordID(t *testing.T) {
 	// given
 	workDir := t.TempDir()
 	repoRoot, recordID := setupSessionsEnterEnv(t, "provider-sess-001", workDir)
-	configPath := filepath.Join(repoRoot, domain.StateDir, "config.yaml")
-
-	// Reset package-level cfgPath for this test
-	oldCfgPath := cfgPath
-	cfgPath = configPath
-	t.Cleanup(func() { cfgPath = oldCfgPath })
 
 	var stdout bytes.Buffer
 	rootCmd := NewRootCommand()
-	rootCmd.SetArgs([]string{"--config", configPath, "sessions", "enter", recordID})
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, recordID})
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&bytes.Buffer{})
 
@@ -80,15 +74,10 @@ func TestSessionsEnter_ByProviderID(t *testing.T) {
 	// given
 	workDir := t.TempDir()
 	repoRoot, _ := setupSessionsEnterEnv(t, "provider-sess-002", workDir)
-	configPath := filepath.Join(repoRoot, domain.StateDir, "config.yaml")
-
-	oldCfgPath := cfgPath
-	cfgPath = configPath
-	t.Cleanup(func() { cfgPath = oldCfgPath })
 
 	var stdout bytes.Buffer
 	rootCmd := NewRootCommand()
-	rootCmd.SetArgs([]string{"--config", configPath, "sessions", "enter", "--provider-id", "provider-sess-002"})
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, "--provider-id", "provider-sess-002"})
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&bytes.Buffer{})
 
@@ -112,20 +101,15 @@ func TestSessionsEnter_ConfigBaseIsRepoRoot(t *testing.T) {
 	// given: config + settings.json in correct location
 	workDir := t.TempDir()
 	repoRoot, recordID := setupSessionsEnterEnv(t, "provider-sess-037", workDir)
-	configPath := filepath.Join(repoRoot, domain.StateDir, "config.yaml")
 
 	// Create settings.json at the correct location (repoRoot/.siren/.claude/settings.json)
 	settingsDir := filepath.Join(repoRoot, domain.StateDir, ".claude")
 	os.MkdirAll(settingsDir, 0755)
 	os.WriteFile(filepath.Join(settingsDir, "settings.json"), []byte(`{"key":"value"}`), 0644)
 
-	oldCfgPath := cfgPath
-	cfgPath = configPath
-	t.Cleanup(func() { cfgPath = oldCfgPath })
-
 	var stdout bytes.Buffer
 	rootCmd := NewRootCommand()
-	rootCmd.SetArgs([]string{"--config", configPath, "sessions", "enter", recordID})
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, recordID})
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&bytes.Buffer{})
 
