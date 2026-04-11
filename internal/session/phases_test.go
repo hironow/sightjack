@@ -33,7 +33,7 @@ func TestApprovalPhase_CapsDiscussionFailures(t *testing.T) {
 	failCount := 0
 	failingDiscuss := func(_ context.Context, _ *domain.Config, _ string,
 		_ domain.Wave, _ string, _ string,
-		_ io.Writer, _ port.ClaudeRunner, _ domain.Logger) (*domain.ArchitectResponse, error) {
+		_ io.Writer, _ port.ProviderRunner, _ domain.Logger) (*domain.ArchitectResponse, error) {
 		failCount++
 		return nil, fmt.Errorf("API down")
 	}

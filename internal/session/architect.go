@@ -123,7 +123,7 @@ func ClearArchitectOutput(scanDir string, wave domain.Wave) {
 }
 
 // RunArchitectDiscuss executes a single-turn architect discussion via Claude subprocess.
-func RunArchitectDiscuss(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.ArchitectResponse, error) {
+func RunArchitectDiscuss(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, topic string, strictness string, out io.Writer, runner port.ProviderRunner, logger domain.Logger) (*domain.ArchitectResponse, error) {
 	ctx, discussSpan := platform.Tracer.Start(ctx, "architect.discuss",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", platform.SanitizeUTF8(wave.ClusterName)),

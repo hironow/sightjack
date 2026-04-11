@@ -104,7 +104,7 @@ const maxDiscussFailures = 5
 // Extracted for testability (inject failing implementations in tests).
 type discussRunnerFunc func(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, topic string, strictness string,
-	out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.ArchitectResponse, error)
+	out io.Writer, runner port.ProviderRunner, logger domain.Logger) (*domain.ArchitectResponse, error)
 
 // approvalPhase handles the wave approval/reject/discuss/selective loop.
 // waves is passed by value (not pointer) because this phase only mutates
@@ -117,7 +117,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 	feedback []*domain.DMail,
 	store port.OutboxStore, emitter port.SessionEventEmitter,
 	discuss discussRunnerFunc,
-	runner port.ClaudeRunner,
+	runner port.ProviderRunner,
 	out io.Writer, waveSpan trace.Span, logger domain.Logger) (domain.Wave, approvalPhaseResult) {
 
 	gate := cfg.Gate
@@ -315,7 +315,7 @@ func approvalPhase(ctx context.Context, scanner *bufio.Scanner,
 func executeAndRecordApply(ctx context.Context, cfg *domain.Config,
 	scanDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
-	runner port.ClaudeRunner,
+	runner port.ProviderRunner,
 	emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger) (*domain.WaveApplyResult, int, bool) {
 
 	applyResult, err := RunWaveApply(ctx, cfg, scanDir, selected, resolvedStrictness, out, runner, logger)
@@ -355,7 +355,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 	scanDir, adrDir string, selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
-	fbCollector *FeedbackCollector, runner port.ClaudeRunner, emitter port.SessionEventEmitter, waveSpan trace.Span, logger domain.Logger) {
+	fbCollector *FeedbackCollector, runner port.ProviderRunner, emitter port.SessionEventEmitter, waveSpan trace.Span, logger domain.Logger) {
 
 	var clusterForNextgen domain.ClusterScanResult
 	for _, c := range scanResult.Clusters {
@@ -408,7 +408,7 @@ func generateNextWavesIfNeeded(ctx context.Context, cfg *domain.Config,
 // in labeledReady to avoid redundant API calls.
 func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
-	labeledReady map[string]bool, runner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) {
+	labeledReady map[string]bool, runner port.ProviderRunner, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) {
 
 	if !cfg.Labels.Enabled {
 		return
@@ -451,7 +451,7 @@ func applyPhase(ctx context.Context, cfg *domain.Config,
 	waves *[]domain.Wave, completed map[string]bool,
 	scanResult *domain.ScanResult, sessionRejected map[string][]domain.WaveAction,
 	labeledReady map[string]bool,
-	fbCollector *FeedbackCollector, store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger,
+	fbCollector *FeedbackCollector, store port.OutboxStore, runner port.ProviderRunner, onceRunner port.ProviderRunner, emitter port.SessionEventEmitter, out io.Writer, waveSpan trace.Span, logger domain.Logger,
 	stallDetector *StallDetector) {
 
 	gate := cfg.Gate

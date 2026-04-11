@@ -33,7 +33,7 @@ const (
 func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
-	store port.OutboxStore, runner port.ClaudeRunner, onceRunner port.ClaudeRunner, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, []domain.Wave, map[string]bool, error) {
+	store port.OutboxStore, runner port.ProviderRunner, onceRunner port.ProviderRunner, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, []domain.Wave, map[string]bool, error) {
 
 	parentSpan := trace.SpanFromContext(ctx)
 	parentSpan.SetAttributes(attribute.String("sightjack.session_id", platform.SanitizeUTF8(sessionID)))
