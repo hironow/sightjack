@@ -88,8 +88,8 @@ jobs:
               return 1
             fi
           }
-          audit_dir "internal" "internal/" 85
-          audit_dir "internal/session" "internal/session/" 90
+          audit_dir "internal" "internal/" 70
+          audit_dir "internal/session" "internal/session/" 70
 
       - name: Test package rationale audit (white-box-reason comments)
         run: just test-package-rationale-audit

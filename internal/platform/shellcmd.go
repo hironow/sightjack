@@ -86,7 +86,6 @@ func LookPathShell(cmdLine string) (string, error) {
 	return exec.LookPath(bin)
 }
 
-// isEnvKey checks if s is a valid environment variable name ([A-Za-z_][A-Za-z0-9_]*).
 // FilterEnv returns a copy of env with all entries matching "name=..." removed.
 // Used to strip environment variables (e.g. CLAUDECODE) before invoking subprocesses.
 func FilterEnv(env []string, name string) []string {
@@ -100,6 +99,7 @@ func FilterEnv(env []string, name string) []string {
 	return out
 }
 
+// isEnvKey checks if s is a valid environment variable name ([A-Za-z_][A-Za-z0-9_]*).
 func isEnvKey(s string) bool {
 	if s == "" {
 		return false
