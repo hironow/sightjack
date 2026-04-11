@@ -239,7 +239,7 @@ func ParseScribeResult(path string) (*domain.ScribeResponse, error) {
 }
 
 // RunScribeADR executes the Scribe Agent via Claude subprocess to generate an ADR.
-func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.ScribeResponse, error) {
+func RunScribeADR(ctx context.Context, cfg *domain.Config, scanDir string, wave domain.Wave, architectResp *domain.ArchitectResponse, adrDir string, strictness string, out io.Writer, runner port.ProviderRunner, logger domain.Logger) (*domain.ScribeResponse, error) {
 	ctx, span := platform.Tracer.Start(ctx, "sightjack.scribe")
 	defer span.End()
 

@@ -8,7 +8,7 @@ Sightjack follows the Unix convention of separating machine-readable data from h
 |--------|---------|----------------|
 | **stdout** | Machine-readable output (JSON, scan results) | `cmd.OutOrStdout()` |
 | **stderr** | Human-readable progress, logs, errors | `cmd.ErrOrStderr()` |
-| **stdin** | Prompt input to Claude CLI subprocess only | `ClaudeRunner.Run()` internal |
+| **stdin** | Prompt input to provider CLI subprocess only | `ProviderRunner.Run()` internal |
 
 ## Cobra Wiring
 

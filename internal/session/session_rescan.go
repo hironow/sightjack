@@ -21,7 +21,7 @@ import (
 // triggered by design-feedback D-Mail arrival.
 func RescanCore(ctx context.Context, cfg *domain.Config, baseDir, sessionID string,
 	oldWaves []domain.Wave, oldCompleted map[string]bool,
-	runner port.ClaudeRunner, onceRunner port.ClaudeRunner,
+	runner port.ProviderRunner, onceRunner port.ProviderRunner,
 	emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger,
 ) (scanDir, scanResultPath string, scanResult *domain.ScanResult,
 	waves []domain.Wave, completed map[string]bool,

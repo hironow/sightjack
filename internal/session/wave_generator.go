@@ -58,7 +58,7 @@ func GenerateNextWavesDryRun(cfg *domain.Config, scanDir string, completedWave d
 }
 
 // GenerateNextWaves executes post-completion wave generation for a cluster.
-func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*domain.DMail, reports []*domain.DMail, runner port.ClaudeRunner, logger domain.Logger) ([]domain.Wave, error) {
+func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, completedWave domain.Wave, cluster domain.ClusterScanResult, completedWaves []domain.Wave, existingADRs []domain.ExistingADR, rejectedActions []domain.WaveAction, strictness string, feedback []*domain.DMail, reports []*domain.DMail, runner port.ProviderRunner, logger domain.Logger) ([]domain.Wave, error) {
 	ctx, nextgenSpan := platform.Tracer.Start(ctx, "wave.nextgen",
 		trace.WithAttributes(
 			attribute.String("wave.cluster_name", platform.SanitizeUTF8(completedWave.ClusterName)),

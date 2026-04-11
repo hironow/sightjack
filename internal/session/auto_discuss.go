@@ -40,7 +40,7 @@ func autoDiscussOutputFileName(speaker string, wave domain.Wave, round int) stri
 // Returns nil result (not error) when auto_discuss_rounds is 0.
 func RunAutoDiscuss(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, feedback []*domain.DMail, adrDir string, strictness string,
-	out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (*domain.AutoDiscussResult, error) {
+	out io.Writer, runner port.ProviderRunner, logger domain.Logger) (*domain.AutoDiscussResult, error) {
 
 	rounds := cfg.Scribe.AutoDiscussRounds
 	if rounds <= 0 {
@@ -165,7 +165,7 @@ func speakerForRound(r int) string {
 
 func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, actionsJSON, priorContent, feedbackSection, strictness string,
-	roundIndex int, out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (string, error) {
+	roundIndex int, out io.Writer, runner port.ProviderRunner, logger domain.Logger) (string, error) {
 
 	outputFile := filepath.Join(scanDir, autoDiscussOutputFileName("architect", wave, roundIndex))
 	_ = os.Remove(outputFile)
@@ -197,7 +197,7 @@ func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir st
 func runAutoDiscussDevilsAdvocate(ctx context.Context, cfg *domain.Config, scanDir string,
 	wave domain.Wave, actionsJSON, priorContent string, existingADRs []domain.ExistingADR,
 	claudeMD, strictness string, daRoundIndex, totalRounds int, isFinal bool,
-	roundIndex int, out io.Writer, runner port.ClaudeRunner, logger domain.Logger) (string, error) {
+	roundIndex int, out io.Writer, runner port.ProviderRunner, logger domain.Logger) (string, error) {
 
 	outputFile := filepath.Join(scanDir, autoDiscussOutputFileName("devils_advocate", wave, roundIndex))
 	_ = os.Remove(outputFile)

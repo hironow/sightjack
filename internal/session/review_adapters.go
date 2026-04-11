@@ -36,16 +36,16 @@ func (a *branchResolverAdapter) CurrentBranch(ctx context.Context, dir string) (
 	return currentBranch(ctx, dir)
 }
 
-// reviewFixRunnerAdapter implements port.ReviewFixRunner using ClaudeRunner.
+// reviewFixRunnerAdapter implements port.ReviewFixRunner using ProviderRunner.
 type reviewFixRunnerAdapter struct {
-	runner port.ClaudeRunner
+	runner port.ProviderRunner
 	branch port.BranchResolver
 	dir    string
 	logger domain.Logger
 }
 
 // NewReviewFixRunner creates a ReviewFixRunner.
-func NewReviewFixRunner(runner port.ClaudeRunner, branch port.BranchResolver, dir string, logger domain.Logger) port.ReviewFixRunner {
+func NewReviewFixRunner(runner port.ProviderRunner, branch port.BranchResolver, dir string, logger domain.Logger) port.ReviewFixRunner {
 	return &reviewFixRunnerAdapter{
 		runner: runner,
 		branch: branch,

@@ -10,7 +10,7 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 | **How** | Claude MCP tools scan issues → cluster analysis (with estimated strictness) → wave generation → interactive approval (with cancel action) → apply to Linear |
 | **Input** | Linear issues via Claude MCP tools, user approval via stdin |
 | **Output** | Updated Linear issues, D-Mail reports to downstream tools |
-| **Telemetry** | OTel spans: `sightjack.scan`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`), `context_budget.*` (`context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens`) |
+| **Telemetry** | OTel spans: `sightjack.scan`, `provider.invoke` (with `provider.model`, `provider.timeout_sec`, `gen_ai.*`), `context_budget.*` (`context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens`) |
 | **External Systems** | Linear (via Claude MCP), Claude Code subprocess, OTel exporter (Jaeger/Weave) |
 
 ## Layer Architecture

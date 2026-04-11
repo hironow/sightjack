@@ -31,7 +31,7 @@ func testStateDir(baseDir string) string {
 }
 
 // testRunners creates a tracked runner (with retry) and a once runner (no retry) for tests.
-func testRunners(cfg *domain.Config) (port.ClaudeRunner, port.ClaudeRunner) {
+func testRunners(cfg *domain.Config) (port.ProviderRunner, port.ProviderRunner) {
 	logger := platform.NewLogger(io.Discard, false)
 	adapter := session.NewClaudeAdapter(cfg, logger)
 	retrier := session.NewRetryRunner(adapter, cfg, logger)

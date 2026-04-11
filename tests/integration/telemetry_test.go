@@ -60,7 +60,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 	spans := exp.GetSpans()
 	var found bool
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			found = true
 
 			// Verify gen_ai.* semantic convention attributes (P1-3)
@@ -79,7 +79,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 					}
 				}
 				if !attrFound {
-					t.Errorf("missing gen_ai attribute %q on claude.invoke span", key)
+					t.Errorf("missing gen_ai attribute %q on provider.invoke span", key)
 				}
 			}
 
@@ -91,11 +91,11 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 				}
 			}
 			if !modelFound {
-				t.Error("missing gen_ai.request.model attribute on claude.invoke span")
+				t.Error("missing gen_ai.request.model attribute on provider.invoke span")
 			}
 
-			// Cross-tool conformance: claude.model and claude.timeout_sec must be present
-			conformanceAttrs := []string{"claude.model", "claude.timeout_sec"}
+			// Cross-tool conformance: provider.model and provider.timeout_sec must be present
+			conformanceAttrs := []string{"provider.model", "provider.timeout_sec"}
 			for _, key := range conformanceAttrs {
 				var attrFound bool
 				for _, attr := range s.Attributes {
@@ -104,7 +104,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 					}
 				}
 				if !attrFound {
-					t.Errorf("missing cross-tool conformance attribute %q on claude.invoke span", key)
+					t.Errorf("missing cross-tool conformance attribute %q on provider.invoke span", key)
 				}
 			}
 
@@ -116,7 +116,7 @@ func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
 		for i, s := range spans {
 			names[i] = s.Name
 		}
-		t.Errorf("expected 'claude.invoke' span, got: %v", names)
+		t.Errorf("expected 'provider.invoke' span, got: %v", names)
 	}
 }
 

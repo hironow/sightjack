@@ -20,7 +20,7 @@ const (
 // RunReviewGate runs the review-fix cycle with OTel spans.
 // When a ReviewGateRunner is provided (variadic), delegates cycle control to it.
 // Otherwise runs cycle control inline (backward compatibility for integration tests).
-func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Config, runner port.ClaudeRunner, dir string, logger domain.Logger, reviewGate ...port.ReviewGateRunner) (bool, error) {
+func RunReviewGate(ctx context.Context, gate domain.GateConfig, cfg *domain.Config, runner port.ProviderRunner, dir string, logger domain.Logger, reviewGate ...port.ReviewGateRunner) (bool, error) {
 	ctx, span := platform.Tracer.Start(ctx, "sightjack.review")
 	defer span.End()
 
