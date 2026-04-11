@@ -35,11 +35,11 @@ func SessionEventsDir(baseDir, sessionID string) string {
 	return eventsource.EventStorePath(stateDir(baseDir), sessionID)
 }
 
-// NewEventStore creates an event store rooted at stateDir.
+// NewEventStore creates an event store for the given state directory.
 // eventsource is the event persistence adapter (AWS Event Sourcing pattern).
-// cmd layer should use this instead of importing eventsource directly (ADR S0008).
+// Derives the events path from the state root.
 func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
-	raw := eventsource.NewFileEventStore(stateDir, logger)
+	raw := eventsource.NewFileEventStore(eventsource.EventsDir(stateDir), logger)
 	return NewSpanEventStore(raw)
 }
 
@@ -63,7 +63,7 @@ func EnsureCutover(ctx context.Context, baseDir, aggregateType string, logger do
 		return nil, fmt.Errorf("ensure cutover: seq counter: %w", err)
 	}
 	ss := eventsource.NewFileSnapshotStore(filepath.Join(stateDir(baseDir), "snapshots"))
-	raw := eventsource.NewFileEventStore(stateDir(baseDir), logger)
+	raw := eventsource.NewFileEventStore(eventsource.EventsDir(stateDir(baseDir)), logger)
 	if _, err := eventsource.RunCutover(ctx, raw, ss, sc, aggregateType, logger); err != nil {
 		sc.Close()
 		return nil, fmt.Errorf("ensure cutover: %w", err)
