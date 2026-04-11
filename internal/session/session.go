@@ -64,8 +64,14 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	}
 
 	// Create runners once at session startup.
-	runner := NewTrackedRunner(cfg, baseDir, logger)
-	onceRunner := NewOnceRunner(cfg, baseDir, logger)
+	runner, runnerStore := NewTrackedRunner(cfg, baseDir, logger)
+	if runnerStore != nil {
+		defer runnerStore.Close()
+	}
+	onceRunner, onceStore := NewOnceRunner(cfg, baseDir, logger)
+	if onceStore != nil {
+		defer onceStore.Close()
+	}
 
 	scanDir, err := EnsureScanDir(baseDir, sessionID)
 	if err != nil {
@@ -259,8 +265,14 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	fbCollector := CollectFeedbackWithHook(ctx, allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
 
 	// Create runners once at session startup.
-	runner := NewTrackedRunner(cfg, baseDir, logger)
-	onceRunner := NewOnceRunner(cfg, baseDir, logger)
+	runner, runnerStore := NewTrackedRunner(cfg, baseDir, logger)
+	if runnerStore != nil {
+		defer runnerStore.Close()
+	}
+	onceRunner, onceStore := NewOnceRunner(cfg, baseDir, logger)
+	if onceStore != nil {
+		defer onceStore.Close()
+	}
 
 	scanResult, waves, completed, adrCount, err := ResumeSession(baseDir, state)
 	if err != nil {

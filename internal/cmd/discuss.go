@@ -94,7 +94,10 @@ suitable for piping into 'adr' for ADR generation.`,
 				return nil
 			}
 
-			runner := session.NewTrackedRunner(cfg, baseDir, logger)
+			runner, runnerStore := session.NewTrackedRunner(cfg, baseDir, logger)
+			if runnerStore != nil {
+				defer runnerStore.Close()
+			}
 			resp, err := session.RunArchitectDiscuss(cmd.Context(), cfg, scanDir, wave, topic, strictness, cmd.OutOrStdout(), runner, logger)
 			if err != nil {
 				return fmt.Errorf("discussion failed: %w", err)

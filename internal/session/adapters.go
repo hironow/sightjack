@@ -59,8 +59,14 @@ type ScanRunnerAdapter struct{}
 func NewScanRunnerAdapter() *ScanRunnerAdapter { return &ScanRunnerAdapter{} }
 
 func (a *ScanRunnerAdapter) RunScan(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger domain.Logger) (*domain.ScanResult, error) {
-	runner := NewTrackedRunner(cfg, baseDir, logger)
-	onceRunner := NewOnceRunner(cfg, baseDir, logger)
+	runner, runnerStore := NewTrackedRunner(cfg, baseDir, logger)
+	if runnerStore != nil {
+		defer runnerStore.Close()
+	}
+	onceRunner, onceStore := NewOnceRunner(cfg, baseDir, logger)
+	if onceStore != nil {
+		defer onceStore.Close()
+	}
 	return RunScan(ctx, cfg, baseDir, sessionID, dryRun, streamOut, runner, onceRunner, logger)
 }
 
