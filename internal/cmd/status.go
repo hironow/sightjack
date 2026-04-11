@@ -9,8 +9,8 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-// newStatusCmd creates the status subcommand that displays operational status.
-func newStatusCmd() *cobra.Command {
+// newStatusCommand creates the status subcommand that displays operational status.
+func newStatusCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status [path]",
 		Short: "Show sightjack operational status",

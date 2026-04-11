@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newCleanCmd() *cobra.Command {
+func newCleanCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clean [path]",
 		Short: "Remove state directory (.siren/)",

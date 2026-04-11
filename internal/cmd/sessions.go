@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newSessionsCmd() *cobra.Command {
+func newSessionsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sessions",
 		Short: "Manage AI coding sessions",
@@ -23,13 +23,13 @@ func newSessionsCmd() *cobra.Command {
   sightjack sessions enter --provider-id <claude-session-id>`,
 	}
 	cmd.AddCommand(
-		newSessionsListCmd(),
-		newSessionsEnterCmd(),
+		newSessionsListCommand(),
+		newSessionsEnterCommand(),
 	)
 	return cmd
 }
 
-func newSessionsListCmd() *cobra.Command {
+func newSessionsListCommand() *cobra.Command {
 	var (
 		statusFilter string
 		limit        int
@@ -92,7 +92,7 @@ func newSessionsListCmd() *cobra.Command {
 	return cmd
 }
 
-func newSessionsEnterCmd() *cobra.Command {
+func newSessionsEnterCommand() *cobra.Command {
 	var providerID string
 	cmd := &cobra.Command{
 		Use:   "enter [session-record-id]",

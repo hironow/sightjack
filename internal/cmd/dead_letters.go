@@ -16,7 +16,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newDeadLettersCmd() *cobra.Command {
+func newDeadLettersCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dead-letters",
 		Short: "Manage dead-lettered outbox items",
@@ -31,12 +31,12 @@ Use the purge subcommand to remove dead-lettered items.`,
   sightjack dead-letters purge --execute --yes`,
 	}
 
-	cmd.AddCommand(newDeadLettersPurgeCmd())
+	cmd.AddCommand(newDeadLettersPurgeCommand())
 
 	return cmd
 }
 
-func newDeadLettersPurgeCmd() *cobra.Command {
+func newDeadLettersPurgeCommand() *cobra.Command {
 	var (
 		execute bool
 	)

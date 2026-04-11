@@ -14,7 +14,7 @@ import (
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
-func newInitCmd() *cobra.Command {
+func newInitCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init [path]",
 		Short: "Create .siren/config.yaml",

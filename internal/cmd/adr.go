@@ -11,7 +11,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newADRCmd() *cobra.Command {
+func newADRCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "adr [path]",
 		Short: "Generate ADR Markdown from stdin DiscussResult",

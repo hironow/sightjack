@@ -15,7 +15,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newApplyCmd() *cobra.Command {
+func newApplyCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "apply [path]",
 		Short: "Apply a wave from stdin Wave JSON",

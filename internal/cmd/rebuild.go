@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRebuildCmd() *cobra.Command {
+func newRebuildCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rebuild [path]",
 		Short: "Rebuild projections from event store",

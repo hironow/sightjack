@@ -17,7 +17,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newDiscussCmd() *cobra.Command {
+func newDiscussCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "discuss [path]",
 		Short: "Architect discussion from stdin Wave JSON",
