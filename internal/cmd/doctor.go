@@ -42,7 +42,7 @@ hint recommends adjusting .claude/settings.json.`,
   sightjack doctor --repair`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			baseDir, err := resolveBaseDir(args)
+			baseDir, err := resolveTargetDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}

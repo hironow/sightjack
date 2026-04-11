@@ -65,6 +65,19 @@ jobs:
       - name: Check substrate drift
         run: just substrate-drift-check
 
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run E2E tests
+        run: |
+          docker compose -f tests/e2e/compose-e2e.yaml build
+          docker compose -f tests/e2e/compose-e2e.yaml run --rm e2e \
+            go test -tags e2e ./tests/e2e/ -count=1 -v -timeout=600s
+
   package-audit:
     runs-on: ubuntu-latest
     steps:
@@ -93,19 +106,6 @@ jobs:
 
       - name: Test package rationale audit (white-box-reason comments)
         run: just test-package-rationale-audit
-
-  e2e:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Run E2E tests
-        run: |
-          docker compose -f tests/e2e/compose-e2e.yaml build
-          docker compose -f tests/e2e/compose-e2e.yaml run --rm e2e \
-            go test -tags e2e ./tests/e2e/ -count=1 -v -timeout=600s
 
       - name: Cleanup
         if: always()

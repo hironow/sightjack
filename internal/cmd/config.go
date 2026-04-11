@@ -32,7 +32,7 @@ func newConfigShowCommand() *cobra.Command {
 		Long:  "Display the effective configuration after applying defaults and clamping.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			baseDir, err := resolveBaseDir(args)
+			baseDir, err := resolveTargetDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
@@ -91,9 +91,9 @@ Supported keys:
 			var baseDir string
 			var err error
 			if len(args) == 3 {
-				baseDir, err = resolveBaseDir(args[2:])
+				baseDir, err = resolveTargetDir(args[2:])
 			} else {
-				baseDir, err = resolveBaseDir(nil)
+				baseDir, err = resolveTargetDir(nil)
 			}
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)

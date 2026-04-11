@@ -26,7 +26,7 @@ func newCleanCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var stateDir string
 			if len(args) > 0 {
-				base, err := resolveBaseDir(args)
+				base, err := resolveTargetDir(args)
 				if err != nil {
 					return err
 				}
