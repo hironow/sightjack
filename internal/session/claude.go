@@ -101,29 +101,33 @@ func NewRetryRunner(inner port.ClaudeRunner, cfg *domain.Config, logger domain.L
 // NewTrackedRunner creates a provider-tracked runner with retry and session tracking.
 // This is the standard path for resumable provider-backed invocations.
 // Retry IS included — sightjack retries at the runner level via RetryRunner.
-// Store ownership: caller-owned. The store lives for the session/command lifetime;
-// the caller holding the runner reference is responsible for its scope.
-func NewTrackedRunner(cfg *domain.Config, baseDir string, logger domain.Logger) port.ClaudeRunner {
+// Store ownership: returned alongside runner. Caller MUST nil-check store
+// before calling store.Close() (nil when session tracking is unavailable).
+func NewTrackedRunner(cfg *domain.Config, baseDir string, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
 	adapter := NewClaudeAdapter(cfg, logger)
 	retrier := NewRetryRunner(adapter, cfg, logger)
-	return wrapWithSessionTracking(retrier, baseDir, logger)
+	return WrapWithSessionTracking(retrier, baseDir, domain.ProviderClaudeCode, logger)
 }
 
 // NewOnceRunner creates a provider-tracked runner WITHOUT retry.
 // This is the side-effect-safe path where retry is intentionally disabled
 // (e.g. wave apply, classify with label mutations).
-// Store ownership: caller-owned, same as NewTrackedRunner.
-func NewOnceRunner(cfg *domain.Config, baseDir string, logger domain.Logger) port.ClaudeRunner {
+// Store ownership: same as NewTrackedRunner.
+func NewOnceRunner(cfg *domain.Config, baseDir string, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
 	adapter := NewClaudeAdapter(cfg, logger)
-	return wrapWithSessionTracking(adapter, baseDir, logger)
+	return WrapWithSessionTracking(adapter, baseDir, domain.ProviderClaudeCode, logger)
 }
 
-// wrapWithSessionTracking wraps a ClaudeRunner with session persistence.
-// Best-effort: if the session store cannot be opened, returns the runner as-is.
-func wrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, logger domain.Logger) port.ClaudeRunner {
+// WrapWithSessionTracking adds session persistence to a ClaudeRunner.
+// The runner must also implement DetailedRunner for session ID capture.
+// Best-effort: returns (runner, nil) when the session store cannot be opened
+// or the runner does not implement DetailedRunner.
+// Caller MUST nil-check store before calling store.Close().
+// This is the canonical factory helper shared across all AI coding tools.
+func WrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, provider domain.Provider, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
 	detailed, ok := runner.(port.DetailedRunner)
 	if !ok {
-		return runner
+		return runner, nil
 	}
 	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "sessions.db")
 	store, err := NewSQLiteCodingSessionStore(dbPath)
@@ -131,11 +135,9 @@ func wrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, logger do
 		if logger != nil {
 			logger.Debug("session tracking unavailable: %v", err)
 		}
-		return runner
+		return runner, nil
 	}
-	// Store ownership: caller-owned. Not closed here — lives for the session/command lifetime.
-	// The caller holding the runner reference is responsible for its scope.
-	return NewSessionTrackingAdapter(detailed, store, domain.ProviderClaudeCode)
+	return NewSessionTrackingAdapter(detailed, store, provider), store
 }
 
 // recordCircuitBreaker updates the shared circuit breaker based on provider error classification.
