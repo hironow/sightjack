@@ -43,7 +43,7 @@ if event data is found in .siren/events/.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := loggerFrom(cmd)
-			baseDir, err := resolveBaseDir(args)
+			baseDir, err := resolveTargetDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}

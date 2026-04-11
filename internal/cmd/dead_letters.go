@@ -64,7 +64,7 @@ Pass --execute to actually remove them.`,
 			if execute && dryRun {
 				return fmt.Errorf("--execute and --dry-run are mutually exclusive")
 			}
-			baseDir, err := resolveBaseDir(args)
+			baseDir, err := resolveTargetDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}

@@ -321,6 +321,14 @@ release version:
     echo "Tagged $tag successfully."
     echo "Push with:  git push origin $tag"
 
+# Validate goreleaser config
+release-check:
+    goreleaser check
+
+# Snapshot GoReleaser build (no publish)
+release-snapshot:
+    goreleaser release --snapshot --clean
+
 # Open all Markdown and prompt templates in mo viewer (foreground, live-reload)
 docs-view:
     mo --clear --no-open

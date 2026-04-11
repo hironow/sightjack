@@ -27,7 +27,7 @@ Output is written to stdout for redirection to docs/adr/.`,
   cat discussion.json | sightjack adr`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			baseDir, err := resolveBaseDir(args)
+			baseDir, err := resolveTargetDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}

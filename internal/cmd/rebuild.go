@@ -24,7 +24,7 @@ If path is omitted, the current working directory is used.`,
   sightjack rebuild /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			baseDir, err := resolveBaseDir(args)
+			baseDir, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}
