@@ -9,7 +9,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newConfigCmd() *cobra.Command {
+func newConfigCommand() *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config",
 		Short: "View or update sightjack configuration",
@@ -19,13 +19,13 @@ func newConfigCmd() *cobra.Command {
   sightjack config set lang en`,
 	}
 
-	configCmd.AddCommand(newConfigShowCmd())
-	configCmd.AddCommand(newConfigSetCmd())
+	configCmd.AddCommand(newConfigShowCommand())
+	configCmd.AddCommand(newConfigSetCommand())
 
 	return configCmd
 }
 
-func newConfigShowCmd() *cobra.Command {
+func newConfigShowCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show [path]",
 		Short: "Display effective configuration",
@@ -50,7 +50,7 @@ func newConfigShowCmd() *cobra.Command {
 	}
 }
 
-func newConfigSetCmd() *cobra.Command {
+func newConfigSetCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set <key> <value> [path]",
 		Short: "Update a configuration value",

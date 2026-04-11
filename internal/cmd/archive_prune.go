@@ -13,7 +13,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newArchivePruneCmd() *cobra.Command {
+func newArchivePruneCommand() *cobra.Command {
 	var (
 		execute bool
 		days    int

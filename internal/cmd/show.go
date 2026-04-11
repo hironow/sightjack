@@ -15,7 +15,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newShowCmd() *cobra.Command {
+func newShowCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show [path]",
 		Short: "Display last scan results",

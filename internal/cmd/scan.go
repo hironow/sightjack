@@ -13,7 +13,7 @@ import (
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
-func newScanCmd() *cobra.Command {
+func newScanCommand() *cobra.Command {
 	var jsonOutput bool
 
 	cmd := &cobra.Command{

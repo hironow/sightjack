@@ -14,7 +14,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newWavesCmd() *cobra.Command {
+func newWavesCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "waves [path]",
 		Short: "Generate waves from stdin ScanResult JSON",

@@ -13,7 +13,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newSelectCmd() *cobra.Command {
+func newSelectCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "select",
 		Short: "Interactively pick a wave from stdin WavePlan",

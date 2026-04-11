@@ -15,7 +15,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newNextgenCmd() *cobra.Command {
+func newNextgenCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "nextgen [path]",
 		Short: "Generate follow-up waves from stdin ApplyResult",

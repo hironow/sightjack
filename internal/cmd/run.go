@@ -17,7 +17,7 @@ import (
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
-func newRunCmd() *cobra.Command {
+func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run [path]",
 		Short: "Interactive wave approval and apply loop",

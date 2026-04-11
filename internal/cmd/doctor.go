@@ -13,7 +13,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func newDoctorCmd() *cobra.Command {
+func newDoctorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "doctor [path]",
 		Short: "Check environment and tool availability",
