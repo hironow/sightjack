@@ -338,3 +338,12 @@ docs-view:
         -w '.semgrep/**/*.md' \
         -w 'internal/platform/templates/**/*.md.tmpl' -t templates \
         -w 'internal/platform/templates/skills/**/*.md' -t skills
+
+# List all WIP documents in refs/ and update refs/WIP.md
+wip:
+    @../scripts/list-wip.sh > ../refs/WIP.md
+    @cat ../refs/WIP.md
+
+# Open all WIP documents in VS Code
+wip-open:
+    @../scripts/open-wip.sh

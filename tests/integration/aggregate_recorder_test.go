@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,7 +17,8 @@ func TestAggregateRecorder_ScanEvents_HaveSessionID(t *testing.T) {
 	baseDir := t.TempDir()
 	sessionID := "test-scan-001"
 	ctx := context.Background()
-	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID), &domain.NopLogger{})
+	stateDir := filepath.Join(baseDir, domain.StateDir)
+	store := session.NewEventStore(stateDir, &domain.NopLogger{})
 	recorder, err := eventsource.NewSessionRecorder(ctx, store, sessionID, nil)
 	if err != nil {
 		t.Fatalf("new recorder: %v", err)

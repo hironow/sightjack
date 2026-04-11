@@ -77,7 +77,8 @@ func TestStatus_WithEvents(t *testing.T) {
 	// given — create event store with waves and scan events
 	baseDir := t.TempDir()
 	sessionID := "test-session-001"
-	store := session.NewEventStore(session.SessionEventsDir(baseDir, sessionID), &domain.NopLogger{})
+	stateDir := filepath.Join(baseDir, domain.StateDir)
+	store := session.NewEventStore(stateDir, &domain.NopLogger{})
 
 	// Create a scan_completed event with LastScanned
 	scanTime := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
