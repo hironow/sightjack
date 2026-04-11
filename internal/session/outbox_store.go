@@ -102,6 +102,7 @@ func (s *SQLiteOutboxStore) Stage(ctx context.Context, name string, data []byte)
 	_, span := platform.Tracer.Start(ctx, "outbox.stage")
 	defer span.End()
 
+	span.SetAttributes(attribute.String("db.operation", "stage"))
 	_, err := s.db.Exec(`INSERT INTO staged (name, data) VALUES (?, ?)
 		ON CONFLICT(name) DO UPDATE SET data = excluded.data, flushed = 0, retry_count = 0`, name, data)
 	if err != nil {
@@ -109,7 +110,6 @@ func (s *SQLiteOutboxStore) Stage(ctx context.Context, name string, data []byte)
 		span.SetAttributes(attribute.String("error.stage", "outbox.stage"))
 		return fmt.Errorf("outbox store: stage %s: %w", name, err)
 	}
-	span.SetAttributes(attribute.String("db.operation", "stage"))
 	return nil
 }
 
@@ -211,16 +211,26 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		flushed++
 	}
 
+	// Count dead-letter items before committing (while we hold the conn).
+	var deadCount int
+	if scanErr := conn.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM staged WHERE flushed = 0 AND retry_count >= ?`, maxRetryCount).Scan(&deadCount); scanErr != nil {
+		span.RecordError(scanErr)
+		span.SetAttributes(attribute.String("error.stage", "outbox.dead_letter_count"))
+	}
+
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: commit: %w", err)
 	}
 	committed = true
-	span.SetAttributes(
-		attribute.Int("flush.retry.count", retryCount),
-		attribute.Int("flush.success.count", flushed),
-	)
+	span.SetAttributes(attribute.Int("flush.retry.count", retryCount))
+	span.SetAttributes(attribute.Int("flush.success.count", flushed))
+	if deadCount > 0 {
+		span.SetAttributes(attribute.Int("flush.dead_letter.count", deadCount))
+	}
+
 	return flushed, nil
 }
 
