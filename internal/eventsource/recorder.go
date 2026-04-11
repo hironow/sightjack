@@ -23,6 +23,7 @@ type SessionRecorder struct {
 	seqCounter *SeqCounter // nil = no SeqNr assignment (pre-cutover)
 	sessionID  string
 	prevID     string
+	logger     domain.Logger
 	mu         sync.Mutex
 }
 
@@ -48,6 +49,7 @@ func NewSessionRecorder(ctx context.Context, store eventStore, sessionID string,
 		store:     store,
 		sessionID: sessionID,
 		prevID:    prevID,
+		logger:    logger,
 	}, nil
 }
 
