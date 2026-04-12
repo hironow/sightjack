@@ -260,6 +260,9 @@ type RecorderFactory interface {
 	SessionEventsDir(baseDir, sessionID string) string
 	NewSessionRecorder(ctx context.Context, stateDir, sessionID string, logger domain.Logger) (Recorder, error)
 	NewEventStore(stateDir string, logger domain.Logger) EventStore
+	// NewSessionEventStore creates an EventStore scoped to a specific session directory.
+	// stateDir is the session events dir (from SessionEventsDir), NOT the tool state root.
+	NewSessionEventStore(sessionEventsDir string, logger domain.Logger) EventStore
 }
 
 // StateLoader loads session state from the filesystem.

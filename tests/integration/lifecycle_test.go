@@ -132,7 +132,10 @@ func testRecorder(baseDir, sessionID string) port.Recorder {
 }
 
 func testEmitter(baseDir, sessionID string) port.SessionEventEmitter {
-	return usecase.NewSessionEventEmitter(context.Background(), domain.NewSessionAggregate(), testRecorder(baseDir, sessionID), &domain.NopLogger{})
+	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
+	agg := domain.NewSessionAggregate()
+	agg.SetSessionID(sessionID)
+	return usecase.NewSessionEventEmitter(context.Background(), agg, store, nil, &domain.NopLogger{}, sessionID)
 }
 
 // testConfig returns a minimal Config for lifecycle tests.
