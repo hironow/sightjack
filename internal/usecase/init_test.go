@@ -6,26 +6,21 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/usecase"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 type stubInitRunner struct {
-	called     bool
-	baseDir    string
-	team       string
-	project    string
-	lang       string
-	strictness string
-	warnings   []string
-	err        error
+	called   bool
+	baseDir  string
+	config   port.InitConfig
+	warnings []string
+	err      error
 }
 
-func (s *stubInitRunner) InitProject(baseDir, team, project, lang, strictness string) ([]string, error) {
+func (s *stubInitRunner) InitProject(baseDir string, opts ...port.InitOption) ([]string, error) {
 	s.called = true
 	s.baseDir = baseDir
-	s.team = team
-	s.project = project
-	s.lang = lang
-	s.strictness = strictness
+	s.config = port.ApplyInitOptions(opts...)
 	return s.warnings, s.err
 }
 
@@ -45,18 +40,17 @@ func TestRunInit_ValidCommand(t *testing.T) {
 	if !runner.called {
 		t.Fatal("expected InitProject to be called")
 	}
-	if runner.lang != "en" {
-		t.Errorf("expected lang en, got %q", runner.lang)
+	if runner.config.Lang != "en" {
+		t.Errorf("expected lang en, got %q", runner.config.Lang)
 	}
-	if runner.strictness != "alert" {
-		t.Errorf("expected strictness alert, got %q", runner.strictness)
+	if runner.config.Strictness != "alert" {
+		t.Errorf("expected strictness alert, got %q", runner.config.Strictness)
 	}
 }
 
 func TestRunInit_WithDefaults(t *testing.T) {
 	runner := &stubInitRunner{}
 	rp, _ := domain.NewRepoPath("/tmp/repo")
-	// Defaults applied at cmd layer: lang="ja", strictness="fog"
 	cmd := domain.NewInitCommand(rp, "", "", "ja", "fog")
 
 	_, err := usecase.RunInit(cmd, runner)
@@ -64,11 +58,11 @@ func TestRunInit_WithDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if runner.lang != "ja" {
-		t.Errorf("expected default lang ja, got %q", runner.lang)
+	if runner.config.Lang != "ja" {
+		t.Errorf("expected default lang ja, got %q", runner.config.Lang)
 	}
-	if runner.strictness != "fog" {
-		t.Errorf("expected default strictness fog, got %q", runner.strictness)
+	if runner.config.Strictness != "fog" {
+		t.Errorf("expected default strictness fog, got %q", runner.config.Strictness)
 	}
 }
 
@@ -98,6 +92,3 @@ func TestRunInit_RunnerError(t *testing.T) {
 		t.Fatal("expected error from runner")
 	}
 }
-
-// Validation tests (empty BaseDir) are now in domain/primitives_test.go.
-// WithDefaults tests removed — defaults are applied at cmd layer before construction.
