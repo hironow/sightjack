@@ -153,7 +153,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 				return nil
 			}
 
-			runner, runnerStore := session.NewTrackedRunner(cfg, baseDir, logger)
+			runner, runnerStore := session.NewTrackedRunner(session.AdapterConfigFromDomainConfig(cfg, baseDir), session.RetryConfigFromDomainConfig(cfg), logger)
 			if runnerStore != nil {
 				defer runnerStore.Close()
 			}

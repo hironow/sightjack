@@ -94,7 +94,7 @@ suitable for piping into 'adr' for ADR generation.`,
 				return nil
 			}
 
-			runner, runnerStore := session.NewTrackedRunner(cfg, baseDir, logger)
+			runner, runnerStore := session.NewTrackedRunner(session.AdapterConfigFromDomainConfig(cfg, baseDir), session.RetryConfigFromDomainConfig(cfg), logger)
 			if runnerStore != nil {
 				defer runnerStore.Close()
 			}

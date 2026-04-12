@@ -64,11 +64,11 @@ func RunSession(ctx context.Context, cfg *domain.Config, baseDir string, session
 	}
 
 	// Create runners once at session startup.
-	runner, runnerStore := NewTrackedRunner(cfg, baseDir, logger)
+	runner, runnerStore := NewTrackedRunner(AdapterConfigFromDomainConfig(cfg, baseDir), RetryConfigFromDomainConfig(cfg), logger)
 	if runnerStore != nil {
 		defer runnerStore.Close()
 	}
-	onceRunner, onceStore := NewOnceRunner(cfg, baseDir, logger)
+	onceRunner, onceStore := NewOnceRunner(AdapterConfigFromDomainConfig(cfg, baseDir), logger)
 	if onceStore != nil {
 		defer onceStore.Close()
 	}
@@ -265,11 +265,11 @@ func RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, s
 	fbCollector := CollectFeedbackWithHook(ctx, allDmails, inboxCh, notifier, logger, buildCorrectionInsightHook(baseDir, logger))
 
 	// Create runners once at session startup.
-	runner, runnerStore := NewTrackedRunner(cfg, baseDir, logger)
+	runner, runnerStore := NewTrackedRunner(AdapterConfigFromDomainConfig(cfg, baseDir), RetryConfigFromDomainConfig(cfg), logger)
 	if runnerStore != nil {
 		defer runnerStore.Close()
 	}
-	onceRunner, onceStore := NewOnceRunner(cfg, baseDir, logger)
+	onceRunner, onceStore := NewOnceRunner(AdapterConfigFromDomainConfig(cfg, baseDir), logger)
 	if onceStore != nil {
 		defer onceStore.Close()
 	}

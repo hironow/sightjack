@@ -74,7 +74,7 @@ into 'nextgen' for follow-up wave generation.`,
 				return nil
 			}
 
-			onceRunner, onceStore := session.NewOnceRunner(cfg, baseDir, logger)
+			onceRunner, onceStore := session.NewOnceRunner(session.AdapterConfigFromDomainConfig(cfg, baseDir), logger)
 			if onceStore != nil {
 				defer onceStore.Close()
 			}

@@ -59,7 +59,7 @@ for piping into 'select' or 'show'.`,
 
 			logger := loggerFrom(cmd)
 
-			runner, runnerStore := session.NewTrackedRunner(cfg, baseDir, logger)
+			runner, runnerStore := session.NewTrackedRunner(session.AdapterConfigFromDomainConfig(cfg, baseDir), session.RetryConfigFromDomainConfig(cfg), logger)
 			if runnerStore != nil {
 				defer runnerStore.Close()
 			}
