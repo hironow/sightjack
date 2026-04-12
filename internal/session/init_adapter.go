@@ -7,6 +7,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,7 +18,9 @@ type InitAdapter struct {
 
 // InitProject creates .siren/config.yaml and supporting files.
 // Returns warnings for non-fatal errors (skill install, mail dirs).
-func (a *InitAdapter) InitProject(baseDir, team, project, lang, strictness string) ([]string, error) {
+func (a *InitAdapter) InitProject(baseDir string, opts ...port.InitOption) ([]string, error) {
+	cfg := port.ApplyInitOptions(opts...)
+	team, project, lang, strictness := cfg.Team, cfg.Project, cfg.Lang, cfg.Strictness
 	cfgPath := domain.ConfigPath(baseDir)
 	if _, err := os.Stat(cfgPath); err == nil && !a.Force {
 		return nil, fmt.Errorf(".siren/config.yaml already exists in %s\nUse --force to overwrite", baseDir)

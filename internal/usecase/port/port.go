@@ -36,10 +36,43 @@ type ReviewGateRunner interface {
 	RunReviewGate(ctx context.Context, gate domain.GateConfig, timeoutSec int) (bool, error)
 }
 
+// InitOption configures optional behavior for project initialization.
+type InitOption func(*InitConfig)
+
+// InitConfig holds per-invocation configuration for project initialization.
+// Tools use only the fields relevant to their init flow.
+type InitConfig struct {
+	Team       string
+	Project    string
+	Lang       string
+	Strictness string
+}
+
+// ApplyInitOptions applies InitOption functions to an InitConfig and returns it.
+func ApplyInitOptions(opts ...InitOption) InitConfig {
+	var c InitConfig
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return c
+}
+
+// WithTeam sets the team identifier for project initialization.
+func WithTeam(t string) InitOption { return func(c *InitConfig) { c.Team = t } }
+
+// WithProject sets the project name for initialization.
+func WithProject(p string) InitOption { return func(c *InitConfig) { c.Project = p } }
+
+// WithLang sets the language for initialization (e.g. "ja", "en").
+func WithLang(l string) InitOption { return func(c *InitConfig) { c.Lang = l } }
+
+// WithStrictness sets the strictness level (e.g. "fog", "alert", "lockdown").
+func WithStrictness(s string) InitOption { return func(c *InitConfig) { c.Strictness = s } }
+
 // InitRunner handles project initialization I/O.
-// Returns warnings for non-fatal errors (e.g. skill install failures).
+// Returns warnings for non-fatal issues (nil when none). Error for critical failures.
 type InitRunner interface {
-	InitProject(baseDir, team, project, lang, strictness string) (warnings []string, err error)
+	InitProject(baseDir string, opts ...InitOption) (warnings []string, err error)
 }
 
 // EventDispatcher dispatches domain events to policy handlers.
