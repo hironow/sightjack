@@ -152,12 +152,12 @@ func TestSpan_RunClaude_RecordsRetryEvent(t *testing.T) {
 	var retryFound bool
 	for _, s := range spans {
 		for _, ev := range s.Events {
-			if ev.Name == "claude.retry" {
+			if ev.Name == "provider.retry" {
 				retryFound = true
 			}
 		}
 	}
 	if !retryFound {
-		t.Error("expected 'claude.retry' event")
+		t.Error("expected 'provider.retry' event")
 	}
 }
