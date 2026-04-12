@@ -99,23 +99,47 @@ func NewRetryRunner(inner port.ProviderRunner, cfg *domain.Config, logger domain
 }
 
 // NewTrackedRunner creates a provider-tracked runner with retry and session tracking.
-// This is the standard path for resumable provider-backed invocations.
-// Retry IS included — sightjack retries at the runner level via RetryRunner.
+// Sightjack variant: includes RetryRunner wrapping (role-specific policy).
 // Store ownership: returned alongside runner. Caller MUST nil-check store
 // before calling store.Close() (nil when session tracking is unavailable).
-func NewTrackedRunner(cfg *domain.Config, baseDir string, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
-	adapter := NewClaudeAdapter(cfg, logger)
-	retrier := NewRetryRunner(adapter, cfg, logger)
-	return WrapWithSessionTracking(retrier, baseDir, domain.ProviderClaudeCode, logger)
+func NewTrackedRunner(pac ProviderAdapterConfig, rc RetryConfig, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
+	adapter := &ClaudeAdapter{
+		ClaudeCmd:  pac.Cmd,
+		Model:      pac.Model,
+		TimeoutSec: pac.TimeoutSec,
+		Logger:     logger,
+		NewCmd:     newCmd,
+		CancelFunc: cancelFunc,
+		StreamBus:  sharedStreamBus,
+		ToolName:   pac.ToolName,
+	}
+	retrier := &RetryRunner{
+		Inner:          adapter,
+		MaxAttempts:    rc.MaxAttempts,
+		BaseDelay:      time.Duration(rc.BaseDelaySec) * time.Second,
+		Timeout:        time.Duration(rc.TimeoutSec) * time.Second,
+		Logger:         logger,
+		CircuitBreaker: sharedCircuitBreaker,
+	}
+	return WrapWithSessionTracking(retrier, pac.BaseDir, domain.ProviderClaudeCode, logger)
 }
 
 // NewOnceRunner creates a provider-tracked runner WITHOUT retry.
 // This is the side-effect-safe path where retry is intentionally disabled
 // (e.g. wave apply, classify with label mutations).
-// Store ownership: same as NewTrackedRunner.
-func NewOnceRunner(cfg *domain.Config, baseDir string, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
-	adapter := NewClaudeAdapter(cfg, logger)
-	return WrapWithSessionTracking(adapter, baseDir, domain.ProviderClaudeCode, logger)
+// Uses canonical ProviderAdapterConfig shape (same as paintress/amadeus NewTrackedRunner).
+func NewOnceRunner(pac ProviderAdapterConfig, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
+	adapter := &ClaudeAdapter{
+		ClaudeCmd:  pac.Cmd,
+		Model:      pac.Model,
+		TimeoutSec: pac.TimeoutSec,
+		Logger:     logger,
+		NewCmd:     newCmd,
+		CancelFunc: cancelFunc,
+		StreamBus:  sharedStreamBus,
+		ToolName:   pac.ToolName,
+	}
+	return WrapWithSessionTracking(adapter, pac.BaseDir, domain.ProviderClaudeCode, logger)
 }
 
 // WrapWithSessionTracking adds session persistence to a ProviderRunner.
