@@ -101,6 +101,11 @@ func (f *RecorderFactoryAdapter) NewEventStore(stateDir string, logger domain.Lo
 	return NewEventStore(stateDir, logger)
 }
 
+func (f *RecorderFactoryAdapter) NewSessionEventStore(sessionEventsDir string, logger domain.Logger) port.EventStore {
+	raw := eventsource.NewFileEventStore(sessionEventsDir, logger)
+	return NewSpanEventStore(raw)
+}
+
 // --- StateLoader adapter ---
 
 // StateLoaderAdapter implements port.StateLoader by delegating to session package functions.

@@ -23,15 +23,11 @@ func RunScan(ctx context.Context, cmd domain.RunScanCommand, cfg *domain.Config,
 	}
 
 	// Record scan state: cache result + session start/scan completed events
-	stateDir := factory.SessionEventsDir(baseDir, sessionID)
-	recorder, recErr := factory.NewSessionRecorder(ctx, stateDir, sessionID, logger)
-	if recErr != nil {
-		logger.Warn("session recorder: %v", recErr)
-		return result, nil
-	}
+	sessionEventsDir := factory.SessionEventsDir(baseDir, sessionID)
+	store := factory.NewSessionEventStore(sessionEventsDir, logger)
 
 	agg := domain.NewSessionAggregate()
-	emitter := NewSessionEventEmitter(ctx, agg, recorder, logger)
+	emitter := NewSessionEventEmitter(ctx, agg, store, nil, logger, sessionID)
 	scanner.RecordScanState(baseDir, sessionID, result, cfg, emitter, time.Now(), logger)
 
 	return result, nil
