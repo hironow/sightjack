@@ -13,7 +13,8 @@ import (
 
 // InitAdapter implements port.InitRunner by orchestrating project initialization I/O.
 type InitAdapter struct {
-	Force bool // When true, overwrite existing config.yaml
+	Force      bool        // When true, overwrite existing config.yaml
+	LastResult *InitResult // populated after InitProject for display by cmd layer
 }
 
 // InitProject creates .siren/config.yaml and supporting files.
@@ -29,23 +30,30 @@ func (a *InitAdapter) InitProject(baseDir string, opts ...port.InitOption) ([]st
 	sirenDir := filepath.Join(baseDir, domain.StateDir)
 
 	// Create standard directory structure
-	if err := EnsureStateDir(sirenDir, WithMailDirs()); err != nil {
+	result, err := EnsureStateDir(sirenDir, WithMailDirs())
+	if err != nil {
 		return nil, fmt.Errorf("create state dir: %w", err)
 	}
 
 	if err := writeConfigWithDefaults(cfgPath, team, project, lang, strictness); err != nil {
 		return nil, fmt.Errorf("write config: %w", err)
 	}
+	result.Add(domain.StateDir+"/config.yaml", InitUpdated, "")
 
 	// Gitignore (append-only)
 	_ = WriteGitIgnore(baseDir)
+	result.Add(domain.StateDir+"/.gitignore", InitUpdated, "")
 
 	// Skills installation (best-effort)
 	var warnings []string
 	if err := InstallSkills(baseDir, platform.SkillsFS, nil); err != nil {
 		warnings = append(warnings, fmt.Sprintf("failed to install skills: %v", err))
+		result.Add("skills", InitWarning, fmt.Sprintf("failed to install skills: %v", err))
+	} else {
+		result.Add(domain.StateDir+"/skills/", InitCreated, "")
 	}
 
+	a.LastResult = result
 	return warnings, nil
 }
 
