@@ -27,22 +27,23 @@ func (a *InitAdapter) InitProject(baseDir string, opts ...port.InitOption) ([]st
 	}
 
 	sirenDir := filepath.Join(baseDir, domain.StateDir)
-	if err := os.MkdirAll(sirenDir, 0755); err != nil {
-		return nil, fmt.Errorf("create .siren dir: %w", err)
+
+	// Create standard directory structure
+	if err := EnsureStateDir(sirenDir, WithMailDirs()); err != nil {
+		return nil, fmt.Errorf("create state dir: %w", err)
 	}
 
 	if err := writeConfigWithDefaults(cfgPath, team, project, lang, strictness); err != nil {
 		return nil, fmt.Errorf("write config: %w", err)
 	}
 
+	// Gitignore (append-only)
 	_ = WriteGitIgnore(baseDir)
 
+	// Skills installation (best-effort)
 	var warnings []string
 	if err := InstallSkills(baseDir, platform.SkillsFS, nil); err != nil {
 		warnings = append(warnings, fmt.Sprintf("failed to install skills: %v", err))
-	}
-	if err := EnsureMailDirs(baseDir); err != nil {
-		warnings = append(warnings, fmt.Sprintf("failed to create mail dirs: %v", err))
 	}
 
 	return warnings, nil
