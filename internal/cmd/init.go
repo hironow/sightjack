@@ -59,21 +59,19 @@ d-mail skills, and sets up mail directories.`,
 			}
 			force, _ := cmd.Flags().GetBool("force")
 			initCmd := domain.NewInitCommand(rp, team, project, lang, strictness)
-			warnings, initErr := usecase.RunInit(initCmd, &session.InitAdapter{Force: force})
+			adapter := &session.InitAdapter{Force: force}
+			_, initErr := usecase.RunInit(initCmd, adapter)
 			if initErr != nil {
 				return initErr
 			}
-			w := cmd.OutOrStdout()
-			for _, warn := range warnings {
-				fmt.Fprintf(w, "Warning: %s\n", warn)
+			if adapter.LastResult != nil {
+				session.PrintInitResult(cmd.ErrOrStderr(), adapter.LastResult)
 			}
-			fmt.Fprintln(w)
-			fmt.Fprintf(w, "Created .siren/config.yaml\n")
 
 			otelBackend, _ := cmd.Flags().GetString("otel-backend")
 			otelEntity, _ := cmd.Flags().GetString("otel-entity")
 			otelProject, _ := cmd.Flags().GetString("otel-project")
-			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, w)
+			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().Bool("force", false, "Overwrite existing config (preserves state directories)")
