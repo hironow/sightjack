@@ -15,6 +15,8 @@ var sirenGitignoreEntries = []string{
 	".run/",
 	"inbox/",
 	"outbox/",
+	"archive/",
+	"insights/",
 	".otel.env",
 	".mcp.json",
 	".claude/",
