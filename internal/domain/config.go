@@ -11,7 +11,7 @@ import (
 // Resolution: max(default, estimated, overrides) — strictness only goes up.
 type StrictnessConfig struct {
 	Default   StrictnessLevel            `yaml:"default"`
-	Overrides map[string]StrictnessLevel `yaml:"overrides"`
+	Overrides map[string]StrictnessLevel `yaml:"overrides,omitempty"`
 }
 
 // ComputedConfig holds system-written fields that cannot be set via config set.
@@ -51,12 +51,12 @@ type ApproverConfig interface {
 // GateConfig holds convergence gate notification and approval settings.
 // GateConfig implements ApproverConfig.
 type GateConfig struct {
-	NotifyCmd    string        `yaml:"notify_cmd"`
-	ApproveCmd   string        `yaml:"approve_cmd"`
+	NotifyCmd    string        `yaml:"notify_cmd,omitempty"`
+	ApproveCmd   string        `yaml:"approve_cmd,omitempty"`
 	AutoApprove  bool          `yaml:"auto_approve"`
-	ReviewCmd    string        `yaml:"review_cmd"`
-	ReviewBudget int           `yaml:"review_budget"` // max review cycles (0 = default 3)
-	IdleTimeout  time.Duration `yaml:"idle_timeout"`   // idle timeout — exit after no D-Mail activity (0 = 24h safety cap, <0 = disable waiting)
+	ReviewCmd    string        `yaml:"review_cmd,omitempty"`
+	ReviewBudget int           `yaml:"review_budget,omitempty"` // max review cycles (0 = default 3)
+	IdleTimeout  time.Duration `yaml:"idle_timeout"`            // idle timeout — exit after no D-Mail activity (0 = 24h safety cap, <0 = disable waiting)
 }
 
 // IsAutoApprove reports whether the gate is configured to auto-approve.
@@ -116,7 +116,7 @@ const (
 
 // Config holds the top-level sightjack configuration loaded from YAML.
 type Config struct {
-	Tracker      IssueTrackerConfig     `yaml:"tracker"`
+	Tracker      IssueTrackerConfig     `yaml:"tracker,omitempty"`
 	Scan         ScanConfig             `yaml:"scan"`
 	ClaudeCmd    string                 `yaml:"claude_cmd,omitempty"`
 	Model        string                 `yaml:"model,omitempty"`
@@ -126,7 +126,7 @@ type Config struct {
 	Retry        RetryConfig            `yaml:"retry"`
 	Labels       LabelsConfig           `yaml:"labels"`
 	Gate         GateConfig             `yaml:"gate"`
-	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates"`
+	DoDTemplates map[string]DoDTemplate `yaml:"dod_templates,omitempty"`
 	Lang         string                 `yaml:"lang"`
 	Computed     ComputedConfig         `yaml:"computed,omitempty"`
 
@@ -142,9 +142,9 @@ type ScribeConfig struct {
 
 // IssueTrackerConfig holds issue tracker integration settings.
 type IssueTrackerConfig struct {
-	Team    string `yaml:"team"`
-	Project string `yaml:"project"`
-	Cycle   string `yaml:"cycle"`
+	Team    string `yaml:"team,omitempty"`
+	Project string `yaml:"project,omitempty"`
+	Cycle   string `yaml:"cycle,omitempty"`
 }
 
 // ScanConfig holds scan behavior settings.

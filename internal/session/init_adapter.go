@@ -132,7 +132,8 @@ func writeConfigWithDefaults(cfgPath, team, project, lang, strictness string) er
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(cfgPath, data, 0644)
+	header := "# sightjack configuration\n# Run 'sightjack init --force' to regenerate with defaults\n\n"
+	return os.WriteFile(cfgPath, []byte(header+string(data)), 0644)
 }
 
 // deepMerge merges src into dst recursively. src values override dst values.
