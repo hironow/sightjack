@@ -251,7 +251,10 @@ func TestWriteGitIgnore_IncludesMailDirs(t *testing.T) {
 	if !strings.Contains(content, "outbox/") {
 		t.Error("expected outbox/ in .gitignore")
 	}
-	if strings.Contains(content, "archive/") {
-		t.Error("archive/ should NOT be in .gitignore (git-tracked)")
+	if !strings.Contains(content, "archive/") {
+		t.Error("expected archive/ in .gitignore (runtime data)")
+	}
+	if !strings.Contains(content, "insights/") {
+		t.Error("expected insights/ in .gitignore (runtime data)")
 	}
 }
