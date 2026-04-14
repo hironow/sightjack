@@ -11,7 +11,7 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
-	"github.com/hironow/sightjack/internal/usecase"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 func newInitCommand() *cobra.Command {
@@ -53,14 +53,15 @@ d-mail skills, and sets up mail directories.`,
 				strictness = string(domain.DefaultConfig().Strictness.Default)
 			}
 
-			rp, rpErr := domain.NewRepoPath(baseDir)
-			if rpErr != nil {
-				return rpErr
-			}
 			force, _ := cmd.Flags().GetBool("force")
-			initCmd := domain.NewInitCommand(rp, team, project, lang, strictness)
 			adapter := &session.InitAdapter{Force: force}
-			_, initErr := usecase.RunInit(initCmd, adapter)
+			_, initErr := adapter.InitProject(
+				baseDir,
+				port.WithTeam(team),
+				port.WithProject(project),
+				port.WithLang(lang),
+				port.WithStrictness(strictness),
+			)
 			if initErr != nil {
 				return initErr
 			}
