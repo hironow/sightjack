@@ -100,9 +100,8 @@ if event data is found in .siren/events/.`,
 				cfg.Gate.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
 			}
 
-			// Parse base directory into domain primitive (used by all command constructions below)
-			rp, rpErr := domain.NewRepoPath(baseDir)
-			if rpErr != nil {
+			// Validate base directory via domain primitive
+			if _, rpErr := domain.NewRepoPath(baseDir); rpErr != nil {
 				return rpErr
 			}
 
@@ -176,12 +175,13 @@ if event data is found in .siren/events/.`,
 							goto freshSession
 						}
 						resumeStore := factory.NewSessionEventStore(factory.SessionEventsDir(baseDir, resumableSessionID), logger)
-						resumeSID, _ := domain.NewSessionID(resumableSessionID)
-						return usecase.ResumeSession(cmd.Context(), domain.NewResumeSessionCommand(rp, resumeSID), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), resumeStore, logger, &platform.OTelPolicyMetrics{}, runner)
+						emitter := usecase.BuildSessionEmitter(cmd.Context(), resumeStore, logger, false, cfg, &platform.OTelPolicyMetrics{}, runner, resumableState.SessionID)
+						return runner.RunResumeSession(cmd.Context(), cfg, baseDir, resumableState, cmd.InOrStdin(), cmd.OutOrStdout(), emitter, logger)
 					case domain.ResumeChoiceRescan:
 						rescanID := fmt.Sprintf("session-%d-%d", time.Now().UnixMilli(), os.Getpid())
 						rescanStore := factory.NewSessionEventStore(factory.SessionEventsDir(baseDir, rescanID), logger)
-						return usecase.RescanSession(cmd.Context(), domain.NewRunSessionCommand(rp, dryRun), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), rescanStore, logger, &platform.OTelPolicyMetrics{}, runner)
+						emitter := usecase.BuildSessionEmitter(cmd.Context(), rescanStore, logger, false, cfg, &platform.OTelPolicyMetrics{}, runner, rescanID)
+						return runner.RunRescanSession(cmd.Context(), cfg, baseDir, promptState, rescanID, cmd.InOrStdin(), cmd.OutOrStdout(), emitter, logger)
 					case domain.ResumeChoiceNew:
 						goto freshSession
 					}
@@ -196,7 +196,8 @@ if event data is found in .siren/events/.`,
 				sessionInput = cmd.InOrStdin()
 				store = factory.NewSessionEventStore(factory.SessionEventsDir(baseDir, sessionID), logger)
 			}
-			return usecase.RunSession(cmd.Context(), domain.NewRunSessionCommand(rp, dryRun), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), store, logger, &platform.OTelPolicyMetrics{}, runner)
+			emitter := usecase.BuildSessionEmitter(cmd.Context(), store, logger, dryRun, cfg, &platform.OTelPolicyMetrics{}, runner, sessionID)
+			return runner.RunSession(cmd.Context(), cfg, baseDir, sessionID, dryRun, sessionInput, cmd.OutOrStdout(), emitter, logger)
 		},
 	}
 
