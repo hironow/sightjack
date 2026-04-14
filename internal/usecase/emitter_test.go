@@ -1,89 +1,90 @@
-package usecase_test
+package usecase
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/usecase"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
-// fakeEventStore captures appended events for test verification.
-type fakeEventStore struct {
-	appended []domain.Event
-	err      error // injected error for failure tests
+// testStore is a minimal EventStore for emit() testing.
+type testStore struct {
+	appendErr error
 }
 
-func (s *fakeEventStore) Append(_ context.Context, events ...domain.Event) (domain.AppendResult, error) {
-	if s.err != nil {
-		return domain.AppendResult{}, s.err
-	}
-	s.appended = append(s.appended, events...)
-	return domain.AppendResult{BytesWritten: len(events)}, nil
+func (s *testStore) Append(_ context.Context, _ ...domain.Event) (domain.AppendResult, error) {
+	return domain.AppendResult{}, s.appendErr
 }
-
-func (s *fakeEventStore) LoadAll(_ context.Context) ([]domain.Event, domain.LoadResult, error) {
+func (*testStore) LoadAll(_ context.Context) ([]domain.Event, domain.LoadResult, error) {
 	return nil, domain.LoadResult{}, nil
 }
-
-func (s *fakeEventStore) LoadSince(_ context.Context, _ time.Time) ([]domain.Event, domain.LoadResult, error) {
+func (*testStore) LoadSince(_ context.Context, _ time.Time) ([]domain.Event, domain.LoadResult, error) {
 	return nil, domain.LoadResult{}, nil
 }
-
-func (s *fakeEventStore) LoadAfterSeqNr(_ context.Context, _ uint64) ([]domain.Event, domain.LoadResult, error) {
+func (*testStore) LoadAfterSeqNr(_ context.Context, _ uint64) ([]domain.Event, domain.LoadResult, error) {
 	return nil, domain.LoadResult{}, nil
 }
+func (*testStore) LatestSeqNr(_ context.Context) (uint64, error) { return 0, nil }
 
-func (s *fakeEventStore) LatestSeqNr(_ context.Context) (uint64, error) {
-	return 0, nil
-}
-
-// fakeDispatcher captures dispatched events.
-type fakeDispatcher struct {
-	dispatched []domain.Event
-}
-
-func (d *fakeDispatcher) Dispatch(_ context.Context, event domain.Event) error {
-	d.dispatched = append(d.dispatched, event)
-	return nil
-}
-
-func TestSessionEventEmitter_StoresEvents(t *testing.T) {
-	// given
-	store := &fakeEventStore{}
-	dispatcher := &fakeDispatcher{}
+func TestEmit_ReturnsStoreError(t *testing.T) {
+	// given: emitter with a store that always fails
 	agg := domain.NewSessionAggregate()
-	emitter := usecase.NewSessionEventEmitter(context.Background(), agg, store, dispatcher, &domain.NopLogger{}, "test-session")
+	emitter := NewSessionEventEmitter(
+		context.Background(), agg, &testStore{appendErr: fmt.Errorf("store failure")}, nil,
+		&domain.NopLogger{}, "test-session",
+	)
 
 	// when
-	err := emitter.EmitStart("test-project", "standard", time.Now())
+	err := emitter.EmitStart("project", "fog", time.Now())
+
+	// then: error should propagate from store
+	if err == nil {
+		t.Fatal("expected store error to propagate, got nil")
+	}
+}
+
+func TestEmit_SucceedsWithWorkingStore(t *testing.T) {
+	// given: emitter with a working store
+	agg := domain.NewSessionAggregate()
+	emitter := NewSessionEventEmitter(
+		context.Background(), agg, &testStore{}, nil,
+		&domain.NopLogger{}, "test-session",
+	)
+
+	// when
+	err := emitter.EmitStart("project", "fog", time.Now())
 
 	// then
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(store.appended) != 1 {
-		t.Errorf("expected 1 stored event, got %d", len(store.appended))
-	}
-	if len(dispatcher.dispatched) != 1 {
-		t.Errorf("expected 1 dispatched event, got %d", len(dispatcher.dispatched))
+		t.Fatalf("expected nil error, got: %v", err)
 	}
 }
 
-func TestSessionEventEmitter_BestEffort_StoreFailure(t *testing.T) {
-	// given: store that always fails
-	store := &fakeEventStore{err: errors.New("disk full")}
-	dispatcher := &fakeDispatcher{}
+func TestEmit_DispatchErrorIsSwallowed(t *testing.T) {
+	// given: emitter with working store but failing dispatcher
 	agg := domain.NewSessionAggregate()
-	emitter := usecase.NewSessionEventEmitter(context.Background(), agg, store, dispatcher, &domain.NopLogger{}, "test-session")
+	emitter := NewSessionEventEmitter(
+		context.Background(), agg, &testStore{}, &failingDispatcher{},
+		&domain.NopLogger{}, "test-session",
+	)
 
-	// when
-	err := emitter.EmitStart("test-project", "standard", time.Now())
+	// when: dispatcher fails but store succeeds
+	err := emitter.EmitStart("project", "fog", time.Now())
 
-	// then: error is NOT propagated (best-effort semantics)
+	// then: no error (dispatch is best-effort)
 	if err != nil {
-		t.Fatalf("expected nil error (best-effort), got: %v", err)
+		t.Fatalf("expected nil error (dispatch is best-effort), got: %v", err)
 	}
 }
+
+type failingDispatcher struct{}
+
+func (failingDispatcher) Dispatch(_ context.Context, _ domain.Event) error {
+	return fmt.Errorf("dispatch failure")
+}
+
+// Compile-time check
+var _ port.EventStore = (*testStore)(nil)

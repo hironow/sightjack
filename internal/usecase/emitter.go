@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -9,9 +10,10 @@ import (
 )
 
 // sessionEventEmitter wraps a SessionAggregate with EventStore and EventDispatcher
-// to produce and persist domain events. Store and dispatch errors are best-effort
-// (logged, not propagated) to preserve session continuity.
-// Aggregate errors remain critical and are returned.
+// to produce and persist domain events.
+// Store and SeqNr errors are returned to the caller.
+// Dispatch errors are best-effort (logged, not propagated).
+// Callers decide whether to treat store errors as fatal or best-effort.
 type sessionEventEmitter struct {
 	agg        *domain.SessionAggregate
 	store      port.EventStore
@@ -50,8 +52,9 @@ func (e *sessionEventEmitter) SetSeqAllocator(alloc port.SeqAllocator) {
 	e.seqAlloc = alloc
 }
 
-// emit enriches events with session metadata, persists, and dispatches best-effort.
-func (e *sessionEventEmitter) emit(events ...domain.Event) {
+// emit enriches events with session metadata, persists, and dispatches.
+// Store/SeqNr errors are returned to the caller. Dispatch errors are best-effort (logged only).
+func (e *sessionEventEmitter) emit(events ...domain.Event) error {
 	ctx := e.ctx
 	for i := range events {
 		events[i].SessionID = e.sessionID
@@ -62,21 +65,21 @@ func (e *sessionEventEmitter) emit(events ...domain.Event) {
 		if e.seqAlloc != nil {
 			seq, err := e.seqAlloc.AllocSeqNr(ctx)
 			if err != nil {
-				e.logger.Warn("alloc seq nr: %v", err)
-			} else {
-				events[i].SeqNr = seq
+				return fmt.Errorf("alloc seq nr: %w", err)
 			}
+			events[i].SeqNr = seq
 		}
 	}
 	if e.store != nil {
 		if _, err := e.store.Append(ctx, events...); err != nil {
-			e.logger.Warn("append events: %v", err)
+			return fmt.Errorf("append events: %w", err)
 		}
 	}
 	// Update causation chain after successful store
 	if len(events) > 0 {
 		e.prevID = events[len(events)-1].ID
 	}
+	// Dispatch is best-effort: errors are logged, not propagated
 	if e.dispatcher != nil {
 		for _, ev := range events {
 			if err := e.dispatcher.Dispatch(ctx, ev); err != nil {
@@ -84,6 +87,7 @@ func (e *sessionEventEmitter) emit(events ...domain.Event) {
 			}
 		}
 	}
+	return nil
 }
 
 func (e *sessionEventEmitter) EmitStart(project, strictness string, now time.Time) error {
@@ -91,8 +95,7 @@ func (e *sessionEventEmitter) EmitStart(project, strictness string, now time.Tim
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitRecordScan(payload domain.ScanCompletedPayload, now time.Time) error {
@@ -100,8 +103,7 @@ func (e *sessionEventEmitter) EmitRecordScan(payload domain.ScanCompletedPayload
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitResume(originalSessionID string, now time.Time) error {
@@ -109,8 +111,7 @@ func (e *sessionEventEmitter) EmitResume(originalSessionID string, now time.Time
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitRescan(originalSessionID string, now time.Time) error {
@@ -118,8 +119,7 @@ func (e *sessionEventEmitter) EmitRescan(originalSessionID string, now time.Time
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitRecordWavesGenerated(payload domain.WavesGeneratedPayload, now time.Time) error {
@@ -127,8 +127,7 @@ func (e *sessionEventEmitter) EmitRecordWavesGenerated(payload domain.WavesGener
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitApproveWave(waveID, clusterName string, now time.Time) error {
@@ -136,8 +135,7 @@ func (e *sessionEventEmitter) EmitApproveWave(waveID, clusterName string, now ti
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitRejectWave(waveID, clusterName string, now time.Time) error {
@@ -145,8 +143,7 @@ func (e *sessionEventEmitter) EmitRejectWave(waveID, clusterName string, now tim
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitModifyWave(payload domain.WaveModifiedPayload, now time.Time) error {
@@ -154,8 +151,7 @@ func (e *sessionEventEmitter) EmitModifyWave(payload domain.WaveModifiedPayload,
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitApplyWave(payload domain.WaveAppliedPayload, now time.Time) error {
@@ -163,8 +159,7 @@ func (e *sessionEventEmitter) EmitApplyWave(payload domain.WaveAppliedPayload, n
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitCompleteWave(payload domain.WaveCompletedPayload, now time.Time) error {
@@ -172,8 +167,7 @@ func (e *sessionEventEmitter) EmitCompleteWave(payload domain.WaveCompletedPaylo
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitUpdateCompleteness(clusterName string, clusterC, overallC float64, now time.Time) error {
@@ -181,8 +175,7 @@ func (e *sessionEventEmitter) EmitUpdateCompleteness(clusterName string, cluster
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitUnlockWaves(unlockedIDs []string, now time.Time) error {
@@ -190,8 +183,7 @@ func (e *sessionEventEmitter) EmitUnlockWaves(unlockedIDs []string, now time.Tim
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitAddNextGenWaves(payload domain.NextGenWavesAddedPayload, now time.Time) error {
@@ -199,8 +191,7 @@ func (e *sessionEventEmitter) EmitAddNextGenWaves(payload domain.NextGenWavesAdd
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitApplyReadyLabels(payload domain.ReadyLabelsAppliedPayload, now time.Time) error {
@@ -208,8 +199,7 @@ func (e *sessionEventEmitter) EmitApplyReadyLabels(payload domain.ReadyLabelsApp
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitSendSpecification(waveID, clusterName string, now time.Time) error {
@@ -217,8 +207,7 @@ func (e *sessionEventEmitter) EmitSendSpecification(waveID, clusterName string, 
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitSendReport(waveID, clusterName string, now time.Time) error {
@@ -226,8 +215,7 @@ func (e *sessionEventEmitter) EmitSendReport(waveID, clusterName string, now tim
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitSendFeedback(waveID, clusterName string, now time.Time) error {
@@ -235,8 +223,7 @@ func (e *sessionEventEmitter) EmitSendFeedback(waveID, clusterName string, now t
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitReceiveFeedback(payload domain.FeedbackReceivedPayload, now time.Time) error {
@@ -244,8 +231,7 @@ func (e *sessionEventEmitter) EmitReceiveFeedback(payload domain.FeedbackReceive
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitGenerateADR(payload domain.ADRGeneratedPayload, now time.Time) error {
@@ -253,8 +239,7 @@ func (e *sessionEventEmitter) EmitGenerateADR(payload domain.ADRGeneratedPayload
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
 
 func (e *sessionEventEmitter) EmitWaveStalled(waveID, clusterName, fingerprint, reason string, now time.Time) error {
@@ -267,6 +252,5 @@ func (e *sessionEventEmitter) EmitWaveStalled(waveID, clusterName, fingerprint, 
 	if err != nil {
 		return err
 	}
-	e.emit(evt)
-	return nil
+	return e.emit(evt)
 }
