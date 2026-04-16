@@ -40,10 +40,10 @@ d-mail skills, and sets up mail directories.`,
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
-			team, _ := cmd.Flags().GetString("team")
-			project, _ := cmd.Flags().GetString("project")
-			lang, _ := cmd.Flags().GetString("lang")
-			strictness, _ := cmd.Flags().GetString("strictness")
+			team := mustString(cmd, "team")
+			project := mustString(cmd, "project")
+			lang := mustString(cmd, "lang")
+			strictness := mustString(cmd, "strictness")
 
 			// Apply defaults at cmd layer (previously done by WithDefaults)
 			if lang == "" {
@@ -53,7 +53,7 @@ d-mail skills, and sets up mail directories.`,
 				strictness = string(domain.DefaultConfig().Strictness.Default)
 			}
 
-			force, _ := cmd.Flags().GetBool("force")
+			force := mustBool(cmd, "force")
 			adapter := &session.InitAdapter{Force: force}
 			_, initErr := adapter.InitProject(
 				baseDir,
@@ -69,9 +69,9 @@ d-mail skills, and sets up mail directories.`,
 				session.PrintInitResult(cmd.ErrOrStderr(), adapter.LastResult)
 			}
 
-			otelBackend, _ := cmd.Flags().GetString("otel-backend")
-			otelEntity, _ := cmd.Flags().GetString("otel-entity")
-			otelProject, _ := cmd.Flags().GetString("otel-project")
+			otelBackend := mustString(cmd, "otel-backend")
+			otelEntity := mustString(cmd, "otel-entity")
+			otelProject := mustString(cmd, "otel-project")
 			return writeOtelEnv(baseDir, otelBackend, otelEntity, otelProject, cmd.ErrOrStderr())
 		},
 	}

@@ -76,19 +76,19 @@ if event data is found in .siren/events/.`,
 
 			// Override gate config from flags (Changed = user explicitly set the flag)
 			if cmd.Flags().Changed("notify-cmd") {
-				cfg.Gate.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")
+				cfg.Gate.NotifyCmd = mustString(cmd, "notify-cmd")
 			}
 			if cmd.Flags().Changed("approve-cmd") {
-				cfg.Gate.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
+				cfg.Gate.ApproveCmd = mustString(cmd, "approve-cmd")
 			}
 			if cmd.Flags().Changed("auto-approve") {
-				cfg.Gate.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
+				cfg.Gate.AutoApprove = mustBool(cmd, "auto-approve")
 			}
 			if cmd.Flags().Changed("review-cmd") {
-				cfg.Gate.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
+				cfg.Gate.ReviewCmd = mustString(cmd, "review-cmd")
 			}
 			if cmd.Flags().Changed("strictness") {
-				s, _ := cmd.Flags().GetString("strictness")
+				s := mustString(cmd, "strictness")
 				level := domain.StrictnessLevel(s)
 				if !level.Valid() {
 					return fmt.Errorf("invalid strictness %q: must be fog, alert, or lockdown", s)
@@ -97,7 +97,7 @@ if event data is found in .siren/events/.`,
 				logger.Info("Strictness override: %s", s)
 			}
 			if cmd.Flags().Changed("idle-timeout") {
-				cfg.Gate.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
+				cfg.Gate.IdleTimeout = mustDuration(cmd, "idle-timeout")
 			}
 
 			// Validate base directory via domain primitive
@@ -137,7 +137,7 @@ if event data is found in .siren/events/.`,
 
 					// Determine session choice: --session-mode flag, --auto-approve, or interactive prompt
 					var choice domain.ResumeChoice
-					sessionMode, _ := cmd.Flags().GetString("session-mode")
+					sessionMode := mustString(cmd, "session-mode")
 					if sessionMode != "" {
 						parsed, parseErr := domain.ParseSessionMode(sessionMode)
 						if parseErr != nil {
