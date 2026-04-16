@@ -150,7 +150,10 @@ func (s *SQLiteCodingSessionStore) UpdateStatus(ctx context.Context, id string, 
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
 	if n == 0 {
 		return fmt.Errorf("session %q not found", id)
 	}
@@ -178,10 +181,19 @@ func scanRecord(row scanner) (domain.CodingSessionRecord, error) {
 	}
 	rec.Provider = domain.Provider(provider)
 	rec.Status = domain.SessionStatus(status)
-	rec.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-	rec.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
+	var parseErr error
+	rec.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
+	if parseErr != nil {
+		return rec, fmt.Errorf("parse created_at: %w", parseErr)
+	}
+	rec.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
+	if parseErr != nil {
+		return rec, fmt.Errorf("parse updated_at: %w", parseErr)
+	}
 	if metaJSON != "" {
-		_ = json.Unmarshal([]byte(metaJSON), &rec.Metadata)
+		if err := json.Unmarshal([]byte(metaJSON), &rec.Metadata); err != nil {
+			return rec, fmt.Errorf("unmarshal metadata: %w", err)
+		}
 	}
 	return rec, nil
 }
