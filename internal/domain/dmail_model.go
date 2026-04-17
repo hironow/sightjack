@@ -46,7 +46,7 @@ func ValidateKind(kind DMailKind) error { // nosemgrep: validate-returns-error-o
 
 // DMail represents the domain-owned D-Mail model.
 // Core type and invariants belong here; I/O and orchestration stay in session.
-type DMail struct {
+type DMail struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- YAML wire format (D-Mail schema); FCC wrapping would break YAML serialization [permanent]
 	Name          string            `yaml:"name"`
 	Kind          DMailKind         `yaml:"kind"`
 	Description   string            `yaml:"description"`

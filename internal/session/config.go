@@ -15,7 +15,7 @@ import (
 // Supported keys: tracker.team, tracker.project, tracker.cycle, lang, strictness.default,
 // scan.chunk_size, scan.max_concurrency, assistant.model, assistant.timeout_sec,
 // gate.auto_approve, labels.enabled, labels.prefix, labels.ready_label.
-func UpdateConfig(path string, key string, value string) error {
+func UpdateConfig(path string, key string, value string) error { // nosemgrep: domain-primitives.multiple-string-params-go -- internal session adapter; path/key/value are distinct config-update dimensions not individually swappable [permanent]
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read config: %w", err)

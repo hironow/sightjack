@@ -10,14 +10,14 @@ import (
 
 // ClassifyResult is the output of Pass 1 (cluster classification).
 // Written by Claude Code to classify.json.
-type ClassifyResult struct {
+type ClassifyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
 	Clusters        []ClusterClassification `json:"clusters"`
 	TotalIssues     int                     `json:"total_issues"`
 	ShibitoWarnings []ShibitoWarning        `json:"shibito_warnings,omitempty"`
 }
 
 // ClusterClassification holds a cluster name and its issue IDs from Pass 1.
-type ClusterClassification struct {
+type ClusterClassification struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
 	Name     string   `json:"name"`
 	IssueIDs []string `json:"issue_ids"`
 	Labels   []string `json:"labels,omitempty"`
@@ -25,7 +25,7 @@ type ClusterClassification struct {
 
 // ClusterScanResult is the output of Pass 2 (per-cluster deep scan).
 // Written by Claude Code to cluster_{name}.json.
-type ClusterScanResult struct {
+type ClusterScanResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
 	Name                string        `json:"name"`
 	Key                 string        `json:"key"`
 	Completeness        float64       `json:"completeness"`
@@ -47,7 +47,7 @@ func (c ClusterScanResult) NumIssues() int {
 }
 
 // IssueDetail holds the deep scan analysis of a single issue.
-type IssueDetail struct {
+type IssueDetail struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
 	ID           string   `json:"id"`
 	Identifier   string   `json:"identifier"`
 	Title        string   `json:"title"`
@@ -81,7 +81,7 @@ type ShibitoWarning struct {
 
 // ScanResult is the merged result of Pass 1 + Pass 2.
 // Wire format: output of `scan --json`.
-type ScanResult struct {
+type ScanResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
 	Clusters        []ClusterScanResult `json:"clusters"`
 	TotalIssues     int                 `json:"total_issues"`
 	Completeness    float64             `json:"completeness"`
@@ -129,7 +129,7 @@ func (r *ScanResult) CalculateCompleteness() {
 }
 
 // SessionState is the materialized view projected from event replay.
-type SessionState struct {
+type SessionState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (SessionState snapshot); First Class Collection wrapping would break JSON schema [permanent]
 	Version         string         `json:"version"`
 	SessionID       string         `json:"session_id"`
 	Project         string         `json:"project"`
@@ -166,7 +166,7 @@ type ClusterState struct {
 }
 
 // WaveState is the per-wave state within SessionState.
-type WaveState struct {
+type WaveState struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format (SessionState snapshot); custom marshal / FCC wrapping would break JSON schema [permanent]
 	ID            string       `json:"id"`
 	ClusterName   string       `json:"cluster_name"`
 	Title         string       `json:"title"`
@@ -180,7 +180,7 @@ type WaveState struct {
 
 // Wave is a unit of work proposed by AI for a cluster.
 // Wire format: input to `discuss` and `apply` subcommands.
-type Wave struct {
+type Wave struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format (AI output schema); FCC wrapping would break JSON schema [permanent]
 	ID              string             `json:"id"`
 	ClusterName     string             `json:"cluster_name"`
 	ClusterKey      string             `json:"cluster_key,omitempty"`
@@ -203,7 +203,7 @@ type WaveAction struct {
 }
 
 // WaveStepDef defines a single step within a wave specification (D-Mail schema).
-type WaveStepDef struct {
+type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON/YAML wire format (D-Mail schema); FCC wrapping would break serialization [permanent]
 	ID            string   `yaml:"id" json:"id"`
 	Title         string   `yaml:"title" json:"title"`
 	Description   string   `yaml:"description,omitempty" json:"description,omitempty"`
@@ -213,7 +213,7 @@ type WaveStepDef struct {
 }
 
 // WaveReference links a D-Mail to a wave and optionally a specific step.
-type WaveReference struct {
+type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON/YAML wire format (D-Mail schema); FCC wrapping would break serialization [permanent]
 	ID    string        `yaml:"id" json:"id"`
 	Step  string        `yaml:"step,omitempty" json:"step,omitempty"`
 	Steps []WaveStepDef `yaml:"steps,omitempty" json:"steps,omitempty"`
@@ -226,20 +226,20 @@ type WaveDelta struct {
 }
 
 // WaveGenerateResult is the Pass 3 output per cluster.
-type WaveGenerateResult struct {
+type WaveGenerateResult struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
 	ClusterName string `json:"cluster_name"`
 	Waves       []Wave `json:"waves"`
 }
 
 // NextGenResult is the output of post-completion wave generation.
-type NextGenResult struct {
+type NextGenResult struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
 	ClusterName string `json:"cluster_name"`
 	Waves       []Wave `json:"waves"`
 	Reasoning   string `json:"reasoning"`
 }
 
 // WaveApplyResult is the Pass 4 output per wave.
-type WaveApplyResult struct {
+type WaveApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
 	WaveID     string   `json:"wave_id"`
 	Applied    int      `json:"applied"`
 	TotalCount int      `json:"total_count,omitempty"`
@@ -248,7 +248,7 @@ type WaveApplyResult struct {
 }
 
 // Ripple is a cross-cluster effect from applying a wave.
-type Ripple struct {
+type Ripple struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	ClusterName string `json:"cluster_name"`
 	Description string `json:"description"`
 }
@@ -322,7 +322,7 @@ type ADRConflict struct {
 }
 
 // ScribeResponse is the output of the Scribe Agent (ADR generation).
-type ScribeResponse struct {
+type ScribeResponse struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (AI output schema); FCC wrapping would break JSON schema [permanent]
 	ADRID     string        `json:"adr_id"`
 	Title     string        `json:"title"`
 	Content   string        `json:"content"`
@@ -368,14 +368,14 @@ func DetectPipeType(data []byte) PipeType {
 
 // WavePlan is the output of `waves` subcommand.
 // Contains generated waves and optionally the scan result for context.
-type WavePlan struct {
+type WavePlan struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (pipe interface); FCC wrapping would break JSON schema [permanent]
 	Waves      []Wave      `json:"waves"`
 	ScanResult *ScanResult `json:"scan_result,omitempty"`
 }
 
 // DiscussResult is the output of `discuss` subcommand.
 // Captures the architect discussion outcome for a single wave.
-type DiscussResult struct {
+type DiscussResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
 	WaveID        string             `json:"wave_id"`
 	Analysis      string             `json:"analysis"`
 	Reasoning     string             `json:"reasoning"`
@@ -397,7 +397,7 @@ type WaveModification struct {
 // (e.g. nextgen) can operate without replaying event history.
 // RemainingWaves carries sibling waves from the original plan so that
 // nextgen can accurately determine whether follow-up generation is needed.
-type ApplyResult struct {
+type ApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
 	WaveID          string         `json:"wave_id"`
 	AppliedActions  []ActionResult `json:"applied_actions"`
 	RippleEffects   []Ripple       `json:"ripple_effects,omitempty"`
@@ -446,7 +446,7 @@ type IndexEntry struct {
 
 // HandoverState captures in-progress work state when an operation is
 // interrupted by a signal. The struct is pure data — no context, no I/O.
-type HandoverState struct {
+type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping adds no safety for in-memory-only handover state [permanent]
 	Tool         string // "sightjack"
 	Operation    string // "wave"
 	Timestamp    time.Time

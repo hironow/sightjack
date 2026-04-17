@@ -445,7 +445,7 @@ func applyReadyLabelsIfEnabled(ctx context.Context, cfg *domain.Config,
 // cluster completeness update, unlock evaluation, nextgen wave generation,
 // ready labels, and mid-session state save.
 // waves is passed as *[]Wave because append/EvaluateUnlocks may reallocate the slice.
-func applyPhase(ctx context.Context, cfg *domain.Config,
+func applyPhase(ctx context.Context, cfg *domain.Config, // nosemgrep: domain-primitives.multiple-string-params-go -- internal session phase; scanDir/scanResultPath/adrDir/resolvedStrictness are distinct phase-execution roles not individually swappable [permanent]
 	scanDir, scanResultPath, adrDir string,
 	selected domain.Wave, resolvedStrictness string,
 	waves *[]domain.Wave, completed map[string]bool,

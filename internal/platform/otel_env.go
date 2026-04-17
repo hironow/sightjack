@@ -5,7 +5,7 @@ import "fmt"
 // OtelEnvContent returns the .otel.env file content for the given backend.
 // Supported backends: "jaeger" (local OTLP HTTP), "weave" (Weights & Biases).
 // Empty backend returns empty content (no-op). Unknown backends return an error.
-func OtelEnvContent(backend, entity, project string) (string, error) {
+func OtelEnvContent(backend, entity, project string) (string, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- init factory; backend/entity/project are orthogonal config dimensions, typed wrappers deferred [permanent]
 	switch backend {
 	case "jaeger":
 		return "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318\n", nil

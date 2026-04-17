@@ -13,7 +13,7 @@ type AutoDiscussRound struct {
 }
 
 // AutoDiscussResult holds the full auto-discuss debate outcome.
-type AutoDiscussResult struct {
+type AutoDiscussResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (AI output schema); FCC wrapping would break JSON schema [permanent]
 	Rounds     []AutoDiscussRound `json:"rounds"`
 	OpenIssues []string           `json:"open_issues"`
 	Summary    string             `json:"summary"`

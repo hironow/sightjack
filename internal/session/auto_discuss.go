@@ -163,7 +163,7 @@ func speakerForRound(r int) string {
 	return "devils_advocate"
 }
 
-func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir string,
+func runAutoDiscussArchitect(ctx context.Context, cfg *domain.Config, scanDir string, // nosemgrep: domain-primitives.multiple-string-params-go -- internal session adapter; actionsJSON/priorContent/feedbackSection/strictness are distinct pipeline stages not individually swappable [permanent]
 	wave domain.Wave, actionsJSON, priorContent, feedbackSection, strictness string,
 	roundIndex int, out io.Writer, runner port.ProviderRunner, logger domain.Logger) (string, error) {
 

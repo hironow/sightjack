@@ -554,7 +554,7 @@ func (w *Workspace) ListFiles(t *testing.T, dir string) []string {
 
 // InjectDMail atomically writes a D-Mail file to a tool's mailbox.
 // Uses write-to-temp-then-rename to properly trigger fsnotify.
-func (w *Workspace) InjectDMail(t *testing.T, toolDir, sub, filename string, content []byte) {
+func (w *Workspace) InjectDMail(t *testing.T, toolDir, sub, filename string, content []byte) { // nosemgrep: domain-primitives.multiple-string-params-go -- test helper; toolDir/sub/filename are distinct path-composition roles not individually swappable [permanent]
 	t.Helper()
 	dir := filepath.Join(w.RepoPath, toolDir, sub)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

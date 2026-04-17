@@ -39,7 +39,7 @@ func ChunkSlice(items []string, size int) [][]string {
 }
 
 // ClusterScanOutcome records whether wave generation succeeded for a single cluster.
-type ClusterScanOutcome struct {
+type ClusterScanOutcome struct { // nosemgrep: domain-primitives.public-string-field-go -- internal scan result DTO; no validation needed [permanent]
 	ClusterName string
 	Succeeded   bool
 }
@@ -47,7 +47,7 @@ type ClusterScanOutcome struct {
 // ScanRecoveryReport summarises which clusters succeeded and which failed
 // during wave generation so that callers can present partial results and
 // decide on recovery actions.
-type ScanRecoveryReport struct {
+type ScanRecoveryReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping adds no safety benefit for in-memory report [permanent]
 	// Outcomes contains one entry per cluster in the original scan order.
 	Outcomes       []ClusterScanOutcome
 	SucceededCount int

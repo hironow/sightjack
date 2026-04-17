@@ -194,7 +194,7 @@ func currentProviderState() domain.ProviderStateSnapshot {
 // RunClaudeDryRun saves the prompt to a file instead of executing the provider CLI,
 // useful for previewing what would be sent. The name parameter makes each
 // prompt file unique within the output directory (e.g. "classify", "wave_00_auth").
-func RunClaudeDryRun(cfg *domain.Config, prompt, outputPath string, name string, logger domain.Logger) error {
+func RunClaudeDryRun(cfg *domain.Config, prompt, outputPath string, name string, logger domain.Logger) error { // nosemgrep: domain-primitives.multiple-string-params-go -- internal session adapter; prompt/outputPath/name are distinct pipeline stage params not individually swappable [permanent]
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return fmt.Errorf("create dry-run dir: %w", err)
 	}

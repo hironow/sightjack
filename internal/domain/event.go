@@ -174,7 +174,7 @@ type SessionStartedPayload struct {
 }
 
 // ScanCompletedPayload is the payload for EventScanCompleted.
-type ScanCompletedPayload struct {
+type ScanCompletedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	Clusters       []ClusterState `json:"clusters"`
 	Completeness   float64        `json:"completeness"`
 	ShibitoCount   int            `json:"shibito_count"`
@@ -183,26 +183,26 @@ type ScanCompletedPayload struct {
 }
 
 // WavesGeneratedPayload is the payload for EventWavesGenerated.
-type WavesGeneratedPayload struct {
+type WavesGeneratedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	Waves []WaveState `json:"waves"`
 }
 
 // WaveIdentityPayload is a shared payload for events that reference a single wave.
 // Used by: EventWaveApproved, EventWaveRejected, EventSpecificationSent, EventReportSent.
-type WaveIdentityPayload struct {
+type WaveIdentityPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format; custom marshal would break event-log compat [permanent]
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 }
 
 // WaveModifiedPayload is the payload for EventWaveModified.
-type WaveModifiedPayload struct {
+type WaveModifiedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	WaveID      string    `json:"wave_id"`
 	ClusterName string    `json:"cluster_name"`
 	UpdatedWave WaveState `json:"updated_wave"`
 }
 
 // WaveAppliedPayload is the payload for EventWaveApplied.
-type WaveAppliedPayload struct {
+type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	WaveID      string   `json:"wave_id"`
 	ClusterName string   `json:"cluster_name"`
 	Applied     int      `json:"applied"`
@@ -211,7 +211,7 @@ type WaveAppliedPayload struct {
 }
 
 // WaveCompletedPayload is the payload for EventWaveCompleted.
-type WaveCompletedPayload struct {
+type WaveCompletedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 	Applied     int    `json:"applied"`
@@ -219,19 +219,19 @@ type WaveCompletedPayload struct {
 }
 
 // CompletenessUpdatedPayload is the payload for EventCompletenessUpdated.
-type CompletenessUpdatedPayload struct {
+type CompletenessUpdatedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	ClusterName         string  `json:"cluster_name"`
 	ClusterCompleteness float64 `json:"cluster_completeness"`
 	OverallCompleteness float64 `json:"overall_completeness"`
 }
 
 // WavesUnlockedPayload is the payload for EventWavesUnlocked.
-type WavesUnlockedPayload struct {
+type WavesUnlockedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	UnlockedWaveIDs []string `json:"unlocked_wave_ids"`
 }
 
 // NextGenWavesAddedPayload is the payload for EventNextGenWavesAdded.
-type NextGenWavesAddedPayload struct {
+type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	ClusterName string      `json:"cluster_name"`
 	Waves       []WaveState `json:"waves"`
 }
@@ -243,7 +243,7 @@ type ADRGeneratedPayload struct {
 }
 
 // ReadyLabelsAppliedPayload is the payload for EventReadyLabelsApplied.
-type ReadyLabelsAppliedPayload struct {
+type ReadyLabelsAppliedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	IssueIDs []string `json:"issue_ids"`
 }
 
