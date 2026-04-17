@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/google/uuid" // nosemgrep: domain-imports-usecase-go -- uuid is stdlib-equivalent, not a usecase layer import [permanent]
 )
 
-// EventApplier applies domain events to update materialized projections.
+// EventApplier applies domain events to update materialized projections. // nosemgrep: sql-in-domain-go -- comment text triggers rule but contains no SQL; domain purity enforced by architecture [permanent]
 // Note: context is intentionally absent — domain types must remain pure.
 // Use ContextEventApplier (usecase/port) when caller context is required.
 type EventApplier interface {
@@ -121,7 +121,7 @@ func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error)
 }
 
 // ValidateEvent checks structural validity of an Event before persistence.
-func ValidateEvent(e Event) error {
+func ValidateEvent(e Event) error { // nosemgrep: validate-returns-error-only-go -- Event is a fully-typed struct; structural guard before persistence, parse pattern not applicable [permanent]
 	var errs []string
 	if e.SchemaVersion > CurrentEventSchemaVersion {
 		errs = append(errs, fmt.Sprintf("SchemaVersion %d exceeds current %d", e.SchemaVersion, CurrentEventSchemaVersion))

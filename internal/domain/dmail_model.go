@@ -37,7 +37,7 @@ func IsValidDMailKind(kind DMailKind) bool {
 }
 
 // ValidateKind checks that kind is one of the allowed D-Mail kinds.
-func ValidateKind(kind DMailKind) error {
+func ValidateKind(kind DMailKind) error { // nosemgrep: validate-returns-error-only-go -- DMailKind is already a typed string; caller holds validated value without re-parsing [permanent]
 	if !IsValidDMailKind(kind) {
 		return fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
 	}
@@ -68,7 +68,7 @@ func (d *DMail) Filename() string {
 
 // ValidateDMail checks that a DMail conforms to D-Mail schema v1.
 // Send-side strict validation (Postel's law).
-func ValidateDMail(d *DMail) error {
+func ValidateDMail(d *DMail) error { // nosemgrep: validate-returns-error-only-go -- DMail is already a fully-typed struct; validation checks invariants, parse pattern not applicable [permanent]
 	if d.SchemaVersion == "" {
 		return ErrDMailSchemaRequired
 	}

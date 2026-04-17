@@ -91,7 +91,7 @@ func TruncateField(s string, maxBytes int) (string, bool) {
 }
 
 // ValidateSessionStreamEvent checks required fields.
-func ValidateSessionStreamEvent(e SessionStreamEvent) error {
+func ValidateSessionStreamEvent(e SessionStreamEvent) error { // nosemgrep: validate-returns-error-only-go -- SessionStreamEvent is a fully-typed struct; validate-only pattern intentional [permanent]
 	if e.Tool == "" {
 		return fmt.Errorf("session stream event: tool is required")
 	}

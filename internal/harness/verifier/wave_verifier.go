@@ -10,7 +10,7 @@ import (
 // ValidateWaveApplyResult checks the apply result for degenerate or invalid states.
 // Returns an error if the result is nil, empty when actions were expected,
 // or reports more applied actions than expected.
-func ValidateWaveApplyResult(result *domain.WaveApplyResult, expectedActions int) error {
+func ValidateWaveApplyResult(result *domain.WaveApplyResult, expectedActions int) error { // nosemgrep: validate-returns-error-only-go -- WaveApplyResult is a pointer to a fully-typed struct; guard checks, parse pattern not applicable [permanent]
 	if result == nil {
 		return fmt.Errorf("wave apply result is nil")
 	}
