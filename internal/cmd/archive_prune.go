@@ -53,7 +53,7 @@ Pass --execute to actually remove the files.`,
 			}
 			logger := loggerFrom(cmd)
 
-			rebuildIndex, _ := cmd.Flags().GetBool("rebuild-index")
+			rebuildIndex := mustBool(cmd, "rebuild-index")
 			if rebuildIndex {
 				if execute {
 					return fmt.Errorf("--rebuild-index cannot be combined with --execute")
@@ -69,7 +69,7 @@ Pass --execute to actually remove the files.`,
 				return nil
 			}
 
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 
 			files, err := session.ListExpiredArchive(baseDir, days, logger)
 			if err != nil {
@@ -155,7 +155,7 @@ Pass --execute to actually remove the files.`,
 
 			totalFiles := len(files) + len(eventFiles)
 			if totalFiles > 0 {
-				yes, _ := cmd.Flags().GetBool("yes")
+				yes := mustBool(cmd, "yes")
 				if !yes {
 					fmt.Fprintf(errW, "\nDelete these %d file(s)? [y/N] ", totalFiles)
 					scanner := bufio.NewScanner(cmd.InOrStdin())

@@ -47,11 +47,11 @@ hint recommends adjusting .claude/settings.json.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 			resolved := resolveConfigPath(cmd, baseDir)
-			jsonOut, _ := cmd.Flags().GetBool("json")
+			jsonOut := mustBool(cmd, "json")
 
 			logger := loggerFrom(cmd)
-			repair, _ := cmd.Flags().GetBool("repair")
-			linearFlag, _ := cmd.Flags().GetBool("linear")
+			repair := mustBool(cmd, "repair")
+			linearFlag := mustBool(cmd, "linear")
 			mode := domain.NewTrackingMode(linearFlag)
 			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger, repair, mode)
 

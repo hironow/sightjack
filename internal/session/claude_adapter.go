@@ -205,20 +205,28 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		for _, msg := range messages {
 			switch msg.Type {
 			case "assistant":
-				text, _ := msg.ExtractText()
-				if text != "" {
+				text, err := msg.ExtractText()
+				if err == nil && text != "" {
 					if w != nil {
-						_, _ = w.Write([]byte(text))
+						if _, wErr := w.Write([]byte(text)); wErr != nil && a.Logger != nil {
+							a.Logger.Info("stream write: %v", wErr)
+						}
 					}
 					output.WriteString(text)
 				}
-				tools, _ := msg.ExtractToolUse()
-				for _, t := range tools {
-					if a.Logger != nil {
-						a.Logger.Info("  tool: %s", t.Name)
+				tools, toolErr := msg.ExtractToolUse()
+				if toolErr == nil {
+					for _, t := range tools {
+						if a.Logger != nil {
+							a.Logger.Info("  tool: %s", t.Name)
+						}
 					}
 				}
-				if am, _ := msg.ParseAssistantMessage(); am != nil {
+				am, amErr := msg.ParseAssistantMessage()
+				if amErr != nil && a.Logger != nil {
+					a.Logger.Info("ParseAssistantMessage: %v", amErr)
+				}
+				if am != nil {
 					if am.Model != "" {
 						responseModel = am.Model
 					}

@@ -115,7 +115,7 @@ func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *domain.DMai
 
 // ValidateDMail delegates to domain.ValidateDMail (SPEC-004 Stage 2).
 // Session retains this wrapper for nil-check that domain doesn't handle.
-func ValidateDMail(mail *domain.DMail) error {
+func ValidateDMail(mail *domain.DMail) error { // nosemgrep: validate-returns-error-only-go -- DMail is a fully-typed struct; nil-guard wrapper, parse pattern not applicable [permanent]
 	if mail == nil {
 		return fmt.Errorf("dmail: mail is nil")
 	}

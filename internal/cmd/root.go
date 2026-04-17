@@ -60,17 +60,17 @@ func NewRootCommand() *cobra.Command {
 		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse NeedsDefaultScan() to preprocess args before Execute.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			applyOtelEnv(filepath.Dir(cfgPath))
-			noColor, _ := cmd.Flags().GetBool("no-color")
+			noColor := mustBool(cmd, "no-color")
 			if noColor {
 				os.Setenv("NO_COLOR", "1")
 			}
 			out := cmd.ErrOrStderr()
-			quiet, _ := cmd.Flags().GetBool("quiet")
+			quiet := mustBool(cmd, "quiet")
 			if quiet {
 				out = io.Discard
 			}
 			logger := platform.NewLogger(out, verbose)
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt != "json" {
 				logger.Header("sightjack", Version)
 				logger.Section(cmd.Name())
@@ -202,7 +202,7 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	if lang != "" {
 		cfg.Lang = lang
 	}
-	linearFlag, _ := cmd.Flags().GetBool("linear")
+	linearFlag := mustBool(cmd, "linear")
 	cfg.Mode = domain.NewTrackingMode(linearFlag)
 	return cfg, nil
 }

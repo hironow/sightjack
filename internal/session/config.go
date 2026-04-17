@@ -54,7 +54,7 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 		if !domain.ValidLang(value) {
 			return fmt.Errorf("invalid lang %q: must be ja or en", value)
 		}
-		cfg.Lang = value
+		cfg.Lang = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at load time; immutable builder out of scope [permanent]
 	case "strictness.default":
 		level := domain.StrictnessLevel(value)
 		if !level.Valid() {
@@ -74,13 +74,13 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 		}
 		cfg.Scan.MaxConcurrency = n
 	case "model", "assistant.model":
-		cfg.Model = value
+		cfg.Model = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at load time; immutable builder out of scope [permanent]
 	case "timeout_sec", "assistant.timeout_sec":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 1 {
 			return fmt.Errorf("invalid timeout_sec %q: must be positive integer", value)
 		}
-		cfg.TimeoutSec = n
+		cfg.TimeoutSec = n // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at load time; immutable builder out of scope [permanent]
 	case "gate.auto_approve":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
@@ -98,7 +98,7 @@ func setConfigField(cfg *domain.Config, key string, value string) error {
 	case "labels.ready_label":
 		cfg.Labels.ReadyLabel = value
 	case "claude_cmd", "assistant.command":
-		cfg.ClaudeCmd = value
+		cfg.ClaudeCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at load time; immutable builder out of scope [permanent]
 	case "scribe.enabled":
 		b, err := strconv.ParseBool(value)
 		if err != nil {

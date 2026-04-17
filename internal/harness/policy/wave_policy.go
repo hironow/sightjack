@@ -112,7 +112,7 @@ func MergeWaveResults(results []domain.WaveGenerateResult) []domain.Wave {
 		all = append(all, r.Waves...)
 	}
 	normalized := NormalizeWavePrerequisites(all)
-	cleaned, _ := RemoveSelfReferences(normalized)
+	cleaned, _ := RemoveSelfReferences(normalized) // nosemgrep: error-handling.ignored-error-go,error-handling.ignored-error-short-go -- second return is removal count (int), not an error [permanent]
 	for i := range cleaned {
 		cleaned[i].Delta = ClampDelta(cleaned[i].Delta)
 	}
@@ -311,7 +311,7 @@ func PruneStaleWaves(state *domain.SessionState, validClusters []domain.ClusterS
 			removed++
 		}
 	}
-	state.Waves = kept
+	state.Waves = kept // nosemgrep: immutability.no-pointer-field-mutation-go -- filtered-state assignment after pruning; intentional state transition [permanent]
 	return removed
 }
 

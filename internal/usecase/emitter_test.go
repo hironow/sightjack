@@ -1,5 +1,7 @@
 package usecase
 
+// white-box-reason: emitter internals: tests unexported capturing store and event emission plumbing
+
 import (
 	"context"
 	"fmt"

@@ -353,7 +353,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	var cfg *domain.Config
 	cfgResult := CheckConfig(configPath)
 	if cfgResult.Status == domain.CheckOK {
-		cfg, _ = LoadConfig(configPath)
+		cfg, _ = LoadConfig(configPath) // nosemgrep: error-handling.ignored-error-go,error-handling.ignored-error-short-go -- CheckConfig already validated the path; cfg==nil fallback to DefaultClaudeCmd [permanent]
 	}
 
 	claudeName := domain.DefaultClaudeCmd
@@ -521,7 +521,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 	if repair {
 		pidPath := filepath.Join(baseDir, domain.StateDir, "watch.pid")
 		if data, err := os.ReadFile(pidPath); err == nil {
-			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			pid, _ := strconv.Atoi(strings.TrimSpace(string(data))) // nosemgrep: error-handling.ignored-error-go,error-handling.ignored-error-short-go -- invalid parse yields pid=0; pid>0 guard skips it safely [permanent]
 			if pid > 0 && !platform.IsProcessAlive(pid) {
 				_ = os.Remove(pidPath)
 				results = append(results, domain.DoctorCheck{

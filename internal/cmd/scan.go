@@ -47,7 +47,7 @@ into downstream commands.`,
 				return err
 			}
 			if cmd.Flags().Changed("strictness") {
-				s, _ := cmd.Flags().GetString("strictness")
+				s := mustString(cmd, "strictness")
 				level := domain.StrictnessLevel(s)
 				if !level.Valid() {
 					return fmt.Errorf("invalid strictness %q: must be fog, alert, or lockdown", s)

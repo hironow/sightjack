@@ -16,7 +16,7 @@ func BuildDoDCoverageReport(templates map[string]DoDTemplate, clusterNames []str
 		TotalClusters: len(clusterNames),
 	}
 	for _, name := range clusterNames {
-		matched, _ := MatchDoDTemplate(templates, name)
+		matched, _ := MatchDoDTemplate(templates, name) // nosemgrep: error-handling.ignored-error-go,error-handling.ignored-error-short-go -- second return is matched template name (string), not an error [permanent]
 		if matched {
 			report.CoveredClusters++
 		} else {

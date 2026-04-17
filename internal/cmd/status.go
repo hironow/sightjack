@@ -36,7 +36,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 
 			report := session.Status(cmd.Context(), baseDir)
 
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt == "json" {
 				data, jsonErr := json.Marshal(report)
 				if jsonErr != nil {

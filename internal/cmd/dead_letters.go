@@ -69,7 +69,7 @@ Pass --execute to actually remove them.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 			logger := loggerFrom(cmd)
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 
 			// Guard: do not create DB as side-effect if it does not exist yet.
 			dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "outbox.db")
@@ -134,7 +134,7 @@ Pass --execute to actually remove them.`,
 				return nil
 			}
 
-			yes, _ := cmd.Flags().GetBool("yes")
+			yes := mustBool(cmd, "yes")
 			if !yes {
 				fmt.Fprintf(errW, "\nPurge %d dead-lettered item(s)? [y/N] ", count)
 				scanner := bufio.NewScanner(cmd.InOrStdin())

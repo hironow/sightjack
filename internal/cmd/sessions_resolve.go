@@ -18,7 +18,7 @@ const sessionsToolName = "sightjack"
 // Resolution order: --path flag -> --config flag -> cwd.
 func resolveSessionsDir(cmd *cobra.Command) (repoRoot, stateDirPath string, err error) {
 	if cmd.Flags().Changed("path") {
-		p, _ := cmd.Flags().GetString("path")
+		p := mustString(cmd, "path")
 		repoRoot, err = filepath.Abs(p)
 		if err != nil {
 			return "", "", fmt.Errorf("resolve path: %w", err)
