@@ -311,7 +311,7 @@ func PruneStaleWaves(state *domain.SessionState, validClusters []domain.ClusterS
 			removed++
 		}
 	}
-	state.Waves = kept
+	state.Waves = kept // nosemgrep: immutability.no-pointer-field-mutation-go -- filtered-state assignment after pruning; intentional state transition [permanent]
 	return removed
 }
 
