@@ -189,20 +189,20 @@ type WavesGeneratedPayload struct {
 
 // WaveIdentityPayload is a shared payload for events that reference a single wave.
 // Used by: EventWaveApproved, EventWaveRejected, EventSpecificationSent, EventReportSent.
-type WaveIdentityPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format; custom marshal would break event-log compat
+type WaveIdentityPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format; custom marshal would break event-log compat [permanent]
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 }
 
 // WaveModifiedPayload is the payload for EventWaveModified.
-type WaveModifiedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
+type WaveModifiedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	WaveID      string    `json:"wave_id"`
 	ClusterName string    `json:"cluster_name"`
 	UpdatedWave WaveState `json:"updated_wave"`
 }
 
 // WaveAppliedPayload is the payload for EventWaveApplied.
-type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
+type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	WaveID      string   `json:"wave_id"`
 	ClusterName string   `json:"cluster_name"`
 	Applied     int      `json:"applied"`
@@ -211,7 +211,7 @@ type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-f
 }
 
 // WaveCompletedPayload is the payload for EventWaveCompleted.
-type WaveCompletedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
+type WaveCompletedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 	Applied     int    `json:"applied"`
@@ -219,7 +219,7 @@ type WaveCompletedPayload struct { // nosemgrep: domain-primitives.public-string
 }
 
 // CompletenessUpdatedPayload is the payload for EventCompletenessUpdated.
-type CompletenessUpdatedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
+type CompletenessUpdatedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	ClusterName         string  `json:"cluster_name"`
 	ClusterCompleteness float64 `json:"cluster_completeness"`
 	OverallCompleteness float64 `json:"overall_completeness"`
@@ -231,7 +231,7 @@ type WavesUnlockedPayload struct {
 }
 
 // NextGenWavesAddedPayload is the payload for EventNextGenWavesAdded.
-type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
+type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	ClusterName string      `json:"cluster_name"`
 	Waves       []WaveState `json:"waves"`
 }

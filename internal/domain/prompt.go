@@ -17,7 +17,7 @@ type ClassifyPromptData struct {
 }
 
 // DeepScanPromptData holds template data for the deep scan prompt.
-type DeepScanPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO; string required for text/template rendering
+type DeepScanPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO; string required for text/template rendering [permanent]
 	ClusterName     string
 	IssueIDs        string
 	OutputPath      string
@@ -26,7 +26,7 @@ type DeepScanPromptData struct { // nosemgrep: domain-primitives.public-string-f
 }
 
 // WaveGeneratePromptData holds template data for the wave generation prompt.
-type WaveGeneratePromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO
+type WaveGeneratePromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
 	ClusterName     string
 	Completeness    string
 	Issues          string
@@ -37,7 +37,7 @@ type WaveGeneratePromptData struct { // nosemgrep: domain-primitives.public-stri
 }
 
 // WaveApplyPromptData holds template data for the wave apply prompt.
-type WaveApplyPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO
+type WaveApplyPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
 	WaveID          string
 	ClusterName     string
 	Title           string
@@ -57,7 +57,7 @@ type ReadyLabelPromptData struct {
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.
-type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO
+type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string
@@ -70,7 +70,7 @@ type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-
 }
 
 // ArchitectDiscussPromptData holds template data for the architect discussion prompt.
-type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO
+type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string
@@ -80,7 +80,7 @@ type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-
 }
 
 // NextGenPromptData holds template data for post-completion wave generation.
-type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO
+type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
 	ClusterName     string
 	Completeness    string
 	Issues          string
@@ -95,7 +95,7 @@ type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-fi
 }
 
 // AutoDiscussArchitectPromptData holds template data for the auto-discuss architect prompt.
-type AutoDiscussArchitectPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO
+type AutoDiscussArchitectPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string
@@ -106,7 +106,7 @@ type AutoDiscussArchitectPromptData struct { // nosemgrep: domain-primitives.pub
 }
 
 // AutoDiscussDevilsAdvocatePromptData holds template data for the Devil's Advocate prompt.
-type AutoDiscussDevilsAdvocatePromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO
+type AutoDiscussDevilsAdvocatePromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string

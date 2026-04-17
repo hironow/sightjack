@@ -69,7 +69,7 @@ func DetectRepeatedPattern(fingerprints []string, threshold int) (bool, string) 
 }
 
 // WaveStalledPayload is the payload for EventWaveStalled.
-type WaveStalledPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
+type WaveStalledPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 	Fingerprint string `json:"fingerprint,omitempty"`
