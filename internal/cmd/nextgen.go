@@ -141,7 +141,7 @@ Outputs a WavePlan JSON suitable for piping back into 'show' or 'select'.`,
 			}
 
 			adrDir := session.ADRDir(baseDir)
-			existingADRs, _ := session.ReadExistingADRs(adrDir)
+			existingADRs, _ := session.ReadExistingADRs(adrDir) // nosemgrep: error-handling.ignored-error-go,error-handling.ignored-error-short-go -- adrDir may not exist yet; nil slice is a valid "no ADRs" state [permanent]
 			completedWaves := harness.CompletedWavesForCluster(allWaves, cluster.Name)
 			strictness := string(harness.ResolveStrictness(cfg.Strictness, cfg.Computed.EstimatedStrictness, []string{cluster.Name}))
 

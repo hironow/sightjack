@@ -140,7 +140,7 @@ func (s *SpanEmittingStreamReader) CollectAll() (*StreamMessage, []*StreamMessag
 }
 
 func (s *SpanEmittingStreamReader) processMessage(msg *StreamMessage) {
-	raw, _ := json.Marshal(msg)
+	raw, _ := json.Marshal(msg) // nosemgrep: error-handling.ignored-error-go,error-handling.ignored-error-short-go -- StreamMessage contains only JSON-serializable fields; Marshal cannot fail [permanent]
 	s.rawEvents = append(s.rawEvents, FormatRawEvent(msg.Type, string(raw), s.maxValueLen))
 
 	// Capture session_id for Weave thread_id (first non-empty wins).
