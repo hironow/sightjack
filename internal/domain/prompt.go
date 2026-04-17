@@ -57,7 +57,7 @@ type ReadyLabelPromptData struct {
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.
-type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
+type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent]
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string
@@ -80,7 +80,7 @@ type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-
 }
 
 // NextGenPromptData holds template data for post-completion wave generation.
-type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
+type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent]
 	ClusterName     string
 	Completeness    string
 	Issues          string
@@ -106,7 +106,7 @@ type AutoDiscussArchitectPromptData struct { // nosemgrep: domain-primitives.pub
 }
 
 // AutoDiscussDevilsAdvocatePromptData holds template data for the Devil's Advocate prompt.
-type AutoDiscussDevilsAdvocatePromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
+type AutoDiscussDevilsAdvocatePromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent]
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string

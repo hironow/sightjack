@@ -47,7 +47,7 @@ type ClusterScanOutcome struct { // nosemgrep: domain-primitives.public-string-f
 // ScanRecoveryReport summarises which clusters succeeded and which failed
 // during wave generation so that callers can present partial results and
 // decide on recovery actions.
-type ScanRecoveryReport struct {
+type ScanRecoveryReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping adds no safety benefit for in-memory report [permanent]
 	// Outcomes contains one entry per cluster in the original scan order.
 	Outcomes       []ClusterScanOutcome
 	SucceededCount int

@@ -20,7 +20,7 @@ type ComputedConfig struct {
 }
 
 // DoDTemplate holds must/should Definition of Done items for a category.
-type DoDTemplate struct {
+type DoDTemplate struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- YAML config DTO; FCC wrapping would break YAML config serialization [permanent]
 	Must   []string `yaml:"must"`
 	Should []string `yaml:"should"`
 }

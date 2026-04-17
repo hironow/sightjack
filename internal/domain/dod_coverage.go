@@ -2,7 +2,7 @@ package domain
 
 // DoDCoverageReport summarises which clusters have a matching DoD template and
 // which are uncovered.
-type DoDCoverageReport struct {
+type DoDCoverageReport struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping adds no safety benefit for in-memory report [permanent]
 	TotalClusters     int
 	CoveredClusters   int
 	UncoveredClusters []string

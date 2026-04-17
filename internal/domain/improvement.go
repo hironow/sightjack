@@ -64,7 +64,7 @@ const (
 	MetadataImprovementSchemaVersion = "improvement_schema_version"
 )
 
-type CorrectionMetadata struct {
+type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping would break map-based metadata serialization [permanent]
 	SchemaVersion       string
 	FailureType         FailureType
 	Severity            Severity
@@ -87,7 +87,7 @@ type CorrectionMetadata struct {
 	Outcome             ImprovementOutcome
 }
 
-type ImprovementEvent struct {
+type ImprovementEvent struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON/YAML wire format; FCC wrapping would break D-Mail serialization [permanent]
 	SchemaVersion       string             `json:"schema_version" yaml:"schema_version"`
 	FailureType         FailureType        `json:"failure_type" yaml:"failure_type"`
 	Severity            Severity           `json:"severity,omitempty" yaml:"severity,omitempty"`

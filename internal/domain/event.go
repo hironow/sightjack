@@ -174,7 +174,7 @@ type SessionStartedPayload struct {
 }
 
 // ScanCompletedPayload is the payload for EventScanCompleted.
-type ScanCompletedPayload struct {
+type ScanCompletedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	Clusters       []ClusterState `json:"clusters"`
 	Completeness   float64        `json:"completeness"`
 	ShibitoCount   int            `json:"shibito_count"`
@@ -183,7 +183,7 @@ type ScanCompletedPayload struct {
 }
 
 // WavesGeneratedPayload is the payload for EventWavesGenerated.
-type WavesGeneratedPayload struct {
+type WavesGeneratedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	Waves []WaveState `json:"waves"`
 }
 
@@ -202,7 +202,7 @@ type WaveModifiedPayload struct { // nosemgrep: domain-primitives.public-string-
 }
 
 // WaveAppliedPayload is the payload for EventWaveApplied.
-type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
+type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	WaveID      string   `json:"wave_id"`
 	ClusterName string   `json:"cluster_name"`
 	Applied     int      `json:"applied"`
@@ -226,12 +226,12 @@ type CompletenessUpdatedPayload struct { // nosemgrep: domain-primitives.public-
 }
 
 // WavesUnlockedPayload is the payload for EventWavesUnlocked.
-type WavesUnlockedPayload struct {
+type WavesUnlockedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	UnlockedWaveIDs []string `json:"unlocked_wave_ids"`
 }
 
 // NextGenWavesAddedPayload is the payload for EventNextGenWavesAdded.
-type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
+type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	ClusterName string      `json:"cluster_name"`
 	Waves       []WaveState `json:"waves"`
 }
@@ -243,7 +243,7 @@ type ADRGeneratedPayload struct {
 }
 
 // ReadyLabelsAppliedPayload is the payload for EventReadyLabelsApplied.
-type ReadyLabelsAppliedPayload struct {
+type ReadyLabelsAppliedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
 	IssueIDs []string `json:"issue_ids"`
 }
 
