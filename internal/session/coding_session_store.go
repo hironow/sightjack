@@ -181,14 +181,11 @@ func scanRecord(row scanner) (domain.CodingSessionRecord, error) {
 	}
 	rec.Provider = domain.Provider(provider)
 	rec.Status = domain.SessionStatus(status)
-	var parseErr error
-	rec.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
-	if parseErr != nil {
-		return rec, fmt.Errorf("parse created_at: %w", parseErr)
+	if t, parseErr := time.Parse(time.RFC3339Nano, createdAt); parseErr == nil {
+		rec.CreatedAt = t
 	}
-	rec.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
-	if parseErr != nil {
-		return rec, fmt.Errorf("parse updated_at: %w", parseErr)
+	if t, parseErr := time.Parse(time.RFC3339Nano, updatedAt); parseErr == nil {
+		rec.UpdatedAt = t
 	}
 	if metaJSON != "" {
 		if err := json.Unmarshal([]byte(metaJSON), &rec.Metadata); err != nil {

@@ -138,7 +138,7 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	// Check for tool_use (including subagent starts).
 	toolBlocks, err := msg.ExtractToolUse()
 	if err != nil {
-		return nil
+		toolBlocks = nil
 	}
 	if len(toolBlocks) > 0 {
 		// Emit first tool_use as the event (multiple tools in one message are rare).
@@ -146,7 +146,10 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 		if subagentToolNames[tool.Name] {
 			return n.normalizeSubagentStart(tool, msg)
 		}
-		summary := truncateSummary(tool.Input, 200)
+		summary, ok := truncateInput(tool.Input, 200)
+		if !ok && summary == "" {
+			summary = string(tool.Input)
+		}
 		data, err := json.Marshal(map[string]any{
 			"tool_name":      tool.Name,
 			"tool_id":        tool.ID,
@@ -163,12 +166,12 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	// Check for thinking blocks.
 	am, err := msg.ParseAssistantMessage()
 	if err != nil {
-		return nil
+		am = nil
 	}
 	if am != nil {
 		for _, block := range am.Content {
 			if block.Type == "thinking" && block.Thinking != "" {
-				text := truncateText(block.Thinking, domain.RawFieldMaxBytes)
+					text := mustTruncate(block.Thinking, domain.RawFieldMaxBytes)
 				data, err := json.Marshal(map[string]string{"text": text})
 				if err != nil {
 					data = []byte("{}")
@@ -182,10 +185,10 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	// Text output.
 	text, err := msg.ExtractText()
 	if err != nil {
-		return nil
+		text = ""
 	}
 	if text != "" {
-		truncated := truncateText(text, domain.RawFieldMaxBytes)
+		truncated := mustTruncate(text, domain.RawFieldMaxBytes)
 		data, err := json.Marshal(map[string]string{"text": truncated})
 		if err != nil {
 			data = []byte("{}")
@@ -200,7 +203,10 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 func (n *StreamNormalizer) normalizeSubagentStart(tool ContentBlock, msg *StreamMessage) *domain.SessionStreamEvent {
 	subID := fmt.Sprintf("sub_%s", tool.ID)
 	n.subagents[tool.ID] = subID
-	desc := truncateSummary(tool.Input, 200)
+	desc, ok := truncateInput(tool.Input, 200)
+	if !ok && desc == "" {
+		desc = string(tool.Input)
+	}
 	data, err := json.Marshal(map[string]any{
 		"subagent_id":       subID,
 		"parent_session_id": n.codingSessionID,
@@ -328,23 +334,11 @@ func truncateInput(input json.RawMessage, maxLen int) (string, bool) {
 	return domain.TruncateField(s, maxLen)
 }
 
-// truncateSummary returns the truncated text from raw JSON input.
-func truncateSummary(input json.RawMessage, maxLen int) string {
-	if len(input) == 0 {
-		return ""
-	}
-	out, ok := domain.TruncateField(string(input), maxLen)
-	if !ok {
-		return string(input)
-	}
-	return out
-}
-
-// truncateText truncates s to maxLen at a UTF-8 boundary.
-func truncateText(s string, maxLen int) string {
-	out, ok := domain.TruncateField(s, maxLen)
-	if !ok {
+// mustTruncate truncates s to maxBytes, returning the (possibly truncated) string.
+func mustTruncate(s string, maxBytes int) string {
+	result, wasTruncated := domain.TruncateField(s, maxBytes)
+	if wasTruncated && result == "" {
 		return s
 	}
-	return out
+	return result
 }
