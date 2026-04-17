@@ -69,7 +69,7 @@ func DetectRepeatedPattern(fingerprints []string, threshold int) (bool, string) 
 }
 
 // WaveStalledPayload is the payload for EventWaveStalled.
-type WaveStalledPayload struct {
+type WaveStalledPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 	Fingerprint string `json:"fingerprint,omitempty"`
@@ -77,7 +77,7 @@ type WaveStalledPayload struct {
 }
 
 // MarkStalled sets the wave's status to "stalled" and emits an EventWaveStalled event.
-func (a *WaveAggregate) MarkStalled(waveID, clusterName, reason string, opts ...time.Time) (Event, error) {
+func (a *WaveAggregate) MarkStalled(waveID, clusterName, reason string, opts ...time.Time) (Event, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- waveID/clusterName/reason are distinct semantic roles; typed wrappers deferred
 	if _, ok := a.findWave(waveID, clusterName); !ok {
 		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
 	}

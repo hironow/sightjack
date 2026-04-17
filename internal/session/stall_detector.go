@@ -30,7 +30,7 @@ func NewStallDetector(threshold int, cooldownWindow time.Duration, logger domain
 }
 
 // StallResult holds stall detection outcome for the caller to emit events.
-type StallResult struct {
+type StallResult struct { // nosemgrep: domain-primitives.public-string-field-go -- internal result DTO
 	Detected    bool
 	WaveID      string
 	ClusterName string

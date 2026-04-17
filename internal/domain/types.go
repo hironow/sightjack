@@ -166,7 +166,7 @@ type ClusterState struct {
 }
 
 // WaveState is the per-wave state within SessionState.
-type WaveState struct {
+type WaveState struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format (SessionState snapshot)
 	ID            string       `json:"id"`
 	ClusterName   string       `json:"cluster_name"`
 	Title         string       `json:"title"`
@@ -180,7 +180,7 @@ type WaveState struct {
 
 // Wave is a unit of work proposed by AI for a cluster.
 // Wire format: input to `discuss` and `apply` subcommands.
-type Wave struct {
+type Wave struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format (AI output schema)
 	ID              string             `json:"id"`
 	ClusterName     string             `json:"cluster_name"`
 	ClusterKey      string             `json:"cluster_key,omitempty"`
@@ -226,13 +226,13 @@ type WaveDelta struct {
 }
 
 // WaveGenerateResult is the Pass 3 output per cluster.
-type WaveGenerateResult struct {
+type WaveGenerateResult struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
 	ClusterName string `json:"cluster_name"`
 	Waves       []Wave `json:"waves"`
 }
 
 // NextGenResult is the output of post-completion wave generation.
-type NextGenResult struct {
+type NextGenResult struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
 	ClusterName string `json:"cluster_name"`
 	Waves       []Wave `json:"waves"`
 	Reasoning   string `json:"reasoning"`
@@ -248,7 +248,7 @@ type WaveApplyResult struct {
 }
 
 // Ripple is a cross-cluster effect from applying a wave.
-type Ripple struct {
+type Ripple struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format
 	ClusterName string `json:"cluster_name"`
 	Description string `json:"description"`
 }
