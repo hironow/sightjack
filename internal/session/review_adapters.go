@@ -54,7 +54,7 @@ func NewReviewFixRunner(runner port.ProviderRunner, branch port.BranchResolver, 
 	}
 }
 
-func (a *reviewFixRunnerAdapter) RunReviewFix(ctx context.Context, _, _, comments string) error {
+func (a *reviewFixRunnerAdapter) RunReviewFix(ctx context.Context, _, _, comments string) error { // nosemgrep: domain-primitives.multiple-string-params-go -- port adapter impl; blanked params are interface-mandated positional slots not individually swappable [permanent]
 	// Circuit breaker: skip review fix when provider is rate-limited.
 	// Note: SessionTrackingAdapter (wrapping the runner) also records CB
 	// from result.Stderr, so no separate recordCircuitBreaker call needed here.

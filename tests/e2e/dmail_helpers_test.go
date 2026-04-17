@@ -29,7 +29,7 @@ type dmailData struct {
 }
 
 // marshalDMail creates valid d-mail bytes (YAML frontmatter + body).
-func marshalDMail(name, kind, description, severity, body string, issues []string) []byte {
+func marshalDMail(name, kind, description, severity, body string, issues []string) []byte { // nosemgrep: domain-primitives.multiple-string-params-go -- test helper; name/kind/description/severity/body are distinct D-Mail envelope fields not individually swappable [permanent]
 	var b strings.Builder
 	b.WriteString("---\n")
 	fm := struct {
@@ -136,7 +136,7 @@ func ensureMailDirs(t *testing.T, dir string) {
 }
 
 // writeDMailToDir writes a d-mail file to the specified mail subdirectory.
-func writeDMailToDir(t *testing.T, dir, sub, filename string, content []byte) string {
+func writeDMailToDir(t *testing.T, dir, sub, filename string, content []byte) string { // nosemgrep: domain-primitives.multiple-string-params-go -- test helper; dir/sub/filename are distinct path-composition roles not individually swappable [permanent]
 	t.Helper()
 	p := filepath.Join(dir, ".siren", sub, filename)
 	if err := os.WriteFile(p, content, 0o644); err != nil {

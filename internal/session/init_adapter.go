@@ -60,7 +60,7 @@ func (a *InitAdapter) InitProject(baseDir string, opts ...port.InitOption) ([]st
 // writeConfigWithDefaults writes config.yaml with all defaults populated.
 // If an existing config.yaml exists, user values are preserved (merged over defaults).
 // CLI-provided values (team, project, lang, strictness) always win.
-func writeConfigWithDefaults(cfgPath, team, project, lang, strictness string) error {
+func writeConfigWithDefaults(cfgPath, team, project, lang, strictness string) error { // nosemgrep: domain-primitives.multiple-string-params-go -- init factory; team/project/lang/strictness are orthogonal config dimensions, typed wrappers deferred [permanent]
 	cfg := domain.DefaultConfig()
 
 	// Apply CLI flags

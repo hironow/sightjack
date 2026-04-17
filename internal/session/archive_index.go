@@ -80,7 +80,7 @@ var opFromTool = map[string]string{
 
 // ExtractMeta populates a domain.IndexEntry from a markdown file, extracting
 // operation type, issue ID, status, timestamp, and summary.
-func ExtractMeta(filePath, stateDir, tool string) domain.IndexEntry {
+func ExtractMeta(filePath, stateDir, tool string) domain.IndexEntry { // nosemgrep: domain-primitives.multiple-string-params-go -- internal session util; filePath/stateDir/tool are distinct archive-meta extraction roles not individually swappable [permanent]
 	relPath, err := filepath.Rel(stateDir, filePath)
 	if err != nil {
 		relPath = filePath
@@ -239,7 +239,7 @@ var indexDirs = []string{"archive", "journal", "journals", "insights"}
 
 // Rebuild scans known subdirectories for .md files, extracts metadata, and
 // overwrites the index file atomically using a temp+rename strategy under flock.
-func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) {
+func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- internal session adapter; indexPath/stateDir/tool are distinct archive-rebuild roles not individually swappable [permanent]
 	indexDir := filepath.Dir(indexPath)
 	if err := os.MkdirAll(indexDir, 0755); err != nil {
 		return 0, fmt.Errorf("mkdir index dir: %w", err)

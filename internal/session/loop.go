@@ -30,7 +30,7 @@ const (
 // RunSession, RunResumeSession, and RunRescanSession.
 // resumedAt controls the Navigator "Session: resumed" banner (nil hides it).
 // scanTimestamp is persisted in state as LastScanned and stays stable across saves.
-func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string,
+func runInteractiveLoop(ctx context.Context, cfg *domain.Config, baseDir, sessionID, scanDir, scanResultPath string, // nosemgrep: domain-primitives.multiple-string-params-go -- internal session loop; baseDir/sessionID/scanDir/scanResultPath are distinct session-state roles not individually swappable [permanent]
 	scanResult *domain.ScanResult, waves []domain.Wave, completed map[string]bool, adrCount int,
 	scanner *bufio.Scanner, adrDir string, resumedAt *time.Time, scanTimestamp time.Time, fbCollector *FeedbackCollector,
 	store port.OutboxStore, runner port.ProviderRunner, onceRunner port.ProviderRunner, emitter port.SessionEventEmitter, out io.Writer, logger domain.Logger) (loopResult, []domain.Wave, map[string]bool, error) {

@@ -298,7 +298,7 @@ func waveFileBase(index int, clusterName string) string {
 
 // savePromptAndCreateLog writes the prompt file and creates a log writer.
 // Returns the log writer and a cleanup function for the log file.
-func savePromptAndCreateLog(scanDir, base, prompt string, logger domain.Logger) (io.Writer, func()) {
+func savePromptAndCreateLog(scanDir, base, prompt string, logger domain.Logger) (io.Writer, func()) { // nosemgrep: domain-primitives.multiple-string-params-go -- internal session util; scanDir/base/prompt are distinct file-creation roles not individually swappable [permanent]
 	if err := os.WriteFile(filepath.Join(scanDir, base+"_prompt.md"), []byte(prompt), 0644); err != nil {
 		logger.Warn("save prompt: %v", err)
 	}

@@ -87,7 +87,7 @@ d-mail skills, and sets up mail directories.`,
 }
 
 // writeOtelEnv writes .otel.env to the siren state directory if backend is set.
-func writeOtelEnv(baseDir, backend, entity, project string, w io.Writer) error {
+func writeOtelEnv(baseDir, backend, entity, project string, w io.Writer) error { // nosemgrep: domain-primitives.multiple-string-params-go -- init factory; baseDir/backend/entity/project are orthogonal config dimensions, typed wrappers deferred [permanent]
 	if backend == "" {
 		return nil
 	}

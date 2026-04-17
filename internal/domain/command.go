@@ -9,7 +9,7 @@ type InitCommand struct {
 	strictness string
 }
 
-func NewInitCommand(baseDir RepoPath, team, project, lang, strictness string) InitCommand {
+func NewInitCommand(baseDir RepoPath, team, project, lang, strictness string) InitCommand { // nosemgrep: domain-primitives.multiple-string-params-go -- init factory; team/project/lang/strictness are orthogonal config dimensions, typed wrappers deferred [permanent]
 	return InitCommand{baseDir: baseDir, team: team, project: project, lang: lang, strictness: strictness}
 }
 

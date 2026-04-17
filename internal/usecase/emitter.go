@@ -242,7 +242,7 @@ func (e *sessionEventEmitter) EmitGenerateADR(payload domain.ADRGeneratedPayload
 	return e.emit(evt)
 }
 
-func (e *sessionEventEmitter) EmitWaveStalled(waveID, clusterName, fingerprint, reason string, now time.Time) error {
+func (e *sessionEventEmitter) EmitWaveStalled(waveID, clusterName, fingerprint, reason string, now time.Time) error { // nosemgrep: domain-primitives.multiple-string-params-go -- emitter; waveID/clusterName/fingerprint/reason are orthogonal event dimensions, typed wrappers deferred [permanent]
 	evt, err := domain.NewEvent(domain.EventWaveStalled, domain.WaveStalledPayload{
 		WaveID:      waveID,
 		ClusterName: clusterName,

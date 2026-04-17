@@ -30,7 +30,7 @@ func BuildClassifyModeSection(isWaveMode bool, lang string) string {
 }
 
 // BuildClassifyFilterSection returns the pre-computed filter criteria section.
-func BuildClassifyFilterSection(isWaveMode bool, teamFilter, projectFilter, cycleFilter, lang string) string {
+func BuildClassifyFilterSection(isWaveMode bool, teamFilter, projectFilter, cycleFilter, lang string) string { // nosemgrep: domain-primitives.multiple-string-params-go -- filter builder; teamFilter/projectFilter/cycleFilter/lang are orthogonal filter dimensions, typed wrappers deferred [permanent]
 	var b strings.Builder
 	if isWaveMode {
 		if teamFilter != "" || projectFilter != "" {

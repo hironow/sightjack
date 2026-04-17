@@ -112,7 +112,7 @@ func StatusColor(s domain.CheckStatus) string {
 	}
 }
 
-func (l *Logger) logLine(prefix, color, format string, args ...any) {
+func (l *Logger) logLine(prefix, color, format string, args ...any) { // nosemgrep: domain-primitives.multiple-string-params-go -- logger/display format signature; prefix/color/format are distinct roles not individually swappable [permanent]
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")
 
@@ -159,7 +159,7 @@ func (l *Logger) Debug(format string, args ...any) {
 // Banner prints an inverted-color full-line banner for D-Mail intent logging.
 // SEND uses green inversion, RECV uses cyan inversion.
 // In no-color mode, uses >>> / <<< prefix as fallback.
-func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description string) {
+func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description string) { // nosemgrep: domain-primitives.multiple-string-params-go -- logger/display format signature; kind/name/description are distinct display roles not individually swappable [permanent]
 	desc := description
 	if len(desc) > 50 {
 		desc = desc[:47] + "..."

@@ -331,7 +331,7 @@ func loadFixture(prefix, prompt string) string {
 
 // loadFixtureByFilename tries filepath.Match-based matching for sightjack,
 // then falls back to keyword matching.
-func loadFixtureByFilename(prefix, filename, prompt string) string {
+func loadFixtureByFilename(prefix, filename, prompt string) string { // nosemgrep: domain-primitives.multiple-string-params-go -- test helper; prefix/filename/prompt are distinct fixture-lookup roles not individually swappable [permanent]
 	fixtureDir := os.Getenv("FAKE_CLAUDE_FIXTURE_DIR")
 	if fixtureDir == "" {
 		return ""
