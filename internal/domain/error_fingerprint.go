@@ -77,7 +77,7 @@ type WaveStalledPayload struct { // nosemgrep: domain-primitives.public-string-f
 }
 
 // MarkStalled sets the wave's status to "stalled" and emits an EventWaveStalled event.
-func (a *WaveAggregate) MarkStalled(waveID, clusterName, reason string, opts ...time.Time) (Event, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- waveID/clusterName/reason are distinct semantic roles; typed wrappers deferred
+func (a *WaveAggregate) MarkStalled(waveID, clusterName, reason string, opts ...time.Time) (Event, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- waveID/clusterName/reason are distinct semantic roles; typed wrappers deferred [permanent]
 	if _, ok := a.findWave(waveID, clusterName); !ok {
 		return Event{}, fmt.Errorf("wave %s:%s not found", clusterName, waveID)
 	}
