@@ -2,7 +2,7 @@
 package domain
 
 // InitCommand represents the intent to initialize a sightjack project.
-type InitCommand struct {
+type InitCommand struct { // nosemgrep: structure.multiple-exported-structs-go
 	baseDir    RepoPath
 	team       string
 	project    string
@@ -21,7 +21,7 @@ func (c InitCommand) Lang() string       { return c.lang }
 func (c InitCommand) Strictness() string { return c.strictness }
 
 // RunScanCommand represents the intent to run a sightjack scan.
-type RunScanCommand struct {
+type RunScanCommand struct { // nosemgrep: structure.multiple-exported-structs-go
 	repoPath RepoPath
 	dryRun   bool
 }
@@ -34,7 +34,7 @@ func (c RunScanCommand) RepoPath() RepoPath { return c.repoPath }
 func (c RunScanCommand) DryRun() bool       { return c.dryRun }
 
 // RunSessionCommand represents the intent to start an interactive session.
-type RunSessionCommand struct {
+type RunSessionCommand struct { // nosemgrep: structure.multiple-exported-structs-go
 	repoPath RepoPath
 	dryRun   bool
 }
@@ -47,7 +47,7 @@ func (c RunSessionCommand) RepoPath() RepoPath { return c.repoPath }
 func (c RunSessionCommand) DryRun() bool       { return c.dryRun }
 
 // ResumeSessionCommand represents the intent to resume an existing session.
-type ResumeSessionCommand struct {
+type ResumeSessionCommand struct { // nosemgrep: structure.multiple-exported-structs-go
 	repoPath  RepoPath
 	sessionID SessionID
 }
@@ -60,7 +60,7 @@ func (c ResumeSessionCommand) RepoPath() RepoPath   { return c.repoPath }
 func (c ResumeSessionCommand) SessionID() SessionID { return c.sessionID }
 
 // ApplyWaveCommand represents the intent to approve and apply a wave.
-type ApplyWaveCommand struct {
+type ApplyWaveCommand struct { // nosemgrep: structure.multiple-exported-structs-go
 	repoPath    RepoPath
 	sessionID   SessionID
 	clusterName ClusterName

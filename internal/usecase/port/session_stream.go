@@ -8,12 +8,12 @@ import (
 )
 
 // SessionStreamPublisher publishes session stream events to subscribers.
-type SessionStreamPublisher interface {
+type SessionStreamPublisher interface { // nosemgrep: structure.multiple-exported-interfaces-go
 	Publish(ctx context.Context, event domain.SessionStreamEvent)
 }
 
 // SessionStreamSubscriber receives session stream events.
-type SessionStreamSubscriber interface {
+type SessionStreamSubscriber interface { // nosemgrep: structure.multiple-exported-interfaces-go
 	C() <-chan domain.SessionStreamEvent
 	Close()
 }

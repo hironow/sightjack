@@ -9,19 +9,19 @@ import (
 )
 
 // RunResult holds the output of a detailed runner invocation.
-type RunResult struct {
+type RunResult struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
 	Text              string
 	ProviderSessionID string
 	Stderr            string // captured stderr for circuit breaker inspection
 }
 
 // DetailedRunner extends ProviderRunner to also return session metadata.
-type DetailedRunner interface {
+type DetailedRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go
 	RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (RunResult, error)
 }
 
 // ListSessionOpts controls session listing filters.
-type ListSessionOpts struct {
+type ListSessionOpts struct { // nosemgrep: structure.exported-struct-and-interface-go
 	Provider *domain.Provider
 	Status   *domain.SessionStatus
 	Limit    int

@@ -92,7 +92,7 @@ func AllValidEventTypes() map[EventType]bool {
 const CurrentEventSchemaVersion uint8 = 1
 
 // Event is the immutable event envelope persisted to the event store.
-type Event struct {
+type Event struct { // nosemgrep: structure.multiple-exported-structs-go
 	SchemaVersion uint8           `json:"schema_version,omitempty"`
 	ID            string          `json:"id"`
 	Type          EventType       `json:"type"`
@@ -148,12 +148,12 @@ func ValidateEvent(e Event) error { // nosemgrep: validate-returns-error-only-go
 }
 
 // AppendResult captures metrics from an event store Append operation.
-type AppendResult struct {
+type AppendResult struct { // nosemgrep: structure.multiple-exported-structs-go
 	BytesWritten int // total bytes written to event files
 }
 
 // LoadResult captures metrics from an event store Load operation.
-type LoadResult struct {
+type LoadResult struct { // nosemgrep: structure.multiple-exported-structs-go
 	FileCount        int // number of .jsonl files scanned
 	CorruptLineCount int // number of lines skipped due to parse errors
 }
@@ -169,13 +169,13 @@ func UnmarshalEventPayload(e Event, target any) error {
 }
 
 // SessionStartedPayload is the payload for EventSessionStarted.
-type SessionStartedPayload struct {
+type SessionStartedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
 	Project         string `json:"project"`
 	StrictnessLevel string `json:"strictness_level"`
 }
 
 // ScanCompletedPayload is the payload for EventScanCompleted.
-type ScanCompletedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
+type ScanCompletedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent], structure.multiple-exported-structs-go
 	Clusters       []ClusterState `json:"clusters"`
 	Completeness   float64        `json:"completeness"`
 	ShibitoCount   int            `json:"shibito_count"`
@@ -184,26 +184,26 @@ type ScanCompletedPayload struct { // nosemgrep: first-class-collection.raw-slic
 }
 
 // WavesGeneratedPayload is the payload for EventWavesGenerated.
-type WavesGeneratedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
+type WavesGeneratedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent], structure.multiple-exported-structs-go
 	Waves []WaveState `json:"waves"`
 }
 
 // WaveIdentityPayload is a shared payload for events that reference a single wave.
 // Used by: EventWaveApproved, EventWaveRejected, EventSpecificationSent, EventReportSent.
-type WaveIdentityPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format; custom marshal would break event-log compat [permanent]
+type WaveIdentityPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format; custom marshal would break event-log compat [permanent], structure.multiple-exported-structs-go
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 }
 
 // WaveModifiedPayload is the payload for EventWaveModified.
-type WaveModifiedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
+type WaveModifiedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent], structure.multiple-exported-structs-go
 	WaveID      string    `json:"wave_id"`
 	ClusterName string    `json:"cluster_name"`
 	UpdatedWave WaveState `json:"updated_wave"`
 }
 
 // WaveAppliedPayload is the payload for EventWaveApplied.
-type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
+type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent], structure.multiple-exported-structs-go
 	WaveID      string   `json:"wave_id"`
 	ClusterName string   `json:"cluster_name"`
 	Applied     int      `json:"applied"`
@@ -212,7 +212,7 @@ type WaveAppliedPayload struct { // nosemgrep: domain-primitives.public-string-f
 }
 
 // WaveCompletedPayload is the payload for EventWaveCompleted.
-type WaveCompletedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
+type WaveCompletedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent], structure.multiple-exported-structs-go
 	WaveID      string `json:"wave_id"`
 	ClusterName string `json:"cluster_name"`
 	Applied     int    `json:"applied"`
@@ -220,46 +220,46 @@ type WaveCompletedPayload struct { // nosemgrep: domain-primitives.public-string
 }
 
 // CompletenessUpdatedPayload is the payload for EventCompletenessUpdated.
-type CompletenessUpdatedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
+type CompletenessUpdatedPayload struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent], structure.multiple-exported-structs-go
 	ClusterName         string  `json:"cluster_name"`
 	ClusterCompleteness float64 `json:"cluster_completeness"`
 	OverallCompleteness float64 `json:"overall_completeness"`
 }
 
 // WavesUnlockedPayload is the payload for EventWavesUnlocked.
-type WavesUnlockedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
+type WavesUnlockedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent], structure.multiple-exported-structs-go
 	UnlockedWaveIDs []string `json:"unlocked_wave_ids"`
 }
 
 // NextGenWavesAddedPayload is the payload for EventNextGenWavesAdded.
-type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
+type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent], structure.multiple-exported-structs-go
 	ClusterName string      `json:"cluster_name"`
 	Waves       []WaveState `json:"waves"`
 }
 
 // ADRGeneratedPayload is the payload for EventADRGenerated.
-type ADRGeneratedPayload struct {
+type ADRGeneratedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
 	ADRID string `json:"adr_id"`
 	Title string `json:"title"`
 }
 
 // ReadyLabelsAppliedPayload is the payload for EventReadyLabelsApplied.
-type ReadyLabelsAppliedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent]
+type ReadyLabelsAppliedPayload struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break event-log compat [permanent], structure.multiple-exported-structs-go
 	IssueIDs []string `json:"issue_ids"`
 }
 
 // SessionResumedPayload is the payload for EventSessionResumed.
-type SessionResumedPayload struct {
+type SessionResumedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
 	OriginalSessionID string `json:"original_session_id"`
 }
 
 // SessionRescannedPayload is the payload for EventSessionRescanned.
-type SessionRescannedPayload struct {
+type SessionRescannedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
 	OriginalSessionID string `json:"original_session_id"`
 }
 
 // FeedbackReceivedPayload is the payload for EventFeedbackReceived.
-type FeedbackReceivedPayload struct {
+type FeedbackReceivedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
 	Kind  string `json:"kind"`
 	Name  string `json:"name"`
 	Count int    `json:"count"`

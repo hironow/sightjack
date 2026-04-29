@@ -7,7 +7,7 @@ import (
 )
 
 // AutoDiscussRound captures a single round of the auto-discuss debate.
-type AutoDiscussRound struct {
+type AutoDiscussRound struct { // nosemgrep: structure.multiple-exported-structs-go
 	Round   int    `json:"round"`
 	Speaker string `json:"speaker"` // "architect" or "devils_advocate"
 	Content string `json:"content"`

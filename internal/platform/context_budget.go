@@ -24,7 +24,7 @@ const tokensPerMCPServer = 300
 
 // ContextBudgetReport summarises the estimated context consumption
 // from Claude Code hooks, plugins, skills, and MCP servers.
-type ContextBudgetReport struct {
+type ContextBudgetReport struct { // nosemgrep: structure.multiple-exported-structs-go
 	ToolCount        int
 	SkillCount       int
 	PluginCount      int

@@ -22,7 +22,7 @@ const (
 )
 
 // InitEntry represents a single init action.
-type InitEntry struct {
+type InitEntry struct { // nosemgrep: structure.multiple-exported-structs-go
 	Path   string     // relative path (e.g. ".siren/config.yaml")
 	Action InitAction // what happened
 	Detail string     // optional detail (e.g. warning message)

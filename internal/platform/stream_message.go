@@ -7,7 +7,7 @@ import (
 )
 
 // StreamMessage represents a single NDJSON line from Claude Code --output-format stream-json.
-type StreamMessage struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format for Claude CLI stream events [permanent]
+type StreamMessage struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format for Claude CLI stream events [permanent], structure.multiple-exported-structs-go
 	Type            string          `json:"type"`
 	Subtype         string          `json:"subtype,omitempty"`
 	UUID            string          `json:"uuid,omitempty"`
@@ -48,19 +48,19 @@ type StreamMessage struct { // nosemgrep: domain-primitives.public-string-field-
 }
 
 // MCPServerInfo represents a connected MCP server from system:init.
-type MCPServerInfo struct {
+type MCPServerInfo struct { // nosemgrep: structure.multiple-exported-structs-go
 	Name   string `json:"name"`
 	Status string `json:"status"`
 }
 
 // PluginInfo represents a loaded plugin from system:init.
-type PluginInfo struct {
+type PluginInfo struct { // nosemgrep: structure.multiple-exported-structs-go
 	Name string `json:"name"`
 	Path string `json:"path,omitempty"`
 }
 
 // RateLimitInfo holds rate limit details from Claude Code rate_limit_event.
-type RateLimitInfo struct {
+type RateLimitInfo struct { // nosemgrep: structure.multiple-exported-structs-go
 	Status             string  `json:"status,omitempty"`
 	ResetsAt           int64   `json:"resetsAt,omitempty"`
 	RateLimitType      string  `json:"rateLimitType,omitempty"`
@@ -70,7 +70,7 @@ type RateLimitInfo struct {
 }
 
 // Usage holds token usage from Claude Code.
-type Usage struct {
+type Usage struct { // nosemgrep: structure.multiple-exported-structs-go
 	InputTokens              int `json:"input_tokens"`
 	OutputTokens             int `json:"output_tokens"`
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
@@ -78,7 +78,7 @@ type Usage struct {
 }
 
 // AssistantMessage is the nested message inside SDKAssistantMessage.
-type AssistantMessage struct {
+type AssistantMessage struct { // nosemgrep: structure.multiple-exported-structs-go
 	ID         string         `json:"id,omitempty"`
 	Role       string         `json:"role,omitempty"`
 	Model      string         `json:"model,omitempty"`

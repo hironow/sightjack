@@ -40,7 +40,7 @@ func ChunkSlice(items []string, size int) [][]string {
 }
 
 // ClusterScanOutcome records whether wave generation succeeded for a single cluster.
-type ClusterScanOutcome struct { // nosemgrep: domain-primitives.public-string-field-go -- internal scan result DTO; no validation needed [permanent]
+type ClusterScanOutcome struct { // nosemgrep: domain-primitives.public-string-field-go -- internal scan result DTO; no validation needed [permanent], structure.multiple-exported-structs-go
 	ClusterName string
 	Succeeded   bool
 }

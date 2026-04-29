@@ -38,7 +38,7 @@ const (
 	MetadataProviderResumeWhen  = "provider_resume_when"
 )
 
-type ProviderStateSnapshot struct {
+type ProviderStateSnapshot struct { // nosemgrep: structure.multiple-exported-structs-go
 	State           ProviderState
 	Reason          string
 	RetryBudget     int

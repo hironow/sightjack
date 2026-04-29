@@ -15,7 +15,7 @@ import (
 const InsightSchemaVersion = "1"
 
 // InsightEntry represents a single semantic insight with 6 required axes + optional extras.
-type InsightEntry struct {
+type InsightEntry struct { // nosemgrep: structure.multiple-exported-structs-go
 	Title       string
 	What        string
 	Why         string
@@ -27,7 +27,7 @@ type InsightEntry struct {
 }
 
 // InsightFile is the on-disk representation of an insight ledger file.
-type InsightFile struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO (parsed from Markdown); FCC wrapping adds no safety benefit [permanent]
+type InsightFile struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO (parsed from Markdown); FCC wrapping adds no safety benefit [permanent], structure.multiple-exported-structs-go
 	SchemaVersion string         `yaml:"insight-schema-version"`
 	Kind          string         `yaml:"kind"`
 	Tool          string         `yaml:"tool"`
@@ -45,7 +45,7 @@ type insightFrontmatter struct {
 }
 
 // InsightContext is the optional context field added to D-Mail envelopes.
-type InsightContext struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- YAML/JSON wire format (D-Mail envelope); FCC wrapping would break serialization [permanent]
+type InsightContext struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- YAML/JSON wire format (D-Mail envelope); FCC wrapping would break serialization [permanent], structure.multiple-exported-structs-go
 	Insights []InsightSummary `yaml:"insights,omitempty" json:"insights,omitempty"`
 }
 

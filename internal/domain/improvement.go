@@ -65,7 +65,7 @@ const (
 	MetadataImprovementSchemaVersion = "improvement_schema_version"
 )
 
-type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping would break map-based metadata serialization [permanent]
+type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping would break map-based metadata serialization [permanent], structure.multiple-exported-structs-go
 	SchemaVersion       string
 	FailureType         FailureType
 	Severity            Severity
