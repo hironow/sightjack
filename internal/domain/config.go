@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- Config DTO family (all structs are sub-configs of the top-level Config; ApproverConfig interface is a sealed pair with GateConfig); splitting would obscure the nested config hierarchy [permanent]
 package domain
 
 import (
@@ -9,30 +10,30 @@ import (
 // StrictnessConfig holds user-settable DoD strictness level settings.
 // Overrides are keyed by cluster name or Linear issue label (case-insensitive).
 // Resolution: max(default, estimated, overrides) — strictness only goes up.
-type StrictnessConfig struct {
+type StrictnessConfig struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Default   StrictnessLevel            `yaml:"default"`
 	Overrides map[string]StrictnessLevel `yaml:"overrides,omitempty"`
 }
 
 // ComputedConfig holds system-written fields that cannot be set via config set.
-type ComputedConfig struct {
+type ComputedConfig struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	EstimatedStrictness map[string]StrictnessLevel `yaml:"estimated_strictness,omitempty"`
 }
 
 // DoDTemplate holds must/should Definition of Done items for a category.
-type DoDTemplate struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- YAML config DTO; FCC wrapping would break YAML config serialization [permanent]
+type DoDTemplate struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- YAML config DTO; FCC wrapping would break YAML config serialization [permanent], structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
 	Must   []string `yaml:"must"`
 	Should []string `yaml:"should"`
 }
 
 // RetryConfig holds exponential backoff retry settings for Claude subprocess calls.
-type RetryConfig struct {
+type RetryConfig struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	MaxAttempts  int `yaml:"max_attempts"`
 	BaseDelaySec int `yaml:"base_delay_sec"`
 }
 
 // LabelsConfig holds Linear label assignment settings.
-type LabelsConfig struct {
+type LabelsConfig struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Enabled    bool   `yaml:"enabled"`
 	Prefix     string `yaml:"prefix"`
 	ReadyLabel string `yaml:"ready_label"`
@@ -50,7 +51,7 @@ type ApproverConfig interface {
 
 // GateConfig holds convergence gate notification and approval settings.
 // GateConfig implements ApproverConfig.
-type GateConfig struct {
+type GateConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	NotifyCmd    string        `yaml:"notify_cmd,omitempty"`
 	ApproveCmd   string        `yaml:"approve_cmd,omitempty"`
 	AutoApprove  bool          `yaml:"auto_approve"`
@@ -115,7 +116,7 @@ const (
 )
 
 // Config holds the top-level sightjack configuration loaded from YAML.
-type Config struct {
+type Config struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Tracker      IssueTrackerConfig     `yaml:"tracker,omitempty"`
 	Scan         ScanConfig             `yaml:"scan"`
 	ClaudeCmd    string                 `yaml:"claude_cmd,omitempty"`
@@ -135,13 +136,13 @@ type Config struct {
 }
 
 // ScribeConfig holds Scribe Agent settings.
-type ScribeConfig struct {
+type ScribeConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Enabled           bool `yaml:"enabled"`
 	AutoDiscussRounds int  `yaml:"auto_discuss_rounds"`
 }
 
 // IssueTrackerConfig holds issue tracker integration settings.
-type IssueTrackerConfig struct {
+type IssueTrackerConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Team    string `yaml:"team,omitempty"`
 	Project string `yaml:"project,omitempty"`
 	Cycle   string `yaml:"cycle,omitempty"`

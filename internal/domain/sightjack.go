@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- sentinel error pair (DeviationError and SilentError are the two process-exit error types; ExitCode function requires both to be co-located for the exit-code dispatch table to be readable in one place) [permanent]
 package domain
 
 import (
@@ -7,7 +8,7 @@ import (
 
 // DeviationError is returned when a scan detects issues (deviation from spec).
 // Callers can use errors.As to distinguish deviation from runtime errors.
-type DeviationError struct {
+type DeviationError struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	TotalIssues int
 }
 

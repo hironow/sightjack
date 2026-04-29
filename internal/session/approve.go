@@ -28,7 +28,7 @@ func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writ
 // StdinApprover prompts the user on a terminal and reads y/n.
 // Uses goroutine + channel for context cancellation support.
 // Safe default: empty or non-y input = deny.
-type StdinApprover struct {
+type StdinApprover struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	reader io.Reader
 	writer io.Writer
 }

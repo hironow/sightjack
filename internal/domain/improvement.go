@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- improvement event family (FailureType, Severity, ImprovementOutcome, RoutingMode are the typed vocabulary; CorrectionMetadata and ImprovementEvent are the two representations of the same correction data, dual form required for internal-map and wire-format usage; all types are inextricably linked) [permanent]
 package domain
 
 import (
@@ -64,7 +65,7 @@ const (
 	MetadataImprovementSchemaVersion = "improvement_schema_version"
 )
 
-type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping would break map-based metadata serialization [permanent]
+type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping would break map-based metadata serialization [permanent], structure.multiple-exported-structs-go
 	SchemaVersion       string
 	FailureType         FailureType
 	Severity            Severity

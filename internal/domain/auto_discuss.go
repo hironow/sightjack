@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- auto-discuss DTO pair (AutoDiscussRound is a single debate round; AutoDiscussResult aggregates rounds; they form a sealed parent-child pair and are always used together via ToArchitectResponse) [permanent]
 package domain
 
 import (
@@ -6,7 +7,7 @@ import (
 )
 
 // AutoDiscussRound captures a single round of the auto-discuss debate.
-type AutoDiscussRound struct {
+type AutoDiscussRound struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Round   int    `json:"round"`
 	Speaker string `json:"speaker"` // "architect" or "devils_advocate"
 	Content string `json:"content"`

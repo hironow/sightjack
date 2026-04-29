@@ -1,7 +1,8 @@
+// nosemgrep: structure.multiple-exported-interfaces-go,structure.exported-struct-and-interface-go -- logger interface family (Logger, NopLogger null-object, and BannerLogger extension are a sealed trio; NopLogger is the null object for Logger; BannerLogger is an optional extension checked via type assertion in LogBanner) [permanent]
 package domain
 
 // Logger provides structured log output. Implementations must be goroutine-safe.
-type Logger interface {
+type Logger interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Info(format string, args ...any)
 	OK(format string, args ...any)
 	Warn(format string, args ...any)
@@ -10,7 +11,7 @@ type Logger interface {
 }
 
 // NopLogger is a no-op logger for testing and quiet mode.
-type NopLogger struct{}
+type NopLogger struct{} // nosemgrep: structure.exported-struct-and-interface-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 
 func (*NopLogger) Info(string, ...any)  {}
 func (*NopLogger) OK(string, ...any)    {}

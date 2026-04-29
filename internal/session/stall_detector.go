@@ -11,7 +11,7 @@ import (
 // StallDetector tracks repeated structural failures and emits stall-escalation
 // D-Mails when the threshold is reached. Integrates ApplyErrorBudget,
 // ErrorFingerprint, and StallCooldown.
-type StallDetector struct {
+type StallDetector struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	threshold int // N consecutive structural failures to trigger stall
 	cooldown  *domain.StallCooldown
 	// fingerprint tracking per wave

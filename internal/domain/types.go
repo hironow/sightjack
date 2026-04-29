@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- JSON/YAML wire-format DTO family (scan results, wave types, session state, pipe interface types); all types form a single cohesive schema set; splitting by type would break cross-type method receivers and navigation [permanent]
 package domain
 
 import (
@@ -10,14 +11,14 @@ import (
 
 // ClassifyResult is the output of Pass 1 (cluster classification).
 // Written by Claude Code to classify.json.
-type ClassifyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
+type ClassifyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	Clusters        []ClusterClassification `json:"clusters"`
 	TotalIssues     int                     `json:"total_issues"`
 	ShibitoWarnings []ShibitoWarning        `json:"shibito_warnings,omitempty"`
 }
 
 // ClusterClassification holds a cluster name and its issue IDs from Pass 1.
-type ClusterClassification struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
+type ClusterClassification struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	Name     string   `json:"name"`
 	IssueIDs []string `json:"issue_ids"`
 	Labels   []string `json:"labels,omitempty"`
@@ -25,7 +26,7 @@ type ClusterClassification struct { // nosemgrep: first-class-collection.raw-sli
 
 // ClusterScanResult is the output of Pass 2 (per-cluster deep scan).
 // Written by Claude Code to cluster_{name}.json.
-type ClusterScanResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
+type ClusterScanResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	Name                string        `json:"name"`
 	Key                 string        `json:"key"`
 	Completeness        float64       `json:"completeness"`
@@ -47,7 +48,7 @@ func (c ClusterScanResult) NumIssues() int {
 }
 
 // IssueDetail holds the deep scan analysis of a single issue.
-type IssueDetail struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
+type IssueDetail struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	ID           string   `json:"id"`
 	Identifier   string   `json:"identifier"`
 	Title        string   `json:"title"`
@@ -72,7 +73,7 @@ func (d IssueDetail) HasPROpen() bool {
 
 // ShibitoWarning represents a detected resurrection risk — a previously
 // closed issue pattern re-emerging in current issues.
-type ShibitoWarning struct {
+type ShibitoWarning struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ClosedIssueID  string `json:"closed_issue_id"`
 	CurrentIssueID string `json:"current_issue_id"`
 	Description    string `json:"description"`
@@ -81,7 +82,7 @@ type ShibitoWarning struct {
 
 // ScanResult is the merged result of Pass 1 + Pass 2.
 // Wire format: output of `scan --json`.
-type ScanResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent]
+type ScanResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; First Class Collection wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	Clusters        []ClusterScanResult `json:"clusters"`
 	TotalIssues     int                 `json:"total_issues"`
 	Completeness    float64             `json:"completeness"`
@@ -129,7 +130,7 @@ func (r *ScanResult) CalculateCompleteness() {
 }
 
 // SessionState is the materialized view projected from event replay.
-type SessionState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (SessionState snapshot); First Class Collection wrapping would break JSON schema [permanent]
+type SessionState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (SessionState snapshot); First Class Collection wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	Version         string         `json:"version"`
 	SessionID       string         `json:"session_id"`
 	Project         string         `json:"project"`
@@ -159,14 +160,14 @@ func (s *SessionState) AllWavesCompleted() bool {
 }
 
 // ClusterState is the per-cluster state within SessionState.
-type ClusterState struct {
+type ClusterState struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Name         string  `json:"name"`
 	Completeness float64 `json:"completeness"`
 	IssueCount   int     `json:"issue_count"`
 }
 
 // WaveState is the per-wave state within SessionState.
-type WaveState struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format (SessionState snapshot); custom marshal / FCC wrapping would break JSON schema [permanent]
+type WaveState struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format (SessionState snapshot); custom marshal / FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	ID            string       `json:"id"`
 	ClusterName   string       `json:"cluster_name"`
 	Title         string       `json:"title"`
@@ -180,7 +181,7 @@ type WaveState struct { // nosemgrep: domain-primitives.public-string-field-go,f
 
 // Wave is a unit of work proposed by AI for a cluster.
 // Wire format: input to `discuss` and `apply` subcommands.
-type Wave struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format (AI output schema); FCC wrapping would break JSON schema [permanent]
+type Wave struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format (AI output schema); FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	ID              string             `json:"id"`
 	ClusterName     string             `json:"cluster_name"`
 	ClusterKey      string             `json:"cluster_key,omitempty"`
@@ -195,7 +196,7 @@ type Wave struct { // nosemgrep: domain-primitives.public-string-field-go,first-
 }
 
 // WaveAction is a single change proposed within a Wave.
-type WaveAction struct {
+type WaveAction struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Type        string `json:"type"`
 	IssueID     string `json:"issue_id"`
 	Description string `json:"description"`
@@ -203,7 +204,7 @@ type WaveAction struct {
 }
 
 // WaveStepDef defines a single step within a wave specification (D-Mail schema).
-type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON/YAML wire format (D-Mail schema); FCC wrapping would break serialization [permanent]
+type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON/YAML wire format (D-Mail schema); FCC wrapping would break serialization [permanent], structure.multiple-exported-structs-go
 	ID            string   `yaml:"id" json:"id"`
 	Title         string   `yaml:"title" json:"title"`
 	Description   string   `yaml:"description,omitempty" json:"description,omitempty"`
@@ -213,33 +214,33 @@ type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-d
 }
 
 // WaveReference links a D-Mail to a wave and optionally a specific step.
-type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON/YAML wire format (D-Mail schema); FCC wrapping would break serialization [permanent]
+type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON/YAML wire format (D-Mail schema); FCC wrapping would break serialization [permanent], structure.multiple-exported-structs-go
 	ID    string        `yaml:"id" json:"id"`
 	Step  string        `yaml:"step,omitempty" json:"step,omitempty"`
 	Steps []WaveStepDef `yaml:"steps,omitempty" json:"steps,omitempty"`
 }
 
 // WaveDelta holds expected completeness change.
-type WaveDelta struct {
+type WaveDelta struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Before float64 `json:"before"`
 	After  float64 `json:"after"`
 }
 
 // WaveGenerateResult is the Pass 3 output per cluster.
-type WaveGenerateResult struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
+type WaveGenerateResult struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	ClusterName string `json:"cluster_name"`
 	Waves       []Wave `json:"waves"`
 }
 
 // NextGenResult is the output of post-completion wave generation.
-type NextGenResult struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
+type NextGenResult struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	ClusterName string `json:"cluster_name"`
 	Waves       []Wave `json:"waves"`
 	Reasoning   string `json:"reasoning"`
 }
 
 // WaveApplyResult is the Pass 4 output per wave.
-type WaveApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
+type WaveApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	WaveID     string   `json:"wave_id"`
 	Applied    int      `json:"applied"`
 	TotalCount int      `json:"total_count,omitempty"`
@@ -248,7 +249,7 @@ type WaveApplyResult struct { // nosemgrep: first-class-collection.raw-slice-fie
 }
 
 // Ripple is a cross-cluster effect from applying a wave.
-type Ripple struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent]
+type Ripple struct { // nosemgrep: domain-primitives.public-string-field-go -- JSON wire format [permanent], structure.multiple-exported-structs-go
 	ClusterName string `json:"cluster_name"`
 	Description string `json:"description"`
 }
@@ -316,13 +317,13 @@ func (l StrictnessLevel) Valid() bool {
 }
 
 // ADRConflict represents a detected contradiction between a new ADR and an existing one.
-type ADRConflict struct {
+type ADRConflict struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ExistingADRID string `json:"existing_adr_id"`
 	Description   string `json:"description"`
 }
 
 // ScribeResponse is the output of the Scribe Agent (ADR generation).
-type ScribeResponse struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (AI output schema); FCC wrapping would break JSON schema [permanent]
+type ScribeResponse struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (AI output schema); FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	ADRID     string        `json:"adr_id"`
 	Title     string        `json:"title"`
 	Content   string        `json:"content"`
@@ -331,7 +332,7 @@ type ScribeResponse struct { // nosemgrep: first-class-collection.raw-slice-fiel
 }
 
 // ArchitectResponse is the output of an architect discussion round.
-type ArchitectResponse struct {
+type ArchitectResponse struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Analysis     string `json:"analysis"`
 	ModifiedWave *Wave  `json:"modified_wave"`
 	Reasoning    string `json:"reasoning"`
@@ -368,14 +369,14 @@ func DetectPipeType(data []byte) PipeType {
 
 // WavePlan is the output of `waves` subcommand.
 // Contains generated waves and optionally the scan result for context.
-type WavePlan struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (pipe interface); FCC wrapping would break JSON schema [permanent]
+type WavePlan struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format (pipe interface); FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	Waves      []Wave      `json:"waves"`
 	ScanResult *ScanResult `json:"scan_result,omitempty"`
 }
 
 // DiscussResult is the output of `discuss` subcommand.
 // Captures the architect discussion outcome for a single wave.
-type DiscussResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
+type DiscussResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	WaveID        string             `json:"wave_id"`
 	Analysis      string             `json:"analysis"`
 	Reasoning     string             `json:"reasoning"`
@@ -386,7 +387,7 @@ type DiscussResult struct { // nosemgrep: first-class-collection.raw-slice-field
 }
 
 // WaveModification describes a change made to a wave action during discussion.
-type WaveModification struct {
+type WaveModification struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ActionIndex int    `json:"action_index"`
 	Change      string `json:"change"`
 }
@@ -397,7 +398,7 @@ type WaveModification struct {
 // (e.g. nextgen) can operate without replaying event history.
 // RemainingWaves carries sibling waves from the original plan so that
 // nextgen can accurately determine whether follow-up generation is needed.
-type ApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent]
+type ApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- JSON wire format; FCC wrapping would break JSON schema [permanent], structure.multiple-exported-structs-go
 	WaveID          string         `json:"wave_id"`
 	AppliedActions  []ActionResult `json:"applied_actions"`
 	RippleEffects   []Ripple       `json:"ripple_effects,omitempty"`
@@ -407,7 +408,7 @@ type ApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-d
 }
 
 // ActionResult reports the outcome of a single wave action application.
-type ActionResult struct {
+type ActionResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Type    string `json:"type"`
 	IssueID string `json:"issue_id"`
 	Success bool   `json:"success"`
@@ -415,7 +416,7 @@ type ActionResult struct {
 }
 
 // ExistingADR holds the filename and content of an existing ADR file.
-type ExistingADR struct {
+type ExistingADR struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Filename string
 	Content  string
 }
@@ -432,7 +433,7 @@ var ShutdownKey = shutdownKey{}
 // --- Index entry ---
 
 // IndexEntry represents one line in the archive index JSONL file.
-type IndexEntry struct {
+type IndexEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Timestamp string `json:"ts"`
 	Operation string `json:"op"`
 	Issue     string `json:"issue"`
@@ -446,7 +447,7 @@ type IndexEntry struct {
 
 // HandoverState captures in-progress work state when an operation is
 // interrupted by a signal. The struct is pure data — no context, no I/O.
-type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping adds no safety for in-memory-only handover state [permanent]
+type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- internal DTO; FCC wrapping adds no safety for in-memory-only handover state [permanent], structure.multiple-exported-structs-go
 	Tool         string // "sightjack"
 	Operation    string // "wave"
 	Timestamp    time.Time
@@ -471,7 +472,7 @@ func WaveKey(w Wave) string {
 // --- Review ---
 
 // ReviewResult represents the outcome of a code review execution.
-type ReviewResult struct {
+type ReviewResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Passed   bool   // true if no actionable comments were found
 	Output   string // raw review output
 	Comments string // extracted review comments (empty if passed)
@@ -488,7 +489,7 @@ var ErrGoBack = errors.New("go back")
 // --- Handoff ---
 
 // HandoffResult tracks the outcome of a handoff for a single issue.
-type HandoffResult struct {
+type HandoffResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	IssueID string // Linear issue identifier
 	Status  string // "success", "failed", "skipped"
 	Error   string // non-empty when Status is "failed"

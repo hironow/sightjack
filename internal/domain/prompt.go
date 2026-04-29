@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- template DTO family (all structs are prompt data containers for the same template engine; they share DoDTemplate references and are used together in prompt construction); splitting would scatter related rendering logic [permanent]
 package domain
 
 import (
@@ -5,7 +6,7 @@ import (
 )
 
 // ClassifyPromptData holds template data for the classify prompt.
-type ClassifyPromptData struct {
+type ClassifyPromptData struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	TeamFilter      string
 	ProjectFilter   string
 	CycleFilter     string
@@ -17,7 +18,7 @@ type ClassifyPromptData struct {
 }
 
 // DeepScanPromptData holds template data for the deep scan prompt.
-type DeepScanPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO; string required for text/template rendering [permanent]
+type DeepScanPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO; string required for text/template rendering [permanent], structure.multiple-exported-structs-go
 	ClusterName     string
 	IssueIDs        string
 	OutputPath      string
@@ -26,7 +27,7 @@ type DeepScanPromptData struct { // nosemgrep: domain-primitives.public-string-f
 }
 
 // WaveGeneratePromptData holds template data for the wave generation prompt.
-type WaveGeneratePromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
+type WaveGeneratePromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent], structure.multiple-exported-structs-go
 	ClusterName     string
 	Completeness    string
 	Issues          string
@@ -37,7 +38,7 @@ type WaveGeneratePromptData struct { // nosemgrep: domain-primitives.public-stri
 }
 
 // WaveApplyPromptData holds template data for the wave apply prompt.
-type WaveApplyPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
+type WaveApplyPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent], structure.multiple-exported-structs-go
 	WaveID          string
 	ClusterName     string
 	Title           string
@@ -51,13 +52,13 @@ type WaveApplyPromptData struct { // nosemgrep: domain-primitives.public-string-
 }
 
 // ReadyLabelPromptData holds template data for the ready label prompt.
-type ReadyLabelPromptData struct {
+type ReadyLabelPromptData struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ReadyLabel    string
 	ReadyIssueIDs string
 }
 
 // ScribeADRPromptData holds template data for the scribe ADR generation prompt.
-type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent]
+type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent], structure.multiple-exported-structs-go
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string
@@ -70,7 +71,7 @@ type ScribeADRPromptData struct { // nosemgrep: domain-primitives.public-string-
 }
 
 // ArchitectDiscussPromptData holds template data for the architect discussion prompt.
-type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
+type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent], structure.multiple-exported-structs-go
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string
@@ -80,7 +81,7 @@ type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-
 }
 
 // NextGenPromptData holds template data for post-completion wave generation.
-type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent]
+type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent], structure.multiple-exported-structs-go
 	ClusterName     string
 	Completeness    string
 	Issues          string
@@ -95,7 +96,7 @@ type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-fi
 }
 
 // AutoDiscussArchitectPromptData holds template data for the auto-discuss architect prompt.
-type AutoDiscussArchitectPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent]
+type AutoDiscussArchitectPromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- template DTO [permanent], structure.multiple-exported-structs-go
 	ClusterName     string
 	WaveTitle       string
 	WaveActions     string

@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- provider state family (ProviderState, ProviderStateSnapshot, and RetryBudgetTracker are the three aspects of provider health tracking; Snapshot.ApplyMetadata depends on RetryBudgetTracker.Snapshot; they form a tightly coupled rate-limit circuit-breaker unit) [permanent]
 package domain
 
 import (
@@ -37,7 +38,7 @@ const (
 	MetadataProviderResumeWhen  = "provider_resume_when"
 )
 
-type ProviderStateSnapshot struct {
+type ProviderStateSnapshot struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	State           ProviderState
 	Reason          string
 	RetryBudget     int

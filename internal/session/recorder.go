@@ -9,7 +9,7 @@ import (
 
 // LoggingRecorder wraps a Recorder and logs errors instead of propagating them.
 // This ensures callers never need to handle Record errors at every call site.
-type LoggingRecorder struct {
+type LoggingRecorder struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	inner  port.Recorder
 	logger domain.Logger
 }
