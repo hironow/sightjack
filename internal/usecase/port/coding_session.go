@@ -1,4 +1,3 @@
-// nosemgrep: structure.multiple-exported-structs-go,structure.multiple-exported-interfaces-go,structure.exported-struct-and-interface-go -- coding session port family (RunResult, DetailedRunner, ListSessionOpts, and CodingSessionStore are the four tightly coupled types of the coding session port; splitting would scatter the session contract across multiple files) [permanent]
 package port
 
 import (
@@ -9,26 +8,26 @@ import (
 )
 
 // RunResult holds the output of a detailed runner invocation.
-type RunResult struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
+type RunResult struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- coding session port family (RunResult/DetailedRunner/ListSessionOpts/CodingSessionStore) is a cohesive set for session tracking; RunResult co-locates with DetailedRunner as related return type [permanent]
 	Text              string
 	ProviderSessionID string
 	Stderr            string // captured stderr for circuit breaker inspection
 }
 
 // DetailedRunner extends ProviderRunner to also return session metadata.
-type DetailedRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type DetailedRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- coding session port family; see RunResult [permanent]
 	RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (RunResult, error)
 }
 
 // ListSessionOpts controls session listing filters.
-type ListSessionOpts struct { // nosemgrep: structure.exported-struct-and-interface-go
+type ListSessionOpts struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- coding session port family; ListSessionOpts co-locates with CodingSessionStore as query parameter for the same port; see RunResult [permanent]
 	Provider *domain.Provider
 	Status   *domain.SessionStatus
 	Limit    int
 }
 
 // CodingSessionStore persists and queries coding session records.
-type CodingSessionStore interface {
+type CodingSessionStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- coding session port family; see RunResult [permanent]
 	Save(ctx context.Context, record domain.CodingSessionRecord) error
 	Load(ctx context.Context, id string) (domain.CodingSessionRecord, error)
 	FindByProviderSessionID(ctx context.Context, provider domain.Provider, pid string) ([]domain.CodingSessionRecord, error)
