@@ -38,7 +38,7 @@ const (
 	MetadataProviderResumeWhen  = "provider_resume_when"
 )
 
-type ProviderStateSnapshot struct { // nosemgrep: structure.multiple-exported-structs-go
+type ProviderStateSnapshot struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	State           ProviderState
 	Reason          string
 	RetryBudget     int

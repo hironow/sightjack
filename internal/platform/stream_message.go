@@ -48,19 +48,19 @@ type StreamMessage struct { // nosemgrep: domain-primitives.public-string-field-
 }
 
 // MCPServerInfo represents a connected MCP server from system:init.
-type MCPServerInfo struct { // nosemgrep: structure.multiple-exported-structs-go
+type MCPServerInfo struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Name   string `json:"name"`
 	Status string `json:"status"`
 }
 
 // PluginInfo represents a loaded plugin from system:init.
-type PluginInfo struct { // nosemgrep: structure.multiple-exported-structs-go
+type PluginInfo struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Name string `json:"name"`
 	Path string `json:"path,omitempty"`
 }
 
 // RateLimitInfo holds rate limit details from Claude Code rate_limit_event.
-type RateLimitInfo struct { // nosemgrep: structure.multiple-exported-structs-go
+type RateLimitInfo struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Status             string  `json:"status,omitempty"`
 	ResetsAt           int64   `json:"resetsAt,omitempty"`
 	RateLimitType      string  `json:"rateLimitType,omitempty"`
@@ -70,7 +70,7 @@ type RateLimitInfo struct { // nosemgrep: structure.multiple-exported-structs-go
 }
 
 // Usage holds token usage from Claude Code.
-type Usage struct { // nosemgrep: structure.multiple-exported-structs-go
+type Usage struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	InputTokens              int `json:"input_tokens"`
 	OutputTokens             int `json:"output_tokens"`
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
@@ -78,7 +78,7 @@ type Usage struct { // nosemgrep: structure.multiple-exported-structs-go
 }
 
 // AssistantMessage is the nested message inside SDKAssistantMessage.
-type AssistantMessage struct { // nosemgrep: structure.multiple-exported-structs-go
+type AssistantMessage struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ID         string         `json:"id,omitempty"`
 	Role       string         `json:"role,omitempty"`
 	Model      string         `json:"model,omitempty"`

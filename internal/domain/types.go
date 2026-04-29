@@ -73,7 +73,7 @@ func (d IssueDetail) HasPROpen() bool {
 
 // ShibitoWarning represents a detected resurrection risk — a previously
 // closed issue pattern re-emerging in current issues.
-type ShibitoWarning struct { // nosemgrep: structure.multiple-exported-structs-go
+type ShibitoWarning struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ClosedIssueID  string `json:"closed_issue_id"`
 	CurrentIssueID string `json:"current_issue_id"`
 	Description    string `json:"description"`
@@ -160,7 +160,7 @@ func (s *SessionState) AllWavesCompleted() bool {
 }
 
 // ClusterState is the per-cluster state within SessionState.
-type ClusterState struct { // nosemgrep: structure.multiple-exported-structs-go
+type ClusterState struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Name         string  `json:"name"`
 	Completeness float64 `json:"completeness"`
 	IssueCount   int     `json:"issue_count"`
@@ -196,7 +196,7 @@ type Wave struct { // nosemgrep: domain-primitives.public-string-field-go,first-
 }
 
 // WaveAction is a single change proposed within a Wave.
-type WaveAction struct { // nosemgrep: structure.multiple-exported-structs-go
+type WaveAction struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Type        string `json:"type"`
 	IssueID     string `json:"issue_id"`
 	Description string `json:"description"`
@@ -221,7 +221,7 @@ type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field
 }
 
 // WaveDelta holds expected completeness change.
-type WaveDelta struct { // nosemgrep: structure.multiple-exported-structs-go
+type WaveDelta struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Before float64 `json:"before"`
 	After  float64 `json:"after"`
 }
@@ -317,7 +317,7 @@ func (l StrictnessLevel) Valid() bool {
 }
 
 // ADRConflict represents a detected contradiction between a new ADR and an existing one.
-type ADRConflict struct { // nosemgrep: structure.multiple-exported-structs-go
+type ADRConflict struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ExistingADRID string `json:"existing_adr_id"`
 	Description   string `json:"description"`
 }
@@ -332,7 +332,7 @@ type ScribeResponse struct { // nosemgrep: first-class-collection.raw-slice-fiel
 }
 
 // ArchitectResponse is the output of an architect discussion round.
-type ArchitectResponse struct { // nosemgrep: structure.multiple-exported-structs-go
+type ArchitectResponse struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Analysis     string `json:"analysis"`
 	ModifiedWave *Wave  `json:"modified_wave"`
 	Reasoning    string `json:"reasoning"`
@@ -387,7 +387,7 @@ type DiscussResult struct { // nosemgrep: first-class-collection.raw-slice-field
 }
 
 // WaveModification describes a change made to a wave action during discussion.
-type WaveModification struct { // nosemgrep: structure.multiple-exported-structs-go
+type WaveModification struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ActionIndex int    `json:"action_index"`
 	Change      string `json:"change"`
 }
@@ -408,7 +408,7 @@ type ApplyResult struct { // nosemgrep: first-class-collection.raw-slice-field-d
 }
 
 // ActionResult reports the outcome of a single wave action application.
-type ActionResult struct { // nosemgrep: structure.multiple-exported-structs-go
+type ActionResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Type    string `json:"type"`
 	IssueID string `json:"issue_id"`
 	Success bool   `json:"success"`
@@ -416,7 +416,7 @@ type ActionResult struct { // nosemgrep: structure.multiple-exported-structs-go
 }
 
 // ExistingADR holds the filename and content of an existing ADR file.
-type ExistingADR struct { // nosemgrep: structure.multiple-exported-structs-go
+type ExistingADR struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Filename string
 	Content  string
 }
@@ -433,7 +433,7 @@ var ShutdownKey = shutdownKey{}
 // --- Index entry ---
 
 // IndexEntry represents one line in the archive index JSONL file.
-type IndexEntry struct { // nosemgrep: structure.multiple-exported-structs-go
+type IndexEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Timestamp string `json:"ts"`
 	Operation string `json:"op"`
 	Issue     string `json:"issue"`
@@ -472,7 +472,7 @@ func WaveKey(w Wave) string {
 // --- Review ---
 
 // ReviewResult represents the outcome of a code review execution.
-type ReviewResult struct { // nosemgrep: structure.multiple-exported-structs-go
+type ReviewResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Passed   bool   // true if no actionable comments were found
 	Output   string // raw review output
 	Comments string // extracted review comments (empty if passed)
@@ -489,7 +489,7 @@ var ErrGoBack = errors.New("go back")
 // --- Handoff ---
 
 // HandoffResult tracks the outcome of a handoff for a single issue.
-type HandoffResult struct { // nosemgrep: structure.multiple-exported-structs-go
+type HandoffResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	IssueID string // Linear issue identifier
 	Status  string // "success", "failed", "skipped"
 	Error   string // non-empty when Status is "failed"

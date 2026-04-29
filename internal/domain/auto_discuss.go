@@ -7,7 +7,7 @@ import (
 )
 
 // AutoDiscussRound captures a single round of the auto-discuss debate.
-type AutoDiscussRound struct { // nosemgrep: structure.multiple-exported-structs-go
+type AutoDiscussRound struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Round   int    `json:"round"`
 	Speaker string `json:"speaker"` // "architect" or "devils_advocate"
 	Content string `json:"content"`

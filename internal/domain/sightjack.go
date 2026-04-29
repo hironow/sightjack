@@ -8,7 +8,7 @@ import (
 
 // DeviationError is returned when a scan detects issues (deviation from spec).
 // Callers can use errors.As to distinguish deviation from runtime errors.
-type DeviationError struct { // nosemgrep: structure.multiple-exported-structs-go
+type DeviationError struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	TotalIssues int
 }
 

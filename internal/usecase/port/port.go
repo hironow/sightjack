@@ -15,25 +15,25 @@ var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notification
 
 // ReviewExecutor runs a code review command and returns the result.
 // Implemented in session layer (exec.Command), injected into usecase by cmd.
-type ReviewExecutor interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type ReviewExecutor interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	RunReview(ctx context.Context, reviewCmd string, dir string) (*domain.ReviewResult, error)
 }
 
 // BranchResolver resolves the current git branch name.
 // Implemented in session layer (exec.Command), injected into usecase by cmd.
-type BranchResolver interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type BranchResolver interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	CurrentBranch(ctx context.Context, dir string) (string, error)
 }
 
 // ReviewFixRunner runs Claude to fix review comments.
 // Implemented in session layer, injected into usecase by cmd.
-type ReviewFixRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type ReviewFixRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	RunReviewFix(ctx context.Context, dir, branch, comments string) error
 }
 
 // ReviewGateRunner runs the review-fix cycle.
 // Implemented in usecase layer, injected into session by cmd (composition root).
-type ReviewGateRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type ReviewGateRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	RunReviewGate(ctx context.Context, gate domain.GateConfig, timeoutSec int) (bool, error)
 }
 
@@ -42,7 +42,7 @@ type InitOption func(*InitConfig)
 
 // InitConfig holds per-invocation configuration for project initialization.
 // Tools use only the fields relevant to their init flow.
-type InitConfig struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
+type InitConfig struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Team       string
 	Project    string
 	Lang       string
@@ -72,41 +72,41 @@ func WithStrictness(s string) InitOption { return func(c *InitConfig) { c.Strict
 
 // InitRunner handles project initialization I/O.
 // Returns warnings for non-fatal issues (nil when none). Error for critical failures.
-type InitRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type InitRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	InitProject(baseDir string, opts ...InitOption) (warnings []string, err error)
 }
 
 // EventDispatcher dispatches domain events to policy handlers.
 // Implemented by usecase.PolicyEngine; injected into session via struct field.
-type EventDispatcher interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type EventDispatcher interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Dispatch(ctx context.Context, event domain.Event) error
 }
 
 // Approver determines whether an action should proceed.
 // Implementations include StdinApprover (human prompt),
 // CmdApprover (external command), and AutoApprover (always yes).
-type Approver interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type Approver interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	RequestApproval(ctx context.Context, message string) (approved bool, err error)
 }
 
 // AutoApprover always approves without human interaction.
-type AutoApprover struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
+type AutoApprover struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 
 func (*AutoApprover) RequestApproval(_ context.Context, _ string) (bool, error) { return true, nil }
 
 // Notifier sends a notification to the user.
-type Notifier interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type Notifier interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Notify(ctx context.Context, title, message string) error
 }
 
 // NopNotifier is a no-op notifier for tests and quiet mode.
-type NopNotifier struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
+type NopNotifier struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 
 func (NopNotifier) Notify(context.Context, string, string) error { return nil }
 
 // Handoff defines the integration contract for downstream execution agents (v1.0).
 // Implementations receive ready issue IDs and execute them via Claude Code agents.
-type Handoff interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type Handoff interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	// HandoffReady delivers a batch of ready issue IDs to a downstream agent
 	// for autonomous execution. Returns an error if the handoff fails.
 	HandoffReady(ctx context.Context, issueIDs []string) error
@@ -117,19 +117,19 @@ type Handoff interface { // nosemgrep: structure.multiple-exported-interfaces-go
 }
 
 // PolicyMetrics records policy handler execution metrics.
-type PolicyMetrics interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type PolicyMetrics interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	RecordPolicyEvent(ctx context.Context, eventType string, status string)
 }
 
 // NopPolicyMetrics is a no-op metrics recorder for tests and quiet mode.
-type NopPolicyMetrics struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
+type NopPolicyMetrics struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 
 func (NopPolicyMetrics) RecordPolicyEvent(context.Context, string, string) {}
 
 // ContextEventApplier extends domain.EventApplier with context propagation.
 // domain.EventApplier is ctx-free (pure domain); this port interface adds ctx
 // so that session-layer implementations can propagate trace/cancel.
-type ContextEventApplier interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type ContextEventApplier interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Apply(ctx context.Context, event domain.Event) error
 	Rebuild(ctx context.Context, events []domain.Event) error
 	Serialize() ([]byte, error)
@@ -137,7 +137,7 @@ type ContextEventApplier interface { // nosemgrep: structure.multiple-exported-i
 }
 
 // EventStore is the append-only event persistence interface.
-type EventStore interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type EventStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	// Append persists one or more events. Validation is performed before any writes.
 	Append(ctx context.Context, events ...domain.Event) (domain.AppendResult, error)
 
@@ -159,7 +159,7 @@ type EventStore interface { // nosemgrep: structure.multiple-exported-interfaces
 // SnapshotStore persists materialized projection state at a known SeqNr.
 // Snapshots are an optimization — the system must function without them
 // (falling back to full replay via LoadAll).
-type SnapshotStore interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type SnapshotStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	// Save persists a snapshot. aggregateType identifies the projection kind.
 	Save(ctx context.Context, aggregateType string, seqNr uint64, state []byte) error
 
@@ -170,14 +170,14 @@ type SnapshotStore interface { // nosemgrep: structure.multiple-exported-interfa
 
 // SeqAllocator assigns globally monotonic sequence numbers to events.
 // Implemented by eventsource.SeqCounter (SQLite-backed).
-type SeqAllocator interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type SeqAllocator interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	AllocSeqNr(ctx context.Context) (uint64, error)
 }
 
 // OutboxStore provides transactional outbox semantics for D-Mail delivery.
 // Stage records intent in a durable store; Flush materializes staged items
 // to the filesystem (archive/ + outbox/) using atomic writes.
-type OutboxStore interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type OutboxStore interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	// Stage atomically records a D-Mail for delivery. Idempotent: re-staging
 	// the same name is a no-op.
 	Stage(ctx context.Context, name string, data []byte) error
@@ -191,12 +191,12 @@ type OutboxStore interface { // nosemgrep: structure.multiple-exported-interface
 }
 
 // Recorder records domain events during a session.
-type Recorder interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type Recorder interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Record(ctx context.Context, ev domain.Event) error
 }
 
 // NopRecorder is a no-op Recorder for dry-run mode and testing.
-type NopRecorder struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go
+type NopRecorder struct{} // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 
 // Record always returns nil without recording anything.
 func (NopRecorder) Record(context.Context, domain.Event) error { return nil }
@@ -204,7 +204,7 @@ func (NopRecorder) Record(context.Context, domain.Event) error { return nil }
 // SessionEventEmitter wraps aggregate event production + recording.
 // Implemented in usecase layer, injected into session by cmd (composition root).
 // Record errors are best-effort (logged, not propagated) to preserve session continuity.
-type SessionEventEmitter interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type SessionEventEmitter interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	EmitStart(project, strictness string, now time.Time) error
 	EmitRecordScan(payload domain.ScanCompletedPayload, now time.Time) error
 	EmitResume(originalSessionID string, now time.Time) error
@@ -228,7 +228,7 @@ type SessionEventEmitter interface { // nosemgrep: structure.multiple-exported-i
 }
 
 // NopSessionEventEmitter is a no-op emitter for tests and dry-run mode.
-type NopSessionEventEmitter struct{} // nosemgrep: structure.exported-struct-and-interface-go
+type NopSessionEventEmitter struct{} // nosemgrep: structure.exported-struct-and-interface-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 
 func (*NopSessionEventEmitter) EmitStart(string, string, time.Time) error { return nil }
 func (*NopSessionEventEmitter) EmitRecordScan(domain.ScanCompletedPayload, time.Time) error {
@@ -274,7 +274,7 @@ func (*NopSessionEventEmitter) EmitGenerateADR(domain.ADRGeneratedPayload, time.
 }
 
 // SessionRunner runs interactive sightjack sessions (scan->waves->select->apply->nextgen loop).
-type SessionRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type SessionRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	RunSession(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
 	RunResumeSession(ctx context.Context, cfg *domain.Config, baseDir string, state *domain.SessionState, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
 	RunRescanSession(ctx context.Context, cfg *domain.Config, baseDir string, oldState *domain.SessionState, sessionID string, input io.Reader, out io.Writer, emitter SessionEventEmitter, logger domain.Logger) error
@@ -284,13 +284,13 @@ type SessionRunner interface { // nosemgrep: structure.multiple-exported-interfa
 }
 
 // ScanRunner executes scans and records scan state.
-type ScanRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type ScanRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	RunScan(ctx context.Context, cfg *domain.Config, baseDir, sessionID string, dryRun bool, streamOut io.Writer, logger domain.Logger) (*domain.ScanResult, error)
 	RecordScanState(baseDir, sessionID string, result *domain.ScanResult, cfg *domain.Config, emitter SessionEventEmitter, ts time.Time, logger domain.Logger)
 }
 
 // RecorderFactory creates session recorders and resolves event directories.
-type RecorderFactory interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type RecorderFactory interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	SessionEventsDir(baseDir, sessionID string) string
 	NewSessionRecorder(ctx context.Context, stateDir, sessionID string, logger domain.Logger) (Recorder, error)
 	NewEventStore(stateDir string, logger domain.Logger) EventStore
@@ -300,7 +300,7 @@ type RecorderFactory interface { // nosemgrep: structure.multiple-exported-inter
 }
 
 // StateLoader loads session state from the filesystem.
-type StateLoader interface { // nosemgrep: structure.multiple-exported-interfaces-go
+type StateLoader interface { // nosemgrep: structure.multiple-exported-interfaces-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	LoadLatestState(ctx context.Context, baseDir string) (*domain.SessionState, string, error)
 	LoadLatestResumableState(ctx context.Context, baseDir string, match func(*domain.SessionState) bool) (*domain.SessionState, string, error)
 	CanResume(baseDir string, state *domain.SessionState) bool

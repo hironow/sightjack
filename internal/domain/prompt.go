@@ -6,7 +6,7 @@ import (
 )
 
 // ClassifyPromptData holds template data for the classify prompt.
-type ClassifyPromptData struct { // nosemgrep: structure.multiple-exported-structs-go
+type ClassifyPromptData struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	TeamFilter      string
 	ProjectFilter   string
 	CycleFilter     string
@@ -52,7 +52,7 @@ type WaveApplyPromptData struct { // nosemgrep: domain-primitives.public-string-
 }
 
 // ReadyLabelPromptData holds template data for the ready label prompt.
-type ReadyLabelPromptData struct { // nosemgrep: structure.multiple-exported-structs-go
+type ReadyLabelPromptData struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ReadyLabel    string
 	ReadyIssueIDs string
 }

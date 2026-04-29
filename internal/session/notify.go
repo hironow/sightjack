@@ -20,7 +20,7 @@ func defaultCmdFactory(ctx context.Context, name string, args ...string) *exec.C
 
 // LocalNotifier sends desktop notifications using OS-native tools.
 // darwin: osascript with Funk sound, linux: notify-send.
-type LocalNotifier struct { // nosemgrep: structure.multiple-exported-structs-go
+type LocalNotifier struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	forceOS    string         // override runtime.GOOS for testing
 	cmdFactory cmdFactoryFunc // override exec.CommandContext for testing
 }

@@ -15,7 +15,7 @@ import (
 const InsightSchemaVersion = "1"
 
 // InsightEntry represents a single semantic insight with 6 required axes + optional extras.
-type InsightEntry struct { // nosemgrep: structure.multiple-exported-structs-go
+type InsightEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Title       string
 	What        string
 	Why         string

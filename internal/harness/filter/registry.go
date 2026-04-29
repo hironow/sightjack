@@ -28,7 +28,7 @@ type promptFile struct {
 }
 
 // PromptConfig is the read-only view of a loaded prompt template.
-type PromptConfig struct { // nosemgrep: structure.multiple-exported-structs-go
+type PromptConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Name        string
 	Version     string
 	Description string

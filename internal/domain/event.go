@@ -92,7 +92,7 @@ func AllValidEventTypes() map[EventType]bool {
 const CurrentEventSchemaVersion uint8 = 1
 
 // Event is the immutable event envelope persisted to the event store.
-type Event struct { // nosemgrep: structure.multiple-exported-structs-go
+type Event struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	SchemaVersion uint8           `json:"schema_version,omitempty"`
 	ID            string          `json:"id"`
 	Type          EventType       `json:"type"`
@@ -148,12 +148,12 @@ func ValidateEvent(e Event) error { // nosemgrep: validate-returns-error-only-go
 }
 
 // AppendResult captures metrics from an event store Append operation.
-type AppendResult struct { // nosemgrep: structure.multiple-exported-structs-go
+type AppendResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	BytesWritten int // total bytes written to event files
 }
 
 // LoadResult captures metrics from an event store Load operation.
-type LoadResult struct { // nosemgrep: structure.multiple-exported-structs-go
+type LoadResult struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	FileCount        int // number of .jsonl files scanned
 	CorruptLineCount int // number of lines skipped due to parse errors
 }
@@ -169,7 +169,7 @@ func UnmarshalEventPayload(e Event, target any) error {
 }
 
 // SessionStartedPayload is the payload for EventSessionStarted.
-type SessionStartedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
+type SessionStartedPayload struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Project         string `json:"project"`
 	StrictnessLevel string `json:"strictness_level"`
 }
@@ -238,7 +238,7 @@ type NextGenWavesAddedPayload struct { // nosemgrep: domain-primitives.public-st
 }
 
 // ADRGeneratedPayload is the payload for EventADRGenerated.
-type ADRGeneratedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
+type ADRGeneratedPayload struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ADRID string `json:"adr_id"`
 	Title string `json:"title"`
 }
@@ -249,17 +249,17 @@ type ReadyLabelsAppliedPayload struct { // nosemgrep: first-class-collection.raw
 }
 
 // SessionResumedPayload is the payload for EventSessionResumed.
-type SessionResumedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
+type SessionResumedPayload struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	OriginalSessionID string `json:"original_session_id"`
 }
 
 // SessionRescannedPayload is the payload for EventSessionRescanned.
-type SessionRescannedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
+type SessionRescannedPayload struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	OriginalSessionID string `json:"original_session_id"`
 }
 
 // FeedbackReceivedPayload is the payload for EventFeedbackReceived.
-type FeedbackReceivedPayload struct { // nosemgrep: structure.multiple-exported-structs-go
+type FeedbackReceivedPayload struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	Kind  string `json:"kind"`
 	Name  string `json:"name"`
 	Count int    `json:"count"`

@@ -14,7 +14,7 @@ import (
 // --- SessionRunner adapter ---
 
 // SessionRunnerAdapter implements port.SessionRunner by delegating to session package functions.
-type SessionRunnerAdapter struct { // nosemgrep: structure.multiple-exported-structs-go
+type SessionRunnerAdapter struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	reviewGateRunner port.ReviewGateRunner
 }
 
@@ -54,7 +54,7 @@ func (a *SessionRunnerAdapter) NewDispatchingRecorder(inner port.Recorder, dispa
 // --- ScanRunner adapter ---
 
 // ScanRunnerAdapter implements port.ScanRunner by delegating to session package functions.
-type ScanRunnerAdapter struct{} // nosemgrep: structure.multiple-exported-structs-go
+type ScanRunnerAdapter struct{} // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 
 // NewScanRunnerAdapter creates a new ScanRunnerAdapter.
 func NewScanRunnerAdapter() *ScanRunnerAdapter { return &ScanRunnerAdapter{} }
@@ -78,7 +78,7 @@ func (a *ScanRunnerAdapter) RecordScanState(baseDir, sessionID string, result *d
 // --- RecorderFactory adapter ---
 
 // RecorderFactoryAdapter implements port.RecorderFactory by delegating to session package functions.
-type RecorderFactoryAdapter struct { // nosemgrep: structure.multiple-exported-structs-go
+type RecorderFactoryAdapter struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	seqCounter *eventsource.SeqCounter
 }
 

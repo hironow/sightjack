@@ -11,7 +11,7 @@ import (
 const publishTimeout = 100 * time.Millisecond
 
 // BusSubscriber receives session stream events from an InProcessSessionBus.
-type BusSubscriber struct { // nosemgrep: structure.multiple-exported-structs-go
+type BusSubscriber struct { // nosemgrep: structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	ch   chan domain.SessionStreamEvent
 	done chan struct{}
 	once sync.Once
