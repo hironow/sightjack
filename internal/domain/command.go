@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- command object family (all structs are DDD commands for a single domain; they share domain primitive types and form a sealed command set for the sightjack aggregate); splitting per command would obscure the command surface area [permanent]
 package domain
 
 // InitCommand represents the intent to initialize a sightjack project.

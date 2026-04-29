@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- JSON/YAML wire-format DTO family (scan results, wave types, session state, pipe interface types); all types form a single cohesive schema set; splitting by type would break cross-type method receivers and navigation [permanent]
 package domain
 
 import (

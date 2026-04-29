@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-interfaces-go,structure.exported-struct-and-interface-go -- logger interface family (Logger, NopLogger null-object, and BannerLogger extension are a sealed trio; NopLogger is the null object for Logger; BannerLogger is an optional extension checked via type assertion in LogBanner) [permanent]
 package domain
 
 // Logger provides structured log output. Implementations must be goroutine-safe.

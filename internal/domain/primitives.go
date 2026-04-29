@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- domain primitive value objects (all types are typed wrappers for single-string domain concepts; they form the primitive vocabulary used across the domain layer; splitting would scatter cohesive value types with no benefit) [permanent]
 package domain
 
 import "fmt"

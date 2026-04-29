@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- insight file DTO family (InsightEntry, InsightFile, InsightContext, InsightSummary are all aspects of the same insight ledger format; Marshal/Unmarshal methods require co-location with the types they operate on) [permanent]
 package domain
 
 import (

@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- provider state family (ProviderState, ProviderStateSnapshot, and RetryBudgetTracker are the three aspects of provider health tracking; Snapshot.ApplyMetadata depends on RetryBudgetTracker.Snapshot; they form a tightly coupled rate-limit circuit-breaker unit) [permanent]
 package domain
 
 import (

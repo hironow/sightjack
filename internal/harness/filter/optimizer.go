@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- prompt optimization port (EvalCase, OptimizedResult, and PromptOptimizer are the three tightly coupled types of the GEPA/DSPy optimization API; input cases, output results, and the optimizer interface form a sealed contract that must be co-located for clarity) [permanent]
 package filter
 
 import (

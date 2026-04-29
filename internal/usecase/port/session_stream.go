@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-interfaces-go -- session stream pub/sub triple (Publisher, Subscriber, Bus are a sealed pub/sub trio; Bus embeds Publisher and returns Subscriber; all three must be co-located for the interface composition to be legible) [permanent]
 package port
 
 import (

@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- template DTO family (all structs are prompt data containers for the same template engine; they share DoDTemplate references and are used together in prompt construction); splitting would scatter related rendering logic [permanent]
 package domain
 
 import (

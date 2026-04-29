@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- JSON wire-format DTO family for Claude CLI stream-json events; all types are tightly coupled to a single NDJSON parsing pipeline; splitting would break ParseStreamMessage and AssistantMessage parsing co-location [permanent]
 package platform
 
 import (

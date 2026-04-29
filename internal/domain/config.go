@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- Config DTO family (all structs are sub-configs of the top-level Config; ApproverConfig interface is a sealed pair with GateConfig); splitting would obscure the nested config hierarchy [permanent]
 package domain
 
 import (

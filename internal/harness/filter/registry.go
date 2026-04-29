@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- prompt registry pair (PromptConfig is the read-only view; PromptRegistry holds all templates keyed by name; all registry methods operate on PromptConfig values; they form an inseparable registry+entry pair) [permanent]
 // Package filter defines LLM action spaces: prompt templates,
 // response schemas, and variable specifications.
 // Phase 2: PromptRegistry + YAML externalization (GEPA optimize ready).

@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- sentinel error pair (DeviationError and SilentError are the two process-exit error types; ExitCode function requires both to be co-located for the exit-code dispatch table to be readable in one place) [permanent]
 package domain
 
 import (

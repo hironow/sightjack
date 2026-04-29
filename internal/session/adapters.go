@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- port adapter family (all structs implement usecase/port interfaces by delegating to session package functions; they are the composition root wiring for the session layer and belong together as the adapter surface) [permanent]
 package session
 
 import (

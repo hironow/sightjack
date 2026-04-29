@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- scan recovery DTO pair (ClusterScanOutcome is the per-cluster result; ScanRecoveryReport aggregates outcomes; they form a sealed parent-child pair always used together for partial-failure recovery reporting) [permanent]
 package domain
 
 import (

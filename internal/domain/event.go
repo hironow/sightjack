@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- event payload family (all structs are typed payloads for a single event-sourcing event log); splitting would scatter the schema across files with no cohesion benefit [permanent]
 package domain
 
 import (

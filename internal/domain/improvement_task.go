@@ -36,6 +36,7 @@ func NewImprovementTask(sourceEvent, targetAgent, action string, ft FailureType,
 }
 
 // Expired returns true if the task's validity window has passed.
+// Uses !Before (i.e. >=) so that a task with 0 TTL is immediately expired.
 func (t ImprovementTask) Expired() bool {
-	return time.Now().UTC().After(t.ExpiresAt)
+	return !time.Now().UTC().Before(t.ExpiresAt)
 }

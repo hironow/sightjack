@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-interfaces-go,structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- port interface family (all interfaces are usecase-layer ports for dependency inversion; Nop implementations are null objects sealed with their interface); splitting each port to its own file would scatter the contract surface with no cohesion benefit [permanent]
 package port
 
 import (

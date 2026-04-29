@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go,structure.multiple-exported-interfaces-go,structure.exported-struct-and-interface-go -- coding session port family (RunResult, DetailedRunner, ListSessionOpts, and CodingSessionStore are the four tightly coupled types of the coding session port; splitting would scatter the session contract across multiple files) [permanent]
 package port
 
 import (

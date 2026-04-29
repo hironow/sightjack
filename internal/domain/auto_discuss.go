@@ -1,3 +1,4 @@
+// nosemgrep: structure.multiple-exported-structs-go -- auto-discuss DTO pair (AutoDiscussRound is a single debate round; AutoDiscussResult aggregates rounds; they form a sealed parent-child pair and are always used together via ToArchitectResponse) [permanent]
 package domain
 
 import (
