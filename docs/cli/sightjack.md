@@ -38,6 +38,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
 * [sightjack mcp-config](sightjack_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
 * [sightjack nextgen](sightjack_nextgen.md)	 - Generate follow-up waves from stdin ApplyResult
 * [sightjack rebuild](sightjack_rebuild.md)	 - Rebuild projections from event store
+* [sightjack rival](sightjack_rival.md)	 - Rival Contract v1.1 utilities
 * [sightjack run](sightjack_run.md)	 - Interactive wave approval and apply loop
 * [sightjack scan](sightjack_scan.md)	 - Classify and deep-scan issues
 * [sightjack select](sightjack_select.md)	 - Interactively pick a wave from stdin WavePlan
