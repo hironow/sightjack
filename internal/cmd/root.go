@@ -149,6 +149,7 @@ func NewRootCommand() *cobra.Command {
 		newSessionsCommand(),
 		newRebuildCommand(),
 		newDeadLettersCommand(),
+		newRivalCommand(),
 	)
 
 	return rootCmd
@@ -187,7 +188,6 @@ func openTTY() (*os.File, error) {
 	}
 	return nil, fmt.Errorf("no controlling terminal available (tried %v: %v)", devices, firstErr)
 }
-
 
 // loadConfig loads the sightjack config, applying lang override if set.
 func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
