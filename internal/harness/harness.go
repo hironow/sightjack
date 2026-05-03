@@ -105,3 +105,47 @@ type OptimizedResult = filter.OptimizedResult
 
 var SavePrompt = filter.Save
 var PromptsDir = filter.PromptsDir
+
+// --- Rival Contract v1 re-exports ---
+//
+// Refs: refs/plans/2026-05-03-rival-contract-v1.md
+
+// RivalContract is the parsed body of a Rival Contract v1 specification.
+type RivalContract = filter.RivalContract
+
+// RivalContractMetadata is the parsed view of contract metadata fields.
+type RivalContractMetadata = filter.RivalContractMetadata
+
+// EvidenceItem is a single deterministic bullet from the Evidence section.
+type EvidenceItem = filter.EvidenceItem
+
+// CurrentContract pairs a parsed contract body with its metadata.
+type CurrentContract = filter.CurrentContract
+
+// ContractConflict is emitted when two D-Mails claim the same contract id.
+type ContractConflict = filter.ContractConflict
+
+// RivalContractInput is the renderer input for a Rival Contract v1 body.
+type RivalContractInput = filter.RivalContractInput
+
+// SchemaRivalContractV1 is the only accepted contract_schema value.
+const SchemaRivalContractV1 = filter.SchemaRivalContractV1
+
+var (
+	// ParseRivalContractBody parses a Markdown body into a RivalContract.
+	ParseRivalContractBody = filter.ParseRivalContractBody
+	// ParseRivalContractMetadata extracts Rival Contract v1 metadata.
+	ParseRivalContractMetadata = filter.ParseRivalContractMetadata
+	// ParseEvidenceItems parses Evidence into deterministic bullets.
+	ParseEvidenceItems = filter.ParseEvidenceItems
+	// DeriveContractID returns a stable contract id from waveID/issues/cluster.
+	DeriveContractID = filter.DeriveContractID
+	// RenderRivalContract renders a Rival Contract v1 specification body.
+	RenderRivalContract = filter.RenderRivalContract
+	// ErrContractIDUnavailable signals no stable contract id input.
+	ErrContractIDUnavailable = filter.ErrContractIDUnavailable
+	// ErrPartialContractBody signals a body with title but missing sections.
+	ErrPartialContractBody = filter.ErrPartialContractBody
+	// ErrDMailNameAsContractID guards against using D-Mail names as ids.
+	ErrDMailNameAsContractID = filter.ErrDMailNameAsContractID
+)

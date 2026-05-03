@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/harness/filter"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -144,7 +144,7 @@ func TestComposeSpecification_WaveMode_RendersRivalContractV1(t *testing.T) {
 	mail := loadWaveSpec(t, dir, "auth", "rcv1-wave", wave)
 
 	// then: body parses as Rival Contract v1
-	contract, ok, err := filter.ParseRivalContractBody(mail.Body)
+	contract, ok, err := harness.ParseRivalContractBody(mail.Body)
 	if err != nil {
 		t.Fatalf("ParseRivalContractBody: %v", err)
 	}
@@ -181,8 +181,8 @@ func TestComposeSpecification_WritesContractMetadata(t *testing.T) {
 	mail := loadWaveSpec(t, dir, "core", "meta-wave", wave)
 
 	// then: required Rival Contract metadata fields present
-	if got := mail.Metadata["contract_schema"]; got != filter.SchemaRivalContractV1 {
-		t.Errorf("contract_schema: got %q, want %q", got, filter.SchemaRivalContractV1)
+	if got := mail.Metadata["contract_schema"]; got != harness.SchemaRivalContractV1 {
+		t.Errorf("contract_schema: got %q, want %q", got, harness.SchemaRivalContractV1)
 	}
 	if got := mail.Metadata["contract_id"]; got == "" {
 		t.Error("contract_id must be set")
@@ -215,7 +215,7 @@ func TestComposeSpecification_ContractIDUsesWaveID(t *testing.T) {
 		t.Errorf("contract_id should equal wave id; got %q, want %q", got, "stable-wave-id-001")
 	}
 	// And it must parse via the canonical metadata parser.
-	parsed, ok, err := filter.ParseRivalContractMetadata(mail.Metadata)
+	parsed, ok, err := harness.ParseRivalContractMetadata(mail.Metadata)
 	if err != nil {
 		t.Fatalf("ParseRivalContractMetadata: %v", err)
 	}
@@ -250,7 +250,7 @@ func TestComposeSpecification_DoesNotUseDMailNameAsContractID(t *testing.T) {
 		t.Errorf("contract_id (%q) must not equal D-Mail name (%q)", mail.Metadata["contract_id"], mail.Name)
 	}
 	// And the metadata parser must accept it (i.e. id is not D-Mail-name shaped).
-	if _, _, err := filter.ParseRivalContractMetadata(mail.Metadata); err != nil {
+	if _, _, err := harness.ParseRivalContractMetadata(mail.Metadata); err != nil {
 		t.Errorf("metadata parser rejected emitted contract metadata: %v", err)
 	}
 }

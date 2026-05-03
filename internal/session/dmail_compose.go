@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
-	"github.com/hironow/sightjack/internal/harness/filter"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
@@ -191,7 +191,7 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 		mail.Wave = ref
 
 		// Replace the legacy action-list body with a Rival Contract v1 body.
-		mail.Body = filter.RenderRivalContract(filter.RivalContractInput{
+		mail.Body = harness.RenderRivalContract(harness.RivalContractInput{
 			Title:              wave.Title,
 			Description:        wave.Description,
 			ClusterName:        wave.ClusterName,
@@ -202,14 +202,14 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 
 		// Attach Rival Contract v1 metadata. contract_id MUST be stable
 		// across revisions and MUST NOT use the D-Mail name (per plan).
-		contractID, err := filter.DeriveContractID(wave.ID, mail.Issues, wave.ClusterName)
+		contractID, err := harness.DeriveContractID(wave.ID, mail.Issues, wave.ClusterName)
 		if err != nil {
 			return fmt.Errorf("compose specification: derive contract id: %w", err)
 		}
 		if mail.Metadata == nil {
 			mail.Metadata = make(map[string]string, 4)
 		}
-		mail.Metadata["contract_schema"] = filter.SchemaRivalContractV1
+		mail.Metadata["contract_schema"] = harness.SchemaRivalContractV1
 		mail.Metadata["contract_id"] = contractID
 		mail.Metadata["contract_revision"] = strconv.Itoa(1)
 		mail.Metadata["supersedes"] = ""
