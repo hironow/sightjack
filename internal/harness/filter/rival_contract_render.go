@@ -51,6 +51,14 @@ type RivalContractInput struct { // nosemgrep: structure.multiple-exported-struc
 	// Each entry is rendered as a single bullet under Evidence in addition
 	// to the canonical machine-readable grammar bullets.
 	AdditionalEvidence []string
+	// DomainStyle is the OPTIONAL Rival Contract v1.1 vocabulary tag the
+	// producer chose for this contract (one of "event-sourced", "generic",
+	// "mixed"). When non-empty, the renderer will emit a
+	// `domain_style: <value>` line via RenderRivalContractMetadata. An
+	// empty value yields output bit-identical to the v1 renderer; the
+	// producer must NEVER set this from a parser-time inference path —
+	// the parser refuses to infer and the renderer refuses to default.
+	DomainStyle string
 }
 
 // decisionsPlaceholder is rendered when the caller did not supply a
@@ -219,6 +227,25 @@ func renderEvidenceSection(in RivalContractInput) string {
 			continue
 		}
 		fmt.Fprintf(&b, "- %s\n", s)
+	}
+	return b.String()
+}
+
+// RenderRivalContractMetadata renders the OPTIONAL Rival Contract v1.1
+// metadata key-value lines that should travel with the rendered body via
+// the D-Mail YAML frontmatter. The function emits ONLY keys whose producer
+// has explicitly populated a non-empty value; legacy v1 inputs (no
+// DomainStyle) yield an empty string so the rendered metadata block is
+// bit-identical to v1.
+//
+// The output format mirrors the wire-level YAML representation
+// (`<key>: <value>` per line) so callers can append it directly to an
+// existing metadata map or assert on it in tests without first parsing
+// YAML. The renderer never invents values.
+func RenderRivalContractMetadata(in RivalContractInput) string {
+	var b strings.Builder
+	if style := strings.TrimSpace(in.DomainStyle); style != "" {
+		fmt.Fprintf(&b, "domain_style: %s\n", style)
 	}
 	return b.String()
 }
