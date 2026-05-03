@@ -1,0 +1,39 @@
+{
+  "title": "Add session expiry enforcement",
+  "requirements": [
+    "Prevent expired sessions from authorizing API calls.",
+    "Success means expired sessions return 401 and active sessions continue to work."
+  ],
+  "entities": {
+    "domain_style": "",
+    "verbatim": "- Command: validate session for request.\n- Event: session validation failed.\n- Read model: auth middleware sees session status and expiry timestamp."
+  },
+  "approach": [
+    "Enforce expiry in middleware before handler execution.",
+    "Reuse the existing session repository instead of adding a cache."
+  ],
+  "structure": [
+    "internal/http/auth_middleware.go",
+    "tests/unit/auth_middleware_test.go"
+  ],
+  "operations": "1. Add expiry check to auth middleware.\n   - Target: `internal/http/auth_middleware.go`\n   - Acceptance: expired sessions return 401.\n2. Add unit tests for active, expired, and missing sessions.\n   - Target: `tests/unit/auth_middleware_test.go`\n   - Acceptance: all three cases are covered.",
+  "norms": [
+    "Preserve existing error response format."
+  ],
+  "safeguards": [
+    "Do not add OAuth, refresh tokens, or background cleanup.",
+    "Do not change session table shape."
+  ],
+  "validation": [
+    "test: just test",
+    "lint: just lint",
+    "nfr.p95_latency_ms: <= 200",
+    "Add a regression test for expired sessions."
+  ],
+  "sync": {
+    "source_dmail": "spec-auth_aaaaaaaa",
+    "revision": 1,
+    "supersedes": "none",
+    "line": "Source: D-Mail spec-auth_aaaaaaaa, revision 1, supersedes none"
+  }
+}
