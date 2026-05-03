@@ -239,6 +239,23 @@ func BuildReportSection(report, lang string) string {
 	return "\n## Cross-Tool Reports\nThe following reports were received from other tools. These are automated analysis results such as check outcomes and drift detection.\nIncorporate them into your wave proposals.\n" + report
 }
 
+// BuildContractAmendmentsSection formats Rival Contract v1 amendments
+// extracted from inbound design-feedback D-Mails into a prompt section.
+// The body is the pre-formatted citation block produced by the
+// session-layer extractor (one bullet per amendment). Empty input
+// produces an empty section so legacy nextgen flows are unaffected.
+//
+// Refs: refs/plans/2026-05-03-rival-contract-v1.md (Phase 5 PR).
+func BuildContractAmendmentsSection(amendments, lang string) string {
+	if amendments == "" {
+		return ""
+	}
+	if lang == "ja" {
+		return "\n## Contract Amendments\namadeus が現行の Rival Contract に対する修正提案を送ってきました。次の Wave / 仕様 D-Mail に取り込んでください。\n新規仕様を作る場合は contract_id を維持し、contract_revision を 1 進め、supersedes に直前の D-Mail 名を設定してください。\n\n" + amendments
+	}
+	return "\n## Contract Amendments\namadeus has proposed amendments to the current Rival Contract. Incorporate them into the next wave / specification D-Mail.\nWhen producing a new specification, keep the same contract_id, increment contract_revision by 1, and set supersedes to the previous D-Mail name.\n\n" + amendments
+}
+
 // BuildAutoDiscussFeedbackSection formats design feedback for auto-discuss architect.
 func BuildAutoDiscussFeedbackSection(feedback, lang string) string {
 	if feedback == "" {

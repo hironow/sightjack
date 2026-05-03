@@ -81,18 +81,27 @@ type ArchitectDiscussPromptData struct { // nosemgrep: domain-primitives.public-
 }
 
 // NextGenPromptData holds template data for post-completion wave generation.
+//
+// AmendmentsSection carries pre-formatted Rival Contract v1 amendments
+// extracted by ExtractContractAmendments from inbound design-feedback
+// D-Mails. The string is rendered into the prompt under a dedicated
+// "Contract Amendments" heading so the nextgen LLM can generate
+// amended specifications. Empty when no amendment context applies.
+//
+// Refs: refs/plans/2026-05-03-rival-contract-v1.md (Phase 5 PR).
 type NextGenPromptData struct { // nosemgrep: domain-primitives.public-string-field-go,first-class-collection.raw-slice-field-domain-go -- template DTO; string required for text/template, FCC wrapping would break rendering [permanent], structure.multiple-exported-structs-go
-	ClusterName     string
-	Completeness    string
-	Issues          string
-	CompletedWaves  string
-	ExistingADRs    []ExistingADR
-	RejectedActions string
-	FeedbackSection string
-	ReportSection   string
-	DoDSection      string
-	OutputPath      string
-	StrictnessLevel string
+	ClusterName       string
+	Completeness      string
+	Issues            string
+	CompletedWaves    string
+	ExistingADRs      []ExistingADR
+	RejectedActions   string
+	FeedbackSection   string
+	ReportSection     string
+	AmendmentsSection string
+	DoDSection        string
+	OutputPath        string
+	StrictnessLevel   string
 }
 
 // AutoDiscussArchitectPromptData holds template data for the auto-discuss architect prompt.
