@@ -270,3 +270,96 @@ specifications are not exportable in v1.1; revisit in v2 if needed).
 The OpenSPDD REASONS Canvas referenced here is a vocabulary alignment
 target only — sightjack does NOT depend on any external prompt manager,
 and the export subcommand is one-way. There is no v1.1 import path.
+
+## v1.2 additions — integration & E2E test coverage
+
+Rival Contract v1.2 is a test-only minor revision. The schema name remains
+`rival-contract-v1` and no production code path changed in any of the four
+tools. v1.2 closes the integration and end-to-end coverage gaps left by
+v1 + v1.1 by adding cross-component flow verification: the producer's real
+`ComposeSpecification` writes a canonical fixture, three consumers parse
+the SAME bytes, and the actual `sightjack` binary is exercised through a
+subprocess for the export subcommand.
+
+Plan: [`refs/plans/2026-05-03-rival-contract-v1-2-integration-e2e.md`](../../refs/plans/2026-05-03-rival-contract-v1-2-integration-e2e.md).
+
+### Producer integration (sj is source of truth)
+
+`tests/integration/rival_contract_produce_test.go` calls the real
+`ComposeSpecification` against a synthetic wave + ADR + DoD context. The
+emitted D-Mail is normalized through the public `ParseDMail` +
+`MarshalDMail` canonicalization pipeline (avoids exposing the internal
+`uuidFunc` seam) and written byte-stable to
+`tests/integration/testdata/rival/produced/canonical-spec-v1.md`. This
+file is the **source of truth** for cross-tool consumers; pt/am/dom each
+commit a byte-identical copy in their own `tests/integration/testdata/`
+trees. `refs/scripts/check_rival_canonical_fixture.sh` enforces byte
+identity and is wired into `just gap-check-rival-contract`.
+
+### Roundtrip self-test
+
+`tests/integration/rival_contract_roundtrip_test.go` reads the produced
+fixture and runs sj's own `ParseRivalContractBody` +
+`ParseRivalContractMetadata` against it (parity check against the same
+parser the consumer-side roundtrip tests run). Companion fixtures
+`legacy-spec.md` and `event-sourced-v1.md` exercise the legacy fallback
+and the v1.1 `domain_style: event-sourced` path.
+
+### Amendment cycle (sj-side)
+
+`tests/integration/rival_amendment_extract_test.go` is a black-box
+`package integration` test that consumes the SAME bytes amadeus emits
+from its own white-box golden test. The shared committed fixture lives
+at `tests/integration/testdata/rival/cross-tool/amadeus-emitted-correction.md`
+(byte-identical copy of am's
+`internal/session/testdata/rival/cross-tool/amadeus-emitted-correction.md`).
+The test runs sj's real `ExtractContractAmendments` against the body and
+then `ComposeAmendedSpecification` to assert:
+
+- the new D-Mail's `metadata.contract_revision = previous + 1`,
+- `metadata.supersedes = previous_dmail_name`,
+- the `## Amendment Lineage` trailer cites the corrective D-Mail,
+- the previous D-Mail on disk is unchanged (append-only invariant).
+
+`refs/scripts/check_rival_amendment_fixture.sh` enforces byte-identity
+of the am SoT and the sj copy and is wired into
+`just gap-check-rival-contract`.
+
+### Binary E2E (`rival export reasons`)
+
+`tests/e2e/rival_export_e2e_test.go` (build tag `e2e`) compiles the
+actual `sightjack` binary via `go build -o $TMPDIR/sightjack
+./cmd/sightjack`, writes a sample D-Mail to a temp directory, and runs
+the binary as a subprocess. Assertions cover:
+
+- markdown stdout vs. committed golden,
+- `--format json` mode,
+- `--output <file>` mode (golden diff against on-disk file),
+- exit code propagation through the cobra layer.
+
+Default `go test ./...` skips this test (build tag); CI's `e2e` job runs
+it via `go test -tags e2e ./tests/e2e/...`.
+
+### Test inventory delta (sj only)
+
+| Phase | Tests added (sj) |
+|---|---|
+| 1.2A — produce + roundtrip | 7 integration tests |
+| 1.2B — amendment extract+compose | (covered above) |
+| 1.2C — `rival export reasons` E2E | 4 e2e tests |
+
+Total: 11 cross-component tests added in v1.2 for sightjack alone.
+Cross-tool consumers (pt/am/dom) add their own roundtrip tests against
+the sj-emitted fixture; see each tool's `docs/rival-contract-v1.md`
+v1.2 section.
+
+### What did NOT change
+
+- Schema (still `rival-contract-v1`; v1 invariants 1-13 maintained).
+- D-Mail v1 transport, kinds, routing, archive behavior.
+- Producer code paths (`ComposeSpecification`, `ComposeAmendedSpecification`,
+  `RenderRivalContract`).
+- The `rival export reasons` subcommand (v1.1 surface).
+- Any consumer-side parser or projection.
+
+v1.2 is purely additive test code, fixtures, and gap-check guards.
