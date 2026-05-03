@@ -14,15 +14,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack/internal/harness/filter"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
 func TestExportToReasonsCanvasJSON_DeterministicShape(t *testing.T) {
 	// given a v1 contract + minimal metadata.
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:     filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:     harness.SchemaRivalContractV1,
 		ID:         "wave-auth-expiry",
 		Revision:   1,
 		Supersedes: "",
@@ -57,7 +57,7 @@ func TestExportToReasonsCanvasJSON_DeterministicShape(t *testing.T) {
 
 func TestExportToReasonsCanvasJSON_RejectsMissingSchema(t *testing.T) {
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{}
+	meta := harness.RivalContractMetadata{}
 
 	_, err := usecase.ExportToReasonsCanvasJSON(contract, meta, "spec-auth_aaaaaaaa")
 	if err == nil {

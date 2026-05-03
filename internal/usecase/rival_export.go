@@ -39,7 +39,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hironow/sightjack/internal/harness/filter"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 // ErrUnsupportedContractForExport is returned by ExportToReasonsCanvas when
@@ -56,9 +56,9 @@ var ErrUnsupportedContractForExport = errors.New("rival export: only rival-contr
 // trace back to the contract revision.
 //
 // Returns ErrUnsupportedContractForExport when the metadata is not Rival
-// Contract v1 (Schema must equal filter.SchemaRivalContractV1).
-func ExportToReasonsCanvas(rc filter.RivalContract, meta filter.RivalContractMetadata, sourceDMailName string) (string, error) {
-	if meta.Schema != filter.SchemaRivalContractV1 {
+// Contract v1 (Schema must equal harness.SchemaRivalContractV1).
+func ExportToReasonsCanvas(rc harness.RivalContract, meta harness.RivalContractMetadata, sourceDMailName string) (string, error) {
+	if meta.Schema != harness.SchemaRivalContractV1 {
 		return "", fmt.Errorf("%w: got schema %q", ErrUnsupportedContractForExport, meta.Schema)
 	}
 
@@ -115,7 +115,7 @@ func renderEntities(domain string, domainStyle string) string {
 	if domain == "" {
 		return ""
 	}
-	if domainStyle != filter.DomainStyleEventSourced {
+	if domainStyle != harness.DomainStyleEventSourced {
 		return domain
 	}
 
@@ -201,7 +201,7 @@ func writeBucket(b *strings.Builder, label string, items []string) {
 	b.WriteByte('\n')
 }
 
-// stepTargetPattern matches `Target: \`<path>\`` lines anywhere in the
+// stepTargetPattern matches `Target: \`<path>\“ lines anywhere in the
 // Steps body. The path is captured so renderStructure can list components
 // without duplicating Steps prose.
 var stepTargetPattern = regexp.MustCompile("`([^`]+)`")
@@ -307,7 +307,7 @@ func isSafeguardBullet(text string) bool {
 
 // renderSync emits the deterministic Sync section line. supersedes is
 // rendered as "none" when empty so the line shape is invariant.
-func renderSync(meta filter.RivalContractMetadata, sourceDMailName string) string {
+func renderSync(meta harness.RivalContractMetadata, sourceDMailName string) string {
 	supersedes := strings.TrimSpace(meta.Supersedes)
 	if supersedes == "" {
 		supersedes = "none"

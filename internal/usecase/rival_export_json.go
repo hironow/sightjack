@@ -15,23 +15,23 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hironow/sightjack/internal/harness/filter"
+	"github.com/hironow/sightjack/internal/harness"
 )
 
 // reasonsCanvasJSON is the deterministic on-the-wire shape for JSON export.
 // Field order in the struct fixes JSON key order for encoding/json since Go
 // preserves declaration order for struct marshaling.
 type reasonsCanvasJSON struct { // nosemgrep: structure.multiple-exported-structs-go -- not exported [permanent]
-	Title        string                  `json:"title"`
-	Requirements []string                `json:"requirements"`
-	Entities     reasonsCanvasEntities   `json:"entities"`
-	Approach     []string                `json:"approach"`
-	Structure    []string                `json:"structure"`
-	Operations   string                  `json:"operations"`
-	Norms        []string                `json:"norms"`
-	Safeguards   []string                `json:"safeguards"`
-	Validation   []string                `json:"validation"`
-	Sync         reasonsCanvasSyncBlock  `json:"sync"`
+	Title        string                 `json:"title"`
+	Requirements []string               `json:"requirements"`
+	Entities     reasonsCanvasEntities  `json:"entities"`
+	Approach     []string               `json:"approach"`
+	Structure    []string               `json:"structure"`
+	Operations   string                 `json:"operations"`
+	Norms        []string               `json:"norms"`
+	Safeguards   []string               `json:"safeguards"`
+	Validation   []string               `json:"validation"`
+	Sync         reasonsCanvasSyncBlock `json:"sync"`
 }
 
 // reasonsCanvasEntities preserves both the verbatim Domain text and, when
@@ -60,8 +60,8 @@ type reasonsCanvasSyncBlock struct {
 // into a deterministic JSON document. Keys are stable, indentation is
 // two spaces, and the output is reproducible bit-for-bit given the same
 // inputs.
-func ExportToReasonsCanvasJSON(rc filter.RivalContract, meta filter.RivalContractMetadata, sourceDMailName string) (string, error) {
-	if meta.Schema != filter.SchemaRivalContractV1 {
+func ExportToReasonsCanvasJSON(rc harness.RivalContract, meta harness.RivalContractMetadata, sourceDMailName string) (string, error) {
+	if meta.Schema != harness.SchemaRivalContractV1 {
 		return "", fmt.Errorf("%w: got schema %q", ErrUnsupportedContractForExport, meta.Schema)
 	}
 
@@ -139,7 +139,7 @@ func entitiesJSON(domain string, domainStyle string) reasonsCanvasEntities {
 		DomainStyle: domainStyle,
 		Verbatim:    domain,
 	}
-	if domainStyle != filter.DomainStyleEventSourced || domain == "" {
+	if domainStyle != harness.DomainStyleEventSourced || domain == "" {
 		return out
 	}
 	for _, raw := range strings.Split(domain, "\n") {

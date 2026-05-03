@@ -131,6 +131,13 @@ type RivalContractInput = filter.RivalContractInput
 // SchemaRivalContractV1 is the only accepted contract_schema value.
 const SchemaRivalContractV1 = filter.SchemaRivalContractV1
 
+// Rival Contract v1.1 domain_style enum re-exports.
+const (
+	DomainStyleEventSourced = filter.DomainStyleEventSourced
+	DomainStyleGeneric      = filter.DomainStyleGeneric
+	DomainStyleMixed        = filter.DomainStyleMixed
+)
+
 var (
 	// ParseRivalContractBody parses a Markdown body into a RivalContract.
 	ParseRivalContractBody = filter.ParseRivalContractBody
@@ -142,6 +149,11 @@ var (
 	DeriveContractID = filter.DeriveContractID
 	// RenderRivalContract renders a Rival Contract v1 specification body.
 	RenderRivalContract = filter.RenderRivalContract
+	// ProjectCurrentContracts is the deterministic Rival Contract v1
+	// projection that selects the current revision per contract id from a
+	// stream of D-Mails. v1.1 Phase A added a copy of this projection to
+	// sj's filter package; the facade re-exports it for v1.1 export use.
+	ProjectCurrentContracts = filter.ProjectCurrentContracts
 	// ErrContractIDUnavailable signals no stable contract id input.
 	ErrContractIDUnavailable = filter.ErrContractIDUnavailable
 	// ErrPartialContractBody signals a body with title but missing sections.

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/sightjack/internal/harness/filter"
+	"github.com/hironow/sightjack/internal/harness"
 	"github.com/hironow/sightjack/internal/usecase"
 )
 
@@ -32,10 +32,10 @@ func readFixture(t *testing.T, rel string) string {
 // parseFixtureContract parses a fixture body into a RivalContract. Tests own
 // metadata construction so they can vary contract_revision/supersedes/
 // domain_style independently.
-func parseFixtureContract(t *testing.T, fixture string) filter.RivalContract {
+func parseFixtureContract(t *testing.T, fixture string) harness.RivalContract {
 	t.Helper()
 	body := readFixture(t, fixture)
-	contract, ok, err := filter.ParseRivalContractBody(body)
+	contract, ok, err := harness.ParseRivalContractBody(body)
 	if err != nil {
 		t.Fatalf("parse fixture %s: %v", fixture, err)
 	}
@@ -48,8 +48,8 @@ func parseFixtureContract(t *testing.T, fixture string) filter.RivalContract {
 func TestExportToReasonsCanvas_MapsAllSections(t *testing.T) {
 	// given a v1 contract and v1.1 metadata.
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:     filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:     harness.SchemaRivalContractV1,
 		ID:         "wave-auth-expiry",
 		Revision:   1,
 		Supersedes: "",
@@ -83,7 +83,7 @@ func TestExportToReasonsCanvas_MapsAllSections(t *testing.T) {
 
 func TestExportToReasonsCanvas_NormsVsSafeguardsSplit_DeterministicHeuristic(t *testing.T) {
 	// given a contract with explicit Norm and Safeguard boundary bullets.
-	contract := filter.RivalContract{
+	contract := harness.RivalContract{
 		Title:      "Heuristic split",
 		Intent:     "- Verify split rule applies deterministically.",
 		Domain:     "- Auth subsystem.",
@@ -92,8 +92,8 @@ func TestExportToReasonsCanvas_NormsVsSafeguardsSplit_DeterministicHeuristic(t *
 		Boundaries: "- Do not add OAuth.\n- Don't introduce caching.\n- Never bypass middleware.\n- Forbidden: schema migrations.\n- Use existing repository for persistence.\n- Preserve current error responses.",
 		Evidence:   "- test: just test",
 	}
-	meta := filter.RivalContractMetadata{
-		Schema:   filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:   harness.SchemaRivalContractV1,
 		ID:       "split-rule",
 		Revision: 1,
 	}
@@ -131,8 +131,8 @@ func TestExportToReasonsCanvas_NormsVsSafeguardsSplit_DeterministicHeuristic(t *
 func TestExportToReasonsCanvas_AddsSyncSectionFromMetadata(t *testing.T) {
 	// given a contract revision 3 superseding a previous D-Mail name.
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:     filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:     harness.SchemaRivalContractV1,
 		ID:         "wave-auth-expiry",
 		Revision:   3,
 		Supersedes: "spec-auth_bbbbbbbb",
@@ -153,8 +153,8 @@ func TestExportToReasonsCanvas_AddsSyncSectionFromMetadata(t *testing.T) {
 
 func TestExportToReasonsCanvas_AddsSyncSectionWithNoneWhenSupersedesEmpty(t *testing.T) {
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:     filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:     harness.SchemaRivalContractV1,
 		ID:         "wave-auth-expiry",
 		Revision:   1,
 		Supersedes: "",
@@ -175,11 +175,11 @@ func TestExportToReasonsCanvas_EventSourcedDomainExtractsCommandEventReadModel(t
 	// given a contract whose body uses event-sourcing vocabulary AND v1.1
 	// metadata explicitly says domain_style=event-sourced.
 	contract := parseFixtureContract(t, "event-sourced-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:      filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:      harness.SchemaRivalContractV1,
 		ID:          "wave-event-sourced",
 		Revision:    1,
-		DomainStyle: filter.DomainStyleEventSourced,
+		DomainStyle: harness.DomainStyleEventSourced,
 	}
 
 	// when.
@@ -216,8 +216,8 @@ func TestExportToReasonsCanvas_GenericDomainPassesThroughVerbatim(t *testing.T) 
 	// "Command:" prose, with DomainStyle empty the projection MUST NOT
 	// extract event-sourcing buckets.
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:   filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:   harness.SchemaRivalContractV1,
 		ID:       "wave-auth-expiry",
 		Revision: 1,
 	}
@@ -244,7 +244,7 @@ func TestExportToReasonsCanvas_LegacyV1NoMetadataReturnsError(t *testing.T) {
 	// given a parsed contract but a metadata struct with empty Schema (i.e.
 	// Rival Contract v1 metadata not present — pre-v1 raw spec).
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{
+	meta := harness.RivalContractMetadata{
 		Schema:   "",
 		ID:       "",
 		Revision: 0,
@@ -265,8 +265,8 @@ func TestExportToReasonsCanvas_LegacyV1NoMetadataReturnsError(t *testing.T) {
 func TestExportToReasonsCanvas_GoldenValidV1(t *testing.T) {
 	// given v1 contract + minimal metadata.
 	contract := parseFixtureContract(t, "valid-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:     filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:     harness.SchemaRivalContractV1,
 		ID:         "wave-auth-expiry",
 		Revision:   1,
 		Supersedes: "",
@@ -287,12 +287,12 @@ func TestExportToReasonsCanvas_GoldenValidV1(t *testing.T) {
 
 func TestExportToReasonsCanvas_GoldenEventSourcedV1(t *testing.T) {
 	contract := parseFixtureContract(t, "event-sourced-v1.md")
-	meta := filter.RivalContractMetadata{
-		Schema:      filter.SchemaRivalContractV1,
+	meta := harness.RivalContractMetadata{
+		Schema:      harness.SchemaRivalContractV1,
 		ID:          "wave-event-sourced",
 		Revision:    2,
 		Supersedes:  "spec-es_aaaaaaaa",
-		DomainStyle: filter.DomainStyleEventSourced,
+		DomainStyle: harness.DomainStyleEventSourced,
 	}
 
 	got, err := usecase.ExportToReasonsCanvas(contract, meta, "spec-es_bbbbbbbb")
