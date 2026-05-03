@@ -137,3 +137,136 @@ The lineage trailer is informational — amadeus uses the metadata
 
 - [`refs/plans/2026-05-03-rival-contract-v1.md`](../../refs/plans/2026-05-03-rival-contract-v1.md) — full design, phase plan, risks
 - [`refs/scripts/check_rival_contract_docs.sh`](../../refs/scripts/check_rival_contract_docs.sh) — gap-check enforcement
+
+## v1.1 additions
+
+Rival Contract v1.1 is a purely additive minor extension. The schema name
+remains `rival-contract-v1` — the SCHEMA itself did not change. Only this
+spec doc gets a new appendix describing two opt-in capabilities:
+
+1. An OPTIONAL metadata key `metadata.domain_style`.
+2. A new sightjack-only subcommand `sightjack rival export reasons` that
+   projects a Rival Contract v1 spec into the OpenSPDD REASONS Canvas.
+
+Plan: [`refs/plans/2026-05-03-rival-contract-v1-1-extensions.md`](../../refs/plans/2026-05-03-rival-contract-v1-1-extensions.md).
+
+### `metadata.domain_style` (optional)
+
+The producer MAY attach an optional `domain_style` key to the D-Mail
+`metadata` map when emitting a new contract. The key takes one of three
+enumerated values:
+
+- `event-sourced` — the target subsystem is event-sourced; contributors
+  SHOULD use Command / Event / Read Model / Aggregate vocabulary in the
+  `## Domain` section.
+- `generic` — any domain noun phrasing is acceptable; no structural
+  expectation.
+- `mixed` — starts as `generic`, includes some event-sourced bullets where
+  applicable.
+
+```yaml
+metadata:
+  contract_schema: rival-contract-v1
+  contract_id: "<stable work-unit id>"
+  contract_revision: "1"
+  supersedes: ""
+  domain_style: event-sourced  # optional; one of event-sourced|generic|mixed
+```
+
+Producer rules:
+
+- The producer SHOULD set `domain_style: event-sourced` when the wave or a
+  matching ADR (e.g. `docs/adr/NNNN-event-sourcing-mandate.md`) signals
+  event sourcing for the target subsystem. This is a producer decision; the
+  producer never modifies an already-emitted D-Mail.
+- The parser never infers `domain_style`. Missing key always parses as the
+  empty string (treated as `generic` by all consumers).
+- Unknown values are rejected by `ParseRivalContractMetadata` (only the
+  three enumerated values are accepted).
+
+Legacy v1 D-Mails (no `domain_style` key) parse identically to v1 and
+produce bit-identical downstream behavior.
+
+### `sightjack rival export reasons` subcommand
+
+The `rival export reasons` subcommand projects a Rival Contract v1 spec
+into the OpenSPDD REASONS Canvas markdown shape for external prompt-
+manager interoperability (Cursor, Copilot, OpenSPDD itself). The
+projection is pure: deterministic, no D-Mail mutation, no LLM, no network.
+
+```
+sightjack rival export reasons \
+  --input <dmail-path> | --wave <wave-id> \
+  [--output <path>]                          # default: stdout
+  [--format markdown|json]                   # default: markdown
+  [--allow-conflict]                         # default: false
+```
+
+`--input` and `--wave` are mutually exclusive. `--wave` resolves the
+current revision through the same `ProjectCurrentContracts` projection
+amadeus uses; sightjack carries an internal copy of that function for
+parity (see `internal/harness/filter/rival_contract.go`). On
+`ContractConflict` for the requested wave, the command exits non-zero by
+default; `--allow-conflict` downgrades the failure to a stderr warning and
+picks the lexicographically smaller D-Mail name for best-effort export.
+
+Mapping table (Rival Contract v1 section → REASONS Canvas section):
+
+| Rival Contract section | REASONS Canvas section | Notes |
+|---|---|---|
+| `# Contract: <title>` | (header) | Used as canvas title |
+| `## Intent` | `## Requirements` | 1:1 |
+| `## Domain` | `## Entities` | When `domain_style=event-sourced`, may split into Commands/Events/Read Models bullets |
+| `## Decisions` | `## Approach` | 1:1 |
+| (derived from Steps targets) | `## Structure` | Files / components mentioned in Steps targets |
+| `## Steps` | `## Operations` | 1:1 |
+| `## Boundaries` | `## Norms` AND `## Safeguards` | Norms = positive style rules; Safeguards = forbidden edits / non-goals |
+| `## Evidence` | `## Validation` (extra) | Canvas has no 1:1 evidence section |
+| `metadata.contract_revision` + `metadata.supersedes` | `## Sync` | Deterministic source attribution line |
+
+Sample command output:
+
+```text
+$ sightjack rival export reasons --input ./spec-auth_aaaaaaaa.md
+# REASONS Canvas: Stabilize Auth Refresh Loop
+
+## Requirements
+…
+
+## Entities
+…
+
+## Approach
+…
+
+## Operations
+…
+
+## Norms
+…
+
+## Safeguards
+…
+
+## Validation
+…
+
+## Sync
+Source: D-Mail spec-auth_aaaaaaaa.md, revision 2, supersedes spec-auth_zzzzzzzz.md
+```
+
+Exit non-zero when the source D-Mail is not Rival Contract v1 (legacy raw
+specifications are not exportable in v1.1; revisit in v2 if needed).
+
+### What did NOT change
+
+- D-Mail v1 transport schema (no new fields, no new required keys).
+- The six canonical body sections (Intent, Domain, Decisions, Steps,
+  Boundaries, Evidence).
+- D-Mail kinds (no new kinds; the deprecated non-canonical kind from
+  Phase 4 remains forbidden).
+- phonewave routing / archive behavior / idempotency.
+
+The OpenSPDD REASONS Canvas referenced here is a vocabulary alignment
+target only — sightjack does NOT depend on any external prompt manager,
+and the export subcommand is one-way. There is no v1.1 import path.
