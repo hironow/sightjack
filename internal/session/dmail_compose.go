@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/harness/filter"
 	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
@@ -149,6 +151,11 @@ var issueManagementTypes = map[string]bool{
 // In wave mode, issue management actions are filtered out — only implementation-oriented
 // actions (implement, fix, verify, etc.) are included as steps. If no implementation
 // actions remain, the spec D-Mail is not generated.
+//
+// In wave mode, the body is rendered as a Rival Contract v1 specification
+// and the D-Mail metadata carries contract_schema, contract_id,
+// contract_revision, and supersedes per refs/plans/2026-05-03-rival-contract-v1.md.
+// Legacy non-wave callers retain the existing SpecificationBody output.
 func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave domain.Wave, mode ...domain.TrackingMode) error {
 	key := domain.WaveKey(wave)
 	mail := &domain.DMail{
@@ -161,12 +168,16 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 	}
 
 	// Wave mode: attach WaveReference with implementation actions as steps
+	// and render Rival Contract v1 body + metadata.
 	if len(mode) > 0 && mode[0].IsWave() {
+		var implActs, issueMgmtActs []domain.WaveAction
 		ref := &domain.WaveReference{ID: key}
 		for _, action := range wave.Actions {
 			if issueManagementTypes[action.Type] {
+				issueMgmtActs = append(issueMgmtActs, action)
 				continue // already applied by sightjack
 			}
+			implActs = append(implActs, action)
 			ref.Steps = append(ref.Steps, domain.WaveStepDef{
 				ID:          action.IssueID,
 				Title:       action.Description,
@@ -178,6 +189,30 @@ func ComposeSpecification(ctx context.Context, store port.OutboxStore, wave doma
 			return ErrSpecNoImplementationSteps
 		}
 		mail.Wave = ref
+
+		// Replace the legacy action-list body with a Rival Contract v1 body.
+		mail.Body = filter.RenderRivalContract(filter.RivalContractInput{
+			Title:              wave.Title,
+			Description:        wave.Description,
+			ClusterName:        wave.ClusterName,
+			IssueIDs:           mail.Issues,
+			ImplementationActs: implActs,
+			IssueMgmtActs:      issueMgmtActs,
+		})
+
+		// Attach Rival Contract v1 metadata. contract_id MUST be stable
+		// across revisions and MUST NOT use the D-Mail name (per plan).
+		contractID, err := filter.DeriveContractID(wave.ID, mail.Issues, wave.ClusterName)
+		if err != nil {
+			return fmt.Errorf("compose specification: derive contract id: %w", err)
+		}
+		if mail.Metadata == nil {
+			mail.Metadata = make(map[string]string, 4)
+		}
+		mail.Metadata["contract_schema"] = filter.SchemaRivalContractV1
+		mail.Metadata["contract_id"] = contractID
+		mail.Metadata["contract_revision"] = strconv.Itoa(1)
+		mail.Metadata["supersedes"] = ""
 	}
 
 	return ComposeDMail(ctx, store, mail)
