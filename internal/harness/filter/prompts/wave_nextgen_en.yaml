@@ -13,6 +13,7 @@ variables:
   rejected_section: Pre-computed rejected actions section (may be empty).
   feedback_section: Pre-computed feedback section (may be empty).
   report_section: Pre-computed cross-tool reports section (may be empty).
+  amendments_section: Pre-computed Rival Contract v1 amendments section (may be empty).
   dod_section: Pre-computed DoD section (may be empty).
   output_path: File path for JSON output.
 template: |
@@ -41,6 +42,7 @@ template: |
   {rejected_section}
   {feedback_section}
   {report_section}
+  {amendments_section}
 
   ## Generation Guidelines
   - Generate 0-2 new waves based on remaining gaps

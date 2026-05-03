@@ -139,17 +139,18 @@ func RenderNextGenPrompt(lang string, data domain.NextGenPromptData) (string, er
 	name := "wave_nextgen_" + lang
 	reg := DefaultRegistry()
 	result, err := reg.Expand(name, map[string]string{
-		"strictness_level": data.StrictnessLevel,
-		"cluster_name":     data.ClusterName,
-		"completeness":     data.Completeness,
-		"issues":           data.Issues,
-		"completed_waves":  data.CompletedWaves,
-		"adrs_section":     BuildExistingADRsSection(data.ExistingADRs, lang),
-		"rejected_section": BuildRejectedActionsSection(data.RejectedActions, lang),
-		"feedback_section": BuildFeedbackSection(data.FeedbackSection, lang),
-		"report_section":   BuildReportSection(data.ReportSection, lang),
-		"dod_section":      BuildDoDSection(data.DoDSection, lang),
-		"output_path":      data.OutputPath,
+		"strictness_level":   data.StrictnessLevel,
+		"cluster_name":       data.ClusterName,
+		"completeness":       data.Completeness,
+		"issues":             data.Issues,
+		"completed_waves":    data.CompletedWaves,
+		"adrs_section":       BuildExistingADRsSection(data.ExistingADRs, lang),
+		"rejected_section":   BuildRejectedActionsSection(data.RejectedActions, lang),
+		"feedback_section":   BuildFeedbackSection(data.FeedbackSection, lang),
+		"report_section":     BuildReportSection(data.ReportSection, lang),
+		"amendments_section": BuildContractAmendmentsSection(data.AmendmentsSection, lang),
+		"dod_section":        BuildDoDSection(data.DoDSection, lang),
+		"output_path":        data.OutputPath,
 	})
 	if err != nil {
 		return "", fmt.Errorf("expand wave_nextgen prompt %s: %w", lang, err)

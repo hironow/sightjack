@@ -13,6 +13,7 @@ variables:
   rejected_section: 事前計算済みの拒否されたアクションセクション（空の場合あり）。
   feedback_section: 事前計算済みのフィードバックセクション（空の場合あり）。
   report_section: 事前計算済みのクロスツールレポートセクション（空の場合あり）。
+  amendments_section: 事前計算済みの Rival Contract v1 amendments セクション（空の場合あり）。
   dod_section: 事前計算済みのDoDセクション（空の場合あり）。
   output_path: JSON出力のファイルパス。
 template: |
@@ -41,6 +42,7 @@ template: |
   {rejected_section}
   {feedback_section}
   {report_section}
+  {amendments_section}
 
   ## 生成ガイドライン
   - 残りのギャップに基づいて0〜2個の新しいWaveを生成
