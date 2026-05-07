@@ -262,7 +262,7 @@ func (*NopSessionEventEmitter) EmitApplyReadyLabels(domain.ReadyLabelsAppliedPay
 }
 func (*NopSessionEventEmitter) EmitSendSpecification(string, string, time.Time) error { return nil }
 func (*NopSessionEventEmitter) EmitSendReport(string, string, time.Time) error        { return nil }
-func (*NopSessionEventEmitter) EmitSendFeedback(string, string, time.Time) error { return nil }
+func (*NopSessionEventEmitter) EmitSendFeedback(string, string, time.Time) error      { return nil }
 func (*NopSessionEventEmitter) EmitReceiveFeedback(domain.FeedbackReceivedPayload, time.Time) error {
 	return nil
 }

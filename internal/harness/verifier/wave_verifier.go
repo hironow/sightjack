@@ -67,4 +67,3 @@ func IsRateLimited(output string) bool {
 	}
 	return false
 }
-

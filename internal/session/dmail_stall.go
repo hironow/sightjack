@@ -27,10 +27,10 @@ func ComposeStallEscalation(ctx context.Context, store port.OutboxStore, wave do
 		Body:          domain.StallEscalationBody(wave, errors, reason),
 		Metadata: map[string]string{
 			"wave_id":           wave.ID,
-			"cluster_name":     wave.ClusterName,
+			"cluster_name":      wave.ClusterName,
 			"error_fingerprint": fingerprint,
 			"failure_count":     strconv.Itoa(failureCount),
-			"detected_at":      time.Now().UTC().Format(time.RFC3339),
+			"detected_at":       time.Now().UTC().Format(time.RFC3339),
 		},
 	}
 	return ComposeDMail(ctx, store, mail)

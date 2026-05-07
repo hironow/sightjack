@@ -82,7 +82,7 @@ func TestScenario_WaitingModeSpecRescan(t *testing.T) {
 	// Phase 6: Re-inject the same spec names and verify idempotency.
 	// The consumed spec names (spec-waiting-001, spec-waiting-002) must not
 	// trigger a second rescan even when re-delivered in a new arrival.
-	waitForLog(t, output, "Waiting for", 30*time.Second) // re-entered waiting phase
+	waitForLog(t, output, "Waiting for", 30*time.Second)                   // re-entered waiting phase
 	ws.InjectDMail(t, ".siren", "inbox", "spec-waiting-001-dup.md", spec1) // same name in D-Mail, different filename
 	time.Sleep(3 * time.Second)
 	rescanCount2 := strings.Count(output.String(), "Auto-rescan")

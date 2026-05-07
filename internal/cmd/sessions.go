@@ -160,4 +160,3 @@ func newSessionsEnterCommand() *cobra.Command {
 	cmd.Flags().String("path", "", "Repository root path")
 	return cmd
 }
-

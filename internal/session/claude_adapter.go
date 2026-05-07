@@ -24,10 +24,10 @@ type ClaudeAdapter struct { // nosemgrep: domain-primitives.public-string-field-
 	Model      string
 	TimeoutSec int
 	Logger     domain.Logger
-	ToolName   string                       // CLI tool name for stream events (e.g. "sightjack")
-	StreamBus  port.SessionStreamPublisher   // optional: live session event streaming
+	ToolName   string                      // CLI tool name for stream events (e.g. "sightjack")
+	StreamBus  port.SessionStreamPublisher // optional: live session event streaming
 	// NewCmd overrides command creation. If nil, platform.NewShellCmd is used.
-	NewCmd     func(ctx context.Context, name string, args ...string) *exec.Cmd
+	NewCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
 	// CancelFunc sets cmd.Cancel for graceful shutdown. If nil, default (process kill) is used.
 	CancelFunc func(cmd *exec.Cmd) func() error
 }

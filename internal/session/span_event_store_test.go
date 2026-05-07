@@ -93,7 +93,7 @@ func TestSpanEventStore_AlwaysCollectsAllAttributes(t *testing.T) {
 	store := NewSpanEventStore(stub).(*SpanEventStore)
 
 	// when
-	store.Append(context.Background(),domain.Event{Type: "test"})
+	store.Append(context.Background(), domain.Event{Type: "test"})
 	store.LoadAll(context.Background())
 
 	// then — all attributes always present
@@ -138,7 +138,7 @@ func TestSpanEventStore_NoPII_InAttributes(t *testing.T) {
 	store := NewSpanEventStore(stub).(*SpanEventStore)
 
 	// when
-	store.Append(context.Background(),domain.Event{Type: "test", Data: secretData})
+	store.Append(context.Background(), domain.Event{Type: "test", Data: secretData})
 	store.LoadAll(context.Background())
 
 	// then — no attribute value contains event body or PII-like data

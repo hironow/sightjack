@@ -14,7 +14,6 @@ import (
 	"github.com/hironow/sightjack/internal/domain"
 )
 
-
 // newTestCommand creates a cobra.Command with --config flag registered on Flags()
 // for direct unit testing of resolveConfigPath (without cobra's execution-time
 // persistent flag merging).

@@ -11,12 +11,12 @@ import (
 type DMailKind string
 
 const (
-	KindSpecification  DMailKind = "specification"
-	KindReport         DMailKind = "report"
-	KindDesignFeedback DMailKind = "design-feedback"
-	KindImplFeedback   DMailKind = "implementation-feedback"
-	KindConvergence    DMailKind = "convergence"
-	KindCIResult       DMailKind = "ci-result"
+	KindSpecification   DMailKind = "specification"
+	KindReport          DMailKind = "report"
+	KindDesignFeedback  DMailKind = "design-feedback"
+	KindImplFeedback    DMailKind = "implementation-feedback"
+	KindConvergence     DMailKind = "convergence"
+	KindCIResult        DMailKind = "ci-result"
 	KindStallEscalation DMailKind = "stall-escalation"
 )
 
