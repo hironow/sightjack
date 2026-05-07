@@ -40,6 +40,5 @@ Use the purge subcommand to remove dead-lettered items.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-* [sightjack dead-letters purge](sightjack_dead-letters_purge.md)	 - Remove dead-lettered outbox items
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack dead-letters purge](sightjack_dead-letters_purge.md)  - Remove dead-lettered outbox items

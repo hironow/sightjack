@@ -60,5 +60,4 @@ sightjack rival export reasons [flags]
 
 ### SEE ALSO
 
-* [sightjack rival export](sightjack_rival_export.md)	 - Export a Rival Contract to an interop format
-
+* [sightjack rival export](sightjack_rival_export.md)  - Export a Rival Contract to an interop format

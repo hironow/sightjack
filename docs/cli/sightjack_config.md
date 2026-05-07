@@ -35,7 +35,6 @@ View or update the .siren/config.yaml configuration file.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-* [sightjack config set](sightjack_config_set.md)	 - Update a configuration value
-* [sightjack config show](sightjack_config_show.md)	 - Display effective configuration
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack config set](sightjack_config_set.md)  - Update a configuration value
+* [sightjack config show](sightjack_config_show.md)  - Display effective configuration

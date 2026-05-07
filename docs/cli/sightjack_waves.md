@@ -45,5 +45,4 @@ sightjack waves [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear

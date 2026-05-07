@@ -20,8 +20,8 @@ type sessionEventEmitter struct {
 	dispatcher port.EventDispatcher
 	logger     domain.Logger
 	seqAlloc   port.SeqAllocator
-	sessionID  string // enriches events with session metadata
-	prevID     string // previous event ID for causation chain
+	sessionID  string          // enriches events with session metadata
+	prevID     string          // previous event ID for causation chain
 	ctx        context.Context //nolint:containedctx // stored for trace propagation into emit chain
 }
 

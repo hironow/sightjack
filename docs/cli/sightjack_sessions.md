@@ -37,7 +37,6 @@ and can be listed, filtered, and re-entered interactively.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
-* [sightjack sessions enter](sightjack_sessions_enter.md)	 - Re-enter an AI coding session interactively
-* [sightjack sessions list](sightjack_sessions_list.md)	 - List recorded coding sessions
-
+* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
+* [sightjack sessions enter](sightjack_sessions_enter.md)  - Re-enter an AI coding session interactively
+* [sightjack sessions list](sightjack_sessions_list.md)  - List recorded coding sessions

@@ -40,6 +40,5 @@ Available targets:
 
 ### SEE ALSO
 
-* [sightjack rival](sightjack_rival.md)	 - Rival Contract v1.1 utilities
-* [sightjack rival export reasons](sightjack_rival_export_reasons.md)	 - Export a Rival Contract v1 spec as OpenSPDD REASONS Canvas
-
+* [sightjack rival](sightjack_rival.md)  - Rival Contract v1.1 utilities
+* [sightjack rival export reasons](sightjack_rival_export_reasons.md)  - Export a Rival Contract v1 spec as OpenSPDD REASONS Canvas
