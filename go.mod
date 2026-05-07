@@ -3,7 +3,7 @@ module github.com/hironow/sightjack
 go 1.26
 
 require (
-	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2
 	github.com/alitto/pond/v2 v2.7.1
 	github.com/creativeprojects/go-selfupdate v1.5.2
