@@ -7,9 +7,8 @@ Generate .mcp.json and .claude/settings.json for subprocess isolation
 Generate .mcp.json and .claude/settings.json for Claude subprocess isolation.
 
 .mcp.json controls which MCP servers are available:
-
-- wave mode (default): empty config (no MCP servers)
-- linear mode (--linear): includes Linear MCP server
+  - wave mode (default): empty config (no MCP servers)
+  - linear mode (--linear): includes Linear MCP server
 
 .claude/settings.json disables all plugins for the subprocess.
 
@@ -41,4 +40,5 @@ sightjack mcp-config generate [path] [flags]
 
 ### SEE ALSO
 
-- [sightjack mcp-config](sightjack_mcp-config.md)  - Manage MCP configuration for Claude subprocess isolation
+* [sightjack mcp-config](sightjack_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
+

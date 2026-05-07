@@ -40,5 +40,6 @@ into the OpenSPDD REASONS Canvas markdown shape.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)  - SIREN-inspired issue architecture tool for Linear
-* [sightjack rival export](sightjack_rival_export.md)  - Export a Rival Contract to an interop format
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+* [sightjack rival export](sightjack_rival_export.md)	 - Export a Rival Contract to an interop format
+

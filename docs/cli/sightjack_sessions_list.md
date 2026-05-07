@@ -30,4 +30,5 @@ sightjack sessions list [flags]
 
 ### SEE ALSO
 
-* [sightjack sessions](sightjack_sessions.md)  - Manage AI coding sessions
+* [sightjack sessions](sightjack_sessions.md)	 - Manage AI coding sessions
+

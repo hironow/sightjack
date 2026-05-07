@@ -52,4 +52,5 @@ sightjack dead-letters purge [path] [flags]
 
 ### SEE ALSO
 
-* [sightjack dead-letters](sightjack_dead-letters.md)  - Manage dead-lettered outbox items
+* [sightjack dead-letters](sightjack_dead-letters.md)	 - Manage dead-lettered outbox items
+
