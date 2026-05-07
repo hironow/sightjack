@@ -18,6 +18,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform/projectid"
 	"github.com/hironow/sightjack/internal/usecase/port"
 	"gopkg.in/yaml.v3"
 )
@@ -96,6 +97,7 @@ func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *domain.DMai
 	if err := ValidateDMail(mail); err != nil {
 		return err
 	}
+	mail.Metadata = projectid.InjectProjectID(mail.Metadata)
 	data, err := MarshalDMail(mail)
 	if err != nil {
 		return err
@@ -330,8 +332,8 @@ type FeedbackCollector struct {
 	items         []*domain.DMail
 	convNames     []string
 	notifier      port.Notifier
-	notify        chan struct{} // signals new D-Mail arrival (buffered, size 1)
-	snapshotIdx   int           // index up to which items have been seen
+	notify        chan struct{}   // signals new D-Mail arrival (buffered, size 1)
+	snapshotIdx   int             // index up to which items have been seen
 	consumedSpecs map[string]bool // spec D-Mail names already used as rescan triggers (cross-cycle idempotency)
 }
 

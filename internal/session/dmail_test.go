@@ -2757,3 +2757,64 @@ func TestComposeSpecification_MixedActions(t *testing.T) {
 		}
 	}
 }
+
+func TestComposeDMail_InjectsProjectIDFromEnv(t *testing.T) {
+	// given
+	t.Setenv("RUNOPS_PROJECT_ID", "alpha-bridge")
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := domain.Wave{
+		ID:          "w1",
+		ClusterName: "gate",
+		Title:       "Gate test",
+		Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
+	}
+
+	// when
+	if err := session.ComposeSpecification(context.Background(), store, wave); err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+
+	// then
+	matches, _ := filepath.Glob(filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-gate-w1_*.md"))
+	if len(matches) == 0 {
+		t.Fatal("spec d-mail not found in outbox")
+	}
+	data, _ := os.ReadFile(matches[0])
+	mail, _ := session.ParseDMail(data)
+	if got := mail.Metadata["project_id"]; got != "alpha-bridge" {
+		t.Errorf("project_id: got %q, want %q", got, "alpha-bridge")
+	}
+}
+
+func TestComposeDMail_OmitsProjectIDWhenUnresolved(t *testing.T) {
+	// given — env unset + tmp HOME so cwd inference cannot match projects/<id>
+	t.Setenv("RUNOPS_PROJECT_ID", "")
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	session.EnsureMailDirs(dir)
+	store := testOutboxStore(t, dir)
+	wave := domain.Wave{
+		ID:          "w1",
+		ClusterName: "gate",
+		Title:       "Gate test",
+		Actions:     []domain.WaveAction{{Type: "add_dod", IssueID: "MY-1", Description: "test"}},
+	}
+
+	// when
+	if err := session.ComposeSpecification(context.Background(), store, wave); err != nil {
+		t.Fatalf("ComposeSpecification: %v", err)
+	}
+
+	// then — legacy single-mode: no project_id key in metadata
+	matches, _ := filepath.Glob(filepath.Join(domain.MailDir(dir, "outbox"), "sj-spec-gate-w1_*.md"))
+	if len(matches) == 0 {
+		t.Fatal("spec d-mail not found in outbox")
+	}
+	data, _ := os.ReadFile(matches[0])
+	mail, _ := session.ParseDMail(data)
+	if _, present := mail.Metadata["project_id"]; present {
+		t.Errorf("project_id should be omitted when unresolved, got %q", mail.Metadata["project_id"])
+	}
+}
