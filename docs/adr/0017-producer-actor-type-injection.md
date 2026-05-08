@@ -79,9 +79,9 @@ func IsValidActorType(t string) bool
 //
 // Wiring:
 //
-//	updated, err := actortype.InjectActorType(mail.Metadata)
-//	if err != nil { return fmt.Errorf("dmail emit: %w", err) }
-//	mail.Metadata = updated
+// updated, err := actortype.InjectActorType(mail.Metadata)
+// if err != nil { return fmt.Errorf("dmail emit: %w", err) }
+// mail.Metadata = updated
 func InjectActorType(metadata map[string]string) (map[string]string, error)
 ```
 
