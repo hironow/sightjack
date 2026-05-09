@@ -5,7 +5,7 @@
 **Linked ADR (gateway):** runops-gateway docs/adr/0035-ai-agent-cannot-approve-ai-agent.md (architectural pin)
 **Linked ADR (gateway):** runops-gateway docs/adr/0036-phase-4a-approval-actor-validation.md (effective rule)
 **Linked ADR (gateway):** runops-gateway docs/adr/0037-producer-actor-classification.md (4 axes contract、 §Tests proving coverage の per-tool 必須要件)
-**Linked issue:** /Users/nino/tap/refs/docs/issues/0011-runops-gateway-ai-agent-identity-4-eyes.md
+**Linked issue:** refs/docs/issues/0011-runops-gateway-ai-agent-identity-4-eyes.md
 **Template precedent:** ADR 0016 (producer-side `project_id` injection)
 
 ## Context
