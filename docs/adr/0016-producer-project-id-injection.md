@@ -2,9 +2,9 @@
 
 **Date:** 2026-05-07
 **Status:** Accepted (2026-05-09, producer 4 ツール main merged: sj #203 `1998d182` / pt #205 `1eaa881d` / am #206 `bd82a1c4` / dom #19 `cfed12c4`)
-**Linked plan:** `/Users/nino/.claude-work-a/plans/2026-05-07-phase-alpha-bridge-producer-project-id.md` (v3)
-**Linked spec:** `/Users/nino/tap/refs/docs/dmail-metadata-v1-1.md`
-**Linked audit:** `/Users/nino/tap/refs/docs/audit-multiplex-readiness.md` §軸 5
+**Linked plan:** (operator local plan reference, path omitted)
+**Linked spec:** `refs/docs/dmail-metadata-v1-1.md`
+**Linked audit:** `refs/docs/audit-multiplex-readiness.md` §軸 5
 
 ## Context
 
@@ -96,8 +96,8 @@ env var `RUNOPS_PROJECT_ID` 未設定 + CWD が `~/projects/<id>/` 配下でな�
 
 ## References
 
-- plan v3: `/Users/nino/.claude-work-a/plans/2026-05-07-phase-alpha-bridge-producer-project-id.md`
-- spec: `/Users/nino/tap/refs/docs/dmail-metadata-v1-1.md`
-- audit 軸 5: `/Users/nino/tap/refs/docs/audit-multiplex-readiness.md`
+- plan v3: (operator local plan reference, path omitted)
+- spec: `refs/docs/dmail-metadata-v1-1.md`
+- audit 軸 5: `refs/docs/audit-multiplex-readiness.md`
 - 4 ツール copy-sync 原則: shared ADR S0037 (substrate canonical lock)
 - gateway-side `domain.ValidateProjectID`: regex `^[a-zA-Z0-9_-]+$` + max 64 chars
