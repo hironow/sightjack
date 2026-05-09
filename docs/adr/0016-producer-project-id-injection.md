@@ -1,7 +1,7 @@
 # 0016. Producer-side `project_id` injection (Phase α↔β bridge)
 
 **Date:** 2026-05-07
-**Status:** Proposed
+**Status:** Accepted (2026-05-09, producer 4 ツール main merged: sj #203 `1998d182` / pt #205 `1eaa881d` / am #206 `bd82a1c4` / dom #19 `cfed12c4`)
 **Linked plan:** `/Users/nino/.claude-work-a/plans/2026-05-07-phase-alpha-bridge-producer-project-id.md` (v3)
 **Linked spec:** `/Users/nino/tap/refs/docs/dmail-metadata-v1-1.md`
 **Linked audit:** `/Users/nino/tap/refs/docs/audit-multiplex-readiness.md` §軸 5
