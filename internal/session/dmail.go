@@ -18,6 +18,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform/actortype"
 	"github.com/hironow/sightjack/internal/platform/projectid"
 	"github.com/hironow/sightjack/internal/usecase/port"
 	"gopkg.in/yaml.v3"
@@ -98,6 +99,11 @@ func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *domain.DMai
 		return err
 	}
 	mail.Metadata = projectid.InjectProjectID(mail.Metadata)
+	metadata, err := actortype.InjectActorType(mail.Metadata)
+	if err != nil {
+		return fmt.Errorf("dmail compose: invalid actor type env: %w", err)
+	}
+	mail.Metadata = metadata
 	data, err := MarshalDMail(mail)
 	if err != nil {
 		return err
