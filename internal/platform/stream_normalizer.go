@@ -21,6 +21,7 @@ type StreamNormalizer struct {
 	sessionID       string            // captured from first non-empty provider session_id
 	codingSessionID string            // our CodingSessionRecord.ID
 	subagents       map[string]string // tool_use_id -> subagent_id
+	lastErr         error             // cached for SessionEnd
 	lastUsage       *Usage            // saved from result message for SessionEnd
 	lastCost        float64           // saved from result message for SessionEnd
 	lastDuration    int64             // saved from result message for SessionEnd (ms)
