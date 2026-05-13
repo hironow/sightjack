@@ -38,6 +38,14 @@ linters:
       - path: 'vendor/'
         linters:
           - all
+      # internal/platform/stream_normalizer.go is a 3-tool canonical
+      # lock target (sightjack / paintress / amadeus). The lastErr
+      # field is currently dead but lives in all three copies; a
+      # cross-tool sweep PR will remove it later. Until then,
+      # tolerate the unused field so the canonical hash stays stable.
+      - path: 'internal/platform/stream_normalizer\.go'
+        linters:
+          - unused
 
   settings:
     revive:
