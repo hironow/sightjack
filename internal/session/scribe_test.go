@@ -255,7 +255,10 @@ func TestSanitizeADRTitle_SpecialChars(t *testing.T) {
 
 	// then: should only contain safe chars
 	for _, r := range result {
-		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+		isLower := r >= 'a' && r <= 'z'
+		isDigit := r >= '0' && r <= '9'
+		isPunct := r == '-' || r == '_'
+		if !isLower && !isDigit && !isPunct {
 			t.Errorf("unexpected character %q in sanitized title %s", r, result)
 		}
 	}

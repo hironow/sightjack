@@ -120,17 +120,6 @@ func writeTestEvents(t *testing.T, baseDir, sessionID string, state *domain.Sess
 	}
 }
 
-// testRecorder creates a real Recorder backed by the event store for lifecycle tests.
-func testRecorder(baseDir, sessionID string) port.Recorder {
-	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
-	ctx := context.Background()
-	rec, recErr := eventsource.NewSessionRecorder(ctx, store, sessionID, nil)
-	if recErr != nil {
-		panic("NewSessionRecorder: " + recErr.Error())
-	}
-	return rec
-}
-
 func testEmitter(baseDir, sessionID string) port.SessionEventEmitter {
 	store := eventsource.NewFileEventStore(eventsource.EventStorePath(testStateDir(baseDir), sessionID), &domain.NopLogger{})
 	agg := domain.NewSessionAggregate()

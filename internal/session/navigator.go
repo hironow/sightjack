@@ -28,23 +28,23 @@ func RenderNavigator(result *domain.ScanResult, projectName string) string {
 	completePct := int(result.Completeness * 100)
 
 	border := strings.Repeat("=", NavigatorWidth)
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
-	b.WriteString(fmt.Sprintf("|%s|\n", Center("SIGHTJACK - Link Navigator", NavigatorWidth)))
+	fmt.Fprintf(&b, "+%s+\n", border)
+	fmt.Fprintf(&b, "|%s|\n", Center("SIGHTJACK - Link Navigator", NavigatorWidth))
 	projName := PadRight(Truncate(projectName, 20), 20)
 	projRow := "  Project: " + projName + "  |  Completeness: " + fmt.Sprintf("%3d%%", completePct)
 	b.WriteString("|" + PadRight(projRow, NavigatorWidth) + "|\n")
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
+	fmt.Fprintf(&b, "+%s+\n", border)
 
-	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", NavigatorWidth)))
+	fmt.Fprintf(&b, "|%s|\n", strings.Repeat(" ", NavigatorWidth))
 	header := fmt.Sprintf("  %-*s", maxClusterName, "Cluster")
 	for i := 1; i <= waveColumns; i++ {
 		header += fmt.Sprintf("  W%d  ", i)
 	}
 	header += "  Comp."
-	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, header))
+	fmt.Fprintf(&b, "| %-*s|\n", NavigatorWidth-1, header)
 
 	separator := "  " + strings.Repeat("-", NavigatorWidth-4)
-	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, separator))
+	fmt.Fprintf(&b, "| %-*s|\n", NavigatorWidth-1, separator)
 
 	for _, cluster := range result.Clusters {
 		pct := int(cluster.Completeness * 100)
@@ -57,11 +57,11 @@ func RenderNavigator(result *domain.ScanResult, projectName string) string {
 		b.WriteString("|" + PadRight(" "+row, NavigatorWidth) + "|\n")
 	}
 
-	b.WriteString(fmt.Sprintf("|%s|\n", strings.Repeat(" ", NavigatorWidth)))
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
-	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, " [] not generated  [=] available  [#] complete"))
-	b.WriteString(fmt.Sprintf("| %-*s|\n", NavigatorWidth-1, " [x] locked (dependency)"))
-	b.WriteString(fmt.Sprintf("+%s+\n", border))
+	fmt.Fprintf(&b, "|%s|\n", strings.Repeat(" ", NavigatorWidth))
+	fmt.Fprintf(&b, "+%s+\n", border)
+	fmt.Fprintf(&b, "| %-*s|\n", NavigatorWidth-1, " [] not generated  [=] available  [#] complete")
+	fmt.Fprintf(&b, "| %-*s|\n", NavigatorWidth-1, " [x] locked (dependency)")
+	fmt.Fprintf(&b, "+%s+\n", border)
 
 	return b.String()
 }
@@ -79,12 +79,12 @@ func RenderMatrixNavigator(result *domain.ScanResult, projectName string, waves 
 
 	// --- Header block (free-form, above the grid) ---
 	b.WriteString("  SIGHTJACK - Link Navigator\n")
-	b.WriteString(fmt.Sprintf("  Project: %s\n", projectName))
+	fmt.Fprintf(&b, "  Project: %s\n", projectName)
 	if lastScanned != nil {
-		b.WriteString(fmt.Sprintf("  Session: resumed (last scan: %s)\n", lastScanned.Format("2006-01-02 15:04")))
+		fmt.Fprintf(&b, "  Session: resumed (last scan: %s)\n", lastScanned.Format("2006-01-02 15:04"))
 	}
 	if shibitoCount > 0 {
-		b.WriteString(fmt.Sprintf("  Shibito: %d\n", shibitoCount))
+		fmt.Fprintf(&b, "  Shibito: %d\n", shibitoCount)
 	}
 
 	// --- Grid ---
@@ -165,20 +165,6 @@ func RenderMatrixNavigator(result *domain.ScanResult, projectName string, waves 
 	}
 
 	return b.String()
-}
-
-// waveStatusSymbol returns a 5-character cell for a wave's status.
-func waveStatusSymbol(status string) string {
-	switch status {
-	case "available":
-		return " [ ] "
-	case "locked":
-		return " [x] "
-	case "completed":
-		return " [=] "
-	default:
-		return " [?] "
-	}
 }
 
 // waveStatusSymbol3 returns a compact 3-character symbol for a wave's status.

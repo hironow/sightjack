@@ -80,11 +80,12 @@ func GenerateNextWaves(ctx context.Context, cfg *domain.Config, scanDir string, 
 		logger.Warn("save nextgen prompt: %v", err)
 	}
 	nextgenLog, nextgenLogErr := os.Create(filepath.Join(scanDir, promptBase+"_output.log"))
-	nextgenOut := io.Writer(io.Discard)
+	var nextgenOut io.Writer
 	if nextgenLogErr == nil {
 		defer nextgenLog.Close()
 		nextgenOut = nextgenLog
 	} else {
+		nextgenOut = io.Discard
 		logger.Warn("create nextgen log: %v", nextgenLogErr)
 	}
 
