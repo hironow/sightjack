@@ -56,6 +56,15 @@ linters:
         - name: var-naming
           arguments:
             - ["ID", "URL", "HTTP", "API", "JSON", "TLS"]
+    misspell:
+      # i18n message tables include French / German / etc. strings
+      # whose substrings collide with English typo dictionary entries
+      # (e.g. `démarrage` -> "marrage", `stratégies` -> "strat").
+      # These are false positives for our use; ignore the substrings
+      # rather than disabling misspell globally.
+      ignore-rules:
+        - marrage
+        - strat
 
 issues:
   max-same-issues: 50
