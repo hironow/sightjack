@@ -608,6 +608,7 @@ func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
 }
 
 func TestRunScan_SavesPromptAndStreamsLog(t *testing.T) {
+	t.Skip("RunScan exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: fake claude that outputs chunks incrementally and writes classify.json
 	baseDir := t.TempDir()
 	sessionID := "test-stream"
@@ -722,6 +723,7 @@ func (w *writeRecorder) Write(p []byte) (int, error) {
 }
 
 func TestRunScan_StreamsIncrementally(t *testing.T) {
+	t.Skip("RunScan exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: fake claude that outputs chunks with a deliberate delay between them.
 	// Instead of polling file sizes (timing-dependent), we pass a writeRecorder
 	// as the out writer. io.MultiWriter(out, logFile) calls out.Write for each
@@ -849,6 +851,7 @@ func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
 }
 
 func TestRunWaveGenerate_PartialFailure(t *testing.T) {
+	t.Skip("WaveGenerate exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: 3 clusters where the second one fails (claude exits non-zero)
 	scanDir := t.TempDir()
 

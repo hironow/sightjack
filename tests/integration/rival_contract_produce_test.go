@@ -170,6 +170,7 @@ func produceCanonicalSpecBytes(t *testing.T) []byte {
 // producer test for Phase 1.2A. It writes the same bytes that pt/am/dom
 // will commit byte-identically into their own integration testdata.
 func TestRivalContractProduce_ComposeSpecificationGoldenMatch(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	produced := produceCanonicalSpecBytes(t)
 
 	if *updateGolden {

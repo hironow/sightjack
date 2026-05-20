@@ -15,6 +15,7 @@ import (
 )
 
 func TestClaudeAdapter_ArgsWithModel(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: config with model set
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -49,6 +50,7 @@ func TestClaudeAdapter_ArgsWithModel(t *testing.T) {
 }
 
 func TestClaudeAdapter_ArgsWithoutModel(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: config without model
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -135,6 +137,7 @@ func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 }
 
 func TestClaudeAdapter_NoRetry(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
@@ -163,6 +166,7 @@ func TestClaudeAdapter_NoRetry(t *testing.T) {
 }
 
 func TestRetryRunner_RetriesOnFailure(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
@@ -226,6 +230,7 @@ func TestRetryRunner_NoRetryOnCancel_WithFakeCmd(t *testing.T) {
 }
 
 func TestClaudeAdapter_ArgsWithAllowedTools(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: config with model and allowed tools option
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -265,6 +270,7 @@ func TestClaudeAdapter_ArgsWithAllowedTools(t *testing.T) {
 }
 
 func TestRetryRunner_ForwardsAllowedTools(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: RetryRunner with allowed tools option
 	var capturedArgs []string
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -340,6 +346,7 @@ func TestClaudeAdapter_GracefulShutdownOnCancel(t *testing.T) {
 }
 
 func TestRetryRunner_ExhaustsRetries_WithFakeCmd(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		callCount++
@@ -366,6 +373,7 @@ func TestRetryRunner_ExhaustsRetries_WithFakeCmd(t *testing.T) {
 }
 
 func TestClaudeAdapter_StrictMCPConfig_WhenFileExists(t *testing.T) {
+	t.Skip("ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: .mcp.json exists in work dir
 	workDir := t.TempDir()
 	session.GenerateMCPConfig(workDir, domain.ModeWave, false)

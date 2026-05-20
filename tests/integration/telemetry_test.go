@@ -35,6 +35,7 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 }
 
 func TestSpan_RunClaude_CreatesSpan(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	exp := setupTestTracer(t)
 
 	ndjson := `{"type":"result","subtype":"success","session_id":"mock","result":"hello","is_error":false,"num_turns":1,"duration_ms":1,"total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`

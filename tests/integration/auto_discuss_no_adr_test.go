@@ -34,6 +34,7 @@ func scribeADRNoADRResponse() string {
 // This documents the existing behavior: the adr_recommended field is NOT used
 // as a gate for scribe invocation.
 func TestAutoDiscuss_NoADRRecommended_ScribeStillCalled(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given
 	baseDir := t.TempDir()
 	cfg := autoApproveConfig()

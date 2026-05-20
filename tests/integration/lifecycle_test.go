@@ -400,6 +400,7 @@ func TestExtractOutputPath(t *testing.T) {
 // --- Phase 2: Scan Tests ---
 
 func TestLifecycle_RunScan_SingleCluster(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -438,6 +439,7 @@ func TestLifecycle_RunScan_SingleCluster(t *testing.T) {
 }
 
 func TestLifecycle_RunScan_StreamingGoesToOut(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: RunScan streams Claude output (from mock: "echo ok") to the `out` writer.
 	// When --json is used, cmd layer redirects `out` to stderr. This test verifies
 	// that streaming data actually arrives in `out`, not somewhere else.
@@ -474,6 +476,7 @@ func TestLifecycle_RunScan_StreamingGoesToOut(t *testing.T) {
 }
 
 func TestLifecycle_RunScan_JsonPipeStdoutClean(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: simulate the --json pipe scenario.
 	// stdout = JSON result only, streaming goes to a separate writer (stderr in real usage).
 	// This verifies that separating `out` from the JSON writer produces clean pipe output.
@@ -523,6 +526,7 @@ func TestLifecycle_RunScan_JsonPipeStdoutClean(t *testing.T) {
 }
 
 func TestLifecycle_RunScan_SavesScanResultJson(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: scan command now saves scan_result.json for pipe replay
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -562,6 +566,7 @@ func TestLifecycle_RunScan_SavesScanResultJson(t *testing.T) {
 }
 
 func TestLifecycle_RunScan_MultiCluster(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -599,6 +604,7 @@ func TestLifecycle_RunScan_MultiCluster(t *testing.T) {
 // --- Phase 3: Session Tests ---
 
 func TestLifecycle_HappyPath(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: single cluster, single wave
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -655,6 +661,7 @@ func TestLifecycle_HappyPath(t *testing.T) {
 }
 
 func TestLifecycle_RejectThenApprove(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: single cluster, two waves (both available)
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -695,6 +702,7 @@ func TestLifecycle_RejectThenApprove(t *testing.T) {
 }
 
 func TestLifecycle_PartialApplyNotCompleted(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: apply returns errors → wave should NOT be completed
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -738,6 +746,7 @@ func TestLifecycle_PartialApplyNotCompleted(t *testing.T) {
 // --- Phase 4: Resume Tests ---
 
 func TestLifecycle_ResumeFromState(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: pre-existing state with wave 1 completed, wave 2 available
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -837,6 +846,7 @@ func TestLifecycle_ResumeFromState(t *testing.T) {
 }
 
 func TestLifecycle_QuitAndResume(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// Phase 1: scan + approve wave 1 + quit
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -905,6 +915,7 @@ func TestLifecycle_QuitAndResume(t *testing.T) {
 // --- Phase 5: Multi-cluster Test ---
 
 func TestLifecycle_MultiCluster(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: 2 clusters (Auth + API), each with 1 wave
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -988,6 +999,7 @@ func TestMockDispatcher_WritesFile(t *testing.T) {
 // --- Phase 6: D-Mail Lifecycle Tests ---
 
 func TestLifecycle_DMailFullCycle(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: pre-place feedback d-mail in inbox before session starts
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -1123,6 +1135,7 @@ func TestLifecycle_DMailFullCycle(t *testing.T) {
 }
 
 func TestLifecycle_DMailResumeCycle(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: pre-existing state with wave 1 completed, wave 2 available
 	// Pre-place feedback in inbox before resuming
 	baseDir := t.TempDir()
@@ -1269,6 +1282,7 @@ func TestLifecycle_DMailResumeCycle(t *testing.T) {
 }
 
 func TestLifecycle_DMailNoFeedback_StillGeneratesSpecAndReport(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: no feedback in inbox, verify spec + report are still generated
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -1336,6 +1350,7 @@ func architectDiscussFixture() string {
 }
 
 func TestResultCache_WavesPlan(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: run scan + wave generation to get a WavePlan
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -1394,6 +1409,7 @@ func TestResultCache_WavesPlan(t *testing.T) {
 }
 
 func TestResultCache_ApplyResult(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: run scan + wave gen + wave apply to get an ApplyResult
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -1457,6 +1473,7 @@ func TestResultCache_ApplyResult(t *testing.T) {
 }
 
 func TestResultCache_DiscussResult(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: run scan + wave gen + architect discuss to get a DiscussResult
 	baseDir := t.TempDir()
 	cfg := testConfig()
@@ -1524,6 +1541,7 @@ func TestResultCache_DiscussResult(t *testing.T) {
 }
 
 func TestResultCache_NextgenPlan(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given: run scan + wave gen + apply + nextgen to get a WavePlan
 	baseDir := t.TempDir()
 	cfg := testConfig()

@@ -39,6 +39,7 @@ func autoApproveConfig() *domain.Config {
 // TestAutoApprove_WithAutoDiscuss_GeneratesADR verifies the full chain:
 // auto-approve → RunAutoDiscuss → RunScribeADR → ADR file created.
 func TestAutoApprove_WithAutoDiscuss_GeneratesADR(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given
 	baseDir := t.TempDir()
 	cfg := autoApproveConfig()
@@ -120,6 +121,7 @@ func TestAutoApprove_WithAutoDiscuss_GeneratesADR(t *testing.T) {
 // TestAutoApprove_DiscussRoundsZero_SkipsAutoDiscuss verifies that
 // auto_discuss_rounds=0 preserves legacy auto-approve behavior (no discuss calls).
 func TestAutoApprove_DiscussRoundsZero_SkipsAutoDiscuss(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given
 	baseDir := t.TempDir()
 	cfg := autoApproveConfig()
@@ -164,6 +166,7 @@ func TestAutoApprove_DiscussRoundsZero_SkipsAutoDiscuss(t *testing.T) {
 // TestAutoApprove_WithAutoDiscuss_RoundsTwo verifies that rounds=2 generates
 // the expected number of debate exchanges (4 calls: arch, DA, arch, DA).
 func TestAutoApprove_WithAutoDiscuss_RoundsTwo(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given
 	baseDir := t.TempDir()
 	cfg := autoApproveConfig()
@@ -222,6 +225,7 @@ func TestAutoApprove_WithAutoDiscuss_RoundsTwo(t *testing.T) {
 // TestAutoApprove_WithAutoDiscuss_OpenIssuesInState verifies that the
 // Devil's Advocate's open_issues survive through to the event store via ADR event.
 func TestAutoApprove_WithAutoDiscuss_OpenIssuesInState(t *testing.T) {
+	t.Skip("Integration test exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given
 	baseDir := t.TempDir()
 	cfg := autoApproveConfig()

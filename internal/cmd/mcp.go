@@ -38,6 +38,11 @@ feat/jun15-mcp-pivot branch.
 
 Not to be confused with 'sightjack mcp-config' (subcommand managing
 the legacy .mcp.json file consumed by the embedded claude_adapter).`,
+		Example: `  # Launch claude code with the sightjack MCP server attached
+  claude --mcp-config '{"sightjack":{"command":"sightjack","args":["mcp"]}}'
+
+  # Pipe a tools/list request manually (for debugging)
+  echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | sightjack mcp`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil)
 			return srv.Serve(cmd.Context())

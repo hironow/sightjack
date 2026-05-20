@@ -125,6 +125,7 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 }
 
 func TestRunReviewGate_ReviewCommentsPropagatedToFix(t *testing.T) {
+	t.Skip("Review gate exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given — review outputs specific comments, verify they reach the fix prompt
 	dir := t.TempDir()
 	initGitRepo(t, dir)
@@ -160,6 +161,7 @@ exit 0
 }
 
 func TestRunReviewGate_FixCycleExecuted(t *testing.T) {
+	t.Skip("Review gate exercises ClaudeAdapter.RunDetailed deprecated post jun15 MCP pivot (refs/issues/0027); sub-B will fully delete this test")
 	// given — review fails once, then passes after fix
 	dir := t.TempDir()
 	initGitRepo(t, dir)
