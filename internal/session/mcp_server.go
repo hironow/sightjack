@@ -94,18 +94,7 @@ func (s *MCPServer) handle(line []byte) error {
 	}
 	switch msg.Method {
 	case "tools/list":
-		return s.respond(msg.ID, map[string]any{
-			"tools": []map[string]any{
-				{
-					"name":        "sightjack.ping",
-					"description": "Health check tool. Returns 'pong'. Real tools land in subsequent commits on feat/jun15-mcp-pivot.",
-					"inputSchema": map[string]any{
-						"type":       "object",
-						"properties": map[string]any{},
-					},
-				},
-			},
-		})
+		return s.respond(msg.ID, map[string]any{"tools": toolDescriptors()})
 	case "tools/call":
 		var call struct {
 			Name      string          `json:"name"`
@@ -114,17 +103,125 @@ func (s *MCPServer) handle(line []byte) error {
 		if err := json.Unmarshal(msg.Params, &call); err != nil {
 			return s.respondError(msg.ID, -32602, "invalid tools/call params")
 		}
-		if call.Name == "sightjack.ping" {
-			return s.respond(msg.ID, map[string]any{
-				"content": []map[string]any{
-					{"type": "text", "text": "pong"},
-				},
-			})
+		switch call.Name {
+		case "sightjack.ping":
+			return s.respond(msg.ID, textResult("pong"))
+		case "sightjack.next_wave":
+			return s.respond(msg.ID, stubNextWave())
+		case "sightjack.get_scan_result":
+			return s.respond(msg.ID, stubGetScanResult(call.Arguments))
+		case "sightjack.update_strictness":
+			return s.respond(msg.ID, stubUpdateStrictness(call.Arguments))
+		default:
+			return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
 		}
-		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
 	default:
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("method not implemented: %s", msg.Method))
 	}
+}
+
+// toolDescriptors returns the Phase 2a MVP tool set. Each entry pins
+// the interface (name, description, inputSchema) so claude code
+// clients see a stable contract. The handler bodies (stubNextWave /
+// stubGetScanResult / stubUpdateStrictness) are placeholders that
+// ship in subsequent commits with real domain wiring.
+func toolDescriptors() []map[string]any {
+	return []map[string]any{
+		{
+			"name":        "sightjack.ping",
+			"description": "Health check. Returns 'pong'.",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			"name":        "sightjack.next_wave",
+			"description": "Return the next implementation wave (Phase 2a: stub returns a placeholder Wave payload until the domain wiring lands).",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			"name":        "sightjack.get_scan_result",
+			"description": "Return the latest scan result for the given session id (Phase 2a: stub echoes the requested id with a contract descriptor).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]any{"type": "string"},
+				},
+				"required": []any{"session_id"},
+			},
+		},
+		{
+			"name":        "sightjack.update_strictness",
+			"description": "Update the scan strictness level (Phase 2a: stub echoes the requested level and a placeholder previous level).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"level": map[string]any{"type": "string", "description": "strictness level: lax / normal / strict"},
+				},
+				"required": []any{"level"},
+			},
+		},
+	}
+}
+
+// textResult wraps a plain string into the MCP content envelope.
+func textResult(text string) map[string]any {
+	return map[string]any{"content": []map[string]any{{"type": "text", "text": text}}}
+}
+
+// jsonResult marshals data as JSON and returns an MCP content envelope.
+func jsonResult(data any) map[string]any {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return textResult(fmt.Sprintf(`{"error":"marshal failed: %v"}`, err))
+	}
+	return map[string]any{"content": []map[string]any{{"type": "text", "text": string(body)}}}
+}
+
+// stubNextWave returns a fixed placeholder Wave payload. Replaced by
+// real domain wiring (= scan event sourcing + cluster ranking) in a
+// subsequent commit on feat/jun15-mcp-pivot.
+func stubNextWave() map[string]any {
+	return jsonResult(map[string]any{
+		"stub":     true,
+		"wave":     nil,
+		"reason":   "phase-2a-mvp: real implementation lands when the domain wiring commit replaces this stub",
+		"contract": map[string]any{"id": "string", "title": "string", "cluster_name": "string", "status": "string", "issues": "array of issue ids"},
+	})
+}
+
+// stubGetScanResult echoes the requested session id with a placeholder
+// scan result so claude code clients can exercise the contract
+// end-to-end before the real ScanResult wiring lands.
+func stubGetScanResult(args json.RawMessage) map[string]any {
+	var payload struct {
+		SessionID string `json:"session_id"`
+	}
+	if len(args) > 0 {
+		_ = json.Unmarshal(args, &payload)
+	}
+	return jsonResult(map[string]any{
+		"stub":       true,
+		"session_id": payload.SessionID,
+		"result":     nil,
+		"reason":     "phase-2a-mvp: real scan result fetch lands when the eventsource bridge is wired",
+		"contract":   map[string]any{"clusters": "array", "completeness": "float (0..1)", "generated_at": "timestamp"},
+	})
+}
+
+// stubUpdateStrictness echoes the requested level with a placeholder
+// previous level.
+func stubUpdateStrictness(args json.RawMessage) map[string]any {
+	var payload struct {
+		Level string `json:"level"`
+	}
+	if len(args) > 0 {
+		_ = json.Unmarshal(args, &payload)
+	}
+	return jsonResult(map[string]any{
+		"stub":           true,
+		"requested":      payload.Level,
+		"previous_level": "normal",
+		"reason":         "phase-2a-mvp: real strictness state wiring lands when the projection store is exposed",
+	})
 }
 
 func (s *MCPServer) respond(id json.RawMessage, result any) error {
