@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -152,8 +155,8 @@ func TestMCPServer_GetScanResultStub_EchoesSessionID(t *testing.T) {
 	}
 }
 
-func TestMCPServer_UpdateStrictnessStub_EchoesLevel(t *testing.T) {
-	// given
+func TestMCPServer_UpdateStrictness_UninitializedBaseDir(t *testing.T) {
+	// given: NewMCPServer without WithBaseDir → uninitialized response.
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"strict"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
@@ -165,11 +168,57 @@ func TestMCPServer_UpdateStrictnessStub_EchoesLevel(t *testing.T) {
 
 	// then
 	body := decodeFirstText(t, &out)
-	if got, _ := body["requested"].(string); got != "strict" {
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false (empty baseDir)", body["initialized"])
+	}
+	if body["requested"] != "strict" {
 		t.Errorf("requested = %v, want strict", body["requested"])
 	}
-	if got, _ := body["previous_level"].(string); got != "normal" {
-		t.Errorf("previous_level = %v, want normal (stub default)", body["previous_level"])
+}
+
+func TestMCPServer_UpdateStrictness_RealImpl_ReadsCurrentFromConfig(t *testing.T) {
+	// given: temp baseDir with a sightjack config (= default strictness 'fog').
+	baseDir := t.TempDir()
+	cfgPath := domain.ConfigPath(baseDir)
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
+		t.Fatalf("mkdir state: %v", err)
+	}
+	cfg := `tracker:
+  source: linear
+scan:
+  team: TEAM-A
+strictness:
+  default: fog
+retry:
+  max_attempts: 3
+labels: {}
+`
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"strict"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: initialized=true + current_level=fog + preview_level=strict
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true (body=%v)", body["initialized"], body)
+	}
+	if body["current_level"] != "fog" {
+		t.Errorf("current_level = %v, want fog", body["current_level"])
+	}
+	if body["preview_level"] != "strict" {
+		t.Errorf("preview_level = %v, want strict", body["preview_level"])
+	}
+	if body["persistence"] != "preview-only" {
+		t.Errorf("persistence = %v, want preview-only", body["persistence"])
 	}
 }
 
