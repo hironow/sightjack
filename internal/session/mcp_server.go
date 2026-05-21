@@ -28,11 +28,17 @@ import (
 //
 // Protocol: JSON-RPC 2.0 over stdio, one envelope per line. Stderr
 // carries human-readable diagnostics (per the project stdout/stderr
-// separation invariant). Pattern follows paintress Phase 1 (ADR 0017).
+// separation invariant). Pattern follows paintress Phase 1 (ADR 0017)
+// + paintress Phase 3 real impl (= e84988b / 83cb3ca) WithContinent
+// pattern.
+//
+// baseDir is the project root used to resolve config / scan results /
+// wave plan paths. When empty, real-impl tools return uninitialized.
 type MCPServer struct {
-	in     io.Reader
-	out    io.Writer
-	logger domain.Logger
+	in      io.Reader
+	out     io.Writer
+	logger  domain.Logger
+	baseDir string
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -42,6 +48,14 @@ func NewMCPServer(in io.Reader, out io.Writer, logger domain.Logger) *MCPServer 
 		logger = &domain.NopLogger{}
 	}
 	return &MCPServer{in: in, out: out, logger: logger}
+}
+
+// WithBaseDir sets the project root used by real-impl MCP tools to
+// resolve config / scan results / wave plan paths. Returns s for
+// chaining (= paintress.WithContinent symmetric).
+func (s *MCPServer) WithBaseDir(baseDir string) *MCPServer {
+	s.baseDir = baseDir
+	return s
 }
 
 // jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this skeleton
@@ -131,8 +145,7 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 		result = stubGetScanResult(call.Arguments)
 		status = "deprecated"
 	case "sightjack.update_strictness":
-		result = stubUpdateStrictness(call.Arguments)
-		status = "deprecated"
+		result = realUpdateStrictness(s.baseDir, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -233,20 +246,52 @@ func stubGetScanResult(args json.RawMessage) map[string]any {
 	})
 }
 
-// stubUpdateStrictness echoes the requested level with a placeholder
-// previous level.
-func stubUpdateStrictness(args json.RawMessage) map[string]any {
+// realUpdateStrictness reads the current default strictness from the
+// sightjack config (.siren/config.yaml) and returns a preview of the
+// requested level alongside it. It does NOT persist the new level to
+// config — full mutation requires the projection store wiring chain
+// (Phase 4 follow-up). The session can rely on this preview to
+// surface the existing default vs the operator's intended override.
+//
+// baseDir is the project root from MCPServer.WithBaseDir. When empty
+// or the config is missing, the response signals uninitialized so the
+// session surfaces a clear error to the operator.
+//
+// Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy.
+func realUpdateStrictness(baseDir string, args json.RawMessage) map[string]any {
 	var payload struct {
 		Level string `json:"level"`
 	}
 	if len(args) > 0 {
 		_ = json.Unmarshal(args, &payload)
 	}
+	if baseDir == "" {
+		return jsonResult(map[string]any{
+			"initialized":   false,
+			"reason":        "sightjack mcp baseDir not configured (start `sightjack mcp` from the project root or pass via WithBaseDir)",
+			"requested":     payload.Level,
+			"current_level": "",
+			"preview_level": payload.Level,
+		})
+	}
+	cfg, err := LoadConfig(domain.ConfigPath(baseDir))
+	if err != nil {
+		return jsonResult(map[string]any{
+			"initialized":   false,
+			"reason":        fmt.Sprintf("config load failed: %v", err),
+			"requested":     payload.Level,
+			"current_level": "",
+			"preview_level": payload.Level,
+		})
+	}
 	return jsonResult(map[string]any{
-		"stub":           true,
-		"requested":      payload.Level,
-		"previous_level": "normal",
-		"reason":         "phase-2a-mvp: real strictness state wiring lands when the projection store is exposed",
+		"initialized":   true,
+		"baseDir":       baseDir,
+		"current_level": string(cfg.Strictness.Default),
+		"requested":     payload.Level,
+		"preview_level": payload.Level,
+		"persistence":   "preview-only",
+		"note":          "Preview only. Persistence of the new default strictness requires the projection store wiring (Phase 4 follow-up). Override per-cluster via `sightjack config set` for now.",
 	})
 }
 
