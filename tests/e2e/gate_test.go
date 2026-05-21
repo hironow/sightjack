@@ -13,6 +13,7 @@ import (
 )
 
 func TestE2E_Gate_AutoApproveWithConvergence(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: convergence d-mail in inbox
 	dir := initDir(t)
 	ensureMailDirs(t, dir)
@@ -49,6 +50,7 @@ func TestE2E_Gate_AutoApproveWithConvergence(t *testing.T) {
 }
 
 func TestE2E_Gate_ApproveCmdApproves(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: convergence d-mail in inbox
 	dir := initDir(t)
 	ensureMailDirs(t, dir)
@@ -101,6 +103,7 @@ func TestE2E_Gate_ApproveCmdDenies(t *testing.T) {
 }
 
 func TestE2E_Gate_NotifyCmdInvoked(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: convergence d-mail in inbox + notify command that writes to file
 	dir := initDir(t)
 	ensureMailDirs(t, dir)

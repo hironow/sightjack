@@ -154,6 +154,7 @@ func TestE2E_DMail_ArchivePruneRealDMails(t *testing.T) {
 }
 
 func TestE2E_DMail_SpecAndReport(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: a configured directory
 	dir := initDir(t)
 
@@ -224,6 +225,7 @@ func TestE2E_DMail_SpecAndReport(t *testing.T) {
 }
 
 func TestE2E_DMail_FeedbackConsumed(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: a configured directory with pre-existing feedback in inbox
 	dir := initDir(t)
 	ensureMailDirs(t, dir)
@@ -250,6 +252,7 @@ func TestE2E_DMail_FeedbackConsumed(t *testing.T) {
 }
 
 func TestE2E_DMail_DedupSkipsDuplicate(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: same-named d-mail in both inbox and archive (simulating already-processed)
 	dir := initDir(t)
 	ensureMailDirs(t, dir)
@@ -284,6 +287,7 @@ func TestE2E_DMail_DedupSkipsDuplicate(t *testing.T) {
 }
 
 func TestE2E_DMail_FsnotifyAndInjection(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: a configured directory with prompt logging enabled
 	dir := initDir(t)
 	ensureMailDirs(t, dir)

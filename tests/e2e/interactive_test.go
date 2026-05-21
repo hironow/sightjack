@@ -82,6 +82,7 @@ func TestE2E_Run_DryRun(t *testing.T) {
 }
 
 func TestE2E_Run_NewSession(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: a configured directory with fake-claude in PATH
 	dir := initDir(t)
 
@@ -159,6 +160,7 @@ func TestE2E_Run_NewSession(t *testing.T) {
 }
 
 func TestE2E_Run_QuitImmediately(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: a configured directory with fake-claude in PATH
 	dir := initDir(t)
 

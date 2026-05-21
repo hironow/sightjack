@@ -1,0 +1,51 @@
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/hironow/sightjack/internal/session"
+)
+
+// newMCPCommand exposes `sightjack mcp` as a stdio MCP server entry
+// point for the refs/issues/0027 jun15 MCP pivot Phase 2a. A claude
+// code interactive session loads this binary via --mcp-config and
+// calls sightjack tools from inside the human-initiated subscription
+// quota.
+//
+// Phase 2a MVP exposes only sightjack.ping. Real tools (next_wave,
+// get_scan_result, update_strictness) land in subsequent commits on
+// feat/jun15-mcp-pivot.
+//
+// Distinct from `sightjack mcp-config` which manages the .mcp.json
+// configuration consumed by the legacy claude_adapter. This server
+// is consumed by claude code itself.
+func newMCPCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "mcp",
+		Short: "Run sightjack as an MCP server over stdio (refs/issues/0027 Phase 2a MVP)",
+		Long: `Start a Model Context Protocol server reading JSON-RPC 2.0
+messages on stdin and writing responses on stdout.
+
+Designed for embedding in a claude code interactive session via
+--mcp-config so inference stays on the session's subscription quota
+rather than crossing into the Agent SDK credit pool that gates
+'claude -p' from 2026-06-15.
+
+Phase 2a MVP scope: only the sightjack.ping health check is exposed.
+Real tools (sightjack.next_wave, sightjack.get_scan_result,
+sightjack.update_strictness) ship in subsequent commits on the
+feat/jun15-mcp-pivot branch.
+
+Not to be confused with 'sightjack mcp-config' (subcommand managing
+the legacy .mcp.json file consumed by the embedded claude_adapter).`,
+		Example: `  # Launch claude code with the sightjack MCP server attached
+  claude --mcp-config '{"sightjack":{"command":"sightjack","args":["mcp"]}}'
+
+  # Pipe a tools/list request manually (for debugging)
+  echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | sightjack mcp`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil)
+			return srv.Serve(cmd.Context())
+		},
+	}
+}

@@ -2,6 +2,7 @@ package session_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -14,15 +15,15 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
-func TestClaudeAdapter_ArgsWithModel(t *testing.T) {
-	// given: config with model set
-	var capturedArgs []string
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		capturedArgs = args
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
-
+// TestClaudeAdapter_RunDetailedReturnsErrMCPPivotDeprecated is the
+// canonical post jun15 MCP pivot assertion (refs/issues/0027): the
+// previous suite of args / retry / stream tests exercised an exec
+// path that has been removed. This single test pins the behavior
+// callers can rely on — every invocation short-circuits with
+// session.ErrMCPPivotDeprecated so operators are routed to the
+// human-initiated claude code /sightjack-scan skill instead.
+func TestClaudeAdapter_RunDetailedReturnsErrMCPPivotDeprecated(t *testing.T) {
+	// given
 	cfg := &domain.Config{
 		ClaudeCmd:  "claude",
 		Model:      "opus",
@@ -33,52 +34,11 @@ func TestClaudeAdapter_ArgsWithModel(t *testing.T) {
 	adapter := session.NewClaudeAdapter(cfg, logger)
 
 	// when
-	adapter.Run(context.Background(), "Analyze these issues", io.Discard)
+	_, err := adapter.Run(context.Background(), "anything", io.Discard)
 
 	// then
-	// Prompt is now passed via stdin, not -p flag, so args should NOT contain "-p" or the prompt text.
-	expected := []string{"--model", "opus", "--verbose", "--output-format", "stream-json", "--setting-sources", "", "--disable-slash-commands", "--dangerously-skip-permissions", "--print"}
-	if len(capturedArgs) != len(expected) {
-		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
-	}
-	for i, e := range expected {
-		if capturedArgs[i] != e {
-			t.Errorf("arg[%d]: expected %q, got %q", i, e, capturedArgs[i])
-		}
-	}
-}
-
-func TestClaudeAdapter_ArgsWithoutModel(t *testing.T) {
-	// given: config without model
-	var capturedArgs []string
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		capturedArgs = args
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd:  "claude",
-		Model:      "",
-		TimeoutSec: 10,
-		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	logger := platform.NewLogger(io.Discard, false)
-	adapter := session.NewClaudeAdapter(cfg, logger)
-
-	// when
-	adapter.Run(context.Background(), "test prompt", io.Discard)
-
-	// then
-	// Prompt is now passed via stdin, not -p flag.
-	expected := []string{"--verbose", "--output-format", "stream-json", "--setting-sources", "", "--disable-slash-commands", "--dangerously-skip-permissions", "--print"}
-	if len(capturedArgs) != len(expected) {
-		t.Fatalf("expected %d args, got %d: %v", len(expected), len(capturedArgs), capturedArgs)
-	}
-	for i, e := range expected {
-		if capturedArgs[i] != e {
-			t.Errorf("arg[%d]: expected %q, got %q", i, e, capturedArgs[i])
-		}
+	if !errors.Is(err, session.ErrMCPPivotDeprecated) {
+		t.Errorf("Run() error = %v, want ErrMCPPivotDeprecated", err)
 	}
 }
 
@@ -134,68 +94,6 @@ func TestRunClaudeDryRun_UniqueNames(t *testing.T) {
 	}
 }
 
-func TestClaudeAdapter_NoRetry(t *testing.T) {
-	callCount := 0
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		callCount++
-		return exec.CommandContext(ctx, "false") // exits non-zero
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd:  "claude",
-		TimeoutSec: 10,
-		Retry:      domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0},
-	}
-	logger := platform.NewLogger(io.Discard, false)
-	adapter := session.NewClaudeAdapter(cfg, logger)
-
-	// when: using adapter directly (no retry)
-	_, err := adapter.Run(context.Background(), "test", io.Discard)
-
-	// then: should fail immediately without retrying
-	if err == nil {
-		t.Fatal("expected error from ClaudeAdapter")
-	}
-	if callCount != 1 {
-		t.Errorf("ClaudeAdapter should not retry; expected 1 call, got %d", callCount)
-	}
-}
-
-func TestRetryRunner_RetriesOnFailure(t *testing.T) {
-	callCount := 0
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		callCount++
-		if callCount < 3 {
-			return exec.CommandContext(ctx, "false") // exits non-zero
-		}
-		// Emit stream-json result with "success" so StreamReader can parse it.
-		resultLine := `{"type":"result","subtype":"success","session_id":"fake","result":"success","is_error":false,"num_turns":1,"duration_ms":100,"total_cost_usd":0.0,"usage":{"input_tokens":1,"output_tokens":1},"stop_reason":"end_turn"}`
-		return exec.CommandContext(ctx, "sh", "-c", "echo '"+resultLine+"'")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd:  "claude",
-		TimeoutSec: 10,
-		Retry:      domain.RetryConfig{MaxAttempts: 3, BaseDelaySec: 0}, // 0 delay for fast test
-	}
-	logger := platform.NewLogger(io.Discard, false)
-	adapter := session.NewClaudeAdapter(cfg, logger)
-	retrier := session.NewRetryRunner(adapter, cfg, logger)
-
-	output, err := retrier.Run(context.Background(), "test", io.Discard)
-	if err != nil {
-		t.Fatalf("expected success after retries, got: %v", err)
-	}
-	if !strings.Contains(output, "success") {
-		t.Errorf("expected 'success' in output, got %q", output)
-	}
-	if callCount != 3 {
-		t.Errorf("expected 3 calls, got %d", callCount)
-	}
-}
-
 func TestRetryRunner_NoRetryOnCancel_WithFakeCmd(t *testing.T) {
 	callCount := 0
 	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -222,83 +120,6 @@ func TestRetryRunner_NoRetryOnCancel_WithFakeCmd(t *testing.T) {
 	}
 	if callCount > 1 {
 		t.Errorf("expected no retry on cancellation, got %d calls", callCount)
-	}
-}
-
-func TestClaudeAdapter_ArgsWithAllowedTools(t *testing.T) {
-	// given: config with model and allowed tools option
-	var capturedArgs []string
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		capturedArgs = args
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd:  "claude",
-		Model:      "opus",
-		TimeoutSec: 10,
-		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	logger := platform.NewLogger(io.Discard, false)
-	adapter := session.NewClaudeAdapter(cfg, logger)
-
-	// when
-	adapter.Run(context.Background(), "test", io.Discard,
-		session.WithAllowedTools("mcp__linear__list_issues", "mcp__linear__get_issue", "Write"))
-
-	// then: --allowedTools flag present with comma-separated tools
-	found := false
-	for i, arg := range capturedArgs {
-		if arg == "--allowedTools" && i+1 < len(capturedArgs) {
-			expected := "mcp__linear__list_issues,mcp__linear__get_issue,Write"
-			if capturedArgs[i+1] != expected {
-				t.Errorf("--allowedTools value: expected %q, got %q", expected, capturedArgs[i+1])
-			}
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("--allowedTools flag not found in args: %v", capturedArgs)
-	}
-}
-
-func TestRetryRunner_ForwardsAllowedTools(t *testing.T) {
-	// given: RetryRunner with allowed tools option
-	var capturedArgs []string
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		capturedArgs = args
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd:  "claude",
-		TimeoutSec: 10,
-		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	logger := platform.NewLogger(io.Discard, false)
-	adapter := session.NewClaudeAdapter(cfg, logger)
-	retrier := session.NewRetryRunner(adapter, cfg, logger)
-
-	// when
-	retrier.Run(context.Background(), "test", io.Discard,
-		session.WithAllowedTools("mcp__linear__list_issues"))
-
-	// then: --allowedTools forwarded
-	found := false
-	for i, arg := range capturedArgs {
-		if arg == "--allowedTools" && i+1 < len(capturedArgs) {
-			if capturedArgs[i+1] != "mcp__linear__list_issues" {
-				t.Errorf("--allowedTools value: expected %q, got %q", "mcp__linear__list_issues", capturedArgs[i+1])
-			}
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("--allowedTools flag not found in RetryRunner args: %v", capturedArgs)
 	}
 }
 
@@ -336,67 +157,6 @@ func TestClaudeAdapter_GracefulShutdownOnCancel(t *testing.T) {
 	// then: should terminate within 10 seconds (not hang forever)
 	if elapsed > 10*time.Second {
 		t.Errorf("command took too long to terminate: %v (expected < 10s)", elapsed)
-	}
-}
-
-func TestRetryRunner_ExhaustsRetries_WithFakeCmd(t *testing.T) {
-	callCount := 0
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		callCount++
-		return exec.CommandContext(ctx, "false")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd:  "claude",
-		TimeoutSec: 10,
-		Retry:      domain.RetryConfig{MaxAttempts: 2, BaseDelaySec: 0},
-	}
-	logger := platform.NewLogger(io.Discard, false)
-	adapter := session.NewClaudeAdapter(cfg, logger)
-	retrier := session.NewRetryRunner(adapter, cfg, logger)
-
-	_, err := retrier.Run(context.Background(), "test", io.Discard)
-	if err == nil {
-		t.Fatal("expected error after exhausting retries")
-	}
-	if callCount != 2 {
-		t.Errorf("expected 2 calls, got %d", callCount)
-	}
-}
-
-func TestClaudeAdapter_StrictMCPConfig_WhenFileExists(t *testing.T) {
-	// given: .mcp.json exists in work dir
-	workDir := t.TempDir()
-	session.GenerateMCPConfig(workDir, domain.ModeWave, false)
-
-	var capturedArgs []string
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		capturedArgs = args
-		return exec.CommandContext(ctx, "echo", "ok")
-	})
-	defer cleanup()
-
-	cfg := &domain.Config{
-		ClaudeCmd:  "claude",
-		Model:      "opus",
-		TimeoutSec: 10,
-		Retry:      domain.RetryConfig{MaxAttempts: 1, BaseDelaySec: 0},
-	}
-	logger := platform.NewLogger(io.Discard, false)
-	adapter := session.NewClaudeAdapter(cfg, logger)
-
-	// when: run with WorkDir containing .mcp.json
-	adapter.Run(context.Background(), "test", io.Discard,
-		session.WithWorkDir(workDir))
-
-	// then: --strict-mcp-config and --mcp-config should be in args
-	argsStr := strings.Join(capturedArgs, " ")
-	if !strings.Contains(argsStr, "--strict-mcp-config") {
-		t.Errorf("expected --strict-mcp-config in args: %v", capturedArgs)
-	}
-	if !strings.Contains(argsStr, "--mcp-config") {
-		t.Errorf("expected --mcp-config in args: %v", capturedArgs)
 	}
 }
 

@@ -1,0 +1,9 @@
+message_id: dmail-2026-06-01T11-00-00Z-def456
+source_tool: paintress
+target_tool: sightjack
+kind: impl_report
+body_path: ./dmail-2026-06-01T11-00-00Z-def456.body.md
+created_at: 2026-06-01T11:00:00Z
+seen_at: null
+ack_at: null
+idempotency_key: sha256:6c2eaa1a3f3b7c0a2c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6071

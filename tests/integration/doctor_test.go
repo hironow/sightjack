@@ -457,19 +457,21 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 	if results[8].Status != domain.CheckOK {
 		t.Errorf("linear-mcp: expected OK, got %v: %s", results[8].Status, results[8].Message)
 	}
-	// claude-inference should be OK (fake-claude --print responds with "2", index 9)
+	// claude-inference is Skip post jun15 MCP pivot (refs/issues/0027):
+	// LLM invocation moved to claude code MCP session; doctor no longer
+	// probes `claude --print` directly.
 	if results[9].Name != "claude-inference" {
 		t.Errorf("expected 'claude-inference', got %q", results[9].Name)
 	}
-	if results[9].Status != domain.CheckOK {
-		t.Errorf("claude-inference: expected OK, got %v: %s", results[9].Status, results[9].Message)
+	if results[9].Status != domain.CheckSkip {
+		t.Errorf("claude-inference: expected Skip post jun15 MCP pivot, got %v: %s", results[9].Status, results[9].Message)
 	}
-	// context-budget should be OK (index 10)
+	// context-budget is Skip post jun15 MCP pivot for the same reason.
 	if results[10].Name != "context-budget" {
 		t.Errorf("expected 'context-budget', got %q", results[10].Name)
 	}
-	if results[10].Status != domain.CheckOK {
-		t.Errorf("context-budget: expected OK, got %v: %s", results[10].Status, results[10].Message)
+	if results[10].Status != domain.CheckSkip {
+		t.Errorf("context-budget: expected Skip post jun15 MCP pivot, got %v: %s", results[10].Status, results[10].Message)
 	}
 	// success-rate (index 11)
 	sr := results[11]

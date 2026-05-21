@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
@@ -121,83 +120,6 @@ func TestRunReviewGate_BudgetZeroUsesDefault(t *testing.T) {
 	}
 	if !passed {
 		t.Error("expected passed=true for passing review")
-	}
-}
-
-func TestRunReviewGate_ReviewCommentsPropagatedToFix(t *testing.T) {
-	// given — review outputs specific comments, verify they reach the fix prompt
-	dir := t.TempDir()
-	initGitRepo(t, dir)
-
-	promptCapture := filepath.Join(dir, "captured-prompt.txt")
-
-	reviewScript := filepath.Join(dir, "review.sh")
-	os.WriteFile(reviewScript, []byte("#!/bin/bash\necho 'UNIQUE-SIGHTJACK-REVIEW-COMMENT-ABC-123'\nexit 1\n"), 0755)
-
-	// Fake claude captures prompt from stdin to file
-	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
-	os.WriteFile(fakeClaudeScript, []byte(`#!/bin/bash
-cat > `+promptCapture+`
-exit 0
-`), 0755)
-
-	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 2}
-	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
-	runner := session.NewClaudeAdapter(assistant, nil)
-	ctx := context.Background()
-
-	// when — review fails, fix is called with review comments in prompt
-	session.RunReviewGate(ctx, gate, assistant, runner, dir, nil)
-
-	// then — captured prompt should contain the review comments
-	captured, err := os.ReadFile(promptCapture)
-	if err != nil {
-		t.Fatalf("fix was not called (no captured prompt): %v", err)
-	}
-	if !strings.Contains(string(captured), "UNIQUE-SIGHTJACK-REVIEW-COMMENT-ABC-123") {
-		t.Errorf("review comments not propagated to fix prompt, got: %s", string(captured))
-	}
-}
-
-func TestRunReviewGate_FixCycleExecuted(t *testing.T) {
-	// given — review fails once, then passes after fix
-	dir := t.TempDir()
-	initGitRepo(t, dir)
-
-	callCount := filepath.Join(dir, "call-count")
-	os.WriteFile(callCount, []byte("0"), 0644)
-
-	// Review script: fail first call, pass second
-	reviewScript := filepath.Join(dir, "review.sh")
-	os.WriteFile(reviewScript, []byte(`#!/bin/bash
-COUNT=$(cat `+callCount+`)
-COUNT=$((COUNT + 1))
-echo $COUNT > `+callCount+`
-if [ $COUNT -eq 1 ]; then
-  echo "fix this naming issue"
-  exit 1
-fi
-exit 0
-`), 0755)
-
-	// Fake claude: drain stdin, emit minimal stream-json result, then exit 0
-	fakeClaudeScript := filepath.Join(dir, "fake-claude.sh")
-	os.WriteFile(fakeClaudeScript, []byte("#!/bin/bash\ncat > /dev/null\necho '{\"type\":\"result\",\"subtype\":\"success\",\"session_id\":\"fake\",\"result\":\"fixed\",\"is_error\":false,\"num_turns\":1,\"duration_ms\":1,\"total_cost_usd\":0,\"usage\":{\"input_tokens\":1,\"output_tokens\":1},\"stop_reason\":\"end_turn\"}'\n"), 0755)
-
-	gate := domain.GateConfig{ReviewCmd: reviewScript, ReviewBudget: 3}
-	assistant := &domain.Config{ClaudeCmd: fakeClaudeScript, Model: "opus", TimeoutSec: 30}
-	runner := session.NewClaudeAdapter(assistant, nil)
-	ctx := context.Background()
-
-	// when — review fail → fix (fake claude) → review pass
-	passed, err := session.RunReviewGate(ctx, gate, assistant, runner, dir, nil)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !passed {
-		t.Error("expected passed=true after fix cycle resolves review")
 	}
 }
 
