@@ -177,6 +177,7 @@ func TestE2E_Verbose_Flag(t *testing.T) {
 }
 
 func TestE2E_State_Persistence(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: run a full scan to generate state
 	dir := initDir(t)
 

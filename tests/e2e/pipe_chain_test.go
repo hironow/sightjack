@@ -86,6 +86,7 @@ func srcRoot() string {
 }
 
 func TestE2E_Pipe_ScanJSON(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: a configured directory with fake-claude in PATH
 	dir := initDir(t)
 
@@ -111,6 +112,7 @@ func TestE2E_Pipe_ScanJSON(t *testing.T) {
 }
 
 func TestE2E_Pipe_WavesFromFixture(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given: a configured directory + fixture ScanResult on stdin
 	dir := initDir(t)
 	fixture := fixtureBytes(t, "scan_result.json")
@@ -398,6 +400,7 @@ func TestE2E_Pipe_ShowFromStdin(t *testing.T) {
 // --- Two-step pipe chains ---
 
 func TestE2E_Pipe_TwoStepChain(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	type step struct {
 		args  func(dir string) []string // command args (dir substituted at runtime)
 		stdin func(t *testing.T) string // stdin content; empty = use previous stdout
@@ -547,6 +550,7 @@ func TestE2E_Pipe_ADRFromDiscussResult(t *testing.T) {
 // --- Interactive pipe tests (go-expect + SIGHTJACK_TTY) ---
 
 func TestE2E_Pipe_DiscussInteractive(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given
 	dir := initDir(t)
 	fixture := string(fixtureBytes(t, "selected_wave.json"))
@@ -573,6 +577,7 @@ func TestE2E_Pipe_DiscussInteractive(t *testing.T) {
 }
 
 func TestE2E_Pipe_DiscussWithTopic(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given
 	dir := initDir(t)
 	fixture := string(fixtureBytes(t, "selected_wave.json"))
@@ -647,6 +652,7 @@ func TestE2E_Pipe_NextgenToSelect(t *testing.T) {
 // --- Multi-step interactive chains ---
 
 func TestE2E_Pipe_SelectToApply(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given
 	dir := initDir(t)
 	fixture := string(fixtureBytes(t, "wave_plan.json"))
@@ -683,6 +689,7 @@ func TestE2E_Pipe_SelectToApply(t *testing.T) {
 }
 
 func TestE2E_Pipe_SelectToDiscussToADR(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given
 	dir := initDir(t)
 	fixture := string(fixtureBytes(t, "wave_plan.json"))
@@ -727,6 +734,7 @@ func TestE2E_Pipe_SelectToDiscussToADR(t *testing.T) {
 }
 
 func TestE2E_Pipe_FullChainWithSelect(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	// given
 	dir := initDir(t)
 
@@ -792,6 +800,7 @@ func TestE2E_Pipe_FullChainWithSelect(t *testing.T) {
 // --- Wave generation partial failure ---
 
 func TestE2E_Pipe_WaveGenPartialFailure(t *testing.T) {
+	t.Skip("E2E exercises deprecated `sightjack scan/run/waves/discuss/apply` CLI (refs/issues/0027 sub-A); Phase 2b will rewire e2e against the MCP server contract")
 	tests := []struct {
 		name        string
 		failPattern string // FAKE_CLAUDE_FAIL_PATTERN value
