@@ -258,7 +258,7 @@ func TestMCPServer_GetScanResult_RealImpl_WithClusterFiles(t *testing.T) {
 
 func TestMCPServer_UpdateStrictness_UninitializedBaseDir(t *testing.T) {
 	// given: NewMCPServer without WithBaseDir → uninitialized response.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"strict"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -272,12 +272,12 @@ func TestMCPServer_UpdateStrictness_UninitializedBaseDir(t *testing.T) {
 	if body["initialized"] != false {
 		t.Errorf("initialized = %v, want false (empty baseDir)", body["initialized"])
 	}
-	if body["requested"] != "strict" {
-		t.Errorf("requested = %v, want strict", body["requested"])
+	if body["requested"] != "alert" {
+		t.Errorf("requested = %v, want alert", body["requested"])
 	}
 }
 
-func TestMCPServer_UpdateStrictness_RealImpl_ReadsCurrentFromConfig(t *testing.T) {
+func TestMCPServer_UpdateStrictness_Phase4_PersistsToConfig(t *testing.T) {
 	// given: temp baseDir with a sightjack config (= default strictness 'fog').
 	baseDir := t.TempDir()
 	cfgPath := domain.ConfigPath(baseDir)
@@ -298,7 +298,7 @@ labels: {}
 		t.Fatalf("write config: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"strict"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -307,19 +307,108 @@ labels: {}
 		t.Fatalf("Serve: %v", err)
 	}
 
-	// then: initialized=true + current_level=fog + preview_level=strict
+	// then: persisted=true + previous_level=fog + new_level=alert + config
+	// file on disk now contains the new level.
 	body := decodeFirstText(t, &out)
 	if body["initialized"] != true {
 		t.Errorf("initialized = %v, want true (body=%v)", body["initialized"], body)
 	}
-	if body["current_level"] != "fog" {
-		t.Errorf("current_level = %v, want fog", body["current_level"])
+	if body["persisted"] != true {
+		t.Errorf("persisted = %v, want true (body=%v)", body["persisted"], body)
 	}
-	if body["preview_level"] != "strict" {
-		t.Errorf("preview_level = %v, want strict", body["preview_level"])
+	if body["previous_level"] != "fog" {
+		t.Errorf("previous_level = %v, want fog", body["previous_level"])
 	}
-	if body["persistence"] != "preview-only" {
-		t.Errorf("persistence = %v, want preview-only", body["persistence"])
+	if body["new_level"] != "alert" {
+		t.Errorf("new_level = %v, want alert", body["new_level"])
+	}
+	if body["persistence"] != "config.yaml" {
+		t.Errorf("persistence = %v, want config.yaml", body["persistence"])
+	}
+
+	// Verify config.yaml on disk now reflects the new level.
+	reloaded, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatalf("reload config: %v", err)
+	}
+	if string(reloaded.Strictness.Default) != "alert" {
+		t.Errorf("on-disk default = %v, want alert", reloaded.Strictness.Default)
+	}
+}
+
+func TestMCPServer_UpdateStrictness_Phase4_RejectsInvalidLevel(t *testing.T) {
+	// given: temp baseDir + invalid level 'strict' (= not in fog/alert/lockdown).
+	baseDir := t.TempDir()
+	cfgPath := domain.ConfigPath(baseDir)
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
+		t.Fatalf("mkdir state: %v", err)
+	}
+	cfg := `strictness:
+  default: fog
+`
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"strict"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: persisted=false + reason mentions valid levels.
+	body := decodeFirstText(t, &out)
+	if body["persisted"] != false {
+		t.Errorf("persisted = %v, want false (invalid level)", body["persisted"])
+	}
+	reason, _ := body["reason"].(string)
+	if !strings.Contains(reason, "fog") || !strings.Contains(reason, "alert") || !strings.Contains(reason, "lockdown") {
+		t.Errorf("reason should list valid levels, got %q", reason)
+	}
+
+	// Verify config.yaml on disk was NOT touched.
+	reloaded, err := session.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatalf("reload config: %v", err)
+	}
+	if string(reloaded.Strictness.Default) != "fog" {
+		t.Errorf("on-disk default = %v, want fog (rejected write should not modify)", reloaded.Strictness.Default)
+	}
+}
+
+func TestMCPServer_UpdateStrictness_Phase4_NoOpWhenAlreadyAtLevel(t *testing.T) {
+	// given: temp baseDir + level equals current default.
+	baseDir := t.TempDir()
+	cfgPath := domain.ConfigPath(baseDir)
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
+		t.Fatalf("mkdir state: %v", err)
+	}
+	cfg := `strictness:
+  default: alert
+`
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: persisted=true with persistence='no-op'
+	body := decodeFirstText(t, &out)
+	if body["persisted"] != true {
+		t.Errorf("persisted = %v, want true (no-op is still 'persisted')", body["persisted"])
+	}
+	if body["persistence"] != "no-op" {
+		t.Errorf("persistence = %v, want no-op", body["persistence"])
 	}
 }
 

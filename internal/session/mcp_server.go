@@ -197,11 +197,11 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "sightjack.update_strictness",
-			"description": "Read current default strictness from .siren/config.yaml + preview the requested level. Phase 3 is preview-only (= no persistence); Phase 4 follow-up wires the projection store mutation.",
+			"description": "Update the default scan strictness in .siren/config.yaml and persist it atomically. Phase 4 follow-up persistence (= replaces Phase 3 preview-only). Validates the level (fog / alert / lockdown) before write.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"level": map[string]any{"type": "string", "description": "strictness level: fog / cloud / clear / strict"},
+					"level": map[string]any{"type": "string", "description": "strictness level: fog / alert / lockdown"},
 				},
 				"required": []any{"level"},
 			},
@@ -366,17 +366,22 @@ func realGetScanResult(baseDir string, args json.RawMessage) map[string]any {
 }
 
 // realUpdateStrictness reads the current default strictness from the
-// sightjack config (.siren/config.yaml) and returns a preview of the
-// requested level alongside it. It does NOT persist the new level to
-// config — full mutation requires the projection store wiring chain
-// (Phase 4 follow-up). The session can rely on this preview to
-// surface the existing default vs the operator's intended override.
+// sightjack config (.siren/config.yaml), validates the requested
+// level, and writes the new level back to the config via
+// UpdateConfig (= atomic load + setConfigField + validate + write).
+// Returns the old + new levels with persistence='persisted'.
 //
 // baseDir is the project root from MCPServer.WithBaseDir. When empty
 // or the config is missing, the response signals uninitialized so the
 // session surfaces a clear error to the operator.
 //
-// Pattern: paintress.update_gradient (= 83cb3ca) symmetric copy.
+// Validation: requested level must be one of fog / alert / lockdown
+// (= domain.StrictnessLevel.Valid()). Invalid input returns
+// persisted=false + reason without touching the config.
+//
+// Pattern: paintress.update_gradient (= 83cb3ca) plus Phase 4
+// follow-up persistence (= sightjack #215 preview-only → real write
+// via existing session.UpdateConfig path).
 func realUpdateStrictness(baseDir string, args json.RawMessage) map[string]any {
 	var payload struct {
 		Level string `json:"level"`
@@ -390,27 +395,61 @@ func realUpdateStrictness(baseDir string, args json.RawMessage) map[string]any {
 			"reason":        "sightjack mcp baseDir not configured (start `sightjack mcp` from the project root or pass via WithBaseDir)",
 			"requested":     payload.Level,
 			"current_level": "",
-			"preview_level": payload.Level,
 		})
 	}
-	cfg, err := LoadConfig(domain.ConfigPath(baseDir))
+	cfgPath := domain.ConfigPath(baseDir)
+	cfg, err := LoadConfig(cfgPath)
 	if err != nil {
 		return jsonResult(map[string]any{
 			"initialized":   false,
 			"reason":        fmt.Sprintf("config load failed: %v", err),
 			"requested":     payload.Level,
 			"current_level": "",
-			"preview_level": payload.Level,
 		})
 	}
+	currentLevel := string(cfg.Strictness.Default)
+
+	// Validate requested level before touching the file.
+	if !domain.StrictnessLevel(payload.Level).Valid() {
+		return jsonResult(map[string]any{
+			"initialized":   true,
+			"persisted":     false,
+			"reason":        fmt.Sprintf("invalid strictness level %q: must be fog, alert, or lockdown", payload.Level),
+			"current_level": currentLevel,
+			"requested":     payload.Level,
+		})
+	}
+
+	// No-op fast path: requested already equals current.
+	if payload.Level == currentLevel {
+		return jsonResult(map[string]any{
+			"initialized":   true,
+			"persisted":     true,
+			"current_level": currentLevel,
+			"requested":     payload.Level,
+			"persistence":   "no-op",
+			"note":          "Requested level equals current default; config left unchanged.",
+		})
+	}
+
+	if err := UpdateConfig(cfgPath, "strictness.default", payload.Level); err != nil {
+		return jsonResult(map[string]any{
+			"initialized":   true,
+			"persisted":     false,
+			"reason":        fmt.Sprintf("config update failed: %v", err),
+			"current_level": currentLevel,
+			"requested":     payload.Level,
+		})
+	}
+
 	return jsonResult(map[string]any{
-		"initialized":   true,
-		"baseDir":       baseDir,
-		"current_level": string(cfg.Strictness.Default),
-		"requested":     payload.Level,
-		"preview_level": payload.Level,
-		"persistence":   "preview-only",
-		"note":          "Preview only. Persistence of the new default strictness requires the projection store wiring (Phase 4 follow-up). Override per-cluster via `sightjack config set` for now.",
+		"initialized":    true,
+		"persisted":      true,
+		"baseDir":        baseDir,
+		"previous_level": currentLevel,
+		"new_level":      payload.Level,
+		"persistence":    "config.yaml",
+		"note":           "Default strictness updated in .siren/config.yaml. Re-running `sightjack scan` will use the new threshold.",
 	})
 }
 
