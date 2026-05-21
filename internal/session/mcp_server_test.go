@@ -114,9 +114,9 @@ func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 	}
 }
 
-func TestMCPServer_NextWaveStub(t *testing.T) {
-	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{}}}` + "\n")
+func TestMCPServer_NextWave_UninitializedBaseDir(t *testing.T) {
+	// given: NewMCPServer without WithBaseDir → uninitialized response.
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{"session_id":"any"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -125,20 +125,82 @@ func TestMCPServer_NextWaveStub(t *testing.T) {
 		t.Fatalf("Serve: %v", err)
 	}
 
-	// then: stub payload includes stub:true so clients can detect
-	// placeholder responses during Phase 2a rollout.
+	// then
 	body := decodeFirstText(t, &out)
-	if body["stub"] != true {
-		t.Errorf("stub flag missing: %v", body)
-	}
-	if _, ok := body["contract"]; !ok {
-		t.Errorf("contract descriptor missing: %v", body)
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false (empty baseDir)", body["initialized"])
 	}
 }
 
-func TestMCPServer_GetScanResultStub_EchoesSessionID(t *testing.T) {
-	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"sightjack.get_scan_result","arguments":{"session_id":"sess-abc"}}}` + "\n")
+func TestMCPServer_NextWave_MissingSessionID(t *testing.T) {
+	// given: baseDir set but session_id missing → initialized but error reason.
+	baseDir := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true", body["initialized"])
+	}
+	if _, ok := body["reason"]; !ok {
+		t.Errorf("reason missing for missing session_id: %v", body)
+	}
+}
+
+func TestMCPServer_NextWave_RealImpl_WithWaveFiles(t *testing.T) {
+	// given: baseDir with scan dir + wave_*.json containing 1 available wave.
+	baseDir := t.TempDir()
+	sessionID := "test-session"
+	scanDir := domain.ScanDir(baseDir, sessionID)
+	if err := os.MkdirAll(scanDir, 0o755); err != nil {
+		t.Fatalf("mkdir scan: %v", err)
+	}
+	waveJSON := `{
+  "cluster_name": "auth",
+  "waves": [
+    {"id": "w1", "cluster_name": "auth", "title": "Add session expiry", "actions": [], "prerequisites": [], "delta": {"before": 0.25, "after": 0.40}, "status": "available"}
+  ]
+}`
+	if err := os.WriteFile(filepath.Join(scanDir, "wave_00_auth.json"), []byte(waveJSON), 0o644); err != nil {
+		t.Fatalf("write wave: %v", err)
+	}
+
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{"session_id":"test-session"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true", body["initialized"])
+	}
+	if got, _ := body["total_waves"].(float64); int(got) != 1 {
+		t.Errorf("total_waves = %v, want 1", body["total_waves"])
+	}
+	if got, _ := body["available_waves"].(float64); int(got) != 1 {
+		t.Errorf("available_waves = %v, want 1", body["available_waves"])
+	}
+	nextWave, _ := body["next_wave"].(map[string]any)
+	if nextWave == nil || nextWave["id"] != "w1" {
+		t.Errorf("next_wave.id = %v, want w1", nextWave)
+	}
+}
+
+func TestMCPServer_GetScanResult_UninitializedBaseDir(t *testing.T) {
+	// given: NewMCPServer without WithBaseDir.
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.get_scan_result","arguments":{"session_id":"any"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -147,11 +209,50 @@ func TestMCPServer_GetScanResultStub_EchoesSessionID(t *testing.T) {
 		t.Fatalf("Serve: %v", err)
 	}
 
-	// then: stub echoes the session_id so the contract is testable
-	// end-to-end before the real ScanResult wiring lands.
+	// then
 	body := decodeFirstText(t, &out)
-	if got, _ := body["session_id"].(string); got != "sess-abc" {
-		t.Errorf("session_id = %v, want sess-abc", body["session_id"])
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false", body["initialized"])
+	}
+}
+
+func TestMCPServer_GetScanResult_RealImpl_WithClusterFiles(t *testing.T) {
+	// given: baseDir with scan dir + 2 cluster_*.json files.
+	baseDir := t.TempDir()
+	sessionID := "test-session"
+	scanDir := domain.ScanDir(baseDir, sessionID)
+	if err := os.MkdirAll(scanDir, 0o755); err != nil {
+		t.Fatalf("mkdir scan: %v", err)
+	}
+	authJSON := `{"name": "auth", "completeness": 0.4, "issues": [], "observations": []}`
+	apiJSON := `{"name": "api", "completeness": 0.6, "issues": [], "observations": []}`
+	if err := os.WriteFile(filepath.Join(scanDir, "cluster_00_auth.json"), []byte(authJSON), 0o644); err != nil {
+		t.Fatalf("write auth: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(scanDir, "cluster_01_api.json"), []byte(apiJSON), 0o644); err != nil {
+		t.Fatalf("write api: %v", err)
+	}
+
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"sightjack.get_scan_result","arguments":{"session_id":"test-session"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true", body["initialized"])
+	}
+	if got, _ := body["cluster_count"].(float64); int(got) != 2 {
+		t.Errorf("cluster_count = %v, want 2", body["cluster_count"])
+	}
+	// avg completeness = (0.4 + 0.6) / 2 = 0.5
+	if got, _ := body["average_completeness"].(float64); got != 0.5 {
+		t.Errorf("average_completeness = %v, want 0.5", body["average_completeness"])
 	}
 }
 
