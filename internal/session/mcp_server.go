@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
+	"github.com/hironow/sightjack/internal/platform"
 )
 
 // MCPServer is a minimal stdio-based Model Context Protocol server
@@ -77,7 +79,7 @@ func (s *MCPServer) Serve(ctx context.Context) error {
 		if len(line) == 0 {
 			continue
 		}
-		if err := s.handle(line); err != nil {
+		if err := s.handle(ctx, line); err != nil {
 			s.logger.Warn("mcp server: handle: %v", err)
 		}
 	}
@@ -87,7 +89,7 @@ func (s *MCPServer) Serve(ctx context.Context) error {
 	return nil
 }
 
-func (s *MCPServer) handle(line []byte) error {
+func (s *MCPServer) handle(ctx context.Context, line []byte) error {
 	var msg jsonrpcMessage
 	if err := json.Unmarshal(line, &msg); err != nil {
 		return fmt.Errorf("decode request: %w", err)
@@ -96,28 +98,52 @@ func (s *MCPServer) handle(line []byte) error {
 	case "tools/list":
 		return s.respond(msg.ID, map[string]any{"tools": toolDescriptors()})
 	case "tools/call":
-		var call struct {
-			Name      string          `json:"name"`
-			Arguments json.RawMessage `json:"arguments"`
-		}
-		if err := json.Unmarshal(msg.Params, &call); err != nil {
-			return s.respondError(msg.ID, -32602, "invalid tools/call params")
-		}
-		switch call.Name {
-		case "sightjack.ping":
-			return s.respond(msg.ID, textResult("pong"))
-		case "sightjack.next_wave":
-			return s.respond(msg.ID, stubNextWave())
-		case "sightjack.get_scan_result":
-			return s.respond(msg.ID, stubGetScanResult(call.Arguments))
-		case "sightjack.update_strictness":
-			return s.respond(msg.ID, stubUpdateStrictness(call.Arguments))
-		default:
-			return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
-		}
+		return s.handleToolsCall(ctx, msg)
 	default:
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("method not implemented: %s", msg.Method))
 	}
+}
+
+// handleToolsCall dispatches a single tools/call request and records
+// MCP invocation metrics (mcp.tool.invocations counter +
+// mcp.tool.duration histogram) for cost-monitoring verification post
+// 2026-06-15 (refs/issues/0027 Phase 3 cost monitoring (a)).
+func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) error {
+	start := time.Now()
+	var call struct {
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+	}
+	if err := json.Unmarshal(msg.Params, &call); err != nil {
+		platform.RecordMCPInvocation(ctx, "", "error", time.Since(start))
+		return s.respondError(msg.ID, -32602, "invalid tools/call params")
+	}
+
+	status := "ok"
+	var result map[string]any
+	switch call.Name {
+	case "sightjack.ping":
+		result = textResult("pong")
+	case "sightjack.next_wave":
+		result = stubNextWave()
+		status = "deprecated"
+	case "sightjack.get_scan_result":
+		result = stubGetScanResult(call.Arguments)
+		status = "deprecated"
+	case "sightjack.update_strictness":
+		result = stubUpdateStrictness(call.Arguments)
+		status = "deprecated"
+	default:
+		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
+		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
+	}
+
+	err := s.respond(msg.ID, result)
+	if err != nil {
+		status = "error"
+	}
+	platform.RecordMCPInvocation(ctx, call.Name, status, time.Since(start))
+	return err
 }
 
 // toolDescriptors returns the Phase 2a MVP tool set. Each entry pins
