@@ -1,11 +1,12 @@
 # Handover
 
-**Last updated:** 2026-05-22 (asia/tokyo, Phase 4 #1 update_strictness landed)
+**Last updated:** 2026-05-22 (asia/tokyo, 0028 semgrep symmetric rule landed)
 **Updated by:** Claude Opus 4.7 session
 
 ## Current State
 
-jun15 MCP pivot (refs/issues/0027) **全 phase 完了 + archive 入り**。
+jun15 MCP pivot (refs/issues/0027) **全 phase 完了 + archive 入り**、
+**かつ 0028 cross-tool semgrep gate 強化も完了**。
 Phase 2a で確立した 9-commit pattern を起点に、 Phase 3 real impl と
 Phase 4 follow-up #1 で sightjack の MCP server-first architecture が
 main merged。
@@ -18,8 +19,15 @@ sightjack 固有の jun15 landmark:
 - Phase 4 #1 (PR #217 `675ce8c`): `sightjack.update_strictness` を
   preview-only → `UpdateConfig` で `config.yaml` 書き戻しに昇格、
   persistence='config.yaml' or 'no-op'
-- `.semgrep/jun15-no-headless-llm.yaml` 5 rule で headless LLM 経路を
-  permanent block (= `tests/**` のみ exclude、 fake-claude binary 用)
+- 0028 (PR #219 `50cab11`): cross-tool symmetric regression prevention。
+  新 semgrep rule `jun15-no-print-flag-literal-go` を 5 ツール全てに
+  追加 (= dynamic args spread を catch する regex rule)。 sightjack の
+  ClaudeAdapter は Phase 2a で既に stub 済なので **production code 変更
+  なし、 future regression 防止のみ**
+- `.semgrep/jun15-no-headless-llm.yaml` **6 rule** (= base 5 + 0028 で
+  `jun15-no-print-flag-literal-go` 追加) で headless LLM 経路 + dynamic
+  args spread を permanent block (= `tests/**` のみ exclude、 fake-claude
+  binary 用)
 - `internal/session/claude_adapter.go` の `Run` / `RunDetailed` は
   `ErrMCPPivotDeprecated` stub
 - `/sightjack-scan` skill + plugin README で claude code session 経由の
@@ -55,15 +63,16 @@ sightjack 固有の jun15 landmark:
   (= immutable、 status pill `✅ ARCHIVED`)
 - **post-mortem**: `tap/refs/HTMLification/lessons/0027-jun15-mcp-pivot-post-mortem.html`
 - **billing boundary 原則**: LLM 発火は常に human-initiated、 daemon は route まで
-- **semgrep gate**: `.semgrep/jun15-no-headless-llm.yaml` 5 rule、 production
-  path に `permanent` nosemgrep 例外禁止
+- **semgrep gate**: `.semgrep/jun15-no-headless-llm.yaml` 6 rule (= 0028 で
+  `jun15-no-print-flag-literal-go` 追加)、 production path に `permanent`
+  nosemgrep 例外禁止
 - **MCP server tool 命名規約**: `<tool_name>.<verb>` (paintress / amadeus /
   dominator / phonewave と対称、 claude code の `mcp__<server>__<tool>` mapping に対応)
 
 ## Relevant Files and Commands
 
 - `docs/adr/0018-mcp-pivot.md` - architectural pin
-- `.semgrep/jun15-no-headless-llm.yaml` - billing-boundary gate (5 rule)
+- `.semgrep/jun15-no-headless-llm.yaml` - billing-boundary gate (6 rule、 0028 で dynamic args spread catch rule 追加)
 - `internal/session/mcp_server.go` - sightjack MCP server (4 tool real impl + config.yaml 書き戻し)
 - `internal/session/claude_adapter.go` - `ClaudeAdapter.Run` / `RunDetailed` = `ErrMCPPivotDeprecated` stub
 - `internal/session/doctor.go` - `claude-inference` / `context-budget` = Skip (post jun15 MCP pivot)
