@@ -39,32 +39,6 @@ func TestParseWaveGenerateResult(t *testing.T) {
 	}
 }
 
-func TestParseWaveApplyResult(t *testing.T) {
-	// given
-	dir := t.TempDir()
-	path := filepath.Join(dir, "apply_auth-w1.json")
-	content := `{
-		"wave_id": "auth-w1",
-		"applied": 5,
-		"errors": [],
-		"ripples": [{"cluster_name": "API", "description": "W2 unlocked"}]
-	}`
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// when
-	result, err := session.ParseWaveApplyResult(path)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.Applied != 5 {
-		t.Errorf("expected 5, got %d", result.Applied)
-	}
-}
-
 func TestAvailableWaves(t *testing.T) {
 	// given
 	waves := []domain.Wave{
@@ -122,49 +96,6 @@ func TestMergeWaveResults_Empty(t *testing.T) {
 	merged := harness.MergeWaveResults(nil)
 	if len(merged) != 0 {
 		t.Errorf("expected 0 waves, got %d", len(merged))
-	}
-}
-
-func TestWaveApplyFileName(t *testing.T) {
-	// given
-	wave := domain.Wave{ID: "auth-w1", ClusterName: "Auth"}
-
-	// when
-	got := session.WaveApplyFileName(wave)
-
-	// then
-	expected := "apply_auth_auth-w1.json"
-	if got != expected {
-		t.Errorf("expected %s, got %s", expected, got)
-	}
-}
-
-func TestWaveApplyFileName_SpecialChars(t *testing.T) {
-	// given
-	wave := domain.Wave{ID: "w2", ClusterName: "My Cluster"}
-
-	// when
-	got := session.WaveApplyFileName(wave)
-
-	// then
-	expected := "apply_my_cluster_w2.json"
-	if got != expected {
-		t.Errorf("expected %s, got %s", expected, got)
-	}
-}
-
-func TestWaveApplyFileName_DuplicateIDsDifferentClusters(t *testing.T) {
-	// given: two waves with same ID but different clusters
-	authWave := domain.Wave{ID: "w1", ClusterName: "Auth"}
-	apiWave := domain.Wave{ID: "w1", ClusterName: "API"}
-
-	// when
-	authFile := session.WaveApplyFileName(authWave)
-	apiFile := session.WaveApplyFileName(apiWave)
-
-	// then: filenames must differ
-	if authFile == apiFile {
-		t.Errorf("duplicate filenames for different clusters: %s", authFile)
 	}
 }
 
@@ -285,25 +216,6 @@ func TestEvaluateUnlocks_AllCompleted(t *testing.T) {
 		if w.Status != "completed" {
 			t.Errorf("expected %s to remain completed, got %s", domain.WaveKey(w), w.Status)
 		}
-	}
-}
-
-func TestToApplyResult_ZeroActions_ReturnsBeforeCompleteness(t *testing.T) {
-	// given: wave with no actions — nothing to accomplish
-	wave := domain.Wave{
-		ID:          "empty-w1",
-		ClusterName: "Auth",
-		Delta:       domain.WaveDelta{Before: 0.3, After: 0.5},
-		Actions:     nil,
-	}
-	internal := &domain.WaveApplyResult{WaveID: "empty-w1", Applied: 0}
-
-	// when
-	result := session.ToApplyResult(wave, internal)
-
-	// then: no actions means nothing accomplished → completeness should be Before
-	if result.NewCompleteness != 0.3 {
-		t.Errorf("expected 0.3 (Delta.Before), got %f", result.NewCompleteness)
 	}
 }
 

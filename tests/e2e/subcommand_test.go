@@ -29,6 +29,23 @@ func sightjackBin() string {
 	return p
 }
 
+// srcRoot walks up from the current working directory to the module root
+// (the directory containing go.mod). Used by e2e tests to locate testdata
+// when running out-of-tree (e.g. in Docker). Returns "." if not found.
+func srcRoot() string {
+	dir, _ := os.Getwd()
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "."
+		}
+		dir = parent
+	}
+}
+
 // runCmd executes sightjack with args and returns stdout+stderr combined.
 func runCmd(t *testing.T, args ...string) (string, error) {
 	t.Helper()
@@ -105,7 +122,7 @@ func TestE2E_Help(t *testing.T) {
 	if err != nil {
 		t.Fatalf("--help failed: %v\noutput: %s", err, out)
 	}
-	for _, sub := range []string{"scan", "waves", "select", "apply", "run", "version"} {
+	for _, sub := range []string{"mcp", "sessions", "show", "status", "doctor", "version"} {
 		if !strings.Contains(out, sub) {
 			t.Errorf("--help output missing subcommand %q", sub)
 		}

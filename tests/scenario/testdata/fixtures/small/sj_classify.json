@@ -1,6 +1,0 @@
-{
-  "clusters": [
-    {"name": "Auth", "issue_ids": ["AUTH-1", "AUTH-2"], "labels": ["security"]}
-  ],
-  "total_issues": 2
-}
