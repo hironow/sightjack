@@ -176,30 +176,6 @@ check-go:
         exit 1; \
     fi
 
-# Run L1 scenario test
-test-scenario-min: check-go
-    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L1 -count=1 -v -timeout=120s
-
-# Run L2 scenario test
-test-scenario-small: check-go
-    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L2 -count=1 -v -timeout=180s
-
-# Run L3 scenario test
-test-scenario-middle: check-go
-    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L3 -count=1 -v -timeout=300s
-
-# Run L4 scenario test
-test-scenario-hard: check-go
-    mise exec -- go test -tags scenario ./tests/scenario/ -run TestScenario_L4 -count=1 -v -timeout=600s
-
-# Run L1+L2 scenario tests (CI default)
-test-scenario: check-go
-    mise exec -- go test -tags scenario ./tests/scenario/ -run "TestScenario_L[12]" -count=1 -v -timeout=300s
-
-# Run all scenario tests
-test-scenario-all: check-go
-    mise exec -- go test -tags scenario ./tests/scenario/ -count=1 -v -timeout=900s
-
 # Audit nosemgrep annotations for proper tagging
 nosemgrep-audit:
     #!/usr/bin/env bash

@@ -52,8 +52,8 @@ Claude subprocess uses --strict-mcp-config to enforce the MCP allowlist.`,
 			}
 
 			logger := platform.NewLogger(cmd.ErrOrStderr(), false)
-			linearFlag := mustBool(cmd, "linear")
-			mode := domain.NewTrackingMode(linearFlag)
+			// Wave mode only post jun15 MCP pivot (Linear tracking removed).
+			mode := domain.NewTrackingMode(false)
 
 			path, genErr := session.GenerateMCPConfig(baseDir, mode, force)
 			if genErr != nil {

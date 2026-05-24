@@ -52,7 +52,6 @@ sightjack rival export reasons [flags]
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
-      --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)
   -q, --quiet           Suppress all stderr output
   -v, --verbose         Verbose logging

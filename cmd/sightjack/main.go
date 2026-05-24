@@ -41,12 +41,7 @@ func run() int {
 	workCtx = context.WithValue(workCtx, domain.ShutdownKey, outerCtx)
 
 	rootCmd := cmd.NewRootCommand()
-	args := os.Args[1:]
-	if cmd.NeedsDefaultScan(rootCmd, args) {
-		args = append([]string{"scan"}, args...)
-	} else {
-		args = cmd.ReorderArgs(rootCmd, args)
-	}
+	args := cmd.ReorderArgs(rootCmd, os.Args[1:])
 	rootCmd.SetArgs(args)
 
 	err := rootCmd.ExecuteContext(workCtx)

@@ -326,7 +326,7 @@ func realNextWave(baseDir string, args json.RawMessage) map[string]any {
 		"available_waves": len(availableWaves),
 		"next_wave":       nextWave,
 		"all_available":   availableWaves,
-		"instruction":     "Pick a wave from all_available by id, then run `sightjack apply` (via skill workflow) to claim it.",
+		"instruction":     "Pick a wave from all_available by id, then claim it from the claude code session via the /sightjack-scan skill (write the spec D-Mail to outbox/).",
 	})
 }
 

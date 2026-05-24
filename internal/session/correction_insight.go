@@ -1,20 +1,8 @@
 package session
 
 import (
-	"path/filepath"
-
 	"github.com/hironow/sightjack/internal/domain"
 )
-
-func buildCorrectionInsightHook(baseDir string, logger domain.Logger) func(*domain.DMail) {
-	w := NewInsightWriter(
-		filepath.Join(baseDir, domain.StateDir, "insights"),
-		filepath.Join(baseDir, domain.StateDir, ".run"),
-	)
-	return func(mail *domain.DMail) {
-		WriteCorrectionInsight(w, mail, logger)
-	}
-}
 
 func WriteCorrectionInsights(w *InsightWriter, mails []*domain.DMail, logger domain.Logger) {
 	for _, mail := range mails {

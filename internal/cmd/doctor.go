@@ -51,8 +51,8 @@ hint recommends adjusting .claude/settings.json.`,
 
 			logger := loggerFrom(cmd)
 			repair := mustBool(cmd, "repair")
-			linearFlag := mustBool(cmd, "linear")
-			mode := domain.NewTrackingMode(linearFlag)
+			// Wave mode only post jun15 MCP pivot (Linear tracking removed).
+			mode := domain.NewTrackingMode(false)
 			results := session.RunDoctor(cmd.Context(), resolved, baseDir, logger, repair, mode)
 
 			if jsonOut {

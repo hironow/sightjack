@@ -38,7 +38,7 @@ Direct `os.Stderr` is acceptable only where cobra's `cmd` is unavailable:
 The stream separation ensures correct behavior in Unix pipelines:
 
 ```bash
-sightjack scan --json | jq '.waves'    # stdout = JSON only
-sightjack scan --json 2>/dev/null      # suppress stderr logs
-sightjack scan --json 2>scan.log       # split logs to file
+sightjack show --json | jq '.'         # stdout = JSON only
+sightjack show --json 2>/dev/null      # suppress stderr logs
+sightjack show --json 2>show.log       # split logs to file
 ```

@@ -28,7 +28,6 @@ and can be listed, filtered, and re-entered interactively.
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
-      --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -q, --quiet           Suppress all stderr output
@@ -37,7 +36,7 @@ and can be listed, filtered, and re-entered interactively.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture MCP data plane
 * [sightjack sessions enter](sightjack_sessions_enter.md)	 - Re-enter an AI coding session interactively
 * [sightjack sessions list](sightjack_sessions_list.md)	 - List recorded coding sessions
 

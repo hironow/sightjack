@@ -31,7 +31,6 @@ into the OpenSPDD REASONS Canvas markdown shape.
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
-      --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -q, --quiet           Suppress all stderr output
@@ -40,6 +39,6 @@ into the OpenSPDD REASONS Canvas markdown shape.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture MCP data plane
 * [sightjack rival export](sightjack_rival_export.md)	 - Export a Rival Contract to an interop format
 

@@ -1,22 +1,21 @@
 # Sightjack
 
-**An interactive planning tool that scans Linear issues, detects gaps in DoD and dependencies, and applies approved wave-by-wave architecture updates back to Linear.**
+**An MCP server + data plane for SIREN-inspired issue architecture: it serves the scan/wave read models from the session's scan dir and persists strictness config.**
 
-Sightjack uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze Linear issues across clusters, detect missing DoD (Definition of Done), hidden dependencies, and technical debt resurrection — then guides you through wave-by-wave approval to incrementally improve issue completeness.
+Following the jun15 MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Sightjack the Go CLI is now a pure data plane: it serves scan results and wave plans over MCP, persists scan strictness atomically, and provides the supporting data-plane commands. The headless designer pipeline — classify/deep-scan, wave generation, the interactive approve loop, the Architect/Scribe discuss + ADR steps, and D-Mail composition — has been retired. The scan/wave workflow now fires from the claude-code session via the `/sightjack-scan` skill and the sightjack MCP tools (see `plugins/sightjack/skills/sightjack-scan/SKILL.md`).
 
 ```bash
-sightjack run
+sightjack mcp
 ```
 
-This single command makes Sightjack repeat the following cycle:
+`sightjack mcp` starts the MCP server. Its tools expose:
 
-1. Scan all Linear issues and classify them into thematic clusters
-2. Deep-scan each cluster for completeness gaps and hidden dependencies
-3. Generate execution waves with prerequisites and completeness deltas
-4. Present the Link Navigator — you choose which wave to tackle
-5. Review, discuss with the Architect agent, approve or modify
-6. Apply changes to Linear, unlock dependent waves, repeat
-7. Stop when all issues reach target completeness
+1. `sightjack.ping` — health check
+2. `sightjack.next_wave` — the first `available` wave from the session's scan dir
+3. `sightjack.get_scan_result` — aggregated cluster info for a session
+4. `sightjack.update_strictness` — atomically persist scan strictness to `.siren/config.yaml`
+
+The claude-code session reads these read models, plans waves, and writes spec D-Mails to `outbox/` itself (via the skill workflow) — sightjack no longer drives the LLM or composes D-Mails.
 
 ## Why "Sightjack"?
 
@@ -136,15 +135,7 @@ Sightjack communicates with downstream tools (amadeus, paintress) via D-Mail, a 
 | `implementation-feedback` | inbound | Implementation feedback from paintress (injected into nextgen prompts) |
 | `convergence` | inbound | Convergence signal — requires user approval before session proceeds |
 
-When a `convergence` D-Mail is detected at session startup, the **convergence gate** activates:
-
-1. **Notify** — desktop notification (fire-and-forget, non-blocking with 30s timeout)
-2. **Approve** — blocking prompt (stdin y/N, external command, or auto-approve)
-3. **Re-drain** — checks for late-arriving convergence and loops if found
-
-The gate runs before the interactive wave loop in the `run` command (which supports resuming or rescanning from previous sessions). Gate behavior is configurable via `gate:` config section or `--notify-cmd` / `--approve-cmd` / `--auto-approve` CLI flags. When `--auto-approve` resumes a fully completed session (all waves done), sightjack automatically falls back to rescan to avoid idle deadlock.
-
-After the convergence gate, a **D-Mail waiting phase** polls the inbox for design-feedback D-Mails. The idle timeout is configurable via `--idle-timeout` (default: 30 minutes, `0` = 24h safety cap, negative = disable).
+> Note: the headless wave loop, convergence gate, and D-Mail waiting phase that previously ran inside the retired `run`/`scan` pipeline have been retired with the jun15 MCP pivot. Spec/report/feedback D-Mails are now composed by the claude-code session via the `/sightjack-scan` skill, not the Go CLI. The kinds above document the D-Mail protocol the skill emits/consumes; sightjack the data plane only serves the scan/wave read models over MCP.
 
 SKILL.md files in `.siren/skills/` declare produces/consumes routing for phonewave discovery using Agent Skills spec format with `dmail-schema-version: "1"`.
 
@@ -251,47 +242,32 @@ sightjack init --force
 # Check environment (config, tools, skills, event store, context-budget with per-item diagnostics, Docker)
 sightjack doctor
 
-# Run — .siren/ is created automatically
-sightjack run
+# Start the MCP server (data plane for the claude-code scan session) — .siren/ is created automatically
+sightjack mcp
 ```
 
 Sightjack creates `.siren/` and all state/run files automatically at runtime. The `insights/` subdirectory is git-tracked and accumulates semantic knowledge (Shibito warnings, strictness estimates) across sessions.
 
 ## Subcommands
 
-Running `sightjack` without a subcommand defaults to `scan` (classify and deep-scan Linear issues).
-
-### Interactive
-
 | Command | Description |
 |---------|-------------|
-| `scan` | Classify and deep-scan Linear issues (default) |
-| `run` | Interactive wave approval and apply loop |
-| `show` | Display last scan results |
+| `mcp` | Start the MCP server (data plane: ping / next_wave / get_scan_result / update_strictness) |
+| `sessions` | Manage coding sessions (`sessions enter` / `sessions list`) |
+| `show` | Display last scan results from the event store |
 | `init` | Initialize `.siren/config.yaml` |
 | `doctor` | Check environment health |
 | `config show` / `config set` | View or update configuration |
 | `status` | Show operational status |
+| `adr` | Generate ADR Markdown from a stdin `DiscussResult` |
 | `clean` | Remove state directory |
 | `archive-prune` | Remove expired scan archives |
+| `rebuild` | Rebuild projections from the event store |
+| `dead-letters` | Inspect / purge failed outbox deliveries |
+| `rival` | Rival contract export utilities |
 | `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
 | `version` | Print version info |
 | `update` | Self-update to the latest release |
-
-### Pipe-friendly (Unix pipeline)
-
-Each subcommand reads JSON from stdin and writes JSON to stdout. Logs go to stderr.
-
-| Command | stdin | stdout |
-|---------|-------|--------|
-| `scan --json` | — | `ScanResult` |
-| `waves` | `ScanResult` | `WavePlan` |
-| `select` | `WavePlan` | `Wave` |
-| `discuss` | `Wave` | `DiscussResult` |
-| `apply` | `Wave` | `ApplyResult` |
-| `adr` | `DiscussResult` | ADR Markdown |
-| `nextgen` | `ApplyResult` | `WavePlan` |
-| `show` | `ScanResult` or `WavePlan` | human-readable |
 
 All commands accept an optional `[path]` argument (defaults to cwd). For flags, examples, and full reference per subcommand, see [docs/cli/](docs/cli/).
 
@@ -300,17 +276,10 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 ```bash
 sightjack init                    # set up .siren/
 sightjack mcp-config generate     # Claude subprocess isolation settings
-sightjack scan                    # classify issues
-sightjack run                     # interactive loop
-sightjack scan -n                 # dry run
+sightjack mcp                     # start the MCP data plane for the claude-code session
 ```
 
-### Unix pipeline
-
-```bash
-sightjack scan --json | sightjack waves | sightjack select | sightjack apply
-sightjack scan --json | sightjack waves | sightjack select | sightjack discuss | sightjack adr > docs/adr/0005-foo.md
-```
+Then launch a claude-code session wired to the sightjack MCP server and invoke the `/sightjack-scan` skill; the session reads the scan/wave read models over MCP and drives the scan + wave planning itself.
 
 ## Configuration
 
@@ -378,7 +347,7 @@ Sightjack instruments key operations (scan, wave generation, architect discussio
 just jaeger
 
 # Run with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack run
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 sightjack mcp
 
 # View traces at http://localhost:16686
 
