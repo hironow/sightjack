@@ -16,13 +16,13 @@ import (
 	"github.com/hironow/sightjack/internal/platform"
 )
 
-// MCPServer is a minimal stdio-based Model Context Protocol server
-// scaffolded for the refs/issues/0027 jun15 MCP pivot (Phase 2a).
+// MCPServer is a stdio-based Model Context Protocol server for the
+// refs/issues/0027 jun15 MCP pivot.
 //
-// This is a SKELETON: only the sightjack.ping health-check tool is
-// exposed. Real tools (sightjack.next_wave, sightjack.get_scan_result,
-// sightjack.update_strictness, ...) ship in subsequent commits on the
-// feat/jun15-mcp-pivot branch.
+// All four tools are real implementations: sightjack.ping (health
+// check), sightjack.next_wave + sightjack.get_scan_result (read the
+// session's scan dir under .siren/.run/<session_id>/), and
+// sightjack.update_strictness (atomically updates .siren/config.yaml).
 //
 // Wire it into a claude code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
@@ -61,7 +61,7 @@ func (s *MCPServer) WithBaseDir(baseDir string) *MCPServer {
 	return s
 }
 
-// jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this skeleton
+// jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this server
 // understands. Method-specific params decode on demand from
 // Params (json.RawMessage).
 type jsonrpcMessage struct {
@@ -191,12 +191,12 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	return err
 }
 
-// toolDescriptors returns the Phase 2a MVP tool set. Each entry pins
-// the interface (name, description, inputSchema) so claude code
-// clients see a stable contract. As of Phase 3 all 3 non-ping tools
-// are real impl (= read from .siren/.run/<session_id>/ scan + wave
-// JSON files + config.yaml strictness default). Mutation persistence
-// (= update_strictness writes to config) is Phase 4 follow-up.
+// toolDescriptors returns the tool set. Each entry pins the interface
+// (name, description, inputSchema) so claude code clients see a stable
+// contract. All 3 non-ping tools are real impl: next_wave +
+// get_scan_result read from .siren/.run/<session_id>/ scan + wave JSON
+// files; update_strictness writes the strictness default to
+// .siren/config.yaml atomically.
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
@@ -228,7 +228,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "sightjack.update_strictness",
-			"description": "Update the default scan strictness in .siren/config.yaml and persist it atomically. Phase 4 follow-up persistence (= replaces Phase 3 preview-only). Validates the level (fog / alert / lockdown) before write.",
+			"description": "Update the default scan strictness in .siren/config.yaml and persist it atomically. Validates the level (fog / alert / lockdown) before write.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -410,9 +410,8 @@ func realGetScanResult(baseDir string, args json.RawMessage) map[string]any {
 // (= domain.StrictnessLevel.Valid()). Invalid input returns
 // persisted=false + reason without touching the config.
 //
-// Pattern: paintress.update_gradient (= 83cb3ca) plus Phase 4
-// follow-up persistence (= sightjack #215 preview-only → real write
-// via existing session.UpdateConfig path).
+// Pattern: paintress.update_gradient (= 83cb3ca) plus atomic
+// persistence via the existing session.UpdateConfig path.
 func realUpdateStrictness(baseDir string, args json.RawMessage) map[string]any {
 	var payload struct {
 		Level string `json:"level"`

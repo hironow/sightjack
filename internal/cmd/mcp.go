@@ -14,9 +14,9 @@ import (
 // calls sightjack tools from inside the human-initiated subscription
 // quota.
 //
-// Phase 2a MVP exposes only sightjack.ping. Real tools (next_wave,
-// get_scan_result, update_strictness) land in subsequent commits on
-// feat/jun15-mcp-pivot.
+// Exposes sightjack.ping + sightjack.next_wave + sightjack.get_scan_result
+// (read the session scan dir) + sightjack.update_strictness (atomic
+// .siren/config.yaml write).
 //
 // Distinct from `sightjack mcp-config` which manages the .mcp.json
 // configuration consumed by the legacy claude_adapter. This server
@@ -24,7 +24,7 @@ import (
 func newMCPCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
-		Short: "Run sightjack as an MCP server over stdio (refs/issues/0027 Phase 2a MVP)",
+		Short: "Run sightjack as an MCP server over stdio (scan/wave data plane + strictness control)",
 		Long: `Start a Model Context Protocol server reading JSON-RPC 2.0
 messages on stdin and writing responses on stdout.
 
@@ -33,10 +33,10 @@ Designed for embedding in a claude code interactive session via
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
 
-Phase 2a MVP scope: only the sightjack.ping health check is exposed.
-Real tools (sightjack.next_wave, sightjack.get_scan_result,
-sightjack.update_strictness) ship in subsequent commits on the
-feat/jun15-mcp-pivot branch.
+Exposes sightjack.ping, sightjack.next_wave + sightjack.get_scan_result
+(read the session's scan dir under .siren/.run/<session_id>/), and
+sightjack.update_strictness (atomically updates the strictness default
+in .siren/config.yaml).
 
 Not to be confused with 'sightjack mcp-config' (subcommand managing
 the legacy .mcp.json file consumed by the embedded claude_adapter).`,
