@@ -35,7 +35,7 @@ Use NeedsDefaultScan() to preprocess args before Execute.
 * [sightjack discuss](sightjack_discuss.md)	 - Architect discussion from stdin Wave JSON
 * [sightjack doctor](sightjack_doctor.md)	 - Check environment and tool availability
 * [sightjack init](sightjack_init.md)	 - Create .siren/config.yaml
-* [sightjack mcp](sightjack_mcp.md)	 - Run sightjack as an MCP server over stdio (refs/issues/0027 Phase 2a MVP)
+* [sightjack mcp](sightjack_mcp.md)	 - Run sightjack as an MCP server over stdio (scan/wave data plane + strictness control)
 * [sightjack mcp-config](sightjack_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
 * [sightjack nextgen](sightjack_nextgen.md)	 - Generate follow-up waves from stdin ApplyResult
 * [sightjack rebuild](sightjack_rebuild.md)	 - Rebuild projections from event store
