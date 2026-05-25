@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -56,8 +55,8 @@ func init() {
 func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "sightjack",
-		Short: "SIREN-inspired issue architecture tool for Linear",
-		Long:  "sightjack — SIREN-inspired issue architecture tool for Linear\n\nClassify, wave-plan, discuss, and apply changes to Linear issues.\nRunning without a subcommand defaults to 'scan'.\nUse NeedsDefaultScan() to preprocess args before Execute.",
+		Short: "SIREN-inspired issue architecture MCP data plane",
+		Long:  "sightjack — SIREN-inspired issue architecture MCP data plane\n\nServe scan/wave read models to a human-initiated claude code session via\nthe `sightjack mcp` stdio server + the /sightjack-scan skill (jun15 MCP\npivot). Use `sightjack sessions` to manage coding sessions and the\ndata-plane commands (show, status, rebuild) to inspect state.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			applyOtelEnv(filepath.Dir(cfgPath))
 			noColor := mustBool(cmd, "no-color")
@@ -81,10 +80,9 @@ func NewRootCommand() *cobra.Command {
 			spanCtx := startRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 
-			// StreamBus: process-wide live session event bus.
-			// All ClaudeAdapter instances auto-pick up via sharedStreamBus.
+			// StreamBus: process-wide live session event bus. Closed by
+			// cobra.OnFinalize. Subscribers bridge stream events to the logger.
 			streamBus := platform.NewInProcessSessionBus()
-			session.SetStreamBus(streamBus)
 			sharedStreamBus = streamBus
 
 			// Production subscriber: bridge stream events to logger.
@@ -123,7 +121,6 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress all stderr output")
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false, "Generate prompts without executing Claude")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
-	rootCmd.PersistentFlags().Bool("linear", false, "Use Linear MCP for issue tracking (default: wave-centric mode)")
 
 	rootCmd.Version = Version
 
@@ -134,13 +131,6 @@ func NewRootCommand() *cobra.Command {
 		newStatusCommand(),
 		newADRCommand(),
 		newArchivePruneCommand(),
-		newScanCommand(),
-		newWavesCommand(),
-		newSelectCommand(),
-		newDiscussCommand(),
-		newApplyCommand(),
-		newNextgenCommand(),
-		newRunCommand(),
 		newCleanCommand(),
 		newVersionCommand(),
 		newUpdateCommand(),
@@ -156,40 +146,6 @@ func NewRootCommand() *cobra.Command {
 	return rootCmd
 }
 
-// ttyDevices returns the ordered list of terminal device paths to try for the
-// given GOOS. On Windows, CONIN$ is tried first; on Unix, /dev/tty is tried first.
-func ttyDevices(goos string) []string {
-	if goos == "windows" {
-		return []string{"CONIN$", "/dev/tty"}
-	}
-	return []string{"/dev/tty", "CONIN$"}
-}
-
-// openTTY opens the platform-appropriate controlling terminal for interactive
-// input. On Unix this is /dev/tty; on Windows it is CONIN$. Returns an error
-// if neither device is available (e.g., in a non-interactive container).
-//
-// If SIGHTJACK_TTY is set, opens that path instead. This allows E2E tests
-// to inject a go-expect PTY device (c.Tty().Name()) so interactive commands
-// work in Docker containers without a controlling terminal.
-func openTTY() (*os.File, error) {
-	if path := os.Getenv("SIGHTJACK_TTY"); path != "" {
-		return os.Open(path)
-	}
-	devices := ttyDevices(runtime.GOOS)
-	var firstErr error
-	for _, dev := range devices {
-		tty, err := os.Open(dev)
-		if err == nil {
-			return tty, nil
-		}
-		if firstErr == nil {
-			firstErr = err
-		}
-	}
-	return nil, fmt.Errorf("no controlling terminal available (tried %v: %v)", devices, firstErr)
-}
-
 // loadConfig loads the sightjack config, applying lang override if set.
 func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	resolved := resolveConfigPath(cmd, baseDir)
@@ -203,8 +159,10 @@ func loadConfig(cmd *cobra.Command, baseDir string) (*domain.Config, error) {
 	if lang != "" {
 		cfg.Lang = lang
 	}
-	linearFlag := mustBool(cmd, "linear")
-	cfg.Mode = domain.NewTrackingMode(linearFlag)
+	// Post jun15 MCP pivot: the headless designer pipeline is retired and
+	// sightjack runs in wave mode only (Linear tracking removed). See the
+	// /sightjack-scan skill + `sightjack mcp` data plane.
+	cfg.Mode = domain.NewTrackingMode(false)
 	return cfg, nil
 }
 

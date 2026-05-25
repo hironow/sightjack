@@ -21,15 +21,14 @@
 - [sightjack config](cli/sightjack_config.md) — View or update configuration
 - [sightjack config show](cli/sightjack_config_show.md) — Show current configuration
 - [sightjack config set](cli/sightjack_config_set.md) — Update configuration values
-- [sightjack scan](cli/sightjack_scan.md) — Classify and deep-scan Linear issues
-- [sightjack run](cli/sightjack_run.md) — Interactive wave approval and apply loop
-- [sightjack waves](cli/sightjack_waves.md) — Generate waves from stdin ScanResult JSON
+- [sightjack mcp](cli/sightjack_mcp.md) — Start the MCP server (data plane)
+- [sightjack mcp-config](cli/sightjack_mcp-config.md) — Generate MCP / Claude subprocess isolation config
+- [sightjack sessions](cli/sightjack_sessions.md) — Manage coding sessions (enter / list)
 - [sightjack show](cli/sightjack_show.md) — Display last scan results
-- [sightjack select](cli/sightjack_select.md) — Interactively pick a wave from stdin WavePlan
-- [sightjack discuss](cli/sightjack_discuss.md) — Architect discussion from stdin Wave JSON
-- [sightjack apply](cli/sightjack_apply.md) — Apply a wave to Linear from stdin Wave JSON
 - [sightjack adr](cli/sightjack_adr.md) — Generate ADR Markdown from stdin DiscussResult
-- [sightjack nextgen](cli/sightjack_nextgen.md) — Generate follow-up waves from stdin ApplyResult
+- [sightjack rebuild](cli/sightjack_rebuild.md) — Rebuild projections from the event store
+- [sightjack dead-letters](cli/sightjack_dead-letters.md) — Inspect / purge failed outbox deliveries
+- [sightjack rival](cli/sightjack_rival.md) — Rival contract export utilities
 - [sightjack status](cli/sightjack_status.md) — Show operational status
 - [sightjack doctor](cli/sightjack_doctor.md) — Check environment and tool availability
 - [sightjack clean](cli/sightjack_clean.md) — Remove state directory (.siren/)

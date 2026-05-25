@@ -31,7 +31,6 @@ this allowlist when the file exists.
   -c, --config string   Config file path (default ".siren/config.yaml")
   -n, --dry-run         Generate prompts without executing Claude
   -l, --lang string     Language override (ja/en)
-      --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -q, --quiet           Suppress all stderr output
@@ -40,6 +39,6 @@ this allowlist when the file exists.
 
 ### SEE ALSO
 
-* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture tool for Linear
+* [sightjack](sightjack.md)	 - SIREN-inspired issue architecture MCP data plane
 * [sightjack mcp-config generate](sightjack_mcp-config_generate.md)	 - Generate .mcp.json and .claude/settings.json for subprocess isolation
 

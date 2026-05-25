@@ -1,18 +1,12 @@
 package session_test
 
 import (
-	"context"
-	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sync/atomic"
 	"testing"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/harness"
-	"github.com/hironow/sightjack/internal/platform"
 	"github.com/hironow/sightjack/internal/session"
 )
 
@@ -113,6 +107,46 @@ func TestParseClusterScanResult(t *testing.T) {
 	}
 	if result.Completeness != 0.35 {
 		t.Errorf("expected 0.35, got %f", result.Completeness)
+	}
+}
+
+func TestParseClassifyResult_WithShibitoWarnings(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	path := filepath.Join(dir, "classify.json")
+	content := `{
+		"clusters": [
+			{"name": "Auth", "issue_ids": ["id1"]}
+		],
+		"total_issues": 1,
+		"shibito_warnings": [
+			{
+				"closed_issue_id": "ENG-50",
+				"current_issue_id": "ENG-120",
+				"description": "Login timeout pattern re-emerging",
+				"risk_level": "high"
+			}
+		]
+	}`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	result, err := session.ParseClassifyResult(path)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.ShibitoWarnings) != 1 {
+		t.Fatalf("expected 1 shibito warning, got %d", len(result.ShibitoWarnings))
+	}
+	if result.ShibitoWarnings[0].ClosedIssueID != "ENG-50" {
+		t.Errorf("expected ENG-50, got %s", result.ShibitoWarnings[0].ClosedIssueID)
+	}
+	if result.ShibitoWarnings[0].RiskLevel != "high" {
+		t.Errorf("expected high, got %s", result.ShibitoWarnings[0].RiskLevel)
 	}
 }
 
@@ -252,430 +286,6 @@ func TestMergeClusterChunks_SingleChunk_CanonicalName(t *testing.T) {
 	}
 }
 
-func TestRunWaveGenerate_ParsesResults(t *testing.T) {
-	// given: mock wave generation output files
-	dir := t.TempDir()
-	wave0 := filepath.Join(dir, "wave_00_auth.json")
-	wave1 := filepath.Join(dir, "wave_01_api.json")
-
-	os.WriteFile(wave0, []byte(`{
-		"cluster_name": "Auth",
-		"waves": [
-			{"id": "auth-w1", "cluster_name": "Auth", "title": "Deps", "actions": [], "prerequisites": [], "delta": {"before": 0.25, "after": 0.40}, "status": "available"}
-		]
-	}`), 0644)
-	os.WriteFile(wave1, []byte(`{
-		"cluster_name": "API",
-		"waves": [
-			{"id": "api-w1", "cluster_name": "API", "title": "Split", "actions": [], "prerequisites": [], "delta": {"before": 0.30, "after": 0.45}, "status": "available"}
-		]
-	}`), 0644)
-
-	// when: parse both files
-	result0, err := session.ParseWaveGenerateResult(wave0)
-	if err != nil {
-		t.Fatalf("parse wave 0: %v", err)
-	}
-	result1, err := session.ParseWaveGenerateResult(wave1)
-	if err != nil {
-		t.Fatalf("parse wave 1: %v", err)
-	}
-
-	// then: merge waves
-	allWaves := harness.MergeWaveResults([]domain.WaveGenerateResult{*result0, *result1})
-	if len(allWaves) != 2 {
-		t.Fatalf("expected 2 waves, got %d", len(allWaves))
-	}
-}
-
-func TestParseClassifyResult_WithShibitoWarnings(t *testing.T) {
-	// given
-	dir := t.TempDir()
-	path := filepath.Join(dir, "classify.json")
-	content := `{
-		"clusters": [
-			{"name": "Auth", "issue_ids": ["id1"]}
-		],
-		"total_issues": 1,
-		"shibito_warnings": [
-			{
-				"closed_issue_id": "ENG-50",
-				"current_issue_id": "ENG-120",
-				"description": "Login timeout pattern re-emerging",
-				"risk_level": "high"
-			}
-		]
-	}`
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// when
-	result, err := session.ParseClassifyResult(path)
-
-	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.ShibitoWarnings) != 1 {
-		t.Fatalf("expected 1 shibito warning, got %d", len(result.ShibitoWarnings))
-	}
-	if result.ShibitoWarnings[0].ClosedIssueID != "ENG-50" {
-		t.Errorf("expected ENG-50, got %s", result.ShibitoWarnings[0].ClosedIssueID)
-	}
-	if result.ShibitoWarnings[0].RiskLevel != "high" {
-		t.Errorf("expected high, got %s", result.ShibitoWarnings[0].RiskLevel)
-	}
-}
-
-func TestMergeScanResults_PropagatesShibitoWarnings(t *testing.T) {
-	// given
-	clusters := []domain.ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: make([]domain.IssueDetail, 3)},
-	}
-	warnings := []domain.ShibitoWarning{
-		{ClosedIssueID: "ENG-50", CurrentIssueID: "ENG-120", Description: "pattern", RiskLevel: "high"},
-	}
-
-	// when
-	result := session.MergeScanResults(clusters, warnings, nil)
-
-	// then
-	if len(result.ShibitoWarnings) != 1 {
-		t.Fatalf("expected 1 shibito warning, got %d", len(result.ShibitoWarnings))
-	}
-	if result.ShibitoWarnings[0].ClosedIssueID != "ENG-50" {
-		t.Errorf("expected ENG-50, got %s", result.ShibitoWarnings[0].ClosedIssueID)
-	}
-}
-
-func TestMergeScanResults(t *testing.T) {
-	// given
-	clusters := []domain.ClusterScanResult{
-		{Name: "Auth", Completeness: 0.25, Issues: make([]domain.IssueDetail, 3)},
-		{Name: "API", Completeness: 0.50, Issues: make([]domain.IssueDetail, 7)},
-	}
-
-	// when
-	result := session.MergeScanResults(clusters, nil, nil)
-
-	// then
-	if result.TotalIssues != 10 {
-		t.Errorf("expected 10, got %d", result.TotalIssues)
-	}
-	if result.Completeness != 0.375 {
-		t.Errorf("expected 0.375, got %f", result.Completeness)
-	}
-	if len(result.Clusters) != 2 {
-		t.Errorf("expected 2 clusters, got %d", len(result.Clusters))
-	}
-}
-
-func TestMergeScanResults_WithScanWarnings(t *testing.T) {
-	// given: partial scan success — some clusters failed
-	clusters := []domain.ClusterScanResult{
-		{Name: "Auth", Completeness: 0.5, Issues: make([]domain.IssueDetail, 3)},
-	}
-	scanWarnings := []string{`Cluster "Infra" scan failed: timeout`}
-
-	// when
-	result := session.MergeScanResults(clusters, nil, scanWarnings)
-
-	// then
-	if len(result.ScanWarnings) != 1 {
-		t.Fatalf("expected 1 scan warning, got %d", len(result.ScanWarnings))
-	}
-	if result.ScanWarnings[0] != scanWarnings[0] {
-		t.Errorf("expected %q, got %q", scanWarnings[0], result.ScanWarnings[0])
-	}
-}
-
-func TestRunParallelDeepScan(t *testing.T) {
-	// given
-	clusters := []domain.ClusterScanResult{
-		{Name: "auth", Issues: []domain.IssueDetail{{ID: "A-1"}}},
-		{Name: "infra", Issues: []domain.IssueDetail{{ID: "I-1"}}},
-		{Name: "frontend", Issues: []domain.IssueDetail{{ID: "F-1"}}},
-	}
-
-	dir := t.TempDir()
-	cfg := domain.DefaultConfig()
-	cfg.Scan.MaxConcurrency = 2
-
-	// when
-	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
-			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 0.5}, nil
-		}, platform.NewLogger(io.Discard, false))
-
-	// then
-	if len(results) != 3 {
-		t.Errorf("expected 3 results, got %d", len(results))
-	}
-	if len(warnings) != 0 {
-		t.Errorf("expected 0 warnings, got %d", len(warnings))
-	}
-}
-
-func TestRunParallelDeepScanWithFailure(t *testing.T) {
-	// given
-	clusters := []domain.ClusterScanResult{
-		{Name: "auth"},
-		{Name: "infra"},
-	}
-
-	dir := t.TempDir()
-	cfg := domain.DefaultConfig()
-	var callCount atomic.Int32
-
-	// when
-	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
-			callCount.Add(1)
-			if cluster.Name == "auth" {
-				return domain.ClusterScanResult{}, fmt.Errorf("auth scan failed")
-			}
-			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 0.7}, nil
-		}, platform.NewLogger(io.Discard, false))
-
-	// then
-	if len(results) != 1 {
-		t.Errorf("expected 1 successful result, got %d", len(results))
-	}
-	if len(results) > 0 && results[0].Name != "infra" {
-		t.Errorf("expected 'infra', got %q", results[0].Name)
-	}
-	if len(warnings) != 1 {
-		t.Errorf("expected 1 warning, got %d", len(warnings))
-	}
-	if callCount.Load() != 2 {
-		t.Errorf("expected 2 calls, got %d", callCount.Load())
-	}
-}
-
-func TestRunParallelDeepScanSingleCluster(t *testing.T) {
-	// given
-	clusters := []domain.ClusterScanResult{{Name: "only"}}
-	dir := t.TempDir()
-	cfg := domain.DefaultConfig()
-
-	// when
-	results, _ := session.RunParallelDeepScan(context.Background(), &cfg, dir, clusters,
-		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
-			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		}, platform.NewLogger(io.Discard, false))
-
-	// then
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-func TestRunParallelDeepScan_IndexBasedLookup(t *testing.T) {
-	// given: classify result with cluster names and issue IDs (simulates Pass 1 output)
-	classifyClusters := []domain.ClusterClassification{
-		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
-		{Name: "Infra", IssueIDs: []string{"I-1"}},
-	}
-
-	scanClusters := make([]domain.ClusterScanResult, len(classifyClusters))
-	for i, cc := range classifyClusters {
-		scanClusters[i] = domain.ClusterScanResult{Name: cc.Name}
-	}
-
-	dir := t.TempDir()
-	cfg := domain.DefaultConfig()
-	cfg.Scan.MaxConcurrency = 2
-
-	// when: use index-based lookup (same pattern as wired in RunScan)
-	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
-		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
-			cc := classifyClusters[index]
-			return domain.ClusterScanResult{
-				Name:         cc.Name,
-				Completeness: 0.5,
-				Issues:       make([]domain.IssueDetail, len(cc.IssueIDs)),
-			}, nil
-		}, platform.NewLogger(io.Discard, false))
-
-	// then
-	if len(warnings) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warnings), warnings)
-	}
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
-	}
-	nameSet := make(map[string]bool)
-	for _, r := range results {
-		nameSet[r.Name] = true
-	}
-	if !nameSet["Auth"] {
-		t.Error("expected Auth cluster in results")
-	}
-	if !nameSet["Infra"] {
-		t.Error("expected Infra cluster in results")
-	}
-}
-
-func TestRunParallelDeepScan_DuplicateClusterNames(t *testing.T) {
-	// given: classifier returns duplicate cluster names with different issue IDs
-	classifyClusters := []domain.ClusterClassification{
-		{Name: "Auth", IssueIDs: []string{"A-1", "A-2"}},
-		{Name: "Auth", IssueIDs: []string{"A-3"}},
-	}
-
-	scanClusters := make([]domain.ClusterScanResult, len(classifyClusters))
-	for i, cc := range classifyClusters {
-		scanClusters[i] = domain.ClusterScanResult{Name: cc.Name}
-	}
-
-	dir := t.TempDir()
-	cfg := domain.DefaultConfig()
-
-	// when: index-based lookup ensures each duplicate gets its own issue IDs
-	results, warnings := session.RunParallelDeepScan(context.Background(), &cfg, dir, scanClusters,
-		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
-			cc := classifyClusters[index]
-			return domain.ClusterScanResult{
-				Name:         cc.Name,
-				Completeness: float64(len(cc.IssueIDs)) * 0.25,
-				Issues:       make([]domain.IssueDetail, len(cc.IssueIDs)),
-			}, nil
-		}, platform.NewLogger(io.Discard, false))
-
-	// then: both clusters scanned with correct issue counts (order is non-deterministic)
-	if len(warnings) != 0 {
-		t.Errorf("expected 0 warnings, got %d", len(warnings))
-	}
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
-	}
-	// Collect completeness values (order may vary)
-	completenessSet := make(map[float64]int)
-	issueCountSet := make(map[int]int)
-	for _, r := range results {
-		completenessSet[r.Completeness]++
-		issueCountSet[len(r.Issues)]++
-	}
-	// One Auth has 2 issues (completeness 0.5), the other has 1 issue (completeness 0.25)
-	if completenessSet[0.5] != 1 {
-		t.Errorf("expected one result with completeness 0.5, got %d", completenessSet[0.5])
-	}
-	if completenessSet[0.25] != 1 {
-		t.Errorf("expected one result with completeness 0.25, got %d", completenessSet[0.25])
-	}
-	if issueCountSet[2] != 1 {
-		t.Errorf("expected one result with 2 issues, got %d", issueCountSet[2])
-	}
-	if issueCountSet[1] != 1 {
-		t.Errorf("expected one result with 1 issue, got %d", issueCountSet[1])
-	}
-}
-
-func TestRunParallelDeepScan_ContextCancellation(t *testing.T) {
-	// given: 5 clusters but context is already cancelled
-	clusters := make([]domain.ClusterScanResult, 5)
-	for i := range clusters {
-		clusters[i] = domain.ClusterScanResult{Name: fmt.Sprintf("c%d", i)}
-	}
-
-	dir := t.TempDir()
-	cfg := domain.DefaultConfig()
-	cfg.Scan.MaxConcurrency = 1
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // cancel immediately
-
-	var callCount atomic.Int32
-
-	// when
-	results, _ := session.RunParallelDeepScan(ctx, &cfg, dir, clusters,
-		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
-			callCount.Add(1)
-			return domain.ClusterScanResult{Name: cluster.Name}, nil
-		}, platform.NewLogger(io.Discard, false))
-
-	// then: no goroutines should have been launched
-	if callCount.Load() != 0 {
-		t.Errorf("expected 0 calls with cancelled context, got %d", callCount.Load())
-	}
-	if len(results) != 0 {
-		t.Errorf("expected 0 results, got %d", len(results))
-	}
-}
-
-func TestRunParallelDeepScan_CancelWhileWaitingSemaphore(t *testing.T) {
-	// given: concurrency=1, cancel while second cluster waits for semaphore
-	clusters := []domain.ClusterScanResult{
-		{Name: "slow"},
-		{Name: "should-not-run"},
-	}
-
-	dir := t.TempDir()
-	cfg := domain.DefaultConfig()
-	cfg.Scan.MaxConcurrency = 1
-
-	ctx, cancel := context.WithCancel(context.Background())
-	var callCount atomic.Int32
-
-	// when: first scan runs, cancels ctx during execution; second should not start
-	results, _ := session.RunParallelDeepScan(ctx, &cfg, dir, clusters,
-		func(ctx context.Context, cfg *domain.Config, scanDir string, index int, cluster domain.ClusterScanResult) (domain.ClusterScanResult, error) {
-			callCount.Add(1)
-			if index == 0 {
-				cancel() // cancel while second cluster waits for semaphore
-			}
-			return domain.ClusterScanResult{Name: cluster.Name, Completeness: 1.0}, nil
-		}, platform.NewLogger(io.Discard, false))
-
-	// then: only the first cluster should have been scanned
-	if callCount.Load() != 1 {
-		t.Errorf("expected 1 call (only first cluster), got %d", callCount.Load())
-	}
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-func TestRunWaveGenerate_AllFail(t *testing.T) {
-	// given: all clusters fail
-	scanDir := t.TempDir()
-
-	cleanup := session.SetNewCmd(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "false")
-	})
-	defer cleanup()
-
-	clusters := []domain.ClusterScanResult{
-		{Name: "A", Completeness: 0.1, Issues: []domain.IssueDetail{{ID: "T-1"}}},
-		{Name: "B", Completeness: 0.1, Issues: []domain.IssueDetail{{ID: "T-2"}}},
-	}
-	cfg := domain.DefaultConfig()
-	cfg.TimeoutSec = 10
-	cfg.Retry.MaxAttempts = 1
-	cfg.Retry.BaseDelaySec = 0
-	logger := platform.NewLogger(io.Discard, false)
-	wgRunner := session.NewRetryRunner(session.NewClaudeAdapter(&cfg, logger), &cfg, logger)
-
-	// when
-	waves, warnings, _, err := session.RunWaveGenerate(context.Background(), &cfg, scanDir, clusters, false, wgRunner, logger)
-
-	// then: error because ALL clusters failed
-	if err == nil {
-		t.Fatal("expected error when all clusters fail")
-	}
-
-	// then: no waves returned
-	if len(waves) != 0 {
-		t.Errorf("expected 0 waves, got %d", len(waves))
-	}
-
-	// then: warnings for each failed cluster
-	if len(warnings) != 2 {
-		t.Errorf("expected 2 warnings, got %d: %v", len(warnings), warnings)
-	}
-}
-
 func TestDetectFailedClusterNames(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -739,34 +349,5 @@ func TestDetectFailedClusterNames(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestRunWaveGenerate_DryRunPopulatesClusterName(t *testing.T) {
-	// given: two clusters in dry-run mode
-	scanDir := t.TempDir()
-	cfg := domain.DefaultConfig()
-	clusters := []domain.ClusterScanResult{
-		{Name: "Auth", Issues: []domain.IssueDetail{{ID: "T-1"}}},
-		{Name: "API", Issues: []domain.IssueDetail{{ID: "T-2"}}},
-	}
-
-	// when: dry-run wave generation via exported API
-	dryLogger := platform.NewLogger(io.Discard, false)
-	_, _, failedNames, err := session.RunWaveGenerate(
-		context.Background(), &cfg, scanDir, clusters,
-		true, // dryRun
-		session.NewClaudeAdapter(&cfg, dryLogger),
-		dryLogger,
-	)
-
-	// then: no error
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// then: no failed clusters — proves ClusterName was correctly populated
-	// (if ClusterName were empty, DetectFailedClusterNames would mark all clusters as failed)
-	if len(failedNames) != 0 {
-		t.Errorf("expected 0 failed clusters in dry-run, got %d: %v", len(failedNames), failedNames)
 	}
 }
