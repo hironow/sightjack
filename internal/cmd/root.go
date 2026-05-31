@@ -61,7 +61,7 @@ func NewRootCommand() *cobra.Command {
 			applyOtelEnv(filepath.Dir(cfgPath))
 			noColor := mustBool(cmd, "no-color")
 			if noColor {
-				os.Setenv("NO_COLOR", "1")
+				_ = os.Setenv("NO_COLOR", "1")
 			}
 			out := cmd.ErrOrStderr()
 			quiet := mustBool(cmd, "quiet")
@@ -106,10 +106,10 @@ func NewRootCommand() *cobra.Command {
 				sharedStreamBus.Close()
 			}
 			if shutdownMeter != nil {
-				shutdownMeter(context.Background())
+				_ = shutdownMeter(context.Background())
 			}
 			if shutdownTracer != nil {
-				shutdownTracer(context.Background())
+				_ = shutdownTracer(context.Background())
 			}
 		})
 	})

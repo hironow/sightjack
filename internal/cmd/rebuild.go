@@ -57,7 +57,7 @@ If path is omitted, the current working directory is used.`,
 			var latestSeqNr uint64
 			seqCounter, scErr := session.NewSeqCounter(baseDir)
 			if scErr == nil {
-				defer seqCounter.Close()
+				defer func() { _ = seqCounter.Close() }()
 				if seq, seqErr := seqCounter.LatestSeqNr(cmd.Context()); seqErr == nil {
 					latestSeqNr = seq
 				}

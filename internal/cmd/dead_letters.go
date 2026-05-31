@@ -86,7 +86,7 @@ Pass --execute to actually remove them.`,
 			if err != nil {
 				return fmt.Errorf("open outbox store: %w", err)
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			ctx := cmd.Context()
 			count, err := store.DeadLetterCount(ctx)
