@@ -3,11 +3,9 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -35,40 +33,19 @@ func parseDoctorJSON(t *testing.T, output string) doctorOutput {
 	return result
 }
 
-// initTestProject creates a temp directory with git repo + sightjack init.
-func initTestProject(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	for _, args := range [][]string{
-		{"git", "init", "--initial-branch", "main", dir},
-		{"git", "-C", dir, "config", "user.email", "test@test.com"},
-		{"git", "-C", dir, "config", "user.name", "test"},
-	} {
-		cmd := exec.Command(args[0], args[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command — static test fixture args [permanent]
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git setup %v failed: %v\n%s", args, err, out)
-		}
-	}
-
-	out, err := runCmd(t, "init", "--team", "TEST", "--project", "TestProject", dir)
-	if err != nil {
-		t.Fatalf("sightjack init failed: %v\n%s", err, out)
-	}
-	return dir
-}
-
 func TestDoctorRepair_StalePID(t *testing.T) {
-	// given: initialized project with stale PID file
-	dir := initTestProject(t)
-	pidDir := filepath.Join(dir, ".siren")
-	pidFile := filepath.Join(pidDir, "watch.pid")
-	if err := os.WriteFile(pidFile, []byte("99999"), 0o644); err != nil {
-		t.Fatalf("create stale PID: %v", err)
-	}
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_stale_pid"
+
+	initTestRepo(t, ctx, c, dir)
+	pidFile := fmt.Sprintf("%s/.siren/watch.pid", dir)
+	
+	// Create stale PID file inside container
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidFile)})
 
 	// when: run doctor --repair --json
-	out, _ := runCmd(t, "doctor", "--repair", "--json", dir)
+	out, _, _ := runCmd(t, ctx, c, dir, "doctor", "--repair", "--json", dir)
 
 	// then: stale-pid should be fixed
 	result := parseDoctorJSON(t, out)
@@ -89,24 +66,27 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 	}
 
 	// Verify PID file was actually removed
-	if _, err := os.Stat(pidFile); err == nil {
+	if fileExistsInContainer(t, ctx, c, pidFile) {
 		t.Error("watch.pid should have been removed but still exists")
 	}
 }
 
 func TestDoctorRepair_MissingSkillMD(t *testing.T) {
-	// given: initialized project with SKILL.md deleted
-	dir := initTestProject(t)
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_missing_skill"
+
+	initTestRepo(t, ctx, c, dir)
 	skillPaths := []string{
-		filepath.Join(dir, ".siren", "skills", "dmail-sendable", "SKILL.md"),
-		filepath.Join(dir, ".siren", "skills", "dmail-readable", "SKILL.md"),
+		fmt.Sprintf("%s/.siren/skills/dmail-sendable/SKILL.md", dir),
+		fmt.Sprintf("%s/.siren/skills/dmail-readable/SKILL.md", dir),
 	}
 	for _, p := range skillPaths {
-		os.Remove(p)
+		execInContainer(t, ctx, c, []string{"rm", "-f", p})
 	}
 
 	// when: run doctor --repair --json
-	out, _ := runCmd(t, "doctor", "--repair", "--json", dir)
+	out, _, _ := runCmd(t, ctx, c, dir, "doctor", "--repair", "--json", dir)
 
 	// then: Skills should be regenerated
 	result := parseDoctorJSON(t, out)
@@ -125,23 +105,25 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 
 	// Verify SKILL.md was actually regenerated
 	for _, p := range skillPaths {
-		if _, err := os.Stat(p); err != nil {
-			t.Errorf("expected %s to be regenerated: %v", filepath.Base(filepath.Dir(p)), err)
+		if !fileExistsInContainer(t, ctx, c, p) {
+			t.Errorf("expected %s to be regenerated", p)
 		}
 	}
 }
 
 func TestDoctorRepair_NoRepairFlag(t *testing.T) {
-	// given: stale PID file exists but --repair is NOT passed
-	dir := initTestProject(t)
-	pidDir := filepath.Join(dir, ".siren")
-	pidFile := filepath.Join(pidDir, "watch.pid")
-	if err := os.WriteFile(pidFile, []byte("99999"), 0o644); err != nil {
-		t.Fatalf("create stale PID: %v", err)
-	}
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_norepair"
+
+	initTestRepo(t, ctx, c, dir)
+	pidFile := fmt.Sprintf("%s/.siren/watch.pid", dir)
+	
+	// Create stale PID file inside container
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidFile)})
 
 	// when: run doctor --json WITHOUT --repair
-	out, _ := runCmd(t, "doctor", "--json", dir)
+	out, _, _ := runCmd(t, ctx, c, dir, "doctor", "--json", dir)
 
 	// then: PID file should NOT be removed
 	result := parseDoctorJSON(t, out)
@@ -152,20 +134,7 @@ func TestDoctorRepair_NoRepairFlag(t *testing.T) {
 	}
 
 	// Verify PID file still exists
-	if _, err := os.Stat(pidFile); err != nil {
-		t.Errorf("watch.pid should still exist without --repair: %v", err)
+	if !fileExistsInContainer(t, ctx, c, pidFile) {
+		t.Error("watch.pid should still exist without --repair")
 	}
-}
-
-// requireBinary skips the test if the named binary is not available.
-func requireBinary(t *testing.T, name string) {
-	t.Helper()
-	if _, err := exec.LookPath(name); err != nil {
-		t.Skipf("skipping: %s not found in PATH", name)
-	}
-}
-
-func init() {
-	// Ensure sightjack binary is available for doctor repair tests.
-	_ = fmt.Sprintf("doctor_repair_test uses sightjackBin() from subcommand_test.go")
 }

@@ -3,79 +3,20 @@
 package e2e
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
-	"errors"
-	"io/fs"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"fmt"
 	"strings"
 	"testing"
 )
 
-// sightjackBin returns the path to the sightjack binary.
-// In Docker it is /usr/local/bin/sightjack; locally fall back to PATH.
-// If neither is found, returns "sightjack" so exec.Command fails with a
-// clear error rather than silently running the wrong binary.
-func sightjackBin() string {
-	if env := os.Getenv("SIGHTJACK_BIN"); env != "" {
-		return env
-	}
-	if _, err := os.Stat("/usr/local/bin/sightjack"); err == nil {
-		return "/usr/local/bin/sightjack"
-	}
-	p, err := exec.LookPath("sightjack")
-	if err != nil {
-		return "sightjack"
-	}
-	return p
-}
-
-// srcRoot walks up from the current working directory to the module root
-// (the directory containing go.mod). Used by e2e tests to locate testdata
-// when running out-of-tree (e.g. in Docker). Returns "." if not found.
-func srcRoot() string {
-	dir, _ := os.Getwd()
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "."
-		}
-		dir = parent
-	}
-}
-
-// runCmd executes sightjack with args and returns stdout+stderr combined.
-func runCmd(t *testing.T, args ...string) (string, error) {
-	t.Helper()
-	cmd := exec.Command(sightjackBin(), args...)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
-}
-
-// runCmdStdout executes sightjack with args and returns stdout only.
-// Use for commands whose stdout must be machine-parseable (e.g. --json).
-func runCmdStdout(t *testing.T, args ...string) (string, error) {
-	t.Helper()
-	cmd := exec.Command(sightjackBin(), args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil && stderr.Len() > 0 {
-		t.Logf("stderr: %s", stderr.String())
-	}
-	return string(out), err
-}
-
 func TestE2E_Version(t *testing.T) {
-	// when
-	out, err := runCmd(t, "version")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_version"
+	initTestRepo(t, ctx, c, dir)
 
-	// then
+	out, _, err := runCmd(t, ctx, c, dir, "version")
 	if err != nil {
 		t.Fatalf("version failed: %v\noutput: %s", err, out)
 	}
@@ -85,17 +26,17 @@ func TestE2E_Version(t *testing.T) {
 }
 
 func TestE2E_VersionJSON(t *testing.T) {
-	// when
-	out, err := runCmdStdout(t, "version", "--json")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_version_json"
+	initTestRepo(t, ctx, c, dir)
 
-	// then
+	out, _, err := runCmd(t, ctx, c, dir, "version", "--json")
 	if err != nil {
 		t.Fatalf("version --json failed: %v\noutput: %s", err, out)
 	}
 	var v map[string]string
-	if jsonErr := json.Unmarshal([]byte(out), &v); jsonErr != nil {
-		t.Fatalf("invalid JSON: %v\noutput: %s", jsonErr, out)
-	}
+	parseJSONOutput(t, out, &v)
 	for _, key := range []string{"version", "commit", "date", "go"} {
 		if _, ok := v[key]; !ok {
 			t.Errorf("missing key %q in version JSON", key)
@@ -104,24 +45,27 @@ func TestE2E_VersionJSON(t *testing.T) {
 }
 
 func TestE2E_Doctor(t *testing.T) {
-	// when: doctor may fail if no config exists, but should always produce output
-	out, _ := runCmd(t, "doctor")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor"
+	initTestRepo(t, ctx, c, dir)
 
-	// then
+	out, _, _ := runCmd(t, ctx, c, dir, "doctor")
 	if len(strings.TrimSpace(out)) == 0 {
 		t.Error("doctor output is empty")
 	}
-	// Should contain health check labels regardless of pass/fail
 	if !strings.Contains(out, "doctor") {
 		t.Errorf("doctor output missing header: %s", out)
 	}
 }
 
 func TestE2E_Help(t *testing.T) {
-	// when
-	out, err := runCmd(t, "--help")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_help"
+	initTestRepo(t, ctx, c, dir)
 
-	// then
+	out, _, err := runCmd(t, ctx, c, dir, "--help")
 	if err != nil {
 		t.Fatalf("--help failed: %v\noutput: %s", err, out)
 	}
@@ -133,81 +77,79 @@ func TestE2E_Help(t *testing.T) {
 }
 
 func TestE2E_UnknownCommand(t *testing.T) {
-	// when
-	_, err := runCmd(t, "nonexistent")
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_unknown"
+	initTestRepo(t, ctx, c, dir)
 
-	// then
+	_, _, err := runCmd(t, ctx, c, dir, "nonexistent")
 	if err == nil {
 		t.Error("expected error for unknown command")
 	}
 }
 
 func TestE2E_Show_NoState(t *testing.T) {
-	// given: a directory with no .siren/events/
-	dir := t.TempDir()
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_show_nostate"
+	initTestRepo(t, ctx, c, dir)
 
-	// when
-	_, err := runCmd(t, "show", dir)
-
-	// then: should fail because no state exists
+	// We don't have .siren/events/ in t_show_nostate, but initTestRepo created basic repo.
+	// Let's run show on a different nonexistent state dir.
+	_, _, err := runCmd(t, ctx, c, dir, "show", "/workspace/nonexistent-state-dir")
 	if err == nil {
 		t.Error("expected error when no state exists")
 	}
 }
 
 func TestE2E_ArchivePrune_Empty(t *testing.T) {
-	// given: an empty directory
-	dir := t.TempDir()
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_archive_prune"
+	initTestRepo(t, ctx, c, dir)
 
-	// when
-	out, err := runCmd(t, "archive-prune", dir)
-
-	// then: should succeed (nothing to prune)
+	out, _, err := runCmd(t, ctx, c, dir, "archive-prune", dir)
 	if err != nil {
 		t.Fatalf("archive-prune failed: %v\noutput: %s", err, out)
 	}
 }
 
 func TestE2E_Init_WithFlags(t *testing.T) {
-	// given
-	dir := t.TempDir()
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_init_flags"
+	
+	// Create folder and git init
+	execInContainer(t, ctx, c, []string{"mkdir", "-p", dir})
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("cd %s && git init --initial-branch=main", dir)})
 
-	// when: init with flags (non-interactive, no prompts)
-	out, err := runCmd(t, "init", "--team", "TestTeam", "--project", "TestProject", dir)
-
-	// then
+	out, _, err := runCmd(t, ctx, c, dir, "init", "--team", "TestTeam", "--project", "TestProject", dir)
 	if err != nil {
 		t.Fatalf("init failed: %v\noutput: %s", err, out)
 	}
-	cfgFile := filepath.Join(dir, ".siren", "config.yaml")
-	if _, statErr := os.Stat(cfgFile); errors.Is(statErr, fs.ErrNotExist) {
+	cfgFile := fmt.Sprintf("%s/.siren/config.yaml", dir)
+	if !fileExistsInContainer(t, ctx, c, cfgFile) {
 		t.Errorf("config file not created: %s", cfgFile)
 	}
 }
 
 func TestE2E_MCPServerToolsList(t *testing.T) {
-	// given
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mcp"
+	initTestRepo(t, ctx, c, dir)
+
 	input := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-
-	// when
-	cmd := exec.Command(sightjackBin(), "mcp")
-	cmd.Stdin = strings.NewReader(input)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
+	stdout, _, err := runCmdStdin(t, ctx, c, dir, input, "mcp")
 	if err != nil {
-		t.Fatalf("mcp command failed: %v\nstderr: %s", err, stderr.String())
+		t.Fatalf("mcp command failed: %v", err)
 	}
 
-	// then
-	outStr := stdout.String()
-	idx := strings.Index(outStr, `{"jsonrpc"`)
+	idx := strings.Index(stdout, `{"jsonrpc"`)
 	if idx < 0 {
-		t.Fatalf("no JSON-RPC response found in stdout: %s", outStr)
+		t.Fatalf("no JSON-RPC response found in stdout: %s", stdout)
 	}
-	jsonStr := outStr[idx:]
+	jsonStr := stdout[idx:]
 
 	var resp struct {
 		JSONRPC string `json:"jsonrpc"`
@@ -250,4 +192,3 @@ func TestE2E_MCPServerToolsList(t *testing.T) {
 		}
 	}
 }
-
