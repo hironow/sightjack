@@ -22,11 +22,13 @@ func UpdateConfig(path string, key string, value string) error { // nosemgrep: d
 	}
 
 	cfg := domain.DefaultConfig()
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	err = yaml.Unmarshal(data, &cfg)
+	if err != nil {
 		return fmt.Errorf("parse config: %w", err)
 	}
 
-	if err := setConfigField(&cfg, key, value); err != nil {
+	err = setConfigField(&cfg, key, value)
+	if err != nil {
 		return err
 	}
 
@@ -159,7 +161,8 @@ func WriteEstimatedStrictness(path string, estimated map[string]domain.Strictnes
 	}
 
 	cfg := domain.DefaultConfig()
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	err = yaml.Unmarshal(data, &cfg)
+	if err != nil {
 		return fmt.Errorf("parse config for estimated strictness: %w", err)
 	}
 

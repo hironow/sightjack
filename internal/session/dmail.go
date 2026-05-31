@@ -108,7 +108,8 @@ func ComposeDMail(ctx context.Context, store port.OutboxStore, mail *domain.DMai
 	if err != nil {
 		return err
 	}
-	if err := store.Stage(ctx, mail.Filename(), data); err != nil {
+	err = store.Stage(ctx, mail.Filename(), data)
+	if err != nil {
 		return fmt.Errorf("dmail stage: %w", err)
 	}
 	n, err := store.Flush(ctx)

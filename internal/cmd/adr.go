@@ -40,7 +40,8 @@ Output is written to stdout for redirection to docs/adr/.`,
 			}
 
 			var dr domain.DiscussResult
-			if err := json.Unmarshal(data, &dr); err != nil {
+			err = json.Unmarshal(data, &dr)
+			if err != nil {
 				return fmt.Errorf("invalid DiscussResult JSON: %w", err)
 			}
 
