@@ -40,7 +40,7 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 
 	initTestRepo(t, ctx, c, dir)
 	pidFile := fmt.Sprintf("%s/.siren/watch.pid", dir)
-	
+
 	// Create stale PID file inside container
 	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidFile)})
 
@@ -118,7 +118,7 @@ func TestDoctorRepair_NoRepairFlag(t *testing.T) {
 
 	initTestRepo(t, ctx, c, dir)
 	pidFile := fmt.Sprintf("%s/.siren/watch.pid", dir)
-	
+
 	// Create stale PID file inside container
 	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidFile)})
 

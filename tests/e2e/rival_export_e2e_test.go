@@ -75,7 +75,7 @@ func TestRivalExportReasonsE2E_StdoutMarkdownDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("binary failed: %v\noutput=%s", err, stdout)
 	}
-	
+
 	stdoutBytes := []byte(stdout)
 	if !bytes.Equal(stdoutBytes, want) {
 		t.Errorf("stdout != golden\n--- got (%d bytes) ---\n%s\n--- want (%d bytes) ---\n%s",

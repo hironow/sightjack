@@ -93,7 +93,7 @@ func (p *Projector) State() *SessionState {
 // Convenience wrapper around Projector for backward compatibility.
 func ProjectState(events []Event) *SessionState {
 	p := NewProjector()
-	p.Rebuild(events)
+	_ = p.Rebuild(events)
 	return p.State()
 }
 

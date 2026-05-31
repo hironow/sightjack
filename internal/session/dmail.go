@@ -61,7 +61,7 @@ func MarshalDMail(mail *domain.DMail) ([]byte, error) {
 	if err := enc.Encode(&cp); err != nil {
 		return nil, fmt.Errorf("dmail marshal frontmatter: %w", err)
 	}
-	enc.Close()
+	_ = enc.Close()
 	buf.WriteString(frontmatterDelim + "\n")
 	if mail.Body != "" {
 		buf.WriteString("\n")
@@ -180,14 +180,14 @@ func receiveDMailIfNew(baseDir, filename string, logger domain.Logger) *domain.D
 // and report d-mails are sent to the returned channel. Consumer-side dedup is applied (MY-271).
 // The channel is closed when the context is cancelled.
 func MonitorInbox(ctx context.Context, baseDir string, logger domain.Logger) (<-chan *domain.DMail, error) {
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher() // nosemgrep: adr0005-fsnotify-watcher-without-close -- watcher is closed in the goroutine owning the event loop [permanent]
 	if err != nil {
 		return nil, fmt.Errorf("dmail monitor: create watcher: %w", err)
 	}
 
 	inboxPath := domain.MailDir(baseDir, domain.InboxDir)
 	if err := watcher.Add(inboxPath); err != nil {
-		watcher.Close()
+		_ = watcher.Close()
 		return nil, fmt.Errorf("dmail monitor: add inbox: %w", err)
 	}
 
@@ -212,7 +212,7 @@ func MonitorInbox(ctx context.Context, baseDir string, logger domain.Logger) (<-
 	// Phase 2: Watch for new files (async).
 	go func() {
 		defer close(ch)
-		defer watcher.Close()
+		defer func() { _ = watcher.Close() }()
 		for {
 			select {
 			case <-ctx.Done():
