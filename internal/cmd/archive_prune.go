@@ -13,6 +13,7 @@ import (
 	"github.com/hironow/sightjack/internal/session"
 )
 
+//nolint:gocyclo // CLI flags parsing and interactive prompts orchestration is flat but highly branched
 func newArchivePruneCommand() *cobra.Command {
 	var (
 		execute bool

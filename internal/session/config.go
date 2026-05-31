@@ -42,6 +42,7 @@ func UpdateConfig(path string, key string, value string) error { // nosemgrep: d
 	return os.WriteFile(path, out, 0644)
 }
 
+//nolint:gocyclo // flat but wide field dispatch switch statement
 func setConfigField(cfg *domain.Config, key string, value string) error {
 	switch key {
 	case "tracker.team":

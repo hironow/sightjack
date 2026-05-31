@@ -99,6 +99,8 @@ func ProjectState(events []Event) *SessionState {
 
 // applyEvent mutates state according to the event type.
 // The projectionContext tracks seen entities to ensure idempotent replay.
+//
+//nolint:gocyclo // event sourcing state transition switch statement is flat but wide
 func applyEvent(state *SessionState, ctx *projectionContext, e Event) {
 	switch e.Type {
 	case EventSessionStarted:
