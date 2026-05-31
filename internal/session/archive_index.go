@@ -265,7 +265,7 @@ func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) { /
 		}
 		_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
 			if walkErr != nil || d.IsDir() {
-				return nil
+				return nil //nolint:nilerr // ignore error to continue walking other files
 			}
 			if filepath.Ext(path) != ".md" {
 				return nil
