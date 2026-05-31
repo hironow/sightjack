@@ -50,12 +50,12 @@ func TestE2E_Doctor(t *testing.T) {
 	dir := "/workspace/t_doctor"
 	initTestRepo(t, ctx, c, dir)
 
-	out, _, _ := runCmd(t, ctx, c, dir, "doctor")
-	if len(strings.TrimSpace(out)) == 0 {
+	_, stderr, _ := runCmd(t, ctx, c, dir, "doctor")
+	if len(strings.TrimSpace(stderr)) == 0 {
 		t.Error("doctor output is empty")
 	}
-	if !strings.Contains(out, "doctor") {
-		t.Errorf("doctor output missing header: %s", out)
+	if !strings.Contains(stderr, "doctor") {
+		t.Errorf("doctor output missing header: %s", stderr)
 	}
 }
 
