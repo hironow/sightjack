@@ -128,10 +128,10 @@ func TruncateEventFile(stateDir, name string, keepLines int) error {
 		}
 	}
 	if scanErr := scanner.Err(); scanErr != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("scan event file %s: %w", name, scanErr)
 	}
-	f.Close()
+	_ = f.Close()
 
 	if len(lines) <= keepLines {
 		return nil // already within limit
@@ -147,25 +147,25 @@ func TruncateEventFile(stateDir, name string, keepLines int) error {
 	w := bufio.NewWriter(out)
 	for _, line := range lines {
 		if _, writeErr := w.WriteString(line + "\n"); writeErr != nil {
-			out.Close()
-			os.Remove(tmpPath)
+			_ = out.Close()
+			_ = os.Remove(tmpPath)
 			return fmt.Errorf("write tmp file for %s: %w", name, writeErr)
 		}
 	}
 	if flushErr := w.Flush(); flushErr != nil {
-		out.Close()
-		os.Remove(tmpPath)
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("flush tmp file for %s: %w", name, flushErr)
 	}
 	if syncErr := out.Sync(); syncErr != nil {
-		out.Close()
-		os.Remove(tmpPath)
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("sync tmp file for %s: %w", name, syncErr)
 	}
-	out.Close()
+	_ = out.Close()
 
 	if renameErr := os.Rename(tmpPath, path); renameErr != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename tmp file for %s: %w", name, renameErr)
 	}
 	return nil

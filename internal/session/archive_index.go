@@ -23,7 +23,7 @@ func ExtractSummary(filePath string) string {
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	inFrontmatter := false
@@ -215,18 +215,18 @@ func (w *IndexWriter) Append(indexPath string, entries []domain.IndexEntry) erro
 	if err != nil {
 		return fmt.Errorf("open lock: %w", err)
 	}
-	defer lockFile.Close()
+	defer func() { _ = lockFile.Close() }()
 
 	if err := flockLock(lockFile.Fd()); err != nil {
 		return fmt.Errorf("flock: %w", err)
 	}
-	defer flockUnlock(lockFile.Fd())
+	defer func() { _ = flockUnlock(lockFile.Fd()) }()
 
 	f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("open index: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := f.Write(buf); err != nil {
 		return fmt.Errorf("write index: %w", err)
@@ -250,12 +250,12 @@ func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) { /
 	if err != nil {
 		return 0, fmt.Errorf("open lock: %w", err)
 	}
-	defer lockFile.Close()
+	defer func() { _ = lockFile.Close() }()
 
 	if err := flockLock(lockFile.Fd()); err != nil {
 		return 0, fmt.Errorf("flock: %w", err)
 	}
-	defer flockUnlock(lockFile.Fd())
+	defer func() { _ = flockUnlock(lockFile.Fd()) }()
 
 	var entries []domain.IndexEntry
 	for _, sub := range indexDirs {
@@ -263,7 +263,7 @@ func (w *IndexWriter) Rebuild(indexPath, stateDir, tool string) (int, error) { /
 		if _, statErr := os.Stat(dir); statErr != nil {
 			continue
 		}
-		filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
+		_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
 			if walkErr != nil || d.IsDir() {
 				return nil
 			}

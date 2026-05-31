@@ -169,7 +169,7 @@ func loadLegacyJSONLFile(path string) ([]domain.Event, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open legacy JSONL %s: %w", filepath.Base(path), err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var events []domain.Event
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

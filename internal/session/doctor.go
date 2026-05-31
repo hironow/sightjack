@@ -247,7 +247,7 @@ func checkDeadLetters(ctx context.Context, baseDir string) domain.DoctorCheck {
 			Message: "outbox store unavailable",
 		}
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	count, err := store.DeadLetterCount(ctx)
 	if err != nil {

@@ -118,7 +118,7 @@ func TestE2E_Init_WithFlags(t *testing.T) {
 	ctx := context.Background()
 	c := buildTestContainer(t, ctx)
 	dir := "/workspace/t_init_flags"
-	
+
 	// Create folder and git init
 	execInContainer(t, ctx, c, []string{"mkdir", "-p", dir})
 	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("cd %s && git init --initial-branch=main", dir)})
@@ -174,9 +174,9 @@ func TestE2E_MCPServerToolsList(t *testing.T) {
 	}
 
 	expectedTools := map[string]bool{
-		"sightjack.ping":             false,
-		"sightjack.next_wave":        false,
-		"sightjack.get_scan_result":  false,
+		"sightjack.ping":              false,
+		"sightjack.next_wave":         false,
+		"sightjack.get_scan_result":   false,
 		"sightjack.update_strictness": false,
 	}
 
