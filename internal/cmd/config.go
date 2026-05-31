@@ -99,8 +99,8 @@ Supported keys:
 				return fmt.Errorf("invalid path: %w", err)
 			}
 
-			cfgPath := resolveConfigPath(cmd, baseDir)
-			if err := session.UpdateConfig(cfgPath, key, value); err != nil {
+			resolvedCfgPath := resolveConfigPath(cmd, baseDir)
+			if err := session.UpdateConfig(resolvedCfgPath, key, value); err != nil {
 				return err
 			}
 
