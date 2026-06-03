@@ -141,61 +141,27 @@ SKILL.md files in `.siren/skills/` declare produces/consumes routing for phonewa
 
 ## Architecture
 
-### Pipe Architecture
-
 ```
-scan --json ──→ waves ──→ select ──→ discuss ──→ apply ──→ nextgen
-   |              |          |           |          |          |
-   v              v          v           v          v          v
-ScanResult    WavePlan     Wave    DiscussResult ApplyResult WavePlan
-                                       |
-                                       └──→ adr ──→ ADR Markdown
-```
-
-All data flows as JSON through Unix pipes. Each subcommand is a standalone filter:
-
-- **stdin**: JSON from previous command (or file)
-- **stdout**: JSON for next command (or file)
-- **stderr**: all log output
-- **/dev/tty**: interactive prompts (select, discuss)
-
-### Monolithic Architecture
-
-```
-Sightjack (binary)
+claude-code session
     |
-    |  Pass 1: Classify
-    |  +-- Claude Code: cluster issues by theme
-    |
-    |  Pass 2: DeepScan
-    |  +-- goroutines: parallel per-cluster analysis
-    |  +-- semaphore: bounded concurrency
-    |
-    |  Pass 3: WaveGenerate
-    |  +-- Claude Code: generate waves per cluster
-    |  +-- EvaluateUnlocks: prerequisite chain resolution
-    |
+    |  /sightjack-scan skill
+    |  +-- scans issues / local context
+    |  +-- writes scan result and wave files
+    |  +-- calls sightjack MCP tools for durable read models
     v
-Matrix Navigator (interactive)
+sightjack mcp  (MCP server / data plane)
     |
-    |  Per Wave:
-    |  +-- PromptWaveSelection -> PromptWaveApproval
-    |  +-- Architect Agent: design discussion (optional)
-    |  +-- Scribe Agent: ADR generation (optional)
-    |  +-- Selective approval: pick individual actions
+    |  sightjack.next_wave         -> read wave_*.json files
+    |  sightjack.get_scan_result   -> read aggregated scan result
+    |  sightjack.update_strictness -> atomically update config.yaml
     |
-    v
-Pass 4: WaveApply
-    |  +-- Claude Code: apply changes to Linear via MCP
-    |  +-- Ripple effects displayed
-    |  +-- Nextgen: dynamic follow-up wave generation
-    |  +-- State saved (crash resilience)
-    |
-    v
-Linear (via MCP Server)
-    +-- Issues updated (DoD, dependencies, sub-issues)
-    +-- ADRs stored as documents
-    +-- Ready labels applied
+.siren/
+    +-- config.yaml
+    +-- events/
+    +-- insights/
+    +-- inbox/
+    +-- outbox/
+    +-- archive/
 ```
 
 ### AI Agent Team
@@ -211,14 +177,16 @@ Linear (via MCP Server)
 
 **What Sightjack does:**
 
-- Scan Linear issues and detect missing DoD, hidden dependencies, and technical debt revival
-- Generate wave-by-wave execution plans with prerequisite chains
-- Guide interactive approval and apply approved changes to Linear via MCP
-- Generate ADRs from design discussions (Scribe agent)
-- Send specification/report D-Mails to downstream tools
+- Serve scan/wave read models over MCP (`next_wave`, `get_scan_result`)
+- Persist scan strictness atomically through `update_strictness`
+- Provide supporting data-plane commands (`init`, `doctor`, `show`, `status`, `sessions`, `rebuild`, `archive-prune`)
+- Generate claude-code MCP wiring (`mcp-config generate`)
 
 **What Sightjack does NOT do:**
 
+- Start a headless Claude subprocess or own LLM inference
+- Run the retired scan / wave / discuss / apply pipeline from the Go CLI
+- Compose or send D-Mails from the Go CLI
 - Implement code changes (paintress handles implementation)
 - Verify post-merge integrity (amadeus handles verification)
 - Deliver D-Mails (phonewave handles routing)

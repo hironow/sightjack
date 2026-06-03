@@ -5,13 +5,13 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 
 | Aspect | Description |
 |--------|-------------|
-| **What** | Interactive AI session that analyzes Linear issues for completeness, dependencies, and architectural gaps |
-| **Why** | Bring issue completeness from ~30% to ~85% before autonomous execution begins |
-| **How** | Claude MCP tools scan issues → cluster analysis (with estimated strictness) → wave generation → interactive approval (with cancel action) → apply to Linear |
-| **Input** | Linear issues via Claude MCP tools, user approval via stdin |
-| **Output** | Updated Linear issues, D-Mail reports to downstream tools |
-| **Telemetry** | OTel spans: `sightjack.scan`, `provider.invoke` (with `provider.model`, `provider.timeout_sec`, `gen_ai.*`), `context_budget.*` (`context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens`) |
-| **External Systems** | Linear (via Claude MCP), Claude Code subprocess, OTel exporter (Jaeger/Weave) |
+| **What** | MCP server + data plane for SIREN-inspired issue architecture: serves scan/wave read models and persists scan strictness |
+| **Why** | Let a human-initiated claude-code session plan waves from durable local read models without the Go CLI owning inference |
+| **How** | `sightjack mcp` serves MCP tools (`next_wave`, `get_scan_result`, `update_strictness`); the `/sightjack-scan` skill in the claude-code session owns issue scanning, wave planning, D-Mail composition, and any LLM/tool use |
+| **Input** | `.siren/` config, event store, scan result files, MCP tool arguments |
+| **Output** | MCP tool responses, atomically updated `.siren/config.yaml`, rebuilt projections for inspection commands |
+| **Telemetry** | OTel spans on command roots and MCP tool handlers; `context_budget.*` attributes remain available for recorded claude-code session metadata |
+| **External Systems** | Local filesystem, OTel exporter (Jaeger/Weave), claude-code session as MCP client |
 
 ## Layer Architecture
 
@@ -70,30 +70,16 @@ Domain command types use the Parse-Don't-Validate pattern:
 
 Ref: `.semgrep/layers.yaml`, ADR S0029
 
-## Tracking Mode (Wave vs Linear)
+## MCP Pivot Boundary
 
-### Claude Subprocess Isolation
+Sightjack no longer starts a Claude subprocess or runs the retired scan / wave / discuss / apply pipeline from the Go CLI. LLM execution is owned by a human-initiated claude-code session attached to `sightjack mcp`.
 
-Claude subprocess uses layered isolation to prevent parent session context (266+ skills, 66+ plugins) from inflating token usage:
+- `sightjack mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
+- `sightjack.next_wave` and `sightjack.get_scan_result` read durable scan/wave state for the session.
+- `sightjack.update_strictness` is the only MCP tool that mutates state, and it atomically updates `.siren/config.yaml`.
+- The `/sightjack-scan` skill composes D-Mails and performs LLM/tool-driven planning from the claude-code session.
 
-- `--setting-sources ""` skips all user/project settings (hooks, plugins, auto-memory) while preserving OAuth authentication
-- `--settings <stateDir>/.claude/settings.json` loads tool-specific settings (empty `enabledPlugins`)
-- `--disable-slash-commands` prevents user skills from inflating context
-- `--strict-mcp-config --mcp-config <stateDir>/.mcp.json` enforces MCP server allowlist
-- `mcp-config generate` creates both `.mcp.json` (wave: empty, linear: Linear MCP) and `.claude/settings.json`
-- User can edit `.mcp.json` to add custom MCP servers, `.claude/settings.json` for env vars or permissions
-
-### Claude Log Persistence
-
-- `WriteClaudeLog` saves raw NDJSON to `.run/claude-logs/{timestamp}.jsonl` after each invocation
-- Enables post-hoc debugging and audit of Claude subprocess interactions
-- Managed by archive-prune lifecycle
-
-- **Wave mode** (default, `--linear` not set): D-Mail archive is the event source for wave state. `AllowedToolsForMode(cfg.Mode)` excludes Linear MCP tools from Claude prompts. `RunReadyLabel` is skipped. `ComposeSpecification` populates the `wave` field with steps derived from WaveActions.
-- **Linear mode** (`--linear`): Existing behavior preserved — Linear MCP tools included, labels applied, no wave field in D-Mails.
-- `Config.Mode` (runtime-only, `yaml:"-"`) carries the tracking mode through all session functions.
-
-Ref: ADR S0035, `internal/domain/primitives.go` (TrackingMode), `internal/session/claude.go` (AllowedToolsForMode)
+Ref: ADR 0018, `internal/session/mcp_server.go`, `plugins/sightjack/skills/sightjack-scan/SKILL.md`
 
 ## Cross-Tool Conformance
 
