@@ -72,7 +72,7 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 
 ## MCP Pivot Boundary
 
-Sightjack no longer starts a Claude subprocess or runs the retired scan / wave / discuss / apply pipeline from the Go CLI. LLM execution is owned by a human-initiated claude-code session attached to `sightjack mcp`.
+Sightjack does not own model inference or run the retired scan / wave / discuss / apply pipeline from the Go CLI. LLM execution is owned by a human-initiated Claude Code session attached to `sightjack mcp`.
 
 - `sightjack mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
 - `sightjack.next_wave` and `sightjack.get_scan_result` read durable scan/wave state for the session.

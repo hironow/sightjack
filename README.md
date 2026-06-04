@@ -184,7 +184,7 @@ sightjack mcp  (MCP server / data plane)
 
 **What Sightjack does NOT do:**
 
-- Start a headless Claude subprocess or own LLM inference
+- Start a retired headless LLM runner or own model inference
 - Run the retired scan / wave / discuss / apply pipeline from the Go CLI
 - Compose or send D-Mails from the Go CLI
 - Implement code changes (paintress handles implementation)

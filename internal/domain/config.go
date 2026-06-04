@@ -26,7 +26,7 @@ type DoDTemplate struct { // nosemgrep: first-class-collection.raw-slice-field-d
 	Should []string `yaml:"should"`
 }
 
-// RetryConfig holds exponential backoff retry settings for Claude subprocess calls.
+// RetryConfig holds exponential backoff retry settings for retired scan pipeline calls.
 type RetryConfig struct { // nosemgrep: structure.exported-struct-and-interface-go, structure.multiple-exported-structs-go -- structure category drained in apr29-structure sweep; cohesive type family co-location is intentional [permanent]
 	MaxAttempts  int `yaml:"max_attempts"`
 	BaseDelaySec int `yaml:"base_delay_sec"`

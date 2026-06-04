@@ -74,7 +74,7 @@ Individual entries are used instead of ignoring the parent `.siren/` directory, 
 | `insights/` | Tracked | Semantic knowledge ledger — environment-independent (per S0030) |
 | `.gitignore` | Tracked | Self-managed ignore rules |
 | `events/` | Ignored | Session-specific event logs (source of truth for state) |
-| `.run/` | Ignored | Ephemeral scan cache, Claude subprocess outputs, `insights.lock` |
+| `.run/` | Ignored | Ephemeral scan cache, retired LLM runner outputs, `insights.lock` |
 | `inbox/` | Ignored | Transient; consumed and archived by MonitorInbox |
 | `outbox/` | Ignored | Transient; courier (phonewave) picks up and delivers |
 | `docs/adr/` | Tracked | Immutable decision records |
@@ -94,14 +94,14 @@ Key functions:
 
 ## Session Scan Cache: `.run/{sessionID}/`
 
-Each session creates a unique directory under `.run/` containing all Claude subprocess outputs. Session ID format: `session-{unixmilli}-{pid}`.
+Each session creates a unique directory under `.run/` containing retired scan pipeline outputs. Session ID format: `session-{unixmilli}-{pid}`.
 
 | File Pattern | Claude Pass | Created By | Purpose |
 |---|---|---|---|
 | `scan_result.json` | — | `WriteScanResult()` | Cached ScanResult for session resume |
-| `classify.json` | Pass 1 | Claude subprocess | Cluster classification and issue grouping |
-| `cluster_{NN}_{name}_c{NN}.json` | Pass 2 | Claude subprocess | Deep scan results per cluster (chunked) |
-| `wave_{NN}_{name}.json` | Pass 3 | Claude subprocess | Generated waves per cluster |
+| `classify.json` | Pass 1 | Retired scan pipeline | Cluster classification and issue grouping |
+| `cluster_{NN}_{name}_c{NN}.json` | Pass 2 | Retired scan pipeline | Deep scan results per cluster (chunked) |
+| `wave_{NN}_{name}.json` | Pass 3 | Retired scan pipeline | Generated waves per cluster |
 | `waves_result.json` | — | `waves` subcommand | Cached aggregated WavePlan for pipe replay |
 | `architect_{name}_{waveID}.json` | — | `RunArchitectDiscuss()` | Architect discussion response |
 | `discuss_result.json` | — | `discuss` subcommand | Cached DiscussResult for pipe replay |
@@ -209,7 +209,7 @@ entries: 2
 | `archive/index.jsonl` | `IndexWriter.Append` / `IndexWriter.Rebuild` | `archive-prune --execute` (before deletion) or `archive-prune --rebuild-index` |
 | `insights/shibito.md` | `WriteShibitoInsights()` | After scan, when Shibito warnings detected |
 | `insights/strictness.md` | `WriteStrictnessInsights()` | After scan, when clusters have estimated strictness |
-| `.run/{sessionID}/*` | Claude subprocess + `WriteScanResult()` | During scan/discuss/apply/scribe/nextgen |
+| `.run/{sessionID}/*` | Retired scan pipeline + `WriteScanResult()` | During scan/discuss/apply/scribe/nextgen |
 | `.run/insights.lock` | `InsightWriter.lock()` | During insight append (flock advisory lock) |
 | `docs/adr/NNNN-*.md` | `RunScribeADR()` | After architect modifies a wave (Scribe agent) |
 | `.doctor_probe` | `checkStateDir()` | `sightjack doctor` (temporary, immediately removed) |
