@@ -201,7 +201,7 @@ just install
 # Initialize project config (Linear team key, etc.)
 sightjack init
 
-# Generate Claude subprocess isolation settings
+# Generate Claude Code MCP session wiring
 sightjack mcp-config generate
 
 # Re-initialize (upgrade SKILL.md, regenerate config)
@@ -233,7 +233,7 @@ Sightjack creates `.siren/` and all state/run files automatically at runtime. Th
 | `rebuild` | Rebuild projections from the event store |
 | `dead-letters` | Inspect / purge failed outbox deliveries |
 | `rival` | Rival contract export utilities |
-| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
+| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for Claude Code sessions |
 | `version` | Print version info |
 | `update` | Self-update to the latest release |
 
@@ -243,7 +243,7 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 
 ```bash
 sightjack init                    # set up .siren/
-sightjack mcp-config generate     # Claude subprocess isolation settings
+sightjack mcp-config generate     # Claude Code MCP session wiring
 sightjack mcp                     # start the MCP data plane for the claude-code session
 ```
 

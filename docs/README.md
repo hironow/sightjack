@@ -7,7 +7,7 @@
 - [self-improvement-loop.md](self-improvement-loop.md) — How sightjack participates in the observable self-improvement loop
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
-- Claude subprocess isolation: `mcp-config generate` creates `.mcp.json` (MCP allowlist) and `.claude/settings.json` (plugin isolation); `--setting-sources ""` + `--settings` + `--strict-mcp-config` enforces it
+- Claude Code MCP session wiring: `mcp-config generate` creates `.mcp.json` (MCP allowlist) and `.claude/settings.json` (plugin isolation); `--setting-sources ""` + `--settings` + `--strict-mcp-config` enforces it
 - Claude log persistence: raw NDJSON saved to `.run/claude-logs/` after each invocation
 
 - [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
@@ -22,7 +22,7 @@
 - [sightjack config show](cli/sightjack_config_show.md) — Show current configuration
 - [sightjack config set](cli/sightjack_config_set.md) — Update configuration values
 - [sightjack mcp](cli/sightjack_mcp.md) — Start the MCP server (data plane)
-- [sightjack mcp-config](cli/sightjack_mcp-config.md) — Generate MCP / Claude subprocess isolation config
+- [sightjack mcp-config](cli/sightjack_mcp-config.md) — Generate MCP wiring for Claude Code sessions
 - [sightjack sessions](cli/sightjack_sessions.md) — Manage coding sessions (enter / list)
 - [sightjack show](cli/sightjack_show.md) — Display last scan results
 - [sightjack adr](cli/sightjack_adr.md) — Generate ADR Markdown from stdin DiscussResult

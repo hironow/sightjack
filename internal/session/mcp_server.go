@@ -24,7 +24,7 @@ import (
 // session's scan dir under .siren/.run/<session_id>/), and
 // sightjack.update_strictness (atomically updates .siren/config.yaml).
 //
-// Wire it into a claude code interactive session via --mcp-config so
+// Wire it into a Claude Code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
 // rather than crossing into the Agent SDK credit pool that gates
 // `claude -p` from 2026-06-15.
@@ -141,7 +141,7 @@ func (s *MCPServer) handle(ctx context.Context, line []byte) error {
 const mcpProtocolVersion = "2024-11-05"
 
 // initializeResult builds the MCP initialize handshake response. The
-// claude code session sends `initialize` first; without a valid reply
+// Claude Code session sends `initialize` first; without a valid reply
 // it never proceeds to tools/list. The server advertises its supported
 // protocol version + the tools capability.
 func initializeResult() map[string]any {
@@ -192,7 +192,7 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 }
 
 // toolDescriptors returns the tool set. Each entry pins the interface
-// (name, description, inputSchema) so claude code clients see a stable
+// (name, description, inputSchema) so Claude Code clients see a stable
 // contract. All 3 non-ping tools are real impl: next_wave +
 // get_scan_result read from .siren/.run/<session_id>/ scan + wave JSON
 // files; update_strictness writes the strictness default to
@@ -326,7 +326,7 @@ func realNextWave(baseDir string, args json.RawMessage) map[string]any {
 		"available_waves": len(availableWaves),
 		"next_wave":       nextWave,
 		"all_available":   availableWaves,
-		"instruction":     "Pick a wave from all_available by id, then claim it from the claude code session via the /sightjack-scan skill (write the spec D-Mail to outbox/).",
+		"instruction":     "Pick a wave from all_available by id, then claim it from the Claude Code session via the /sightjack-scan skill (write the spec D-Mail to outbox/).",
 	})
 }
 

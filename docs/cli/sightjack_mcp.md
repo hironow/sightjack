@@ -7,7 +7,7 @@ Run sightjack as an MCP server over stdio (scan/wave data plane + strictness con
 Start a Model Context Protocol server reading JSON-RPC 2.0
 messages on stdin and writing responses on stdout.
 
-Designed for embedding in a claude code interactive session via
+Designed for embedding in a Claude Code interactive session via
 --mcp-config so inference stays on the session's subscription quota
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
@@ -27,7 +27,7 @@ sightjack mcp [flags]
 ### Examples
 
 ```
-  # Launch claude code with the sightjack MCP server attached
+  # Launch Claude Code with the sightjack MCP server attached
   claude --mcp-config '{"sightjack":{"command":"sightjack","args":["mcp"]}}'
 
   # Pipe a tools/list request manually (for debugging)
