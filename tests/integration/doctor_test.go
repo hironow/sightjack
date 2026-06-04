@@ -458,7 +458,7 @@ func TestRunDoctor_ReturnsAllResults(t *testing.T) {
 		t.Errorf("linear-mcp: expected OK, got %v: %s", results[8].Status, results[8].Message)
 	}
 	// claude-inference is Skip post jun15 MCP pivot (refs/issues/0027):
-	// LLM invocation moved to claude code MCP session; doctor no longer
+	// LLM invocation moved to Claude Code MCP session; doctor no longer
 	// probes `claude --print` directly.
 	if results[9].Name != "claude-inference" {
 		t.Errorf("expected 'claude-inference', got %q", results[9].Name)

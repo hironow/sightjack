@@ -56,7 +56,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "sightjack",
 		Short: "SIREN-inspired issue architecture MCP data plane",
-		Long:  "sightjack — SIREN-inspired issue architecture MCP data plane\n\nServe scan/wave read models to a human-initiated claude code session via\nthe `sightjack mcp` stdio server + the /sightjack-scan skill (jun15 MCP\npivot). Use `sightjack sessions` to manage coding sessions and the\ndata-plane commands (show, status, rebuild) to inspect state.",
+		Long:  "sightjack — SIREN-inspired issue architecture MCP data plane\n\nServe scan/wave read models to a human-initiated Claude Code session via\nthe `sightjack mcp` stdio server + the /sightjack-scan skill (jun15 MCP\npivot). Use `sightjack sessions` to manage coding sessions and the\ndata-plane commands (show, status, rebuild) to inspect state.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			applyOtelEnv(filepath.Dir(cfgPath))
 			noColor := mustBool(cmd, "no-color")

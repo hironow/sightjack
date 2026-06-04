@@ -6,7 +6,7 @@ description: >-
   "run a sightjack scan via MCP", "fetch the next wave from sightjack",
   or "test the sightjack MCP server end-to-end". Drives the sightjack
   MCP server's tools (next_wave / get_scan_result / update_strictness)
-  from inside a human-initiated claude code interactive session so
+  from inside a human-initiated Claude Code interactive session so
   inference stays on the subscription quota rather than the Agent SDK
   credit pool that gates `claude -p` from 2026-06-15.
 version: 0.1.0
@@ -29,7 +29,7 @@ allowed-tools:
 
 Human-initiated entry point. Drives the sightjack MCP server's tools
 without ever invoking `claude -p`, so all inference happens inside
-this interactive claude code session's subscription quota.
+this interactive Claude Code session's subscription quota.
 
 ## Prerequisites
 
@@ -97,7 +97,7 @@ get_scan_result / update_strictness.
 
 ## Done criteria
 
-A `/sightjack-scan` run is complete when, in a real claude code session
+A `/sightjack-scan` run is complete when, in a real Claude Code session
 with the sightjack MCP server attached:
 
 1. `ping` returns `pong` (handshake + tool dispatch verified).
