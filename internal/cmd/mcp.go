@@ -18,9 +18,8 @@ import (
 // (read the session scan dir) + sightjack.update_strictness (atomic
 // .siren/config.yaml write).
 //
-// Distinct from `sightjack mcp-config` which manages the .mcp.json
-// configuration consumed by the legacy claude_adapter. This server
-// is consumed by Claude Code itself.
+// Distinct from `sightjack mcp-config`, which writes the Claude Code
+// MCP allowlist that points back to this stdio server.
 func newMCPCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
@@ -38,8 +37,8 @@ Exposes sightjack.ping, sightjack.next_wave + sightjack.get_scan_result
 sightjack.update_strictness (atomically updates the strictness default
 in .siren/config.yaml).
 
-Not to be confused with 'sightjack mcp-config' (subcommand managing
-the legacy .mcp.json file consumed by the embedded claude_adapter).`,
+Not to be confused with 'sightjack mcp-config' (subcommand writing
+the Claude Code MCP allowlist that points back to this stdio server).`,
 		Example: `  # Launch Claude Code with the sightjack MCP server attached
   claude --mcp-config '{"sightjack":{"command":"sightjack","args":["mcp"]}}'
 

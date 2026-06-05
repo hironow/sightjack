@@ -15,7 +15,6 @@ allowlist when the file exists.
 
 ```
   sightjack mcp-config generate
-  sightjack mcp-config generate --linear
   sightjack mcp-config generate --force
 ```
 

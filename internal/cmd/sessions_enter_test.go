@@ -65,8 +65,8 @@ func TestSessionsEnter_ByRecordID(t *testing.T) {
 	if !strings.Contains(output, "--resume provider-sess-001") {
 		t.Errorf("expected --resume provider-sess-001, got: %q", output)
 	}
-	if !strings.Contains(output, "--disable-slash-commands") {
-		t.Errorf("expected --disable-slash-commands, got: %q", output)
+	if strings.Contains(output, "--disable-slash-commands") {
+		t.Errorf("did not expect --disable-slash-commands, got: %q", output)
 	}
 }
 
