@@ -17,8 +17,8 @@ Exposes sightjack.ping, sightjack.next_wave + sightjack.get_scan_result
 sightjack.update_strictness (atomically updates the strictness default
 in .siren/config.yaml).
 
-Not to be confused with 'sightjack mcp-config' (subcommand managing
-the legacy .mcp.json file consumed by the embedded claude_adapter).
+Not to be confused with 'sightjack mcp-config' (subcommand writing
+the Claude Code MCP allowlist that points back to this stdio server).
 
 ```
 sightjack mcp [flags]
