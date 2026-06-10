@@ -5,20 +5,25 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 
 ## Location
 
-- Engine: `internal/usecase/policy.go`
-- Handlers: `internal/usecase/policy_handlers.go`
-- Policy definitions: `internal/domain/policy.go`
-- Registration: `internal/usecase/session.go` → `registerSessionPolicies()`
+- Engine: `internal/usecase/policy.go` (implements `port.EventDispatcher`)
+- Policy declarations: `internal/domain/event.go` → `var Policies` (declarative WHEN/THEN registry)
+- Wiring: `internal/usecase/emitter.go` → `sessionEventEmitter` (EventStore persistence + dispatch)
 
-## Event → Handler Mapping
+## Post jun15 MCP pivot: declarative registry only
 
-| Policy Name | WHEN [EVENT] | THEN [COMMAND] | Side Effects |
+The headless pipeline that executed these policies was retired with the jun15 MCP
+pivot (ADR 0018). **No handlers are registered in production code today** — the
+`domain.Policies` registry documents the reactive intent, and the reactions
+themselves are driven by the human-initiated Claude Code session via the
+`/sightjack-scan` skill and the sightjack MCP tools.
+
+| Policy Name | WHEN [EVENT] | THEN [COMMAND] | Executed by (post-pivot) |
 |---|---|---|---|
-| WaveAppliedComposeReport | wave.applied | ComposeReport | Log (Debug) + Metrics |
-| ReportSentDeliverToPhonewave | report.sent | DeliverViaPhonewave | Log (Debug) + Metrics |
-| ScanCompletedGenerateWaves | scan.completed | GenerateWaves | Log (Info) + Desktop Notify + Metrics |
-| WaveCompletedNextGen | wave.completed | GenerateNextWaves | Log (Info) + Desktop Notify + Metrics |
-| SpecificationSentDeliverToPhonewave | specification.sent | DeliverViaPhonewave | Log (Info) + Desktop Notify + Metrics |
+| WaveAppliedComposeReport | wave.applied | ComposeReport | Claude Code session (skill workflow) |
+| ReportSentDeliverToPhonewave | report.sent | DeliverViaPhonewave | phonewave daemon (outbox watch) |
+| ScanCompletedGenerateWaves | scan.completed | GenerateWaves | Claude Code session (skill workflow) |
+| WaveCompletedNextGen | wave.completed | GenerateNextWaves | Claude Code session (skill workflow) |
+| SpecificationSentDeliverToPhonewave | specification.sent | DeliverViaPhonewave | phonewave daemon (outbox watch) |
 
 ## Event Payload Format
 
@@ -34,8 +39,3 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 
 Best-effort (at-most-once). Handler failures are silently logged.
 No retry, no dead-letter queue, no error propagation to callers.
-
-## Skeleton Handlers
-
-WaveAppliedComposeReport and ReportSentDeliverToPhonewave are observation-only placeholders
-(Debug log + Metrics, no notification).

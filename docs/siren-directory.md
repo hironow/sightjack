@@ -8,7 +8,7 @@ This document describes what each directory/file does, who creates it, and how i
 ```
 .siren/
   .gitignore              # auto-managed by WriteGitIgnore / EnsureScanDir
-  config.yaml             # project-scoped settings (Linear team/project, strictness, lang)
+  config.yaml             # project-scoped settings (tracker scope, strictness, lang)
   events/                 # append-only event logs (JSONL, one file per session)
     {sessionID}.jsonl     # immutable event stream for a session
   skills/
