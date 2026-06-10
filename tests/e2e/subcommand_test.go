@@ -174,10 +174,10 @@ func TestE2E_MCPServerToolsList(t *testing.T) {
 	}
 
 	expectedTools := map[string]bool{
-		"sightjack.ping":              false,
-		"sightjack.next_wave":         false,
-		"sightjack.get_scan_result":   false,
-		"sightjack.update_strictness": false,
+		"ping":              false,
+		"next_wave":         false,
+		"get_scan_result":   false,
+		"update_strictness": false,
 	}
 
 	for _, tool := range resp.Result.Tools {

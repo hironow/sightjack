@@ -14,15 +14,16 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // MCPServer is a stdio-based Model Context Protocol server for the
 // refs/issues/0027 jun15 MCP pivot.
 //
-// All four tools are real implementations: sightjack.ping (health
-// check), sightjack.next_wave + sightjack.get_scan_result (read the
+// All four tools are real implementations: ping (health
+// check), next_wave + get_scan_result (read the
 // session's scan dir under .siren/.run/<session_id>/), and
-// sightjack.update_strictness (atomically updates .siren/config.yaml).
+// update_strictness (atomically updates .siren/config.yaml).
 //
 // Wire it into a Claude Code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
@@ -42,6 +43,7 @@ type MCPServer struct {
 	out     io.Writer
 	logger  domain.Logger
 	baseDir string
+	emitter port.ScanWriteEmitter
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -58,6 +60,16 @@ func NewMCPServer(in io.Reader, out io.Writer, logger domain.Logger) *MCPServer 
 // chaining (= paintress.WithContinent symmetric).
 func (s *MCPServer) WithBaseDir(baseDir string) *MCPServer {
 	s.baseDir = baseDir
+	return s
+}
+
+// WithEmitter wires the narrow event-write seam used by the
+// save_scan_result / register_waves tools (refs issue 0032). When nil,
+// the write tools still persist the JSON read models but report
+// persistence="files-only" so the session knows the event ledger was
+// skipped (pattern: dominator ADR 0005 preview fallback).
+func (s *MCPServer) WithEmitter(emitter port.ScanWriteEmitter) *MCPServer {
+	s.emitter = emitter
 	return s
 }
 
@@ -149,6 +161,10 @@ func initializeResult() map[string]any {
 		"protocolVersion": mcpProtocolVersion,
 		"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
 		"serverInfo":      map[string]any{"name": "sightjack", "version": "0.1.0"},
+		// instructions feed Claude Code's deferred tool loading (Tool
+		// Search): only tool names + this summary are in context at
+		// startup, so it must say what the server is FOR.
+		"instructions": "sightjack is the designer data plane of the tap 5-tool ecosystem: read scan/wave read models (next_wave, get_scan_result), persist designer output (save_scan_result, register_waves), tune strictness (update_strictness), and emit specification d-mails through the transactional outbox (dmail). Drive it from the /sightjack-scan skill in a human-initiated session.",
 	}
 }
 
@@ -170,14 +186,20 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	status := "ok"
 	var result map[string]any
 	switch call.Name {
-	case "sightjack.ping":
+	case "ping":
 		result = textResult("pong")
-	case "sightjack.next_wave":
+	case "next_wave":
 		result = realNextWave(s.baseDir, call.Arguments)
-	case "sightjack.get_scan_result":
+	case "get_scan_result":
 		result = realGetScanResult(s.baseDir, call.Arguments)
-	case "sightjack.update_strictness":
+	case "update_strictness":
 		result = realUpdateStrictness(s.baseDir, call.Arguments)
+	case "save_scan_result":
+		result = realSaveScanResult(s.baseDir, s.emitter, call.Arguments)
+	case "register_waves":
+		result = realRegisterWaves(s.baseDir, s.emitter, call.Arguments)
+	case "dmail":
+		result = realDMail(ctx, s.baseDir, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -200,12 +222,12 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "sightjack.ping",
+			"name":        "ping",
 			"description": "Health check. Returns 'pong'.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "sightjack.next_wave",
+			"name":        "next_wave",
 			"description": "Return the first 'available' wave from wave_*.json files in the session's scan dir, plus a count of total / available waves. Requires session_id (= use `sightjack sessions list` to look up).",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -216,7 +238,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "sightjack.get_scan_result",
+			"name":        "get_scan_result",
 			"description": "Return aggregated cluster info for the given session (cluster count + names + average completeness). For full per-cluster detail, read scan_dir/cluster_*.json directly.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -227,7 +249,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "sightjack.update_strictness",
+			"name":        "update_strictness",
 			"description": "Update the default scan strictness in .siren/config.yaml and persist it atomically. Validates the level (fog / alert / lockdown) before write.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -235,6 +257,60 @@ func toolDescriptors() []map[string]any {
 					"level": map[string]any{"type": "string", "description": "strictness level: fog / alert / lockdown"},
 				},
 				"required": []any{"level"},
+			},
+		},
+		{
+			"name":        "save_scan_result",
+			"description": "Persist the session's scan result (refs issue 0032 designer write path): writes cluster_*.json read models into the session scan dir first, then appends an EventScanCompleted to the event store. On event-append failure the files survive and persistence='files-only' is reported — re-run the tool to repair (idempotent overwrite).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":    map[string]any{"type": "string", "description": "scan session identifier (stable per scan run; reused by next_wave / get_scan_result)"},
+					"shibito_count": map[string]any{"type": "integer", "description": "number of resurfaced closed-issue patterns detected (optional)"},
+					"clusters": map[string]any{
+						"type":        "array",
+						"description": "ClusterScanResult records: {name, key, completeness, issues[], observations[], labels[], estimated_strictness, strictness_reasoning}",
+						"items":       map[string]any{"type": "object"},
+					},
+				},
+				"required": []any{"session_id", "clusters"},
+			},
+		},
+		{
+			"name":        "register_waves",
+			"description": "Persist designed waves for one cluster (refs issue 0032 designer write path): writes wave_<cluster>.json into the session scan dir first (next_wave serves it immediately), then appends an EventWavesGenerated to the event store. On event-append failure the file survives and persistence='files-only' is reported — re-run the tool to repair (idempotent overwrite per cluster).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":   map[string]any{"type": "string", "description": "scan session identifier (same id used with save_scan_result)"},
+					"cluster_name": map[string]any{"type": "string", "description": "cluster these waves target"},
+					"waves": map[string]any{
+						"type":        "array",
+						"description": "Wave records: {id, title, description, status (use 'available'), actions[{type,description}], prerequisites[], delta{before,after}, complexity_score}",
+						"items":       map[string]any{"type": "object"},
+					},
+				},
+				"required": []any{"session_id", "cluster_name", "waves"},
+			},
+		},
+		{
+			"name":        "dmail",
+			"description": "Emit a D-Mail through the transactional outbox (refs issue 0031). Arguments map 1:1 onto the D-Mail v1 schema; sightjack may emit kinds: specification / report / stall-escalation. Never write outbox/ directly — this tool is the canonical atomic path (SQLite stage -> flush) that phonewave delivery depends on. Re-sending the same name is an idempotent upsert.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind":        map[string]any{"type": "string", "description": "D-Mail kind: specification / report / stall-escalation"},
+					"name":        map[string]any{"type": "string", "description": "unique d-mail name (becomes <name>.md; unique per issue/wave)"},
+					"description": map[string]any{"type": "string", "description": "one-line summary (required by schema v1)"},
+					"body":        map[string]any{"type": "string", "description": "markdown body"},
+					"issues":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "related issue ids"},
+					"severity":    map[string]any{"type": "string", "description": "low / medium / high (optional)"},
+					"action":      map[string]any{"type": "string", "description": "requested action (optional)"},
+					"priority":    map[string]any{"type": "integer", "description": "priority (optional)"},
+					"wave":        map[string]any{"type": "object", "description": "wave reference {id, step, steps[]} (optional)"},
+					"metadata":    map[string]any{"type": "object", "description": "string map; project_id / actor_type are injected automatically"},
+				},
+				"required": []any{"kind", "name", "description", "body"},
 			},
 		},
 	}

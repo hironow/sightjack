@@ -14,11 +14,16 @@ import (
 // Existing files are overwritten when content differs (idempotent).
 // Directories are created as needed. Logs to logger when a file is updated.
 func InstallSkills(baseDir string, skillsFS fs.FS, logger domain.Logger) error {
+	return installSkillTree(skillsFS, "templates/skills", filepath.Join(baseDir, domain.StateDir, "skills"), logger)
+}
+
+// installSkillTree copies an embedded skill tree rooted at srcPrefix
+// into destRoot, creating directories and updating files only when the
+// template content changed (idempotent re-install).
+func installSkillTree(skillsFS fs.FS, srcPrefix, destRoot string, logger domain.Logger) error { // nosemgrep: domain-primitives.multiple-string-params-go -- srcPrefix/destRoot are orthogonal tree roles within a package-private helper [permanent]
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
-	const srcPrefix = "templates/skills"
-	destRoot := filepath.Join(baseDir, domain.StateDir, "skills")
 
 	return fs.WalkDir(skillsFS, srcPrefix, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -47,4 +52,14 @@ func InstallSkills(baseDir string, skillsFS fs.FS, logger domain.Logger) error {
 		}
 		return nil
 	})
+}
+
+// InstallClaudeSkills materializes the embedded Claude Code entry
+// skills into the target project's .claude/skills/ (refs issue 0032,
+// decision D5(a)): a bare `claude` session auto-discovers project
+// skills there, so /sightjack-scan works without plugin machinery or
+// launch flags. Idempotent: files are rewritten only when the embedded
+// template changed.
+func InstallClaudeSkills(baseDir string, skillsFS fs.FS, logger domain.Logger) error {
+	return installSkillTree(skillsFS, "templates/claude-skills", filepath.Join(baseDir, ".claude", "skills"), logger)
 }

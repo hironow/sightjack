@@ -50,6 +50,7 @@
 | S0033 | Loop Safety Audit (2026-03) | Accepted |
 | S0034 | Session-Usecase Boundary Clarification | Accepted |
 | S0035 | D-Mail Wave Field Extension | Accepted |
+| [S0045](../shared-adr/S0045-omni-session-topology-and-project-wiring.md) | Omni-Session Topology and Project Wiring | Accepted |
 
 ## sightjack-specific ADRs
 
@@ -69,3 +70,7 @@
 | [0012](0012-strictness-redefinition.md) | Strictness Redefinition |
 | [0013](0013-state-format-version-contract.md) | State Format Version Contract |
 | [0015](0015-claude-cli-stream-json-requires-verbose.md) | Claude CLI stream-json Requires --verbose |
+| [0016](0016-producer-project-id-injection.md) | Producer project-id Injection |
+| [0017](0017-producer-actor-type-injection.md) | Producer actor-type Injection |
+| [0018](0018-mcp-pivot.md) | MCP Pivot: claude code session owns LLM |
+| [0019](0019-mcp-write-tools-and-project-wiring.md) | MCP Write Tools and Project Wiring |

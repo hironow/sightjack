@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
@@ -41,10 +43,10 @@ func TestMCPServer_ListsAllPhase2aTools(t *testing.T) {
 		t.Fatalf("tools list missing: %v", result["tools"])
 	}
 	want := map[string]bool{
-		"sightjack.ping":              false,
-		"sightjack.next_wave":         false,
-		"sightjack.get_scan_result":   false,
-		"sightjack.update_strictness": false,
+		"ping":              false,
+		"next_wave":         false,
+		"get_scan_result":   false,
+		"update_strictness": false,
 	}
 	for _, t0 := range tools {
 		entry, _ := t0.(map[string]any)
@@ -61,7 +63,7 @@ func TestMCPServer_ListsAllPhase2aTools(t *testing.T) {
 
 func TestMCPServer_CallsPingTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"sightjack.ping","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ping","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -91,7 +93,7 @@ func TestMCPServer_CallsPingTool(t *testing.T) {
 
 func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"sightjack.does_not_exist","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"does_not_exist","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -116,7 +118,7 @@ func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 
 func TestMCPServer_NextWave_UninitializedBaseDir(t *testing.T) {
 	// given: NewMCPServer without WithBaseDir → uninitialized response.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{"session_id":"any"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"next_wave","arguments":{"session_id":"any"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -135,7 +137,7 @@ func TestMCPServer_NextWave_UninitializedBaseDir(t *testing.T) {
 func TestMCPServer_NextWave_MissingSessionID(t *testing.T) {
 	// given: baseDir set but session_id missing → initialized but error reason.
 	baseDir := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"next_wave","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -172,7 +174,7 @@ func TestMCPServer_NextWave_RealImpl_WithWaveFiles(t *testing.T) {
 		t.Fatalf("write wave: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{"session_id":"test-session"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"next_wave","arguments":{"session_id":"test-session"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -200,7 +202,7 @@ func TestMCPServer_NextWave_RealImpl_WithWaveFiles(t *testing.T) {
 
 func TestMCPServer_GetScanResult_UninitializedBaseDir(t *testing.T) {
 	// given: NewMCPServer without WithBaseDir.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.get_scan_result","arguments":{"session_id":"any"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_scan_result","arguments":{"session_id":"any"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -233,7 +235,7 @@ func TestMCPServer_GetScanResult_RealImpl_WithClusterFiles(t *testing.T) {
 		t.Fatalf("write api: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"sightjack.get_scan_result","arguments":{"session_id":"test-session"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"get_scan_result","arguments":{"session_id":"test-session"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -258,7 +260,7 @@ func TestMCPServer_GetScanResult_RealImpl_WithClusterFiles(t *testing.T) {
 
 func TestMCPServer_UpdateStrictness_UninitializedBaseDir(t *testing.T) {
 	// given: NewMCPServer without WithBaseDir → uninitialized response.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -298,7 +300,7 @@ labels: {}
 		t.Fatalf("write config: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -350,7 +352,7 @@ func TestMCPServer_UpdateStrictness_Phase4_RejectsInvalidLevel(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"strict"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"strict"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -393,7 +395,7 @@ func TestMCPServer_UpdateStrictness_Phase4_NoOpWhenAlreadyAtLevel(t *testing.T) 
 		t.Fatalf("write config: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -479,6 +481,7 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 		Result struct {
 			ProtocolVersion string                     `json:"protocolVersion"`
 			Capabilities    map[string]json.RawMessage `json:"capabilities"`
+			Instructions    string                     `json:"instructions"`
 			ServerInfo      struct {
 				Name string `json:"name"`
 			} `json:"serverInfo"`
@@ -496,6 +499,9 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 	if resp.Result.ServerInfo.Name != "sightjack" {
 		t.Errorf("serverInfo.name = %q, want sightjack", resp.Result.ServerInfo.Name)
 	}
+	if !strings.Contains(resp.Result.Instructions, "designer") {
+		t.Errorf("instructions = %q, want a one-paragraph designer role summary (Tool Search deferred loading reads it)", resp.Result.Instructions)
+	}
 }
 
 func TestMCPServer_NotificationsInitialized_NoResponse(t *testing.T) {
@@ -512,5 +518,485 @@ func TestMCPServer_NotificationsInitialized_NoResponse(t *testing.T) {
 	// then: notifications must not produce a response
 	if strings.TrimSpace(out.String()) != "" {
 		t.Errorf("notification must produce no response, got: %q", out.String())
+	}
+}
+
+// --- write tools (refs issue 0032: producer write-path restoration) ---
+
+// recordingScanEmitter is a session_test-local fake that structurally
+// satisfies port.ScanWriteEmitter (EmitRecordScan +
+// EmitRecordWavesGenerated) without importing usecase/port.
+type recordingScanEmitter struct {
+	scans    []domain.ScanCompletedPayload
+	waves    []domain.WavesGeneratedPayload
+	failWith error
+}
+
+func (r *recordingScanEmitter) EmitRecordScan(p domain.ScanCompletedPayload, _ time.Time) error {
+	if r.failWith != nil {
+		return r.failWith
+	}
+	r.scans = append(r.scans, p)
+	return nil
+}
+
+func (r *recordingScanEmitter) EmitRecordWavesGenerated(p domain.WavesGeneratedPayload, _ time.Time) error {
+	if r.failWith != nil {
+		return r.failWith
+	}
+	r.waves = append(r.waves, p)
+	return nil
+}
+
+func decodeToolJSON(t *testing.T, raw []byte) map[string]any {
+	t.Helper()
+	var resp map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(raw), &resp); err != nil {
+		t.Fatalf("decode response: %v (raw=%q)", err, string(raw))
+	}
+	result, ok := resp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing result: %v", resp)
+	}
+	content, ok := result["content"].([]any)
+	if !ok || len(content) == 0 {
+		t.Fatalf("content missing: %v", result)
+	}
+	first, _ := content[0].(map[string]any)
+	text, _ := first["text"].(string)
+	var body map[string]any
+	if err := json.Unmarshal([]byte(text), &body); err != nil {
+		t.Fatalf("decode tool body: %v (text=%q)", err, text)
+	}
+	return body
+}
+
+func TestMCPServer_ToolsList_IncludesWriteTools(t *testing.T) {
+	// given
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	var resp map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	result := resp["result"].(map[string]any)
+	tools := result["tools"].([]any)
+	want := map[string]bool{"save_scan_result": false, "register_waves": false}
+	for _, t0 := range tools {
+		entry, _ := t0.(map[string]any)
+		if name, _ := entry["name"].(string); name != "" {
+			if _, tracked := want[name]; tracked {
+				want[name] = true
+			}
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("missing write tool in tools/list: %s", name)
+		}
+	}
+}
+
+func TestMCPServer_RegisterWaves_WritesWaveFileAndEmitsEvent(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	emitter := &recordingScanEmitter{}
+	req := `{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"register_waves","arguments":{"session_id":"s1","cluster_name":"Auth Cluster","waves":[{"id":"w1","cluster_name":"Auth Cluster","title":"Fix token refresh","status":"available","actions":[{"type":"edit","description":"x"}]}]}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir).WithEmitter(emitter)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: response contract
+	body := decodeToolJSON(t, out.Bytes())
+	if body["registered"] != true {
+		t.Fatalf("registered = %v, want true (body=%v)", body["registered"], body)
+	}
+	if body["persistence"] != "files+event-store" {
+		t.Errorf("persistence = %v, want files+event-store", body["persistence"])
+	}
+
+	// then: wave_*.json written into the session scan dir, parseable
+	scanDir := domain.ScanDir(baseDir, "s1")
+	waveFile := filepath.Join(scanDir, "wave_auth_cluster.json")
+	result, err := session.ParseWaveGenerateResult(waveFile)
+	if err != nil {
+		t.Fatalf("ParseWaveGenerateResult(%s): %v", waveFile, err)
+	}
+	if result.ClusterName != "Auth Cluster" || len(result.Waves) != 1 || result.Waves[0].ID != "w1" {
+		t.Errorf("wave file content mismatch: %+v", result)
+	}
+
+	// then: event payload emitted with mapped WaveState
+	if len(emitter.waves) != 1 || len(emitter.waves[0].Waves) != 1 {
+		t.Fatalf("emitted waves = %+v, want 1 payload with 1 wave", emitter.waves)
+	}
+	ws := emitter.waves[0].Waves[0]
+	if ws.ID != "w1" || ws.ClusterName != "Auth Cluster" || ws.Status != "available" || ws.ActionCount != 1 {
+		t.Errorf("WaveState mismatch: %+v", ws)
+	}
+
+	// then: next_wave roundtrip serves the registered wave
+	nwReq := `{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"next_wave","arguments":{"session_id":"s1"}}}` + "\n"
+	var out2 bytes.Buffer
+	srv2 := session.NewMCPServer(strings.NewReader(nwReq), &out2, nil).WithBaseDir(baseDir)
+	if err := srv2.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve next_wave: %v", err)
+	}
+	nw := decodeToolJSON(t, out2.Bytes())
+	wave, _ := nw["next_wave"].(map[string]any)
+	if wave == nil || wave["id"] != "w1" {
+		t.Errorf("next_wave roundtrip = %v, want next_wave id w1", nw)
+	}
+}
+
+func TestMCPServer_RegisterWaves_FilesOnlyWhenEventAppendFails(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	emitter := &recordingScanEmitter{failWith: errors.New("event store offline")}
+	req := `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"register_waves","arguments":{"session_id":"s1","cluster_name":"auth","waves":[{"id":"w1","title":"t","status":"available"}]}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir).WithEmitter(emitter)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: files written, persistence degraded, reason surfaced
+	body := decodeToolJSON(t, out.Bytes())
+	if body["persistence"] != "files-only" {
+		t.Errorf("persistence = %v, want files-only", body["persistence"])
+	}
+	if reason, _ := body["reason"].(string); !strings.Contains(reason, "event store offline") {
+		t.Errorf("reason = %v, want event append error surfaced", body["reason"])
+	}
+	if _, err := os.Stat(filepath.Join(domain.ScanDir(baseDir, "s1"), "wave_auth.json")); err != nil {
+		t.Errorf("wave file should exist even when event append fails: %v", err)
+	}
+}
+
+func TestMCPServer_RegisterWaves_NilEmitterIsFilesOnly(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"register_waves","arguments":{"session_id":"s1","cluster_name":"auth","waves":[{"id":"w1","title":"t","status":"available"}]}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["persistence"] != "files-only" {
+		t.Errorf("persistence = %v, want files-only when emitter is not wired", body["persistence"])
+	}
+}
+
+func TestMCPServer_RegisterWaves_OverwriteIsIdempotent(t *testing.T) {
+	// given: two register calls for the same cluster
+	baseDir := t.TempDir()
+	emitter := &recordingScanEmitter{}
+	req := `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"register_waves","arguments":{"session_id":"s1","cluster_name":"auth","waves":[{"id":"w1","title":"t","status":"available"}]}}}` + "\n" +
+		`{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"register_waves","arguments":{"session_id":"s1","cluster_name":"auth","waves":[{"id":"w1","title":"t","status":"available"},{"id":"w2","title":"t2","status":"available"}]}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir).WithEmitter(emitter)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: exactly one wave file (overwritten), latest content wins
+	entries, err := os.ReadDir(domain.ScanDir(baseDir, "s1"))
+	if err != nil {
+		t.Fatalf("read scan dir: %v", err)
+	}
+	waveFiles := 0
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "wave_") {
+			waveFiles++
+		}
+	}
+	if waveFiles != 1 {
+		t.Errorf("wave files = %d, want 1 (idempotent overwrite)", waveFiles)
+	}
+	result, err := session.ParseWaveGenerateResult(filepath.Join(domain.ScanDir(baseDir, "s1"), "wave_auth.json"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(result.Waves) != 2 {
+		t.Errorf("latest content should win: waves = %d, want 2", len(result.Waves))
+	}
+}
+
+func TestMCPServer_RegisterWaves_ValidatesArgs(t *testing.T) {
+	// given: missing session_id
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"register_waves","arguments":{"cluster_name":"auth","waves":[{"id":"w1"}]}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["registered"] != false {
+		t.Errorf("registered = %v, want false without session_id", body["registered"])
+	}
+}
+
+func TestMCPServer_SaveScanResult_WritesClusterFilesAndEmitsEvent(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	emitter := &recordingScanEmitter{}
+	req := `{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"save_scan_result","arguments":{"session_id":"s1","shibito_count":1,"clusters":[{"name":"Auth","key":"auth","completeness":0.4,"issues":[{"id":"I-1"}]},{"name":"API","key":"api","completeness":0.8,"issues":[]}]}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir).WithEmitter(emitter)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: response contract
+	body := decodeToolJSON(t, out.Bytes())
+	if body["saved"] != true || body["persistence"] != "files+event-store" {
+		t.Fatalf("save response mismatch: %v", body)
+	}
+	if int(body["cluster_count"].(float64)) != 2 {
+		t.Errorf("cluster_count = %v, want 2", body["cluster_count"])
+	}
+
+	// then: cluster files exist and parse
+	for _, name := range []string{"cluster_auth.json", "cluster_api.json"} {
+		if _, err := session.ParseClusterScanResult(filepath.Join(domain.ScanDir(baseDir, "s1"), name)); err != nil {
+			t.Errorf("cluster file %s unparseable: %v", name, err)
+		}
+	}
+
+	// then: event payload mapped (ClusterState carries issue counts)
+	if len(emitter.scans) != 1 {
+		t.Fatalf("scans emitted = %d, want 1", len(emitter.scans))
+	}
+	sp := emitter.scans[0]
+	if len(sp.Clusters) != 2 || sp.ShibitoCount != 1 {
+		t.Errorf("ScanCompletedPayload mismatch: %+v", sp)
+	}
+	var authState *domain.ClusterState
+	for i := range sp.Clusters {
+		if sp.Clusters[i].Name == "Auth" {
+			authState = &sp.Clusters[i]
+		}
+	}
+	if authState == nil || authState.IssueCount != 1 {
+		t.Errorf("Auth ClusterState mismatch: %+v", sp.Clusters)
+	}
+
+	// then: get_scan_result roundtrip sees both clusters
+	gsReq := `{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"get_scan_result","arguments":{"session_id":"s1"}}}` + "\n"
+	var out2 bytes.Buffer
+	srv2 := session.NewMCPServer(strings.NewReader(gsReq), &out2, nil).WithBaseDir(baseDir)
+	if err := srv2.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve get_scan_result: %v", err)
+	}
+	gs := decodeToolJSON(t, out2.Bytes())
+	if int(gs["cluster_count"].(float64)) != 2 {
+		t.Errorf("get_scan_result roundtrip cluster_count = %v, want 2", gs["cluster_count"])
+	}
+}
+
+func TestMCPServer_SaveScanResult_FilesOnlyWhenEventAppendFails(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	emitter := &recordingScanEmitter{failWith: errors.New("append refused")}
+	req := `{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"save_scan_result","arguments":{"session_id":"s1","clusters":[{"name":"Auth","key":"auth","completeness":0.4,"issues":[]}]}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir).WithEmitter(emitter)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["persistence"] != "files-only" {
+		t.Errorf("persistence = %v, want files-only", body["persistence"])
+	}
+	if _, err := os.Stat(filepath.Join(domain.ScanDir(baseDir, "s1"), "cluster_auth.json")); err != nil {
+		t.Errorf("cluster file should exist even when event append fails: %v", err)
+	}
+}
+
+// --- dmail emission tool (refs issue 0031: D-Mail emission via transactional outbox) ---
+
+func TestMCPServer_ToolsList_IncludesDMail(t *testing.T) {
+	// given
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	var resp map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	tools := resp["result"].(map[string]any)["tools"].([]any)
+	found := false
+	for _, t0 := range tools {
+		entry, _ := t0.(map[string]any)
+		if entry["name"] == "dmail" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("missing dmail tool in tools/list")
+	}
+}
+
+func TestMCPServer_DMail_StagesAndFlushesToOutbox(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"sj-spec-w1","description":"wave w1 spec","body":"# Spec\n\ndo the thing","issues":["X-1"],"severity":"medium"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: response contract
+	body := decodeToolJSON(t, out.Bytes())
+	if body["sent"] != true || body["persistence"] != "transactional-outbox" {
+		t.Fatalf("dmail response mismatch: %v", body)
+	}
+
+	// then: flushed into outbox/ AND archive/ with parseable frontmatter
+	for _, sub := range []string{"outbox", "archive"} {
+		path := filepath.Join(baseDir, ".siren", sub, "sj-spec-w1.md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("flushed file missing in %s: %v", sub, err)
+		}
+		text := string(data)
+		if !strings.Contains(text, "kind: specification") || !strings.Contains(text, "do the thing") {
+			t.Errorf("flushed %s content mismatch:\n%s", sub, text)
+		}
+	}
+}
+
+func TestMCPServer_DMail_IsIdempotentForSameName(t *testing.T) {
+	// given: same d-mail name sent twice
+	baseDir := t.TempDir()
+	line := `{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"sj-spec-dup","description":"d","body":"b"}}}`
+	req := line + "\n" + strings.Replace(line, `"id":21`, `"id":22`, 1) + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: both sends succeed; exactly one file in outbox/
+	entries, err := os.ReadDir(filepath.Join(baseDir, ".siren", "outbox"))
+	if err != nil {
+		t.Fatalf("read outbox: %v", err)
+	}
+	count := 0
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("outbox .md files = %d, want 1 (idempotent re-send)", count)
+	}
+}
+
+func TestMCPServer_DMail_RejectsKindOutsideProducesSet(t *testing.T) {
+	// given: design-feedback is a valid D-Mail kind but sightjack does
+	// not produce it (dmail-sendable manifest: specification / report /
+	// stall-escalation)
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"design-feedback","name":"sj-bad","description":"d","body":"b"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["sent"] != false {
+		t.Fatalf("sent = %v, want false for non-produced kind", body["sent"])
+	}
+	if reason, _ := body["reason"].(string); !strings.Contains(reason, "produce") {
+		t.Errorf("reason = %v, want produces-set explanation", body["reason"])
+	}
+	if _, err := os.Stat(filepath.Join(baseDir, ".siren", "outbox", "sj-bad.md")); err == nil {
+		t.Error("rejected d-mail must not reach outbox/")
+	}
+}
+
+func TestMCPServer_DMail_RejectsInvalidPayload(t *testing.T) {
+	// given: missing description (D-Mail schema v1 requires it)
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"sj-no-desc","body":"b"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["sent"] != false {
+		t.Errorf("sent = %v, want false for invalid payload", body["sent"])
+	}
+}
+
+func TestMCPServer_DMail_UninitializedWithoutBaseDir(t *testing.T) {
+	// given
+	req := `{"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"x","description":"d","body":"b"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false without baseDir", body["initialized"])
 	}
 }

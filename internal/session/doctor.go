@@ -463,7 +463,7 @@ func RunDoctor(ctx context.Context, configPath string, baseDir string, logger do
 		// driven by the sightjack MCP server; doctor only verifies that
 		// the binary is present and authed, not that headless inference
 		// works. Sub-B of the pivot will replace these skip results with
-		// an MCP server health probe (sightjack.ping equivalent).
+		// an MCP server health probe (ping equivalent).
 		results = append(results, domain.DoctorCheck{
 			Name:    "claude-inference",
 			Status:  domain.CheckSkip,
