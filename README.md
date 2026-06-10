@@ -2,7 +2,7 @@
 
 **An MCP server + data plane for SIREN-inspired issue architecture: it serves the scan/wave read models from the session's scan dir and persists strictness config.**
 
-Following the jun15 MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Sightjack the Go CLI is now a pure data plane: it serves scan results and wave plans over MCP, persists scan strictness atomically, and provides the supporting data-plane commands. The headless designer pipeline — classify/deep-scan, wave generation, the interactive approve loop, the Architect/Scribe discuss + ADR steps, and D-Mail composition — has been retired. The scan/wave workflow now fires from the claude-code session via the `/sightjack-scan` skill and the sightjack MCP tools (see `plugins/sightjack/skills/sightjack-scan/SKILL.md`).
+Following the jun15 MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Sightjack the Go CLI is a data plane: it serves scan/wave read models over MCP, persists designer output (scan results, waves, strictness), and emits specification D-Mails through the transactional outbox. The headless designer pipeline was retired; the design workflow fires from the claude-code session via the `/sightjack-scan` skill (materialized into the project's `.claude/skills/` by `sightjack init`; canonical source `internal/platform/templates/claude-skills/sightjack-scan/SKILL.md`).
 
 ```bash
 sightjack mcp
@@ -10,12 +10,15 @@ sightjack mcp
 
 `sightjack mcp` starts the MCP server. Its tools expose:
 
-1. `sightjack.ping` — health check
-2. `sightjack.next_wave` — the first `available` wave from the session's scan dir
-3. `sightjack.get_scan_result` — aggregated cluster info for a session
-4. `sightjack.update_strictness` — atomically persist scan strictness to `.siren/config.yaml`
+1. `ping` — health check
+2. `next_wave` — the first `available` wave from the session's scan dir
+3. `get_scan_result` — aggregated cluster info for a session
+4. `save_scan_result` — persist cluster read models + EventScanCompleted (designer write path, refs issue 0032)
+5. `register_waves` — persist designed waves (wave_*.json + EventWavesGenerated); next_wave serves them immediately
+6. `update_strictness` — atomically persist scan strictness to `.siren/config.yaml`
+7. `dmail` — emit a specification / report / stall-escalation D-Mail via the transactional outbox (refs issue 0031)
 
-The claude-code session reads these read models, plans waves, and writes spec D-Mails to `outbox/` itself (via the skill workflow) — sightjack no longer drives the LLM or composes D-Mails.
+The claude-code session reads the read models, designs waves, persists them through the write tools, and emits spec D-Mails through `dmail` — never by writing `outbox/` directly. sightjack still never drives the LLM.
 
 ## Why "Sightjack"?
 
@@ -151,9 +154,10 @@ claude-code session
     v
 sightjack mcp  (MCP server / data plane)
     |
-    |  sightjack.next_wave         -> read wave_*.json files
-    |  sightjack.get_scan_result   -> read aggregated scan result
-    |  sightjack.update_strictness -> atomically update config.yaml
+    |  next_wave / get_scan_result   -> read scan dir read models
+    |  save_scan_result / register_waves -> write read models + events
+    |  update_strictness             -> atomically update config.yaml
+    |  dmail                         -> stage + flush via outbox (SQLite)
     |
 .siren/
     +-- config.yaml

@@ -53,6 +53,16 @@ func (a *InitAdapter) InitProject(baseDir string, opts ...port.InitOption) ([]st
 		result.Add(domain.StateDir+"/skills/", InitCreated, "")
 	}
 
+	// Claude Code entry skill materialization (refs issue 0032 D5):
+	// .claude/skills/sightjack-scan makes /sightjack-scan auto-discovered
+	// by a bare `claude` session in this project.
+	if err := InstallClaudeSkills(baseDir, platform.ClaudeSkillsFS, nil); err != nil {
+		warnings = append(warnings, fmt.Sprintf("failed to install claude skills: %v", err))
+		result.Add(".claude/skills", InitWarning, fmt.Sprintf("failed to install claude skills: %v", err))
+	} else {
+		result.Add(".claude/skills/sightjack-scan/", InitCreated, "")
+	}
+
 	a.LastResult = result
 	return warnings, nil
 }

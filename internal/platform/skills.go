@@ -8,6 +8,13 @@ import (
 //go:embed all:templates/skills
 var SkillsFS embed.FS
 
+// ClaudeSkillsFS embeds the Claude Code entry skills that `sightjack
+// init` materializes into the target project's .claude/skills/ for
+// bare-`claude` auto-discovery (refs issue 0032, decision D5).
+//
+//go:embed all:templates/claude-skills
+var ClaudeSkillsFS embed.FS
+
 // RenderInitConfig generates a minimal config.yaml content string.
 // Only user-specified values are written; remaining fields are filled
 // by DefaultConfig when LoadConfig reads the file.

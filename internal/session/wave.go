@@ -9,7 +9,7 @@ import (
 )
 
 // ParseWaveGenerateResult reads and parses a wave_{name}.json output file.
-// Used by the MCP data-plane (sightjack.next_wave) to surface available waves
+// Used by the MCP data-plane (next_wave) to surface available waves
 // from the session's scan dir.
 func ParseWaveGenerateResult(path string) (*domain.WaveGenerateResult, error) {
 	data, err := os.ReadFile(path)

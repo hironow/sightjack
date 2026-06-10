@@ -22,7 +22,7 @@ func ParseClassifyResult(path string) (*domain.ClassifyResult, error) {
 }
 
 // ParseClusterScanResult reads and parses a cluster_{name}.json output file.
-// Used by the MCP data-plane (sightjack.get_scan_result) to surface aggregated
+// Used by the MCP data-plane (get_scan_result) to surface aggregated
 // cluster info from the session's scan dir.
 func ParseClusterScanResult(path string) (*domain.ClusterScanResult, error) {
 	data, err := os.ReadFile(path)
