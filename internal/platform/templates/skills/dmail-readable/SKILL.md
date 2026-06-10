@@ -2,13 +2,15 @@
 name: dmail-readable
 description: Declares inbound D-Mail kinds for phonewave routing discovery.
 license: Apache-2.0
-compatibility: Requires phonewave daemon or direct filesystem access.
 metadata:
   dmail-schema-version: "1"
   consumes:
     - kind: design-feedback
+      description: design-level corrections from the verifier / NFR judge
     - kind: convergence
+      description: convergence alerts warranting a design re-scan
     - kind: report
+      description: implementer reports for designer awareness
 ---
 
-Sightjack D-Mail readable skill.
+D-Mail read capability for sightjack.

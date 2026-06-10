@@ -1,23 +1,16 @@
 ---
 name: sightjack-scan
 description: >-
-  Slash command for the sightjack designer (jun15 MCP pivot). Triggers
-  when the user types "/sightjack-scan", asks to "run a sightjack scan
-  via MCP", "design the next waves", "スキャンして wave を設計して",
-  or "test the sightjack MCP server end-to-end". Drives the sightjack
-  MCP server's tools (save_scan_result / register_waves / next_wave /
-  get_scan_result / update_strictness / dmail) from inside a
-  human-initiated Claude Code interactive session so inference stays on
-  the subscription quota rather than the Agent SDK credit pool that
-  gates `claude -p` from 2026-06-15.
-version: 0.3.0
-argument-hint: "(none) - scans the project, persists waves, and emits specification d-mails"
+  Run one sightjack designer pass (human-invoked /sightjack-scan;
+  「スキャンして wave を設計して」): scan the project, persist scan
+  clusters and waves through the sightjack MCP server, and emit
+  specification d-mails for /expedition-next to implement. Design-only
+  — never applies waves or edits code. All inference stays inside this
+  interactive session (jun15 billing invariant; see body).
+version: 0.3.2
 disable-model-invocation: true
 allowed-tools:
   - Read
-  - Edit
-  - Write
-  - Bash
   - Grep
   - Glob
   - Agent
@@ -71,13 +64,18 @@ claude --mcp-config '{"sightjack":{"command":"sightjack","args":["mcp"]}}'
    relaunch claude with `--mcp-config`).
 
 2. **Scan**. Read the project's issue source and code (Read / Grep /
-   Glob; use subagents for breadth). Group findings into clusters and
-   assess per-cluster completeness. Pick a stable `session_id` for
-   this scan run (e.g. `scan-YYYYMMDD-<short>`); reuse it for every
-   call below.
+   Glob; use subagents for breadth — this skill needs no file edits
+   and no shell). Group findings into clusters, assess per-cluster
+   completeness, and note resurfaced closed-issue patterns (they feed
+   `shibito_count`). Pick a stable `session_id` for this scan run
+   (e.g. `scan-YYYYMMDD-<short>`); reuse it for every call below.
+   If no cluster needs work, skip steps 4-6 and report "no waves
+   designed".
 
 3. **Persist the scan result**. Call `mcp__sightjack__save_scan_result`
-   with `{session_id, clusters: [...], shibito_count}`. Files
+   with `{session_id, clusters: [...], shibito_count}` (`shibito_count`
+   = count of resurfaced closed-issue patterns from step 2; optional).
+   Files
    (cluster_*.json read models) land first, then the
    EventScanCompleted ledger entry. If the response says
    `persistence: "files-only"`, re-run the same call once to repair
@@ -88,7 +86,10 @@ claude --mcp-config '{"sightjack":{"command":"sightjack","args":["mcp"]}}'
    status "available") and call `mcp__sightjack__register_waves` with
    `{session_id, cluster_name, waves}`. Same files-first /
    re-run-to-repair contract as step 3. `next_wave` serves the result
-   immediately — verify with one `mcp__sightjack__next_wave` call.
+   immediately — verify with one `mcp__sightjack__next_wave` call; if
+   it does not serve a registered wave for this session_id, treat it
+   as the files-only degradation case (re-run `register_waves` once,
+   else report and stop).
 
 5. **Emit specification d-mails**. For each registered wave that is
    ready for implementation, call `mcp__sightjack__dmail` with
@@ -121,9 +122,10 @@ claude --mcp-config '{"sightjack":{"command":"sightjack","args":["mcp"]}}'
 
 Re-invoking `/sightjack-scan` after a partial run is safe: write tools
 overwrite per cluster (same session_id), `dmail` re-sends are upserts
-by name, and `update_strictness` is a no-op when unchanged. Reuse the
-previous `session_id` to repair a partial scan instead of starting a
-new one.
+by name, and `update_strictness` is a no-op when unchanged. Start a
+repair by calling `mcp__sightjack__get_scan_result` with the previous
+`session_id` to see which clusters are already persisted, then re-run
+only the missing writes instead of starting a new session.
 
 ## What this skill must NOT do
 
@@ -153,9 +155,10 @@ session with the sightjack MCP server attached:
 
 ## Related
 
-- Write-path restoration + conformance constraints:
-  `http://localhost:8765/docs/issues/0032-producer-write-path.html` (refs)
-- D-Mail emission tools: `http://localhost:8765/docs/issues/0031-mcp-tool-surface-gaps.html`
-- Canonical pivot plan: `http://localhost:8765/docs/archive/0027-jun15-mcp-pivot.html`
-- Pattern reference: sightjack ADR 0018 (`docs/adr/0018-mcp-pivot.md`)
-- D-Mail 9-field schema: `internal/domain/dmail_envelope.go`
+(Paths below live in the sightjack source repo / the operator's local
+refs server — not in the project this skill is materialized into.)
+
+- Write-path restoration: refs issue 0032 (`http://localhost:8765/docs/archive/0032-producer-write-path.html`, refs server)
+- D-Mail emission tools: refs issue 0031 (`http://localhost:8765/docs/archive/0031-mcp-tool-surface-gaps.html`, refs server)
+- Pattern reference: sightjack ADR 0018 "MCP pivot" + ADR 0019 "MCP write tools and project wiring" (in the sightjack repo)
+- D-Mail envelope schema: see the `dmail` tool's input schema (tools/list)
