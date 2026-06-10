@@ -75,8 +75,10 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 Sightjack does not own model inference or run the retired scan / wave / discuss / apply pipeline from the Go CLI. LLM execution is owned by a human-initiated Claude Code session attached to `sightjack mcp`.
 
 - `sightjack mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
-- `sightjack.next_wave` and `sightjack.get_scan_result` read durable scan/wave state for the session.
-- `sightjack.update_strictness` is the only MCP tool that mutates state, and it atomically updates `.siren/config.yaml`.
+- `next_wave` and `get_scan_result` read durable scan/wave state for the session.
+- `save_scan_result` and `register_waves` restore the designer write path (refs issue 0032): scan-dir JSON read models land first, then the event-ledger append (files-only degradation is reported for re-run repair).
+- `update_strictness` atomically updates `.siren/config.yaml`.
+- `dmail` emits producer-kind D-Mails (specification / report / stall-escalation) through the transactional outbox — the only sanctioned emission path.
 - The `/sightjack-scan` skill composes D-Mails and performs LLM/tool-driven planning from the claude-code session.
 
 Ref: ADR 0018, `internal/session/mcp_server.go`, `plugins/sightjack/skills/sightjack-scan/SKILL.md`
