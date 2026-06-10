@@ -198,7 +198,7 @@ sightjack mcp  (MCP server / data plane)
 # Build and install
 just install
 
-# Initialize project config (Linear team key, etc.)
+# Initialize project config (.siren/config.yaml)
 sightjack init
 
 # Generate Claude Code MCP session wiring
@@ -254,8 +254,8 @@ Then launch a claude-code session wired to the sightjack MCP server and invoke t
 ```yaml
 # .siren/config.yaml
 tracker:
-  team: "ENG"            # Linear team key
-  project: "My Project"  # Linear project name
+  team: "ENG"            # Issue tracker team scope (issue-source-neutral)
+  project: "My Project"  # Issue tracker project scope
   cycle: ""              # Optional: filter by cycle
 
 scan:
@@ -285,7 +285,7 @@ retry:
   base_delay_sec: 2      # Base backoff between retries
 
 labels:
-  enabled: true          # Auto-label ready issues in Linear
+  enabled: true          # Auto-label ready issues in the issue tracker
   prefix: "sightjack"    # Label prefix (default: "sightjack")
   ready_label: "sightjack:ready"  # Ready-for-execution label name
 
@@ -347,7 +347,6 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 - Go 1.26+
 - [just](https://just.systems/) task runner
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
-- [Linear MCP Server](https://github.com/anthropics/model-context-protocol) configured for Claude
 - [Docker](https://www.docker.com/) for tracing (Jaeger)
 
 ## License
