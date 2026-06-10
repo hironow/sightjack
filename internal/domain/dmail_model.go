@@ -36,6 +36,16 @@ func IsValidDMailKind(kind DMailKind) bool {
 	return ValidDMailKinds[kind]
 }
 
+// ProducesKinds is the producer subset of D-Mail kinds sightjack is
+// allowed to emit, mirroring the dmail-sendable SKILL.md manifest
+// (refs issue 0031: the dmail MCP tool validates against this set;
+// ValidKinds remains the full-protocol receive-side set).
+var ProducesKinds = map[DMailKind]bool{
+	KindSpecification:   true,
+	KindReport:          true,
+	KindStallEscalation: true,
+}
+
 // ValidateKind checks that kind is one of the allowed D-Mail kinds.
 func ValidateKind(kind DMailKind) error { // nosemgrep: validate-returns-error-only-go -- DMailKind is already a typed string; caller holds validated value without re-parsing [permanent]
 	if !IsValidDMailKind(kind) {

@@ -194,6 +194,8 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 		result = realSaveScanResult(s.baseDir, s.emitter, call.Arguments)
 	case "register_waves":
 		result = realRegisterWaves(s.baseDir, s.emitter, call.Arguments)
+	case "dmail":
+		result = realDMail(ctx, s.baseDir, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -285,6 +287,26 @@ func toolDescriptors() []map[string]any {
 					},
 				},
 				"required": []any{"session_id", "cluster_name", "waves"},
+			},
+		},
+		{
+			"name":        "dmail",
+			"description": "Emit a D-Mail through the transactional outbox (refs issue 0031). Arguments map 1:1 onto the D-Mail v1 schema; sightjack may emit kinds: specification / report / stall-escalation. Never write outbox/ directly — this tool is the canonical atomic path (SQLite stage -> flush) that phonewave delivery depends on. Re-sending the same name is an idempotent upsert.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind":        map[string]any{"type": "string", "description": "D-Mail kind: specification / report / stall-escalation"},
+					"name":        map[string]any{"type": "string", "description": "unique d-mail name (becomes <name>.md; unique per issue/wave)"},
+					"description": map[string]any{"type": "string", "description": "one-line summary (required by schema v1)"},
+					"body":        map[string]any{"type": "string", "description": "markdown body"},
+					"issues":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "related issue ids"},
+					"severity":    map[string]any{"type": "string", "description": "low / medium / high (optional)"},
+					"action":      map[string]any{"type": "string", "description": "requested action (optional)"},
+					"priority":    map[string]any{"type": "integer", "description": "priority (optional)"},
+					"wave":        map[string]any{"type": "object", "description": "wave reference {id, step, steps[]} (optional)"},
+					"metadata":    map[string]any{"type": "object", "description": "string map; project_id / actor_type are injected automatically"},
+				},
+				"required": []any{"kind", "name", "description", "body"},
 			},
 		},
 	}

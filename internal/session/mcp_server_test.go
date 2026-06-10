@@ -840,3 +840,159 @@ func TestMCPServer_SaveScanResult_FilesOnlyWhenEventAppendFails(t *testing.T) {
 		t.Errorf("cluster file should exist even when event append fails: %v", err)
 	}
 }
+
+// --- dmail emission tool (refs issue 0031: D-Mail emission via transactional outbox) ---
+
+func TestMCPServer_ToolsList_IncludesDMail(t *testing.T) {
+	// given
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	var resp map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	tools := resp["result"].(map[string]any)["tools"].([]any)
+	found := false
+	for _, t0 := range tools {
+		entry, _ := t0.(map[string]any)
+		if entry["name"] == "dmail" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("missing dmail tool in tools/list")
+	}
+}
+
+func TestMCPServer_DMail_StagesAndFlushesToOutbox(t *testing.T) {
+	// given
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"sj-spec-w1","description":"wave w1 spec","body":"# Spec\n\ndo the thing","issues":["X-1"],"severity":"medium"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: response contract
+	body := decodeToolJSON(t, out.Bytes())
+	if body["sent"] != true || body["persistence"] != "transactional-outbox" {
+		t.Fatalf("dmail response mismatch: %v", body)
+	}
+
+	// then: flushed into outbox/ AND archive/ with parseable frontmatter
+	for _, sub := range []string{"outbox", "archive"} {
+		path := filepath.Join(baseDir, ".siren", sub, "sj-spec-w1.md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("flushed file missing in %s: %v", sub, err)
+		}
+		text := string(data)
+		if !strings.Contains(text, "kind: specification") || !strings.Contains(text, "do the thing") {
+			t.Errorf("flushed %s content mismatch:\n%s", sub, text)
+		}
+	}
+}
+
+func TestMCPServer_DMail_IsIdempotentForSameName(t *testing.T) {
+	// given: same d-mail name sent twice
+	baseDir := t.TempDir()
+	line := `{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"sj-spec-dup","description":"d","body":"b"}}}`
+	req := line + "\n" + strings.Replace(line, `"id":21`, `"id":22`, 1) + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: both sends succeed; exactly one file in outbox/
+	entries, err := os.ReadDir(filepath.Join(baseDir, ".siren", "outbox"))
+	if err != nil {
+		t.Fatalf("read outbox: %v", err)
+	}
+	count := 0
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("outbox .md files = %d, want 1 (idempotent re-send)", count)
+	}
+}
+
+func TestMCPServer_DMail_RejectsKindOutsideProducesSet(t *testing.T) {
+	// given: design-feedback is a valid D-Mail kind but sightjack does
+	// not produce it (dmail-sendable manifest: specification / report /
+	// stall-escalation)
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"design-feedback","name":"sj-bad","description":"d","body":"b"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["sent"] != false {
+		t.Fatalf("sent = %v, want false for non-produced kind", body["sent"])
+	}
+	if reason, _ := body["reason"].(string); !strings.Contains(reason, "produce") {
+		t.Errorf("reason = %v, want produces-set explanation", body["reason"])
+	}
+	if _, err := os.Stat(filepath.Join(baseDir, ".siren", "outbox", "sj-bad.md")); err == nil {
+		t.Error("rejected d-mail must not reach outbox/")
+	}
+}
+
+func TestMCPServer_DMail_RejectsInvalidPayload(t *testing.T) {
+	// given: missing description (D-Mail schema v1 requires it)
+	baseDir := t.TempDir()
+	req := `{"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"sj-no-desc","body":"b"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil).WithBaseDir(baseDir)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["sent"] != false {
+		t.Errorf("sent = %v, want false for invalid payload", body["sent"])
+	}
+}
+
+func TestMCPServer_DMail_UninitializedWithoutBaseDir(t *testing.T) {
+	// given
+	req := `{"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"dmail","arguments":{"kind":"specification","name":"x","description":"d","body":"b"}}}` + "\n"
+	var out bytes.Buffer
+	srv := session.NewMCPServer(strings.NewReader(req), &out, nil)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeToolJSON(t, out.Bytes())
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false without baseDir", body["initialized"])
+	}
+}

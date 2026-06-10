@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -217,4 +218,85 @@ func realSaveScanResult(baseDir string, emitter port.ScanWriteEmitter, args json
 		res["reason"] = reason
 	}
 	return jsonResult(res)
+}
+
+// realDMail emits a D-Mail through the transactional outbox (refs
+// issue 0031: D-Mail emission restored as an MCP tool). The arguments
+// are a typed subset of the D-Mail v1 schema mapped 1:1 onto
+// domain.DMail; direct outbox/ writes from the session remain
+// forbidden because they would bypass the SQLite stage -> atomic flush
+// contract that phonewave's watcher depends on.
+//
+// Kind validation is two-layered: domain.ValidateDMail enforces the
+// full-protocol schema, and domain.ProducesKinds restricts emission to
+// the kinds sightjack's dmail-sendable manifest declares
+// (specification / report / stall-escalation) so routing always exists.
+func realDMail(ctx context.Context, baseDir string, args json.RawMessage) map[string]any {
+	var payload struct {
+		Kind        string                `json:"kind"`
+		Name        string                `json:"name"`
+		Description string                `json:"description"`
+		Body        string                `json:"body"`
+		Issues      []string              `json:"issues"`
+		Severity    string                `json:"severity"`
+		Action      string                `json:"action"`
+		Priority    int                   `json:"priority"`
+		Wave        *domain.WaveReference `json:"wave"`
+		Metadata    map[string]string     `json:"metadata"`
+	}
+	if len(args) > 0 {
+		_ = json.Unmarshal(args, &payload)
+	}
+	if baseDir == "" {
+		return jsonResult(map[string]any{
+			"initialized": false,
+			"sent":        false,
+			"reason":      "sightjack mcp baseDir not configured (start `sightjack mcp` from the project root)",
+		})
+	}
+	kind := domain.DMailKind(payload.Kind)
+	if !domain.ProducesKinds[kind] {
+		return jsonResult(map[string]any{
+			"initialized": true,
+			"sent":        false,
+			"reason":      fmt.Sprintf("sightjack does not produce kind %q (produces: specification / report / stall-escalation per the dmail-sendable manifest)", payload.Kind),
+		})
+	}
+	mail := &domain.DMail{
+		SchemaVersion: domain.DMailSchemaVersion,
+		Name:          payload.Name,
+		Kind:          kind,
+		Description:   payload.Description,
+		Body:          payload.Body,
+		Issues:        payload.Issues,
+		Severity:      payload.Severity,
+		Action:        payload.Action,
+		Priority:      payload.Priority,
+		Wave:          payload.Wave,
+		Metadata:      payload.Metadata,
+	}
+	store, err := NewOutboxStoreForDir(baseDir)
+	if err != nil {
+		return jsonResult(map[string]any{
+			"initialized": true,
+			"sent":        false,
+			"reason":      fmt.Sprintf("outbox store open failed: %v", err),
+		})
+	}
+	defer func() { _ = store.Close() }()
+	if err := ComposeDMail(ctx, store, mail); err != nil {
+		return jsonResult(map[string]any{
+			"initialized": true,
+			"sent":        false,
+			"reason":      fmt.Sprintf("dmail compose failed: %v", err),
+		})
+	}
+	return jsonResult(map[string]any{
+		"initialized": true,
+		"sent":        true,
+		"name":        mail.Name,
+		"filename":    mail.Filename(),
+		"kind":        string(mail.Kind),
+		"persistence": "transactional-outbox",
+	})
 }
