@@ -53,3 +53,13 @@ func installSkillTree(skillsFS fs.FS, srcPrefix, destRoot string, logger domain.
 		return nil
 	})
 }
+
+// InstallClaudeSkills materializes the embedded Claude Code entry
+// skills into the target project's .claude/skills/ (refs issue 0032,
+// decision D5(a)): a bare `claude` session auto-discovers project
+// skills there, so /sightjack-scan works without plugin machinery or
+// launch flags. Idempotent: files are rewritten only when the embedded
+// template changed.
+func InstallClaudeSkills(baseDir string, skillsFS fs.FS, logger domain.Logger) error {
+	return installSkillTree(skillsFS, "templates/claude-skills", filepath.Join(baseDir, ".claude", "skills"), logger)
+}
