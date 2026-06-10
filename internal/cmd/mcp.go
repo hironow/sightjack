@@ -14,8 +14,8 @@ import (
 // calls sightjack tools from inside the human-initiated subscription
 // quota.
 //
-// Exposes sightjack.ping + sightjack.next_wave + sightjack.get_scan_result
-// (read the session scan dir) + sightjack.update_strictness (atomic
+// Exposes ping + next_wave + get_scan_result
+// (read the session scan dir) + update_strictness (atomic
 // .siren/config.yaml write).
 //
 // Distinct from `sightjack mcp-config`, which writes the Claude Code
@@ -32,9 +32,9 @@ Designed for embedding in a Claude Code interactive session via
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
 
-Exposes sightjack.ping, sightjack.next_wave + sightjack.get_scan_result
+Exposes ping, next_wave + get_scan_result
 (read the session's scan dir under .siren/.run/<session_id>/), and
-sightjack.update_strictness (atomically updates the strictness default
+update_strictness (atomically updates the strictness default
 in .siren/config.yaml).
 
 Not to be confused with 'sightjack mcp-config' (subcommand writing

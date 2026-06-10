@@ -19,10 +19,10 @@ import (
 // MCPServer is a stdio-based Model Context Protocol server for the
 // refs/issues/0027 jun15 MCP pivot.
 //
-// All four tools are real implementations: sightjack.ping (health
-// check), sightjack.next_wave + sightjack.get_scan_result (read the
+// All four tools are real implementations: ping (health
+// check), next_wave + get_scan_result (read the
 // session's scan dir under .siren/.run/<session_id>/), and
-// sightjack.update_strictness (atomically updates .siren/config.yaml).
+// update_strictness (atomically updates .siren/config.yaml).
 //
 // Wire it into a Claude Code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
@@ -170,13 +170,13 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	status := "ok"
 	var result map[string]any
 	switch call.Name {
-	case "sightjack.ping":
+	case "ping":
 		result = textResult("pong")
-	case "sightjack.next_wave":
+	case "next_wave":
 		result = realNextWave(s.baseDir, call.Arguments)
-	case "sightjack.get_scan_result":
+	case "get_scan_result":
 		result = realGetScanResult(s.baseDir, call.Arguments)
-	case "sightjack.update_strictness":
+	case "update_strictness":
 		result = realUpdateStrictness(s.baseDir, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
@@ -200,12 +200,12 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "sightjack.ping",
+			"name":        "ping",
 			"description": "Health check. Returns 'pong'.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "sightjack.next_wave",
+			"name":        "next_wave",
 			"description": "Return the first 'available' wave from wave_*.json files in the session's scan dir, plus a count of total / available waves. Requires session_id (= use `sightjack sessions list` to look up).",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -216,7 +216,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "sightjack.get_scan_result",
+			"name":        "get_scan_result",
 			"description": "Return aggregated cluster info for the given session (cluster count + names + average completeness). For full per-cluster detail, read scan_dir/cluster_*.json directly.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -227,7 +227,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "sightjack.update_strictness",
+			"name":        "update_strictness",
 			"description": "Update the default scan strictness in .siren/config.yaml and persist it atomically. Validates the level (fog / alert / lockdown) before write.",
 			"inputSchema": map[string]any{
 				"type": "object",

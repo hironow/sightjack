@@ -41,10 +41,10 @@ func TestMCPServer_ListsAllPhase2aTools(t *testing.T) {
 		t.Fatalf("tools list missing: %v", result["tools"])
 	}
 	want := map[string]bool{
-		"sightjack.ping":              false,
-		"sightjack.next_wave":         false,
-		"sightjack.get_scan_result":   false,
-		"sightjack.update_strictness": false,
+		"ping":              false,
+		"next_wave":         false,
+		"get_scan_result":   false,
+		"update_strictness": false,
 	}
 	for _, t0 := range tools {
 		entry, _ := t0.(map[string]any)
@@ -61,7 +61,7 @@ func TestMCPServer_ListsAllPhase2aTools(t *testing.T) {
 
 func TestMCPServer_CallsPingTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"sightjack.ping","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ping","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -91,7 +91,7 @@ func TestMCPServer_CallsPingTool(t *testing.T) {
 
 func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"sightjack.does_not_exist","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"does_not_exist","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -116,7 +116,7 @@ func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 
 func TestMCPServer_NextWave_UninitializedBaseDir(t *testing.T) {
 	// given: NewMCPServer without WithBaseDir → uninitialized response.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{"session_id":"any"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"next_wave","arguments":{"session_id":"any"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -135,7 +135,7 @@ func TestMCPServer_NextWave_UninitializedBaseDir(t *testing.T) {
 func TestMCPServer_NextWave_MissingSessionID(t *testing.T) {
 	// given: baseDir set but session_id missing → initialized but error reason.
 	baseDir := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"next_wave","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -172,7 +172,7 @@ func TestMCPServer_NextWave_RealImpl_WithWaveFiles(t *testing.T) {
 		t.Fatalf("write wave: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.next_wave","arguments":{"session_id":"test-session"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"next_wave","arguments":{"session_id":"test-session"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -200,7 +200,7 @@ func TestMCPServer_NextWave_RealImpl_WithWaveFiles(t *testing.T) {
 
 func TestMCPServer_GetScanResult_UninitializedBaseDir(t *testing.T) {
 	// given: NewMCPServer without WithBaseDir.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.get_scan_result","arguments":{"session_id":"any"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_scan_result","arguments":{"session_id":"any"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -233,7 +233,7 @@ func TestMCPServer_GetScanResult_RealImpl_WithClusterFiles(t *testing.T) {
 		t.Fatalf("write api: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"sightjack.get_scan_result","arguments":{"session_id":"test-session"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"get_scan_result","arguments":{"session_id":"test-session"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -258,7 +258,7 @@ func TestMCPServer_GetScanResult_RealImpl_WithClusterFiles(t *testing.T) {
 
 func TestMCPServer_UpdateStrictness_UninitializedBaseDir(t *testing.T) {
 	// given: NewMCPServer without WithBaseDir → uninitialized response.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -298,7 +298,7 @@ labels: {}
 		t.Fatalf("write config: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -350,7 +350,7 @@ func TestMCPServer_UpdateStrictness_Phase4_RejectsInvalidLevel(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"strict"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"strict"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
@@ -393,7 +393,7 @@ func TestMCPServer_UpdateStrictness_Phase4_NoOpWhenAlreadyAtLevel(t *testing.T) 
 		t.Fatalf("write config: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"sightjack.update_strictness","arguments":{"level":"alert"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"update_strictness","arguments":{"level":"alert"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithBaseDir(baseDir)
 
