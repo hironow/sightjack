@@ -481,6 +481,7 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 		Result struct {
 			ProtocolVersion string                     `json:"protocolVersion"`
 			Capabilities    map[string]json.RawMessage `json:"capabilities"`
+			Instructions    string                     `json:"instructions"`
 			ServerInfo      struct {
 				Name string `json:"name"`
 			} `json:"serverInfo"`
@@ -497,6 +498,9 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 	}
 	if resp.Result.ServerInfo.Name != "sightjack" {
 		t.Errorf("serverInfo.name = %q, want sightjack", resp.Result.ServerInfo.Name)
+	}
+	if !strings.Contains(resp.Result.Instructions, "designer") {
+		t.Errorf("instructions = %q, want a one-paragraph designer role summary (Tool Search deferred loading reads it)", resp.Result.Instructions)
 	}
 }
 

@@ -161,6 +161,10 @@ func initializeResult() map[string]any {
 		"protocolVersion": mcpProtocolVersion,
 		"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
 		"serverInfo":      map[string]any{"name": "sightjack", "version": "0.1.0"},
+		// instructions feed Claude Code's deferred tool loading (Tool
+		// Search): only tool names + this summary are in context at
+		// startup, so it must say what the server is FOR.
+		"instructions": "sightjack is the designer data plane of the tap 5-tool ecosystem: read scan/wave read models (next_wave, get_scan_result), persist designer output (save_scan_result, register_waves), tune strictness (update_strictness), and emit specification d-mails through the transactional outbox (dmail). Drive it from the /sightjack-scan skill in a human-initiated session.",
 	}
 }
 
