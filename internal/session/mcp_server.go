@@ -14,6 +14,7 @@ import (
 
 	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/platform"
+	"github.com/hironow/sightjack/internal/usecase/port"
 )
 
 // MCPServer is a stdio-based Model Context Protocol server for the
@@ -42,6 +43,7 @@ type MCPServer struct {
 	out     io.Writer
 	logger  domain.Logger
 	baseDir string
+	emitter port.ScanWriteEmitter
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -58,6 +60,16 @@ func NewMCPServer(in io.Reader, out io.Writer, logger domain.Logger) *MCPServer 
 // chaining (= paintress.WithContinent symmetric).
 func (s *MCPServer) WithBaseDir(baseDir string) *MCPServer {
 	s.baseDir = baseDir
+	return s
+}
+
+// WithEmitter wires the narrow event-write seam used by the
+// save_scan_result / register_waves tools (refs issue 0032). When nil,
+// the write tools still persist the JSON read models but report
+// persistence="files-only" so the session knows the event ledger was
+// skipped (pattern: dominator ADR 0005 preview fallback).
+func (s *MCPServer) WithEmitter(emitter port.ScanWriteEmitter) *MCPServer {
+	s.emitter = emitter
 	return s
 }
 
@@ -178,6 +190,10 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 		result = realGetScanResult(s.baseDir, call.Arguments)
 	case "update_strictness":
 		result = realUpdateStrictness(s.baseDir, call.Arguments)
+	case "save_scan_result":
+		result = realSaveScanResult(s.baseDir, s.emitter, call.Arguments)
+	case "register_waves":
+		result = realRegisterWaves(s.baseDir, s.emitter, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -235,6 +251,40 @@ func toolDescriptors() []map[string]any {
 					"level": map[string]any{"type": "string", "description": "strictness level: fog / alert / lockdown"},
 				},
 				"required": []any{"level"},
+			},
+		},
+		{
+			"name":        "save_scan_result",
+			"description": "Persist the session's scan result (refs issue 0032 designer write path): writes cluster_*.json read models into the session scan dir first, then appends an EventScanCompleted to the event store. On event-append failure the files survive and persistence='files-only' is reported — re-run the tool to repair (idempotent overwrite).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":    map[string]any{"type": "string", "description": "scan session identifier (stable per scan run; reused by next_wave / get_scan_result)"},
+					"shibito_count": map[string]any{"type": "integer", "description": "number of resurfaced closed-issue patterns detected (optional)"},
+					"clusters": map[string]any{
+						"type":        "array",
+						"description": "ClusterScanResult records: {name, key, completeness, issues[], observations[], labels[], estimated_strictness, strictness_reasoning}",
+						"items":       map[string]any{"type": "object"},
+					},
+				},
+				"required": []any{"session_id", "clusters"},
+			},
+		},
+		{
+			"name":        "register_waves",
+			"description": "Persist designed waves for one cluster (refs issue 0032 designer write path): writes wave_<cluster>.json into the session scan dir first (next_wave serves it immediately), then appends an EventWavesGenerated to the event store. On event-append failure the file survives and persistence='files-only' is reported — re-run the tool to repair (idempotent overwrite per cluster).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":   map[string]any{"type": "string", "description": "scan session identifier (same id used with save_scan_result)"},
+					"cluster_name": map[string]any{"type": "string", "description": "cluster these waves target"},
+					"waves": map[string]any{
+						"type":        "array",
+						"description": "Wave records: {id, title, description, status (use 'available'), actions[{type,description}], prerequisites[], delta{before,after}, complexity_score}",
+						"items":       map[string]any{"type": "object"},
+					},
+				},
+				"required": []any{"session_id", "cluster_name", "waves"},
 			},
 		},
 	}

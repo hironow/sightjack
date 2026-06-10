@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/hironow/sightjack/internal/domain"
 	"github.com/hironow/sightjack/internal/session"
+	"github.com/hironow/sightjack/internal/usecase"
 )
 
 // newMCPCommand exposes `sightjack mcp` as a stdio MCP server entry
@@ -49,7 +52,17 @@ the Claude Code MCP allowlist that points back to this stdio server).`,
 			if err != nil {
 				return err
 			}
-			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).WithBaseDir(baseDir)
+			logger := loggerFrom(cmd)
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), logger).WithBaseDir(baseDir)
+			// Wire the write seam (refs issue 0032): save_scan_result /
+			// register_waves append to the event store via the session
+			// emitter. Composition-root construction mirrors dominator
+			// ADR 0005; without it the tools degrade to files-only.
+			store := session.NewEventStore(filepath.Join(baseDir, domain.StateDir), logger)
+			emitter := usecase.NewSessionEventEmitter(
+				cmd.Context(), domain.NewSessionAggregate(), store, nil, logger, "sightjack.mcp",
+			)
+			srv = srv.WithEmitter(emitter)
 			return srv.Serve(cmd.Context())
 		},
 	}
